@@ -1,0 +1,18 @@
+---
+- logo:
+    icon: https://cdn0.iconfinder.com/data/icons/famous-character-vol-1-colored/48/JD-37-512.png
+
+- resources:
+    cpu: true
+    memory: true
+    disk: /
+
+- datetime:
+    text_size: xl
+    format:
+      timeStyle: short
+      hourCycle: h23
+
+- search:
+    provider: google
+    target: _blank

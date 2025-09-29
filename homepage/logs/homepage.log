@@ -1,0 +1,50 @@
+[2025-09-29T21:14:00.779Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:00.780Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:00.781Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:00.782Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:00.782Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:02.101Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:02.102Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:02.103Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:02.110Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:14:02.111Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:38:04.259Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:38:04.260Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:38:04.261Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:38:04.263Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T21:38:04.263Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:01:02.219Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:01:02.221Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:01:02.222Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:01:02.223Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:01:02.224Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:02:22.159Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:02:22.160Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:02:22.160Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:02:22.161Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)
+[2025-09-29T22:02:22.161Z] error: <dockerStatusService> Error: connect EACCES /var/run/docker.sock
+    at PipeConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)

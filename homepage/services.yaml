@@ -1,0 +1,37 @@
+---
+- Core Services:
+    - Stremio:
+        icon: stremio
+        href: https://stremio.homelab.example.com
+        description: Streaming Service
+        container: stremio
+
+    - Home Assistant:
+        icon: https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/New_Home_Assistant_logo.svg/1200px-New_Home_Assistant_logo.svg.png
+        href: https://homeassistant.homelab.example.com
+        description: Home Automation
+        container: homeassistant
+
+- Management Tools:
+    - Portainer:
+        icon: portainer
+        href: https://portainer.homelab.example.com
+        description: Docker Management
+        container: portainer
+
+    - Pi-hole:
+        icon: https://upload.wikimedia.org/wikipedia/commons/0/00/Pi-hole_Logo.png
+        href: https://pihole.homelab.example.com
+        description: DNS Sinkhole & Ad Blocking
+        container: pihole
+
+    - Uptime Kuma:
+        icon: https://raw.githubusercontent.com/louislam/uptime-kuma/master/public/icon.svg
+        href: https://uptime.homelab.example.com
+        description: Service Monitoring
+
+    - What's Up Docker:
+        icon: https://getwud.github.io/wud/assets/wud-logo.svg
+        href: https://docker.homelab.example.com
+        description: Docker Container Monitoring
+        container: whats-up-docker

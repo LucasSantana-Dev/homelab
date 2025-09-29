@@ -1,0 +1,187 @@
+services:
+
+  # Homepage Dashboard
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    volumes:
+      - ./appdata/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+      - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
+      - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
+    ports:
+      - "3000:3000"
+
+  # Stremio Web Server (Main streaming service)
+  stremio:
+    image: stremio/server:latest
+    container_name: stremio-server
+    restart: unless-stopped
+    environment:
+      - NO_CORS=1
+      - INTERNAL_IP=0.0.0.0
+    volumes:
+      - ./appdata/stremio:/root/.stremio-server
+      - stremio_cache:/root/.stremio-server/stremio-cache
+    ports:
+      - "11470:11470"
+      - "12470:12470"
+
+
+  # Plataforma de automação residencial
+  homeassistant:
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    container_name: homeassistant
+    restart: unless-stopped
+    volumes:
+      - ./appdata/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=${TIMEZONE}
+
+  # Docker Management Interface
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    ports:
+      - "9000:9000"
+
+  # Uptime Kuma - Service Monitoring
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+    ports:
+      - "3001:3001"
+
+  # What's up Docker? - Container update monitoring
+  whats-up-docker:
+    image: fmartinou/whats-up-docker:latest
+    container_name: whats-up-docker
+    restart: unless-stopped
+    volumes:
+      - whats_up_docker_data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "${WUD_PORT}:3000"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+      - WUD_WATCHER_LOCAL_CRON=0 18 * * 6  # Runs every Saturday at 6 PM
+      - WUD_TRIGGER_DISCORD_1_URL=${WUD_DISCORD_WEBHOOK_URL}
+      - WUD_TRIGGER_DISCORD_1_BOTUSERNAME=Whatsupdocker
+      - WUD_TRIGGER_SMTP_GMAIL_HOST=${WUD_SMTP_HOST}
+      - WUD_TRIGGER_SMTP_GMAIL_PORT=${WUD_SMTP_PORT}
+      - WUD_TRIGGER_SMTP_GMAIL_USER=${WUD_SMTP_USER}
+      - WUD_TRIGGER_SMTP_GMAIL_PASS=${WUD_SMTP_PASS}
+      - WUD_TRIGGER_SMTP_GMAIL_FROM=${WUD_SMTP_FROM}
+      - WUD_TRIGGER_SMTP_GMAIL_TO=${WUD_SMTP_TO}
+      - WUD_TRIGGER_SMTP_GMAIL_TLS_ENABLED=true
+
+
+  # Pi-hole Network-wide Ad Blocker
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    environment:
+      - TZ=${TIMEZONE}
+      - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
+      - PIHOLE_DNS_=1.1.1.1;8.8.8.8
+    volumes:
+      - ./appdata/pihole/etc:/etc/pihole
+      - ./appdata/pihole/dnsmasq:/etc/dnsmasq.d
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+
+  # Cloudflare Tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run ${CF_TUNNEL_ID}
+    volumes:
+      - /home/luk-server/.cloudflared:/etc/cloudflared
+    networks:
+      - default
+
+  # Monitoring Stack
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    volumes:
+      - ./appdata/grafana:/var/lib/grafana
+      - ./appdata/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=grafana-sentry-datasource
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    volumes:
+      - ./appdata/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - node-exporter
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    ports:
+      - "${NODE_EXPORTER_PORT}:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+
+volumes:
+  portainer_data:
+  prometheus_data:
+  uptime_kuma_data:
+  whats_up_docker_data:
+  stremio_cache:
