@@ -101,7 +101,7 @@ class HomelabCLI:
             f"0 2 * * * {script_path} backup >> {homelab_dir}/logs/backup.log 2>&1",
             f"0 3 * * 0 {script_path} update >> {homelab_dir}/logs/update.log 2>&1",
             f"0 4 * * * {script_path} cleanup >> {homelab_dir}/logs/cleanup.log 2>&1",
-            f"0 5 * * * {script_path} check-updates >> {homelab_dir}/logs/updates.log 2>&1",
+            f"0 5 * * * {script_path} update-check >> {homelab_dir}/logs/updates.log 2>&1",
         ]
 
         try:
