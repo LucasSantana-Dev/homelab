@@ -1,584 +1,243 @@
-# Luk's Homelab 🏠
+# 🏠 Luk's Homelab
 
-An ultra-optimized self-hosted homelab setup running on Ubuntu Server with Docker Compose, featuring Cloudflare Tunnel for secure access and a streamlined service architecture.
+A modern, Python-based homelab automation system that provides enterprise-grade features without the complexity.
 
-## 🚀 Current Status
-- **Secure Access:** Cloudflare Tunnel with automatic HTTPS ✅ FULLY OPERATIONAL
-- **Main Dashboard:** Homepage ✅ WORKING - Complete homelab service integration
-- **Domain Access:** Configured with Cloudflare Tunnel ✅ WORKING
-- **SSL Certificate:** Cloudflare automatic SSL/TLS ✅ WORKING
-- **Service Deployment:** All services accessible via subdomains with HTTPS
-- **📊 Monitoring Stack:** Grafana + Prometheus (streamlined) ✅ OPERATIONAL
-- **🐍 Python Management:** Comprehensive Python automation system ✅ READY
-- **🔐 Security:** Cloudflare WAF, DDoS protection, and secure tunneling ✅ ACTIVE
-- **⚡ Performance:** Ultra-minimal stack with 47% fewer services ✅ OPTIMIZED
-- **🔔 Notifications:** Discord webhook integration for real-time alerts ✅ ACTIVE
+## 🚀 Quick Start
 
-## Table of Contents
-1. [Overview](#overview)
-2. [Prerequisites](#prerequisites)
-3. [Services](#services)
-4. [Python Management System](#python-management-system)
-5. [Management Scripts](#management-scripts)
-6. [HTTPS Setup](#https-setup)
-7. [Monitoring Setup](#monitoring-setup)
-8. [Troubleshooting](#troubleshooting)
-9. [Maintenance](#maintenance)
-
-## Overview
-
-This ultra-optimized homelab setup provides essential self-hosted infrastructure including:
-- **Streaming Service**: Stremio (main streaming platform)
-- **Home Automation**: Home Assistant
-- **Monitoring**: Grafana + Prometheus (streamlined)
-- **Management Tools**: Portainer
-- **Network Services**: Pi-hole DNS sinkhole
-- **Dashboard**: Homepage for centralized access
-- **Secure Access**: Cloudflare Tunnel with automatic HTTPS
-
-**Current Implementation:**
-- ✅ **Cloudflare Tunnel** with automatic SSL/TLS termination
-- ✅ **Homepage Dashboard** accessible via HTTPS
-- ✅ **Docker Container Networking** between services
-- ✅ **Subdomain Routing** for all services
-- ✅ **Python Automation System** for management
-
-## Prerequisites
-
-Before starting, ensure you have:
-- ✅ Docker and Docker Compose installed
-- ✅ Cloudflare account with API token
-- ✅ Domain configured in Cloudflare
-- ✅ Cloudflare Tunnel set up
-- ✅ Environment variables configured (copy `.env.example` to `.env` and customize)
-
-## Services
-
-### 🎬 Streaming Services
-| Service | Internal Port | External URL | Description |
-|---------|---------------|--------------|-------------|
-| Stremio | ${STREMIO_PORT} | Configured with Cloudflare Tunnel | Main Streaming Platform |
-
-### 🏡 Home Automation
-| Service | Internal Port | External URL | Description |
-|---------|---------------|--------------|-------------|
-| Home Assistant | ${HOMEASSISTANT_PORT} | Configured with Cloudflare Tunnel | Home Automation Platform |
-
-### 📊 Monitoring & Management
-| Service | Internal Port | External URL | Description |
-|---------|---------------|--------------|-------------|
-| Homepage | ${HOMEPAGE_PORT} | Configured with Cloudflare Tunnel | Main Dashboard |
-| Grafana | ${GRAFANA_PORT} | Configured with Cloudflare Tunnel | Metrics Visualization with Sentry |
-| Prometheus | ${PROMETHEUS_PORT} | Configured with Cloudflare Tunnel | Metrics Collection |
-| Node Exporter | ${NODE_EXPORTER_PORT} | - | System Metrics Collection |
-| Portainer | ${PORTAINER_PORT} | Configured with Cloudflare Tunnel | Docker Management |
-| What's up Docker? | ${WUD_PORT} | Configured with Cloudflare Tunnel | Container Update Monitoring |
-
-### 🌐 Network Services
-| Service | Internal Port | External URL | Description |
-|---------|---------------|--------------|-------------|
-| Pi-hole | ${PIHOLE_WEB_PORT} | Configured with Cloudflare Tunnel | DNS Ad Blocking |
-| Cloudflare Tunnel | - | - | Secure HTTPS Access |
-
-## 🔔 Discord Notifications
-
-### Real-time Homelab Monitoring
-
-**Discord Webhook Integration** provides instant notifications for your homelab:
-
-#### **What's up Docker? Notifications**
-- **Container Updates**: Get notified when Docker container updates are available
-- **Update Schedule**: Automatic checks every Saturday at 6 PM
-- **Rich Notifications**: Detailed information about available updates
-- **Action Required**: Know exactly which containers need updating
-
-#### **Uptime Kuma Notifications**
-- **Service Downtime**: Immediate alerts when services go down
-- **Service Recovery**: Notifications when services come back online
-- **Status Changes**: Real-time updates on service health
-- **Monitoring Coverage**: All homelab services monitored
-
-#### **Configuration**
 ```bash
-# Set Discord webhook URL in environment variables
-# Configure Discord webhook for container update notifications
-
-# Configure Uptime Kuma Discord webhook in the web interface
-# Navigate to Settings > Notifications > Discord
-```
-
-#### **Benefits**
-- **Stay Informed**: Never miss important homelab events
-- **Proactive Monitoring**: Get alerts before issues become problems
-- **Centralized Notifications**: All alerts in one Discord channel
-- **Mobile Friendly**: Receive notifications on your phone
-
-## Python Management System
-
-### 🐍 Modern Python Automation
-
-The homelab now includes a comprehensive Python-based management system that replaces most shell scripts:
-
-#### **Core Commands**
-```bash
-# Deploy everything
-python3 -m homelab_manager deploy
+# Deploy your homelab
+./homelab deploy
 
 # Check status
-python3 -m homelab_manager status
+./homelab status
 
-# Test all services
-python3 -m homelab_manager test
+# Setup automation
+./homelab setup
 
-# Verify environment
-python3 -m homelab_manager verify
-
-# Start monitoring
-python3 -m homelab_manager monitor
+# Check for updates
+./homelab update-check
 ```
 
-#### **Cloudflare Commands**
-```bash
-# Setup tunnel
-python3 -m homelab_manager cloudflare setup-tunnel
+## 📋 Available Commands
 
-# Configure DNS records
-python3 -m homelab_manager cloudflare configure-dns
+### 🚀 Deployment
+- `./homelab deploy` - Deploy homelab services
+- `./homelab down` - Stop homelab services
+- `./homelab restart` - Restart homelab services
 
-# Configure tunnel DNS
-python3 -m homelab_manager cloudflare configure-tunnel-dns
+### 🔄 Updates
+- `./homelab update` - Update all services
+- `./homelab update-check` - Check for available updates
+- `./homelab update-all` - Update all services
+- `./homelab versions` - Show current versions
 
-# Update tunnel DNS
-python3 -m homelab_manager cloudflare update-tunnel-dns
-```
+### 💾 Backup
+- `./homelab backup` - Create backup
+- `./homelab restore <path>` - Restore from backup
 
-#### **Docker Commands**
-```bash
-# Show container status
-python3 -m homelab_manager docker status
+### 📊 Monitoring
+- `./homelab status` - Quick status check
+- `./homelab check` - Full health check
+- `./homelab monitor` - Continuous monitoring
+- `./homelab logs <service>` - Show service logs
 
-# Restart service
-python3 -m homelab_manager docker restart <service>
+### 🧹 Maintenance
+- `./homelab cleanup` - Clean up unused resources
+- `./homelab setup` - Setup automated tasks
+- `./homelab validate` - Validate configuration
+- `./homelab config` - Show configuration summary
 
-# Cleanup resources
-python3 -m homelab_manager docker cleanup
-```
+## 🏗️ Architecture
 
-#### **Benefits**
-- **70% fewer files** (7 shell scripts → 1 Python package)
-- **Rich console output** with colors and progress bars
-- **Async operations** for better performance
-- **Comprehensive error handling**
-- **Type safety** and validation
-- **Modular architecture** for easy maintenance
+### Core Components
+- **Docker Compose** - Container orchestration
+- **Python Automation** - Modern automation system
+- **Environment Variables** - Secure configuration management
+- **Rich CLI** - Beautiful command-line interface
 
-#### **Installation**
-```bash
-# Install Python dependencies
-./scripts/install_python_homelab.sh
+### Services
+- **Home Assistant** - Home automation hub
+- **Grafana** - Monitoring and dashboards
+- **Portainer** - Container management
+- **Pi-hole** - Network-wide ad blocking
+- **Uptime Kuma** - Uptime monitoring
+- **Prometheus** - Metrics collection
+- **What's Up Docker** - Container update monitoring
 
-# Test the system
-python3 -m homelab_manager --help
-```
+## 🔧 Configuration
 
-#### **Python Management System**
-The Python management system provides comprehensive automation for all homelab operations. All Python files are located in the `scripts/homelab_manager/` directory.
-
-## Management Scripts
-
-**📁 Remaining scripts are located in the `scripts/` directory**
-
-> **🔄 Migration Notice:** Most shell scripts have been replaced by the Python management system above. Only essential scripts remain.
-
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| `optimize-homelab.sh` | Remove redundant services | `./scripts/optimize-homelab.sh` |
-| `generate-prometheus-config.sh` | Generate Prometheus config from environment variables | `./scripts/generate-prometheus-config.sh` |
-
-### Monitoring Management Commands
+### Environment Variables
+All configuration is managed through the `.env` file:
 
 ```bash
-# Regenerate Prometheus configuration after .env changes
-./scripts/generate-prometheus-config.sh
+# Copy the example file
+cp .env.example .env
 
-# Restart monitoring stack
-docker compose restart prometheus grafana
-
-# View monitoring service status
-docker ps | rg "(prometheus|grafana)"
-
-# Check Prometheus targets health
-curl -s "http://localhost:9091/api/v1/targets" | jq '.data.activeTargets[] | {job: .labels.job, instance: .labels.instance, health: .health}'
-
-# Quick monitoring stack health check
-echo "🔍 Monitoring Stack Health Check:"
-echo "Prometheus: $(curl -s http://localhost:9091/-/healthy 2>/dev/null && echo "✅ Healthy" || echo "❌ Unhealthy")"
-echo "Grafana: $(curl -s http://localhost:3002/api/health 2>/dev/null | rg '"ok"' > /dev/null && echo "✅ Healthy" || echo "❌ Unhealthy")"
+# Edit with your values
+nano .env
 ```
 
+### Required Variables
+- `DOMAIN` - Your domain name
+- `TIMEZONE` - Your timezone
+- `PUID/PGID` - User/group IDs
+- `TAILSCALE_IP` - Your Tailscale IP
+- `CF_API_TOKEN` - Cloudflare API token
+- `CF_TUNNEL_ID` - Cloudflare tunnel ID
+- `PIHOLE_WEB_PASSWORD` - Pi-hole password
+- `GRAFANA_PASSWORD` - Grafana password
+- `HOMEASSISTANT_KEY` - Home Assistant API key
 
-## HTTPS Setup (Cloudflare Tunnel)
+### Additional Variables
+- `LUKBOT_SENTRY_DSN` - Sentry DSN for error tracking
+- `LUKBOT_SENTRY_ORG_SLUG` - Sentry organization slug
+- `LUKBOT_SENTRY_PROJECT_SLUG` - Sentry project slug
+- `LUKBOT_SENTRY_AUTH_TOKEN` - Sentry authentication token
+- `WUD_DISCORD_WEBHOOK_URL` - Discord webhook for update notifications
+- `WUD_SMTP_PASS` - SMTP password for email notifications
 
-### 🎉 HTTPS Setup Complete! ✅
-- **Domain Access:** Configured with Cloudflare Tunnel
-- **SSL Certificate:** Cloudflare automatic SSL/TLS
-- **Secure Tunnel:** Cloudflare Tunnel with automatic HTTPS
-- **Status:** Fully operational with Cloudflare security features
+## 🐍 Python Automation System
 
-### Cloudflare Tunnel Configuration
+### Features
+- **Rich CLI Interface** - Beautiful, colored output
+- **Health Monitoring** - Comprehensive service health checks
+- **Update Management** - Automated update checking and deployment
+- **Backup System** - Automated backups with retention
+- **Configuration Validation** - Environment variable validation
+- **Cron Integration** - Automated task scheduling
 
-The homelab uses Cloudflare Tunnel for secure HTTPS access:
+### Structure
+```
+scripts/homelab_manager/
+├── cli.py              # Main CLI interface
+├── automation.py       # Deploy/update/backup automation
+├── health.py          # Health monitoring
+├── updates.py         # Update management
+├── config.py          # Configuration management
+└── container_manager.py # Container management
+```
 
-1. **Automatic SSL/TLS:** Cloudflare handles all SSL certificates
-2. **DDoS Protection:** Built-in Cloudflare security
-3. **WAF Protection:** Web Application Firewall enabled
-4. **Global CDN:** Fast access worldwide
+## 🔄 Automated Tasks
 
-### Service Access
+The system can be configured to run automated tasks:
 
-All services are accessible via HTTPS subdomains:
-- **Main Dashboard:** Configured with Cloudflare Tunnel
-- **Stremio:** Configured with Cloudflare Tunnel
-- **Home Assistant:** Configured with Cloudflare Tunnel
-- **Grafana:** Configured with Cloudflare Tunnel
-- **Portainer:** Configured with Cloudflare Tunnel
-- **Pi-hole:** Configured with Cloudflare Tunnel
-- **Prometheus:** Configured with Cloudflare Tunnel
-
-## Monitoring Setup
-
-### Grafana Dashboard with Service Discovery ✅
-
-**Access Grafana:** Configured with Cloudflare Tunnel or `http://localhost:${GRAFANA_PORT}`
-
-#### 📊 Pre-Built Dashboards Available
-**Ready-to-use dashboards with real metrics:**
-
-**Infrastructure Dashboards:**
-1. **🏠 Homelab Overview** - Main dashboard showing:
-   - Service uptime status for all homelab services
-   - Real-time CPU, Memory, Disk usage gauges
-   - System resources trends (CPU/Memory over time)
-   - Network traffic monitoring
-   - Docker container memory usage
-
-2. **🐳 Docker Containers** - Container-specific monitoring:
-   - Per-container CPU usage trends
-   - Container memory consumption
-   - Network I/O (RX/TX) per container
-   - Disk I/O (Read/Write) per container
-   - Container status indicators (Up/Down)
-
-3. **🖥️ Node Exporter System** - Detailed system metrics:
-   - CPU usage percentage over time
-   - Memory usage (Total/Used/Available)
-   - Disk space utilization
-   - Network I/O by interface
-   - Disk I/O by device
-
-**Sentry Application Monitoring Dashboards:**
-4. **🚨 Sentry Error Overview** - Comprehensive error monitoring:
-   - Real-time error counts by severity level
-   - Error distribution by level and status
-   - Error events over time trends
-   - Critical issues requiring attention
-   - Interactive error level filtering
-
-5. **⚡ Sentry Performance** - Application performance monitoring:
-   - Response time trends and averages
-   - Throughput and request rates
-   - Error rates and Apdex scores
-   - Transaction distribution by status/environment
-   - Slowest transactions identification
-
-6. **🔔 Sentry Alerting** - Incident response and alerting:
-   - Assigned and ignored issues tracking
-   - Critical and fatal alert monitoring
-   - Alert volume trends over time
-   - Alert distribution by level and status
-   - Incident management tables
-
-7. **🏠 Homelab Comprehensive** - Combined infrastructure + Sentry:
-   - Service health with error correlation
-   - Infrastructure metrics with application errors
-   - Combined monitoring overview
-   - Critical issues with system context
-
-#### Automated Service Discovery
-Grafana is configured with Prometheus for automatic service discovery:
-
-- **✅ Prometheus (Port 9091):** Metrics collection from all homelab services
-- **✅ Service Discovery:** Automatic detection of Docker containers
-
-#### 🚨 Intelligent Alerting System
-**Proactive monitoring with built-in alerts:**
-
-**System Alerts:**
-- High CPU usage (>80% for 5+ minutes)
-- High memory usage (>85% for 5+ minutes)
-- Low disk space (>90% for 5+ minutes)
-- Service downtime detection (>2 minutes)
-
-**Container Alerts:**
-- Container high CPU usage (>80% for 5+ minutes)
-- Container memory limit exceeded (>90% for 5+ minutes)
-- Frequent container restarts (>3 times/hour)
-
-**Application-Specific Alerts:**
-- Stremio service down (>5 minutes)
-- Home Assistant service down (>5 minutes)
-- Grafana service down (>5 minutes)
-- Portainer service down (>5 minutes)
-
-#### Key Features
-- ✅ **Pre-Built Dashboards:** Professional dashboards with real metrics
-- ✅ **Automatic Configuration:** Grafana data sources provisioned automatically
-- ✅ **Dynamic Service Discovery:** Automatic Docker container detection
-- ✅ **Container Metrics:** All Docker services monitored
-- ✅ **System Health:** Comprehensive system metrics
-- ✅ **Smart Alerts:** Built-in alerting rules for proactive monitoring
-- ✅ **Sentry Integration:** Error tracking and performance monitoring
-
-## Lukbot Sentry Integration
-
-### 🔍 Lukbot Service Error Tracking & Performance Monitoring
-
-The homelab now includes comprehensive error tracking and performance monitoring for the Lukbot service through Sentry integration:
-
-#### **Lukbot Sentry Data Source**
-- **Error Tracking:** Automatic error detection and reporting for Lukbot service
-- **Performance Monitoring:** Lukbot application performance metrics
-- **Release Tracking:** Monitor Lukbot deployments and releases
-- **User Context:** Track Lukbot user sessions and interactions
-
-#### **Setup Instructions**
-1. **Configure Lukbot Sentry Auth Token:**
-   ```bash
-   # Add to .env file
-   LUKBOT_SENTRY_AUTH_TOKEN=your_lukbot_sentry_auth_token_here
-   ```
-
-2. **Run Sentry Integration Setup:**
-   ```bash
-   ./scripts/setup-sentry-integration.sh
-   ```
-
-3. **Deploy Comprehensive Sentry Dashboards:**
-   ```bash
-   ./scripts/deploy-sentry-dashboards.sh
-   ```
-
-4. **Deploy Monitoring Stack:**
-   ```bash
-   docker compose up -d grafana prometheus node-exporter
-   ```
-
-#### **Lukbot Sentry Dashboard Features**
-- **Error Rate Monitoring:** Track Lukbot error frequency over time
-- **Performance Metrics:** Lukbot response times and throughput
-- **Release Health:** Monitor Lukbot deployment success rates
-- **User Impact:** Track affected Lukbot users and sessions
-
-#### **Access Lukbot Sentry Data**
-- **Grafana Dashboard:** Configured with Cloudflare Tunnel
-- **Lukbot Sentry Project:** Configured with your Lukbot DSN
-- **Real-time Monitoring:** Live Lukbot error tracking and alerts
-
-#### Monitoring Endpoints
-| Service | Metrics URL | Purpose | Status |
-|---------|-------------|---------|--------|
-| Prometheus | `http://localhost:${PROMETHEUS_PORT}` | Metrics aggregation | ✅ Active |
-| Grafana | `http://localhost:${GRAFANA_PORT}` | Visualization dashboard | ✅ Active |
-
-#### Service Discovery Configuration
-The monitoring stack uses environment variables from `.env`:
 ```bash
-# Monitoring Ports
-PROMETHEUS_PORT=9091
-GRAFANA_PORT=3002
+# Setup automated tasks
+./homelab setup
 ```
 
-#### Configuration Management
-To regenerate Prometheus configuration after environment changes:
+This creates cron jobs for:
+- **Daily backup at 2 AM**
+- **Weekly update check on Sunday at 3 AM**
+- **Daily cleanup at 4 AM**
+- **Daily update check at 5 AM**
+
+## 📊 Monitoring
+
+### Health Checks
+- Service availability (HTTP endpoints)
+- System resources (CPU, memory, disk)
+- Docker container status
+- Network connectivity
+
+### Monitoring Tools
+- **Grafana** - Dashboards and visualization
+- **Prometheus** - Metrics collection
+- **Uptime Kuma** - Service uptime monitoring
+- **What's Up Docker** - Container update monitoring
+
+## 💾 Backup System
+
+### Automated Backups
+- **Docker volumes** - Application data
+- **Configuration files** - Docker Compose and environment
+- **Application data** - Home Assistant, Grafana configs
+- **Retention policy** - Keeps last 7 days of backups
+
+### Manual Backups
 ```bash
-./generate-prometheus-config.sh
-docker compose restart prometheus
+# Create backup
+./homelab backup
+
+# Restore from backup
+./homelab restore /path/to/backup
 ```
 
-To restart the entire monitoring stack:
-```bash
-docker compose restart prometheus grafana
+## 🔒 Security
+
+### Environment Variables
+- All sensitive data stored in `.env` file
+- `.env` file excluded from version control
+- Environment variable validation with security checks
+- Secure configuration templates with placeholders
+- Password strength validation
+- Token format validation
+
+### Docker Security
+- Non-root user execution
+- Read-only containers where possible
+- Network isolation
+- Resource limits
+- Secure subprocess execution (no `os.system()`)
+
+### Security Features
+- **Zero hardcoded secrets** - All sensitive data externalized
+- **Environment validation** - Comprehensive validation with security checks
+- **Secure subprocess handling** - Uses `subprocess.run()` instead of `os.system()`
+- **Password strength checks** - Validates password complexity
+- **Token format validation** - Ensures proper token formats
+
+## 🚀 Benefits
+
+### Why Python Over Shell?
+- **Better Error Handling** - Comprehensive exception handling
+- **Rich Output** - Beautiful, colored CLI interface
+- **Type Safety** - Better code reliability
+- **Maintainability** - Easier to modify and extend
+- **Testing** - Unit testing capabilities
+- **Documentation** - Self-documenting code
+
+### Why This Over Terraform/Ansible?
+- **Homelab-Focused** - Built specifically for homelab use
+- **Simple** - No complex infrastructure concepts
+- **Fast** - Quick deployment and updates
+- **Maintainable** - Easy to understand and modify
+- **Appropriate Scale** - Perfect for single-server homelab
+
+## 📁 Project Structure
+
+```
+homelab/
+├── docker-compose.yml          # Core infrastructure
+├── .env                        # Environment variables
+├── .env.example               # Template
+├── .gitignore                 # Security
+├── homelab                    # Main entry point
+├── scripts/
+│   ├── homelab_manager/       # Python automation system
+│   ├── containers             # Simple wrapper
+│   ├── container-status.py    # Container status
+│   ├── update-containers.py   # Container updates
+│   └── requirements.txt       # Python dependencies
+├── appdata/                   # Application data
+├── homepage/                  # Homepage config
+├── grafana/                   # Grafana data
+└── venv/                      # Python environment
 ```
 
+## 🎯 Perfect for Homelab Because:
 
-## Troubleshooting
+1. **Simple Commands** - One script for everything
+2. **No Learning Curve** - Just Python and Docker
+3. **Automated Tasks** - Set and forget
+4. **Health Monitoring** - Know if something breaks
+5. **Easy Backups** - Never lose your data
+6. **Update Management** - Keep services current
+7. **Troubleshooting** - Easy log viewing
+8. **Maintainable** - Easy to modify and extend
 
-### Common Issues and Solutions
+## 🏠 This is Your Homelab, Simplified!
 
-#### Cloudflare Tunnel Issues
-**Symptoms**: Services not accessible via HTTPS subdomains
+You now have **enterprise-grade automation** with **homelab simplicity**! 🎉
 
-**Solutions**:
-1. **Check Tunnel Status**: Verify cloudflared container is running
-2. **DNS Configuration**: Ensure CNAME records point to tunnel
-3. **Service Configuration**: Verify ingress rules in tunnel config
-
-**Test Commands**:
-```bash
-# Check tunnel status
-docker logs cloudflared --tail 20
-
-# Test service directly
-curl -I http://localhost:${HOMEPAGE_PORT}
-
-# Test HTTPS access
-curl -I http://localhost:${HOMEPAGE_PORT}
-
-# Check DNS resolution
-nslookup localhost
-```
-
-#### Service Connectivity Issues
-**Symptoms**: Services not responding or slow response
-
-**Solutions**:
-1. **Container Status**: Check if all containers are running
-2. **Port Configuration**: Verify port mappings in docker-compose.yml
-3. **Network Issues**: Check Docker network connectivity
-
-**Debug Commands**:
-```bash
-# Check container status
-docker ps
-
-# Check service logs
-docker logs [service-name] --tail 20
-
-# Test local connectivity
-curl -I http://localhost:[port]
-```
-
-### Log Analysis
-```bash
-# Cloudflare tunnel logs
-docker logs cloudflared --tail 50
-
-# Service-specific logs
-docker logs [service-name]
-
-# Container health
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-# Network inspection
-docker network inspect homelab_default
-```
-
-## Maintenance
-
-### Regular Tasks
-
-#### Certificate Management
-- Cloudflare automatically handles SSL certificates
-- No manual certificate management required
-- Monitor Cloudflare dashboard for any issues
-
-#### Service Updates
-```bash
-# Update all services
-docker-compose pull
-docker-compose up -d
-
-# Update specific service
-docker-compose pull [service-name]
-docker-compose up -d [service-name]
-```
-
-#### Backups
-Important directories to backup:
-- `./appdata/grafana/` - Grafana dashboards and data
-- `./appdata/homeassistant/` - Home Assistant configuration
-- `./appdata/pihole/` - Pi-hole configuration
-- `./.cloudflared/` - Cloudflare tunnel configuration
-- `./docker-compose.yml` - Service definitions
-
-#### Security Recommendations
-
-1. **Cloudflare Security**: Use Cloudflare WAF and security features
-2. **Two-Factor Authentication**: Enable 2FA for critical services
-3. **Regular Updates**: Keep all services updated
-4. **Monitor Logs**: Regular log review for security events
-5. **Network Segmentation**: Consider VLANs for service isolation
-
-### Performance Optimization
-
-#### Resource Monitoring
-- Monitor CPU/memory usage via Grafana
-- Set up alerts for high resource usage
-- Regular cleanup of logs and temporary files
-
-#### Network Optimization
-- Optimize Docker networks for better performance
-- Consider dedicated networks for different service types
-- Monitor bandwidth usage through Pi-hole
-
-### Update Homepage Dashboard
-
-After setup, update `services.yaml`:
-
-```yaml
-- Media:
-    - Stremio:
-        icon: stremio
-        href: http://localhost:${STREMIO_PORT}
-        description: Streaming Service
-
-- Management:
-    - Portainer:
-        icon: portainer
-        href: http://localhost:${PORTAINER_PORT}
-        description: Docker Management
-
-    - Grafana:
-        icon: grafana
-        href: http://localhost:${GRAFANA_PORT}
-        description: Monitoring Dashboard
-
-# Continue for all services...
-```
-
-## Benefits
-
-✅ **Complete Self-Hosting**: Full control over your data and services
-✅ **Encrypted Traffic**: All services secured with Cloudflare SSL certificates
-✅ **Centralized Management**: Single dashboard for all services
-✅ **Monitoring**: Comprehensive health monitoring with alerts
-✅ **Professional Setup**: Valid HTTPS certificates and proper domain management
-✅ **Remote Access**: Secure access from anywhere via Cloudflare Tunnel
-✅ **Scalability**: Easy to add new services to the existing infrastructure
-✅ **Ultra-Optimized**: 47% fewer services with better performance
-✅ **Modern Management**: Python-based automation system
-
-## 🎆 Current Status
-
-### Ultra-Optimized Homelab ✅
-- **Cloudflare Tunnel:** Secure HTTPS access with automatic SSL
-- **8 Essential Services:** Streamlined from 15 to 8 services (47% reduction)
-- **Python Management:** Modern automation system replacing shell scripts
-- **Subdomain Routing:** Clean URLs for all services
-- **Security:** Cloudflare WAF, DDoS protection, and secure tunneling
-
-### Service Architecture 🔗
-**Main Domain:** Configured with Cloudflare Tunnel
-- **Dashboard:** Homepage (main dashboard)
-- **Media:** Stremio (streaming service)
-- **Automation:** Home Assistant
-- **Monitoring:** Grafana + Prometheus
-- **Management:** Portainer
-- **Network:** Pi-hole DNS
-- **Security:** Cloudflare Tunnel
-
----
-
-**Last Updated:** 2025-09-28 15:20 UTC | **Status:** ✅ ULTRA-OPTIMIZED - Cloudflare Tunnel with 8 essential services
-
-For additional help or specific issues, refer to the individual service documentation or check the troubleshooting section above.
+The system gives you all the benefits of automation (backups, updates, monitoring) without the complexity of enterprise tools. Perfect for a homelab! 🚀
