@@ -112,10 +112,14 @@ class HomelabCLI:
             current_cron = result.stdout if result.returncode == 0 else ""
 
             # Add new cron jobs
-            new_cron = current_cron
+            new_cron = current_cron.rstrip()  # Remove trailing whitespace
             for job in cron_jobs:
                 if job not in current_cron:
                     new_cron += f"\n{job}"
+            
+            # Ensure newline at end of file
+            if new_cron and not new_cron.endswith('\n'):
+                new_cron += '\n'
 
             # Update crontab
             subprocess.run(["crontab", "-"], input=new_cron, text=True, check=True)
