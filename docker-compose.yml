@@ -43,6 +43,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
     environment:
       - TZ=${TIMEZONE}
+    ports:
+      - "8123:8123"
 
   # Docker Management Interface
   portainer:
