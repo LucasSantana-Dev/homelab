@@ -25,7 +25,9 @@ class TestHomelabHealthMonitor:
 
             assert monitor.homelab_dir == temp_homelab_dir
             assert monitor.log_dir == temp_homelab_dir / "logs"
-            assert len(monitor.services) == 4  # Homepage, HA, Grafana, Portainer
+            assert (
+                len(monitor.services) == 8
+            )  # All services: Homepage, HA, Grafana, Portainer, Uptime Kuma, Prometheus, Node Exporter, What's Up Docker
 
     def test_check_service_health_success(self, mock_requests):
         """Test successful service health check"""

@@ -118,8 +118,8 @@ class HomelabCLI:
                     new_cron += f"\n{job}"
 
             # Ensure newline at end of file
-            if new_cron and not new_cron.endswith('\n'):
-                new_cron += '\n'
+            if new_cron and not new_cron.endswith("\n"):
+                new_cron += "\n"
 
             # Update crontab
             subprocess.run(["crontab", "-"], input=new_cron, text=True, check=True)
