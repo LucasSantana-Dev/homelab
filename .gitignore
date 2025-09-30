@@ -1,0 +1,146 @@
+.env
+.cursor/
+.cursorignore
+
+# Home Assistant sensitive files
+appdata/homeassistant/config/secrets.yaml
+appdata/homeassistant/config/.storage/
+appdata/homeassistant/config/home-assistant_v2.db*
+appdata/homeassistant/config/home-assistant.log*
+appdata/homeassistant/config/deps/
+appdata/homeassistant/config/tts/
+appdata/homeassistant/config/__pycache__/
+appdata/homeassistant/config/*/__pycache__/
+appdata/homeassistant/config/.cloud/
+appdata/homeassistant/config/.cloudflared/
+appdata/homeassistant/config/backups/
+appdata/homeassistant/config/cleanup_backup_*/
+
+# Home Assistant runtime files
+appdata/homeassistant/config/.storage/
+appdata/homeassistant/config/.uuid
+appdata/homeassistant/config/known_devices.yaml
+appdata/homeassistant/config/ip_bans.yaml
+appdata/homeassistant/config/entity_registry.yaml
+appdata/homeassistant/config/device_registry.yaml
+appdata/homeassistant/config/area_registry.yaml
+appdata/homeassistant/config/person.yaml
+appdata/homeassistant/config/group.yaml
+appdata/homeassistant/config/automations.yaml
+appdata/homeassistant/config/scripts.yaml
+appdata/homeassistant/config/scenes.yaml
+appdata/homeassistant/config/blueprints/
+appdata/homeassistant/config/custom_components/
+appdata/homeassistant/config/www/
+appdata/homeassistant/config/translations/
+
+# Home Assistant temporary files
+appdata/homeassistant/config/*.tmp
+appdata/homeassistant/config/*.bak
+appdata/homeassistant/config/*.old
+appdata/homeassistant/config/*.orig
+appdata/homeassistant/config/*.pyc
+appdata/homeassistant/config/*.pyo
+appdata/homeassistant/config/*.pyd
+appdata/homeassistant/config/.Python
+appdata/homeassistant/config/pip-log.txt
+appdata/homeassistant/config/pip-delete-this-directory.txt
+appdata/homeassistant/config/.coverage
+appdata/homeassistant/config/.pytest_cache/
+appdata/homeassistant/config/.mypy_cache/
+appdata/homeassistant/config/.tox/
+appdata/homeassistant/config/.cache/
+appdata/homeassistant/config/.coverage.*
+appdata/homeassistant/config/coverage.xml
+appdata/homeassistant/config/*.cover
+appdata/homeassistant/config/.hypothesis/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
+
+# Terraform state and sensitive files
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+!terraform/terraform.tfvars.example
+
+# Ansible sensitive files
+ansible/group_vars/*/vault.yml
+ansible/host_vars/*/vault.yml
+ansible/.vault_pass
+
+# Security and secrets
+security/vault/
+security/encrypted-backups/
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+vault/
+
+# Security scan reports
+bandit-report.json
+safety-report.json
+
+# Backup files
+backups/
+*.backup
+*.bak
+*.tar.gz
+*.zip
+
+# Log files
+*.log
+logs/
+/var/log/security/
+
+# Python virtual environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.coverage
+.pytest_cache/
+.mypy_cache/
+.tox/
+.cache/
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+appdata/homeassistant/config/.pytest_cache/
+appdata/homeassistant/config/.mypy_cache/
+appdata/homeassistant/config/.tox/
+appdata/homeassistant/config/.cache/
+appdata/homeassistant/config/.coverage.*
+appdata/homeassistant/config/coverage.xml
+appdata/homeassistant/config/*.cover
+appdata/homeassistant/config/.hypothesis/
