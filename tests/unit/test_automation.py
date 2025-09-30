@@ -1,5 +1,5 @@
 """
-Unit tests for automation system
+Unit tests for automation system - Fixed version
 """
 
 import sys
@@ -70,7 +70,7 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env", return_value=mock_client
         ):
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
             automation.create_networks()
 
             # Should not raise any exceptions
@@ -96,7 +96,7 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env", return_value=mock_client
         ):
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
             result = automation.deploy()
 
             assert result is False
@@ -111,7 +111,7 @@ class TestHomelabAutomation:
             # Mock subprocess calls
             mock_run.return_value = Mock(returncode=0)
 
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
             backup_path = automation.backup()
 
             assert backup_path is not None
@@ -124,7 +124,7 @@ class TestHomelabAutomation:
             return_value=mock_docker_client,
         ), patch("subprocess.run", side_effect=Exception("Backup failed")):
 
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
             backup_path = automation.backup()
 
             assert backup_path is None
@@ -142,7 +142,7 @@ class TestHomelabAutomation:
             return_value=mock_docker_client,
         ), patch("homelab_manager.automation.HomelabAutomation.check_health"):
 
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
             result = automation.restore(str(backup_dir))
 
             assert result is True
@@ -153,7 +153,7 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ):
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
             result = automation.restore("/nonexistent/backup")
 
             assert result is False
@@ -187,7 +187,7 @@ class TestHomelabAutomation:
     def test_get_directory_size(self, temp_homelab_dir):
         """Test directory size calculation"""
         with patch("homelab_manager.automation.docker.from_env"):
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
 
             # Create a test file
             test_file = temp_homelab_dir / "test.txt"
@@ -199,7 +199,7 @@ class TestHomelabAutomation:
     def test_cleanup_old_backups(self, temp_homelab_dir):
         """Test old backup cleanup"""
         with patch("homelab_manager.automation.docker.from_env"):
-            automation = HomelabAutomation()
+            automation = HomelabAutomation(str(temp_homelab_dir))
 
             # Create old backup directory
             old_backup = temp_homelab_dir / "backups" / "old_backup"
@@ -207,7 +207,10 @@ class TestHomelabAutomation:
 
             # Mock old modification time
             with patch("pathlib.Path.stat") as mock_stat:
-                mock_stat.return_value.st_mtime = 0  # Very old timestamp
+                mock_stat_result = Mock()
+                mock_stat_result.st_mtime = 0  # Very old timestamp
+                mock_stat_result.st_mode = 0o755  # Directory mode
+                mock_stat.return_value = mock_stat_result
                 automation.cleanup_old_backups()
 
             # Should not raise any exceptions

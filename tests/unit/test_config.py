@@ -1,5 +1,5 @@
 """
-Unit tests for configuration management
+Unit tests for configuration management - Fixed version
 """
 
 import sys
@@ -17,7 +17,7 @@ class TestHomelabConfig:
 
     def test_init(self, temp_homelab_dir):
         """Test HomelabConfig initialization"""
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
 
         assert config.homelab_dir == temp_homelab_dir
         assert config.env_file == temp_homelab_dir / ".env"
@@ -25,7 +25,7 @@ class TestHomelabConfig:
 
     def test_load_environment_success(self, temp_homelab_dir):
         """Test successful environment loading"""
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
         env_vars = config.load_environment()
 
         assert "DOMAIN" in env_vars
@@ -38,14 +38,14 @@ class TestHomelabConfig:
         # Remove .env file
         (temp_homelab_dir / ".env").unlink()
 
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
         env_vars = config.load_environment()
 
         assert env_vars == {}
 
     def test_validate_environment_success(self, temp_homelab_dir):
         """Test successful environment validation"""
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
         is_valid, errors = config.validate_environment()
 
         assert is_valid is True
@@ -62,7 +62,7 @@ DOMAIN=test.example.com
 """
         )
 
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
         is_valid, errors = config.validate_environment()
 
         assert is_valid is False
@@ -95,7 +95,7 @@ WUD_SMTP_PASS=test_password
 """
         )
 
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
         is_valid, errors = config.validate_environment()
 
         assert is_valid is False
@@ -104,7 +104,7 @@ WUD_SMTP_PASS=test_password
 
     def test_create_env_example(self, temp_homelab_dir):
         """Test creating .env.example file"""
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
         success = config.create_env_example()
 
         assert success is True
@@ -117,7 +117,7 @@ WUD_SMTP_PASS=test_password
 
     def test_show_config_summary(self, temp_homelab_dir, capsys):
         """Test configuration summary display"""
-        config = HomelabConfig()
+        config = HomelabConfig(str(temp_homelab_dir))
         config.show_config_summary()
 
         captured = capsys.readouterr()

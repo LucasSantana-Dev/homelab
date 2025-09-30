@@ -1,5 +1,5 @@
 """
-Unit tests for health monitoring
+Unit tests for health monitoring - Fixed version
 """
 
 import sys
@@ -21,11 +21,13 @@ class TestHomelabHealthMonitor:
         with patch(
             "homelab_manager.health.docker.from_env", return_value=mock_docker_client
         ):
-            monitor = HomelabHealthMonitor()
+            monitor = HomelabHealthMonitor(str(temp_homelab_dir))
 
             assert monitor.homelab_dir == temp_homelab_dir
             assert monitor.log_dir == temp_homelab_dir / "logs"
-            assert len(monitor.services) == 4  # Homepage, HA, Grafana, Portainer
+            assert (
+                len(monitor.services) == 8
+            )  # All services: Homepage, HA, Grafana, Portainer, Uptime Kuma, Prometheus, Node Exporter, What's Up Docker
 
     def test_check_service_health_success(self, mock_requests):
         """Test successful service health check"""
@@ -44,7 +46,7 @@ class TestHomelabHealthMonitor:
             "requests.get", side_effect=Exception("Connection failed")
         ):
 
-            monitor = HomelabHealthMonitor()
+            monitor = HomelabHealthMonitor(str(temp_homelab_dir))
             is_healthy, details = monitor.check_service_health(
                 "Test Service", "http://localhost:9999"
             )
@@ -92,7 +94,7 @@ class TestHomelabHealthMonitor:
         mock_client.containers.list.return_value = [mock_container]
 
         with patch("homelab_manager.health.docker.from_env", return_value=mock_client):
-            monitor = HomelabHealthMonitor()
+            monitor = HomelabHealthMonitor(str(temp_homelab_dir))
             containers = monitor.check_docker_containers()
 
             assert len(containers) == 1
@@ -110,7 +112,7 @@ class TestHomelabHealthMonitor:
         mock_client.containers.list.return_value = [mock_container]
 
         with patch("homelab_manager.health.docker.from_env", return_value=mock_client):
-            monitor = HomelabHealthMonitor()
+            monitor = HomelabHealthMonitor(str(temp_homelab_dir))
             containers = monitor.check_docker_containers()
 
             assert len(containers) == 1
