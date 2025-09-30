@@ -1,21 +1,23 @@
 """
-Luk's Homelab Manager - Python-based automation system
-A comprehensive Python replacement for shell scripts
+Homelab Manager Package
+Python-based automation system for homelab management
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 __author__ = "Luk"
+__email__ = "luk@homelab.example.com"
 
-from .core import HomelabManager
-from .docker_manager import DockerManager
-from .cloudflare_manager import CloudflareManager
-from .monitor import HealthMonitor
-from .deploy import DeploymentManager
+# Import main classes
+from .automation import HomelabAutomation
+from .cli import HomelabCLI
+from .config import HomelabConfig
+from .health import HomelabHealthMonitor
+from .updates import HomelabUpdateManager
 
 __all__ = [
-    "HomelabManager",
-    "DockerManager",
-    "CloudflareManager",
-    "HealthMonitor",
-    "DeploymentManager"
+    "HomelabAutomation",
+    "HomelabHealthMonitor",
+    "HomelabUpdateManager",
+    "HomelabConfig",
+    "HomelabCLI",
 ]

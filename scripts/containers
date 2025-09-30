@@ -1,0 +1,37 @@
+#!/bin/bash
+# Container Management Wrapper
+# Modern Python-based container management
+
+case "$1" in
+    "status")
+        python3 /home/luk-server/homelab/scripts/container-status.py
+        ;;
+    "update")
+        if [ -z "$2" ]; then
+            echo "Usage: $0 update [container_name|all]"
+            echo "Available containers: homeassistant, homepage, grafana, filebrowser"
+            exit 1
+        fi
+        python3 /home/luk-server/homelab/scripts/update-containers.py "$2"
+        ;;
+    "check")
+        python3 /home/luk-server/homelab/scripts/update-containers.py --check
+        ;;
+    *)
+        echo "🏠 Homelab Container Management"
+        echo "=============================="
+        echo ""
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show container status and logs"
+        echo "  update    - Update containers (specify container name or 'all')"
+        echo "  check     - Check for available updates"
+        echo ""
+        echo "Examples:"
+        echo "  $0 status"
+        echo "  $0 update homeassistant"
+        echo "  $0 update all"
+        echo "  $0 check"
+        ;;
+esac
