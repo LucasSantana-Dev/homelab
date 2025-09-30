@@ -116,7 +116,7 @@ class HomelabCLI:
             for job in cron_jobs:
                 if job not in current_cron:
                     new_cron += f"\n{job}"
-            
+
             # Ensure newline at end of file
             if new_cron and not new_cron.endswith('\n'):
                 new_cron += '\n'
