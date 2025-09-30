@@ -46,6 +46,10 @@ class HomelabHealthMonitor:
             ("Home Assistant", "http://localhost:8123"),
             ("Grafana", "http://localhost:3002"),
             ("Portainer", "http://localhost:9000"),
+            ("Uptime Kuma", "http://localhost:3001"),
+            ("Prometheus", "http://localhost:9091"),
+            ("Node Exporter", "http://localhost:9100"),
+            ("What's Up Docker", "http://localhost:3003"),
         ]
 
     def check_service_health(self, name: str, url: str) -> Tuple[bool, str]:

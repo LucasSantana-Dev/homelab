@@ -56,13 +56,25 @@ A modern, Python-based homelab automation system that provides enterprise-grade 
 - **Rich CLI** - Beautiful command-line interface
 
 ### Services
-- **Home Assistant** - Home automation hub
-- **Grafana** - Monitoring and dashboards
-- **Portainer** - Container management
-- **Pi-hole** - Network-wide ad blocking
-- **Uptime Kuma** - Uptime monitoring
-- **Prometheus** - Metrics collection
-- **What's Up Docker** - Container update monitoring
+
+#### 🏠 **Dashboard & Management**
+- **Homepage** (3000) - Main dashboard and service overview
+- **Portainer** (9000) - Docker container management interface
+- **Uptime Kuma** (3001) - Service uptime monitoring and alerts
+- **What's Up Docker** (3003) - Container update monitoring and notifications
+
+#### 🏡 **Home Automation**
+- **Home Assistant** (8123) - Smart home automation hub
+
+#### 📊 **Monitoring Stack**
+- **Grafana** (3002) - Metrics visualization and dashboards
+- **Prometheus** (9091) - Metrics collection and storage
+- **Node Exporter** (9100) - System metrics collection
+
+#### 🌐 **Network Services**
+- **Pi-hole** (5354/8054) - Network-wide ad blocking and DNS
+- **Stremio** (11470/12470) - Media streaming server
+- **Cloudflare Tunnel** - Secure external access
 
 ## 🔧 Configuration
 

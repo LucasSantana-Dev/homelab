@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔧 Bug Fixes and Improvements
 
+#### Removed
+- **DuckDNS Integration**: Completely removed DuckDNS cron job and dependencies
+- **Legacy Scripts**: Removed DuckDNS update script and log files
+- **Environment Variables**: Cleaned up DuckDNS token from system environment
+- **Cron Jobs**: Streamlined crontab to only include homelab automation tasks
+
 #### Fixed
 - **Security Issue**: Replaced `os.system()` with `subprocess.run()` for better security
 - **Test Issues**: Fixed hardcoded paths in test classes to use test directories
