@@ -1,0 +1,29 @@
+# Energy Dashboard for Goiânia, Goiás, Brazil
+title: Monitoramento de Energia - Goiânia
+views:
+  - title: Energia
+    path: energia
+    icon: mdi:lightning-bolt
+    cards:
+      - type: entities
+        title: Consumo Atual
+        entities:
+          - sensor.electricity_consumption
+          - sensor.custo_da_energia
+          - sensor.consumo_medio_diario
+      
+      - type: history-graph
+        title: Consumo de Energia - Últimas 24h
+        entities:
+          - sensor.electricity_consumption
+        hours_to_show: 24
+      
+      - type: gauge
+        title: Consumo Atual
+        entity: sensor.electricity_consumption
+        min: 0
+        max: 10
+        severity:
+          green: 0
+          yellow: 3
+          red: 6

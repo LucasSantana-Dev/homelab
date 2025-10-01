@@ -1,0 +1,87 @@
+# Energy Monitoring Configuration for Goiânia, Goiás, Brazil
+
+# Energy Dashboard Configuration
+energy:
+  grid_consumption:
+    - entity_id: sensor.electricity_consumption
+      name: Consumo de Energia
+      stat_cost: sensor.electricity_cost
+      cost_entity: sensor.electricity_cost
+      cost_statistic: sum
+      cost_unit_of_measurement: BRL
+      cost_unit: BRL
+
+# Utility Meter Configuration
+utility_meter:
+  electricity_daily:
+    source: sensor.electricity_consumption
+    cycle: daily
+    name: Consumo Diário
+  
+  electricity_monthly:
+    source: sensor.electricity_consumption
+    cycle: monthly
+    name: Consumo Mensal
+  
+  electricity_yearly:
+    source: sensor.electricity_consumption
+    cycle: yearly
+    name: Consumo Anual
+
+# Template sensors for energy calculations
+template:
+  - sensor:
+      - name: Custo da Energia
+        unit_of_measurement: BRL
+        state_class: total
+        device_class: monetary
+        state: >
+          {% set consumption = states('sensor.electricity_consumption') | float(0) %}
+          {% set rate = 0.75 %}
+          {{ (consumption * rate) | round(2) }}
+      
+      - name: Consumo Médio Diário
+        unit_of_measurement: kWh
+        state_class: measurement
+        device_class: energy
+        state: >
+          {% set daily = states('sensor.electricity_daily') | float(0) %}
+          {{ daily | round(2) }}
+
+# Input helpers for energy configuration
+input_number:
+  electricity_rate:
+    name: Tarifa de Energia
+    min: 0.1
+    max: 2.0
+    step: 0.01
+    unit_of_measurement: R$/kWh
+    initial: 0.75
+    mode: box
+
+# Brazilian energy rates
+input_text:
+  electricity_provider:
+    name: Provedor de Energia
+    initial: Enel Goiás
+    max: 50
+  
+  tariff_type:
+    name: Tipo de Tarifa
+    initial: Residencial B1
+    max: 20
+
+# Energy cost calculation
+template:
+  - sensor:
+      - name: Tarifa de Energia Atual
+        unit_of_measurement: R$/kWh
+        state: >
+          {% set provider = states('input_text.electricity_provider') %}
+          {% if 'Enel' in provider %}
+            0.75
+          {% elif 'Celg' in provider %}
+            0.72
+          {% else %}
+            0.75
+          {% endif %}

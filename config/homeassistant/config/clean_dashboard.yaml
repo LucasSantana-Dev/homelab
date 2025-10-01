@@ -1,0 +1,104 @@
+# Clean Dashboard Configuration
+title: Smart Home
+views:
+  - title: Início
+    path: inicio
+    icon: mdi:home
+    cards:
+      - type: custom:mushroom-title-card
+        title: Bem-vindo ao Smart Home
+        subtitle: Controle Inteligente da sua Casa
+        icon: mdi:home-automation
+      
+      - type: entities
+        title: Status Rápido
+        entities:
+          - sensor.electricity_consumption
+          - sensor.system_uptime
+          - weather.home
+  
+  - title: Quartos
+    path: quartos
+    icon: mdi:bed
+    cards:
+      - type: custom:mushroom-title-card
+        title: Quarto Principal
+        subtitle: Controle do Ambiente
+        icon: mdi:bed
+      
+      - type: entities
+        title: Iluminação
+        entities:
+          - light.quarto_principal
+          - light.quarto_secundaria
+      
+      - type: entities
+        title: Controle do PC
+        entities:
+          - switch.pc_do_luk_desligar
+          - script.pc_do_luk_reiniciar
+  
+  - title: Banheiro
+    path: banheiro
+    icon: mdi:shower
+    cards:
+      - type: custom:mushroom-title-card
+        title: Banheiro
+        subtitle: Controle da Iluminação
+        icon: mdi:shower
+      
+      - type: entities
+        title: Iluminação do Banheiro
+        entities:
+          - light.banheiro_light
+          - light.banheiro_light_toggle
+  
+  - title: Sala
+    path: sala
+    icon: mdi:sofa
+    cards:
+      - type: custom:mushroom-title-card
+        title: Sala de Estar
+        subtitle: Entretenimento e Limpeza
+        icon: mdi:sofa
+      
+      - type: entities
+        title: Aspirador Robô - Rogério
+        entities:
+          - vacuum.rogerio_alarm
+          - vacuum.rogerio_robot_cleaner
+          - switch.rogerio_physical_control
+  
+  - title: Energia
+    path: energia
+    icon: mdi:lightning-bolt
+    cards:
+      - type: custom:mushroom-title-card
+        title: Monitoramento de Energia
+        subtitle: Consumo e Custos
+        icon: mdi:lightning-bolt
+      
+      - type: entities
+        title: Estatísticas de Energia
+        entities:
+          - sensor.electricity_consumption
+          - sensor.electricity_daily
+          - sensor.electricity_monthly
+          - sensor.custo_da_energia
+  
+  - title: Serviços
+    path: servicos
+    icon: mdi:server
+    cards:
+      - type: custom:mushroom-title-card
+        title: Serviços do Homelab
+        subtitle: Status e Monitoramento
+        icon: mdi:server
+      
+      - type: entities
+        title: Status dos Serviços
+        entities:
+          - binary_sensor.homeassistant_status
+          - binary_sensor.grafana_status
+          - binary_sensor.portainer_status
+          - binary_sensor.stremio_status

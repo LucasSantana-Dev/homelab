@@ -1,0 +1,7 @@
+# HACS Resources for Dashboard Components
+- url: /hacsfiles/lovelace-mushroom/mushroom.js
+  type: module
+- url: /hacsfiles/button-card/button-card.js
+  type: module
+- url: /hacsfiles/mini-graph-card/mini-graph-card-bundle.js
+  type: module
