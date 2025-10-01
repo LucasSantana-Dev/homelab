@@ -68,14 +68,6 @@ appdata/homeassistant/config/.hypothesis/
 *.bak
 .env.backup
 
-# Terraform state and sensitive files
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/.terraform/
-terraform/.terraform.lock.hcl
-terraform/terraform.tfvars
-!terraform/terraform.tfvars.example
-
 # Ansible sensitive files
 ansible/group_vars/*/vault.yml
 ansible/host_vars/*/vault.yml
@@ -157,3 +149,37 @@ cloudflared
 *.log
 config/homeassistant/config/.storage/
 config/homeassistant/config/auth
+
+# Additional sensitive files
+config/homeassistant/config/secrets.yaml
+config/nginx/ssl/
+config/nginx/auth/
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Cloudflare tunnel credentials
+.cloudflared/
+*.cfargotunnel.com
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# SSL certificates and keys
+ssl/
+certs/
+certificates/
+
+# Configuration files with secrets
+**/secrets.yaml
+**/secrets.yml
+**/credentials.json
+**/auth.json
+**/tokens.json
+
+# Appdata directories (runtime data)
+appdata/
