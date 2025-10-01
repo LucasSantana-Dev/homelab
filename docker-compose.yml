@@ -112,10 +112,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
     ports:
-      # Localhost access
-      - "127.0.0.1:${PORTAINER_PORT:-9000}:9000"
-      # Tailscale access ONLY
-      - "${TAILSCALE_IP:-127.0.0.1}:${PORTAINER_PORT:-9000}:9000"
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${PORTAINER_PORT:-9000}:9000"
     networks:
       - default
 
@@ -132,10 +130,8 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_DOMAIN=grafana.${DOMAIN}
     ports:
-      # Localhost access
-      - "127.0.0.1:${GRAFANA_PORT:-3002}:3000"
-      # Tailscale access ONLY
-      - "${TAILSCALE_IP:-127.0.0.1}:${GRAFANA_PORT:-3002}:3000"
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${GRAFANA_PORT:-3002}:3000"
     networks:
       - default
 
@@ -179,10 +175,8 @@ services:
       - WUD_SMTP_USER=${WUD_SMTP_USER}
       - WUD_SMTP_PASS=${WUD_SMTP_PASS}
     ports:
-      # Localhost access
-      - "127.0.0.1:${WUD_PORT:-3003}:3000"
-      # Tailscale access ONLY
-      - "${TAILSCALE_IP:-127.0.0.1}:${WUD_PORT:-3003}:3000"
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${WUD_PORT:-3003}:3000"
     networks:
       - default
 
@@ -202,10 +196,30 @@ services:
       - VIRTUAL_HOST=pihole.${DOMAIN}
       - VIRTUAL_PORT=80
     ports:
-      # Localhost access ONLY
-      - "127.0.0.1:${PIHOLE_WEB_PORT:-8054}:80"
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${PIHOLE_WEB_PORT:-8054}:80"
       - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/tcp"
       - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/udp"
+    networks:
+      - default
+
+  # FileBrowser - NAS-like File Manager
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    restart: unless-stopped
+    volumes:
+      - filebrowser_data:/database
+      - /home/luk-server:/srv/home
+      - /home/luk-server/media:/srv/media
+      - /home/luk-server/homelab:/srv/homelab
+    environment:
+      - TZ=${TIMEZONE}
+      - FB_DATABASE=/database/filebrowser.db
+      - FB_ROOT=/srv
+    ports:
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${FILEBROWSER_PORT:-8080}:80"
     networks:
       - default
 
@@ -237,6 +251,7 @@ volumes:
   whats_up_docker_data:
   pihole_data:
   stremio_cache:
+  filebrowser_data:
 
 networks:
   default:
