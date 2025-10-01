@@ -1,6 +1,6 @@
 [run]
 source = scripts
-omit = 
+omit =
     */venv/*
     */tests/*
     */__pycache__/*

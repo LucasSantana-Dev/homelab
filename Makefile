@@ -19,6 +19,9 @@ help:
 	@echo "  make test-integration - Run integration tests"
 	@echo "  make test-cov       - Run tests with coverage"
 	@echo ""
+	@echo "Configuration:"
+	@echo "  make homepage-config - Generate homepage configuration from template"
+	@echo ""
 	@echo "Code Quality:"
 	@echo "  make lint           - Run all linting tools"
 	@echo "  make format         - Format code with black and isort"
@@ -125,3 +128,9 @@ ci: clean install-dev lint test security
 # Quick development check
 quick: format test-unit
 	@echo "✅ Quick development check complete!"
+
+# Generate homepage configuration from template
+homepage-config:
+	@echo "🔄 Generating homepage configuration..."
+	@./scripts/generate-homepage-config.sh
+	@echo "✅ Homepage configuration generated!"

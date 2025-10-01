@@ -1,0 +1,22 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# HTTP configuration for reverse proxy (Cloudflare Tunnel)
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.18.0.0/16  # Docker network range
+    - 172.22.0.0/16  # Docker network range (current)
+    - 172.18.0.1     # Docker bridge IP
+    - 127.0.0.1
+    - ::1
+    - 0.0.0.0/0      # Allow all IPs for Cloudflare tunnel
