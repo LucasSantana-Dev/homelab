@@ -183,3 +183,6 @@ certificates/
 
 # Appdata directories (runtime data)
 appdata/
+config/homeassistant/config/home-assistant_v2.db-shm
+config/homeassistant/config/home-assistant_v2.db-wal
+config/pihole/
