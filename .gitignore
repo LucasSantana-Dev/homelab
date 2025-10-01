@@ -1,4 +1,5 @@
 .env
+.env.backup
 .cursor/
 .cursorignore
 
@@ -61,6 +62,11 @@ appdata/homeassistant/config/.hypothesis/
 !.env.example
 *.env
 !*.env.example
+
+# Backup files
+*.backup
+*.bak
+.env.backup
 
 # Terraform state and sensitive files
 terraform/*.tfstate
@@ -144,3 +150,10 @@ appdata/homeassistant/config/.coverage.*
 appdata/homeassistant/config/coverage.xml
 appdata/homeassistant/config/*.cover
 appdata/homeassistant/config/.hypothesis/
+
+# Temporary files and binaries
+cloudflared
+*.deb
+*.log
+config/homeassistant/config/.storage/
+config/homeassistant/config/auth

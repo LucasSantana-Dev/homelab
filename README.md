@@ -1,255 +1,241 @@
-# 🏠 Luk's Homelab
+# 🏠 Homelab Manager
 
-A modern, Python-based homelab automation system that provides enterprise-grade features without the complexity.
+Modern Python CLI for homelab management with Docker, Tailscale, and Cloudflare integration.
+
+## ✨ Features
+
+- **Modern CLI**: Clean, intuitive command-line interface with rich output
+- **Service Management**: Deploy, update, restart, and monitor homelab services
+- **Health Monitoring**: Real-time health checks and status monitoring
+- **Backup & Restore**: Automated backup and restore functionality
+- **Configuration Management**: Environment variable validation and management
+- **Multi-Access**: Localhost, Tailscale, and Cloudflare tunnel support
 
 ## 🚀 Quick Start
 
+### Installation
+
 ```bash
-# Deploy your homelab
-./homelab deploy
+# Install dependencies
+pip install -r requirements.txt
 
-# Check status
-./homelab status
-
-# Setup automation
-./homelab setup
-
-# Check for updates
-./homelab update-check
+# Or install in development mode
+pip install -e .
 ```
 
-## 📋 Available Commands
+### Basic Usage
 
-### 🚀 Deployment
-- `./homelab deploy` - Deploy homelab services
-- `./homelab down` - Stop homelab services
-- `./homelab restart` - Restart homelab services
+```bash
+# Show homelab status
+python -m homelab_manager status
 
-### 🔄 Updates
-- `./homelab update` - Update all services
-- `./homelab update-check` - Check for available updates
-- `./homelab update-all` - Update all services
-- `./homelab versions` - Show current versions
+# Deploy homelab services
+python -m homelab_manager deploy
 
-### 💾 Backup
-- `./homelab backup` - Create backup
-- `./homelab restore <path>` - Restore from backup
+# Check service health
+python -m homelab_manager health
 
-### 📊 Monitoring
-- `./homelab status` - Quick status check
-- `./homelab check` - Full health check
-- `./homelab monitor` - Continuous monitoring
-- `./homelab logs <service>` - Show service logs
+# Show service URLs
+python -m homelab_manager urls
 
-### 🧹 Maintenance
-- `./homelab cleanup` - Clean up unused resources
-- `./homelab setup` - Setup automated tasks
-- `./homelab validate` - Validate configuration
-- `./homelab config` - Show configuration summary
+# Get help
+python -m homelab_manager --help
+```
+
+### Using the Wrapper Script
+
+```bash
+# Use the wrapper script for backward compatibility
+./scripts/homelab status
+./scripts/homelab deploy
+./scripts/homelab health
+```
+
+## 📋 Commands
+
+### Core Commands
+
+- `status` - Show homelab status and service information
+- `deploy` - Deploy homelab services
+- `update` - Update homelab services
+- `health` - Check homelab health
+- `backup` - Create homelab backup
+- `restore <backup-path>` - Restore from backup
+- `logs [service]` - Show service logs
+- `config` - Show configuration information
+- `urls` - Show service URLs and access methods
+- `restart [service]` - Restart services
+
+### Examples
+
+```bash
+# Deploy all services
+python -m homelab_manager deploy
+
+# Update all services
+python -m homelab_manager update
+
+# Check health of all services
+python -m homelab_manager health
+
+# Create backup
+python -m homelab_manager backup
+
+# Restore from backup
+python -m homelab_manager restore backups/homelab_backup_20241201_120000.tar.gz
+
+# Get logs for specific service
+python -m homelab_manager logs stremio
+
+# Restart specific service
+python -m homelab_manager restart stremio
+
+# Show all service URLs
+python -m homelab_manager urls
+```
 
 ## 🏗️ Architecture
 
-### Core Components
-- **Docker Compose** - Container orchestration
-- **Python Automation** - Modern automation system
-- **Environment Variables** - Secure configuration management
-- **Rich CLI** - Beautiful command-line interface
+### Project Structure
+
+```
+homelab/
+├── homelab_manager/          # Python CLI package
+│   ├── __init__.py
+│   ├── cli.py               # Main CLI interface
+│   ├── config.py            # Configuration management
+│   ├── container_manager.py # Container operations
+│   ├── health.py            # Health monitoring
+│   └── updates.py           # Update management
+├── scripts/                 # Utility scripts
+│   └── homelab             # CLI wrapper
+├── config/                  # Service configurations
+├── appdata/                 # Service data
+├── docker-compose.yml       # Main compose file
+├── .env                     # Environment variables
+└── requirements.txt         # Python dependencies
+```
 
 ### Services
 
-#### 🏠 **Dashboard & Management**
-- **Homepage** (3000) - Main dashboard and service overview
-- **Portainer** (9000) - Docker container management interface
-- **Uptime Kuma** (3001) - Service uptime monitoring and alerts
-- **What's Up Docker** (3003) - Container update monitoring and notifications
-
-#### 🏡 **Home Automation**
-- **Home Assistant** (8123) - Smart home automation hub
-
-#### 📊 **Monitoring Stack**
-- **Grafana** (3002) - Metrics visualization and dashboards
-- **Prometheus** (9091) - Metrics collection and storage
-- **Node Exporter** (9100) - System metrics collection
-
-#### 🌐 **Network Services**
-- **Pi-hole** (5354/8054) - Network-wide ad blocking and DNS
-- **Stremio** (11470/12470) - Media streaming server
-- **Cloudflare Tunnel** - Secure external access
+- **Homepage** - Dashboard (port 3000)
+- **Stremio** - Media streaming (port 8080)
+- **Home Assistant** - Home automation (port 8123)
+- **Portainer** - Container management (port 9000)
+- **Pi-hole** - DNS filtering (port 8054)
+- **Grafana** - Monitoring (port 3002)
+- **Uptime Kuma** - Uptime monitoring (port 3001)
+- **What's Up Docker** - Container monitoring (port 3003)
 
 ## 🔧 Configuration
 
 ### Environment Variables
-All configuration is managed through the `.env` file:
+
+Create a `.env` file with your configuration:
 
 ```bash
-# Copy the example file
-cp .env.example .env
+# Network Configuration
+TAILSCALE_IP=100.64.0.10
+TIMEZONE=America/Sao_Paulo
 
-# Edit with your values
-nano .env
+# User Configuration
+PUID=1000
+PGID=1000
+
+# Domain Configuration
+DOMAIN=your-domain.com
+
+# Cloudflare Configuration (Optional)
+CF_API_TOKEN=your_cloudflare_api_token_here
+CF_TUNNEL_ID=your_tunnel_id_here
+
+# Service Passwords
+PIHOLE_WEB_PASSWORD=your_pihole_password_here
+GRAFANA_PASSWORD=your_grafana_password_here
 ```
 
-### Required Variables
-- `DOMAIN` - Your domain name
-- `TIMEZONE` - Your timezone
-- `PUID/PGID` - User/group IDs
-- `TAILSCALE_IP` - Your Tailscale IP
-- `CF_API_TOKEN` - Cloudflare API token
-- `CF_TUNNEL_ID` - Cloudflare tunnel ID
-- `PIHOLE_WEB_PASSWORD` - Pi-hole password
-- `GRAFANA_PASSWORD` - Grafana password
-- `HOMEASSISTANT_KEY` - Home Assistant API key
+### Access Methods
 
-### Additional Variables
-- `LUKBOT_SENTRY_DSN` - Sentry DSN for error tracking
-- `LUKBOT_SENTRY_ORG_SLUG` - Sentry organization slug
-- `LUKBOT_SENTRY_PROJECT_SLUG` - Sentry project slug
-- `LUKBOT_SENTRY_AUTH_TOKEN` - Sentry authentication token
-- `WUD_DISCORD_WEBHOOK_URL` - Discord webhook for update notifications
-- `WUD_SMTP_PASS` - SMTP password for email notifications
+1. **Localhost**: `http://localhost:PORT`
+2. **Tailscale**: `http://TAILSCALE_IP:PORT`
+3. **Public**: `https://service.DOMAIN` (with Cloudflare tunnel)
 
-## 🐍 Python Automation System
+## 🛠️ Development
 
-### Features
-- **Rich CLI Interface** - Beautiful, colored output
-- **Health Monitoring** - Comprehensive service health checks
-- **Update Management** - Automated update checking and deployment
-- **Backup System** - Automated backups with retention
-- **Configuration Validation** - Environment variable validation
-- **Cron Integration** - Automated task scheduling
-
-### Structure
-```
-scripts/homelab_manager/
-├── cli.py              # Main CLI interface
-├── automation.py       # Deploy/update/backup automation
-├── health.py          # Health monitoring
-├── updates.py         # Update management
-├── config.py          # Configuration management
-└── container_manager.py # Container management
-```
-
-## 🔄 Automated Tasks
-
-The system can be configured to run automated tasks:
+### Setup Development Environment
 
 ```bash
-# Setup automated tasks
-./homelab setup
+# Install development dependencies
+pip install -r requirements.txt
+
+# Run tests
+pytest
+
+# Format code
+black homelab_manager/
+
+# Lint code
+flake8 homelab_manager/
+
+# Type checking
+mypy homelab_manager/
 ```
 
-This creates cron jobs for:
-- **Daily backup at 2 AM**
-- **Weekly update check on Sunday at 3 AM**
-- **Daily cleanup at 4 AM**
-- **Daily update check at 5 AM**
+### Adding New Services
+
+1. Add service to `docker-compose.yml`
+2. Update service configuration in `container_manager.py`
+3. Add health check URL in `health.py`
+4. Update service list in CLI commands
 
 ## 📊 Monitoring
 
 ### Health Checks
-- Service availability (HTTP endpoints)
-- System resources (CPU, memory, disk)
-- Docker container status
-- Network connectivity
 
-### Monitoring Tools
-- **Grafana** - Dashboards and visualization
-- **Prometheus** - Metrics collection
-- **Uptime Kuma** - Service uptime monitoring
-- **What's Up Docker** - Container update monitoring
+The CLI provides comprehensive health monitoring:
 
-## 💾 Backup System
+- **Service Status**: Running/stopped status
+- **Response Time**: HTTP response times
+- **Health Status**: Container health status
+- **Last Check**: Timestamp of last health check
 
-### Automated Backups
-- **Docker volumes** - Application data
-- **Configuration files** - Docker Compose and environment
-- **Application data** - Home Assistant, Grafana configs
-- **Retention policy** - Keeps last 7 days of backups
+### Backup & Restore
 
-### Manual Backups
-```bash
-# Create backup
-./homelab backup
-
-# Restore from backup
-./homelab restore /path/to/backup
-```
+- **Automated Backups**: Create timestamped backups
+- **Data Protection**: Backup all service data
+- **Easy Restore**: Restore from any backup point
 
 ## 🔒 Security
 
-### Environment Variables
-- All sensitive data stored in `.env` file
-- `.env` file excluded from version control
-- Environment variable validation with security checks
-- Secure configuration templates with placeholders
-- Password strength validation
-- Token format validation
+- **Network Isolation**: Services bound to localhost and Tailscale
+- **Authentication**: Service-specific authentication
+- **TLS/SSL**: HTTPS with self-signed certificates
+- **Access Control**: Tailscale-only access by default
 
-### Docker Security
-- Non-root user execution
-- Read-only containers where possible
-- Network isolation
-- Resource limits
-- Secure subprocess execution (no `os.system()`)
+## 📚 Documentation
 
-### Security Features
-- **Zero hardcoded secrets** - All sensitive data externalized
-- **Environment validation** - Comprehensive validation with security checks
-- **Secure subprocess handling** - Uses `subprocess.run()` instead of `os.system()`
-- **Password strength checks** - Validates password complexity
-- **Token format validation** - Ensures proper token formats
+- **CLI Help**: `python -m homelab_manager --help`
+- **Command Help**: `python -m homelab_manager <command> --help`
+- **Configuration**: Check `.env.example` for all options
 
-## 🚀 Benefits
+## 🤝 Contributing
 
-### Why Python Over Shell?
-- **Better Error Handling** - Comprehensive exception handling
-- **Rich Output** - Beautiful, colored CLI interface
-- **Type Safety** - Better code reliability
-- **Maintainability** - Easier to modify and extend
-- **Testing** - Unit testing capabilities
-- **Documentation** - Self-documenting code
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-### Why This Over Terraform/Ansible?
-- **Homelab-Focused** - Built specifically for homelab use
-- **Simple** - No complex infrastructure concepts
-- **Fast** - Quick deployment and updates
-- **Maintainable** - Easy to understand and modify
-- **Appropriate Scale** - Perfect for single-server homelab
+## 📄 License
 
-## 📁 Project Structure
+MIT License - see LICENSE file for details.
 
-```
-homelab/
-├── docker-compose.yml          # Core infrastructure
-├── .env                        # Environment variables
-├── .env.example               # Template
-├── .gitignore                 # Security
-├── homelab                    # Main entry point
-├── scripts/
-│   ├── homelab_manager/       # Python automation system
-│   ├── containers             # Simple wrapper
-│   ├── container-status.py    # Container status
-│   ├── update-containers.py   # Container updates
-│   └── requirements.txt       # Python dependencies
-├── appdata/                   # Application data
-├── homepage/                  # Homepage config
-├── grafana/                   # Grafana data
-└── venv/                      # Python environment
-```
+## 🆘 Support
 
-## 🎯 Perfect for Homelab Because:
+- **Issues**: Create an issue on GitHub
+- **Documentation**: Check the docs/ directory
+- **CLI Help**: Use `--help` for command documentation
 
-1. **Simple Commands** - One script for everything
-2. **No Learning Curve** - Just Python and Docker
-3. **Automated Tasks** - Set and forget
-4. **Health Monitoring** - Know if something breaks
-5. **Easy Backups** - Never lose your data
-6. **Update Management** - Keep services current
-7. **Troubleshooting** - Easy log viewing
-8. **Maintainable** - Easy to modify and extend
+---
 
-## 🏠 This is Your Homelab, Simplified!
-
-You now have **enterprise-grade automation** with **homelab simplicity**! 🎉
-
-The system gives you all the benefits of automation (backups, updates, monitoring) without the complexity of enterprise tools. Perfect for a homelab! 🚀
+**Happy Homelabbing! 🏠✨**

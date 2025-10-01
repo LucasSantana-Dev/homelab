@@ -1,0 +1,29 @@
+# Cloudflare Tunnel Configuration for Homelab
+tunnel: 5cefde7a-6cd0-4d56-a1e2-67f922433682
+credentials-file: /home/luk-server/.cloudflared/5cefde7a-6cd0-4d56-a1e2-67f922433682.json
+origincert: /home/luk-server/.cloudflared/cert.pem
+
+# DNS configuration - Use Tailscale MagicDNS
+dns:
+  - 100.100.100.100  # Tailscale MagicDNS
+  - 1.1.1.1          # Fallback DNS
+
+ingress:
+  # Use localhost since Cloudflared is running directly on host
+  - hostname: homelab.example.com
+    service: http://127.0.0.1:3000
+
+  - hostname: www.homelab.example.com
+    service: http://127.0.0.1:3000
+
+  - hostname: homeassistant.homelab.example.com
+    service: http://127.0.0.1:8123
+
+  - hostname: stremio.homelab.example.com
+    service: http://127.0.0.1:8080
+
+  - hostname: uptime.homelab.example.com
+    service: http://127.0.0.1:3001
+
+  # Catch-all rule
+  - service: http_status:404

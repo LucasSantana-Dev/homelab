@@ -1,0 +1,9 @@
+#!/bin/bash
+# Homelab Manager Wrapper
+# Provides backward compatibility for old script usage
+
+# Change to project directory
+cd "$(dirname "$0")/.."
+
+# Run the Python CLI
+python3 -m homelab_manager "$@"

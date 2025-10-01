@@ -1,0 +1,19 @@
+# Homelab Manager Requirements
+# Core dependencies for homelab management
+
+# CLI and UI
+typer[all]==0.9.0
+rich==13.7.0
+
+# Docker integration
+docker==7.0.0
+
+# HTTP requests
+requests==2.31.0
+
+# Development dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1

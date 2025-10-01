@@ -1,23 +1,72 @@
 services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./config/nginx/ssl:/etc/nginx/ssl:ro
+      - ./config/nginx/auth:/etc/nginx/auth:ro
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+      - "${TAILSCALE_IP}:80:80"
+      - "${TAILSCALE_IP}:443:443"
+    networks:
+      - default
+    depends_on:
+      - homepage
+      - homeassistant
+      - stremio
+      - uptime-kuma
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Homepage Dashboard
+  # Cloudflare Tunnel - Now running directly on host (not in Docker)
+
+  # Homepage Dashboard - Public + Tailscale + Localhost
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
     restart: unless-stopped
     volumes:
-      - ./appdata/homepage:/app/config
+      - ./config/homepage:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TIMEZONE}
-      - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
+      - HOMEPAGE_ALLOWED_HOSTS=${HOMEPAGE_ALLOWED_HOSTS:-${DOMAIN},www.${DOMAIN},localhost,127.0.0.1,${TAILSCALE_IP}}
       - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
+      - DOMAIN=${DOMAIN}
     ports:
-      - "3000:3000"
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${HOMEPAGE_PORT:-3000}:3000"
+    networks:
+      - default
 
-  # Stremio Web Server (Main streaming service)
+  # Home Assistant - Public + Tailscale + Localhost
+  homeassistant:
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    container_name: homeassistant
+    restart: unless-stopped
+    volumes:
+      - ./config/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=${TIMEZONE}
+    ports:
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${HOMEASSISTANT_PORT:-8123}:8123"
+    networks:
+      - default
+
+  # Stremio - Public + Tailscale + Localhost
   stremio:
     image: stremio/server:latest
     container_name: stremio-server
@@ -25,39 +74,18 @@ services:
     environment:
       - NO_CORS=1
       - INTERNAL_IP=0.0.0.0
+      - STREMIO_SERVER_PORT=11470
+      - STREMIO_SERVER_HOST=0.0.0.0
     volumes:
-      - ./appdata/stremio:/root/.stremio-server
+      - ./config/stremio:/root/.stremio-server
       - stremio_cache:/root/.stremio-server/stremio-cache
     ports:
-      - "11470:11470"
-      - "12470:12470"
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${STREMIO_PORT:-8080}:11470"
+    networks:
+      - default
 
-
-  # Plataforma de automação residencial
-  homeassistant:
-    image: "ghcr.io/home-assistant/home-assistant:stable"
-    container_name: homeassistant
-    restart: unless-stopped
-    volumes:
-      - ./appdata/homeassistant/config:/config
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      - TZ=${TIMEZONE}
-    ports:
-      - "8123:8123"
-
-  # Docker Management Interface
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: portainer
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
-    ports:
-      - "9000:9000"
-
-  # Uptime Kuma - Service Monitoring
+  # Uptime Kuma - Public + Tailscale + Localhost
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
@@ -70,90 +98,54 @@ services:
       - PGID=${PGID}
       - TZ=${TIMEZONE}
     ports:
-      - "3001:3001"
-
-  # What's up Docker? - Container update monitoring
-  whats-up-docker:
-    image: fmartinou/whats-up-docker:latest
-    container_name: whats-up-docker
-    restart: unless-stopped
-    volumes:
-      - whats_up_docker_data:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    ports:
-      - "${WUD_PORT}:3000"
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TIMEZONE}
-      - WUD_WATCHER_LOCAL_CRON=0 18 * * 6  # Runs every Saturday at 6 PM
-      - WUD_TRIGGER_DISCORD_1_URL=${WUD_DISCORD_WEBHOOK_URL}
-      - WUD_TRIGGER_DISCORD_1_BOTUSERNAME=Whatsupdocker
-      - WUD_TRIGGER_SMTP_GMAIL_HOST=${WUD_SMTP_HOST}
-      - WUD_TRIGGER_SMTP_GMAIL_PORT=${WUD_SMTP_PORT}
-      - WUD_TRIGGER_SMTP_GMAIL_USER=${WUD_SMTP_USER}
-      - WUD_TRIGGER_SMTP_GMAIL_PASS=${WUD_SMTP_PASS}
-      - WUD_TRIGGER_SMTP_GMAIL_FROM=${WUD_SMTP_FROM}
-      - WUD_TRIGGER_SMTP_GMAIL_TO=${WUD_SMTP_TO}
-      - WUD_TRIGGER_SMTP_GMAIL_TLS_ENABLED=true
-
-
-  # Pi-hole Network-wide Ad Blocker
-  pihole:
-    image: pihole/pihole:latest
-    container_name: pihole
-    restart: unless-stopped
-    environment:
-      - TZ=${TIMEZONE}
-      - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
-      - PIHOLE_DNS_=1.1.1.1;8.8.8.8
-    volumes:
-      - ./appdata/pihole/etc:/etc/pihole
-      - ./appdata/pihole/dnsmasq:/etc/dnsmasq.d
-    dns:
-      - 127.0.0.1
-      - 1.1.1.1
-
-  # Cloudflare Tunnel
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
-    restart: unless-stopped
-    command: tunnel --config /etc/cloudflared/config.yml run ${CF_TUNNEL_ID}
-    volumes:
-      - /home/luk-server/.cloudflared:/etc/cloudflared
+      # Bind to all interfaces for Cloudflared access
+      - "0.0.0.0:${UPTIME_KUMA_PORT:-3001}:3001"
     networks:
       - default
 
-  # Monitoring Stack
+  # Portainer - TAILSCALE ONLY (Sensitive Service)
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    ports:
+      # Localhost access
+      - "127.0.0.1:${PORTAINER_PORT:-9000}:9000"
+      # Tailscale access ONLY
+      - "${TAILSCALE_IP:-127.0.0.1}:${PORTAINER_PORT:-9000}:9000"
+    networks:
+      - default
+
+  # Grafana - TAILSCALE ONLY (Sensitive Service)
   grafana:
     image: grafana/grafana-oss:latest
     container_name: grafana
     restart: unless-stopped
-    user: "${PUID}:${PGID}"
-    ports:
-      - "${GRAFANA_PORT}:3000"
     volumes:
-      - ./appdata/grafana:/var/lib/grafana
-      - ./appdata/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TIMEZONE}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_INSTALL_PLUGINS=grafana-sentry-datasource
-    depends_on:
-      - prometheus
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=grafana.${DOMAIN}
+    ports:
+      # Localhost access
+      - "127.0.0.1:${GRAFANA_PORT:-3002}:3000"
+      # Tailscale access ONLY
+      - "${TAILSCALE_IP:-127.0.0.1}:${GRAFANA_PORT:-3002}:3000"
+    networks:
+      - default
 
+  # Prometheus - TAILSCALE ONLY (Sensitive Service)
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
-    ports:
-      - "${PROMETHEUS_PORT}:9090"
     volumes:
-      - ./appdata/prometheus:/etc/prometheus
+      - ./config/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -162,15 +154,66 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
-    depends_on:
-      - node-exporter
+    ports:
+      # Localhost access
+      - "127.0.0.1:${PROMETHEUS_PORT:-9091}:9090"
+      # Tailscale access ONLY
+      - "${TAILSCALE_IP:-127.0.0.1}:${PROMETHEUS_PORT:-9091}:9090"
+    networks:
+      - default
 
+  # What's Up Docker - TAILSCALE ONLY (Sensitive Service)
+  whats-up-docker:
+    image: fmartinou/whats-up-docker:latest
+    container_name: whats-up-docker
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - whats_up_docker_data:/app/data
+    environment:
+      - WUD_UPDATER_DOCKER_HUB_TOKEN=${DOCKER_HUB_TOKEN:-}
+      - WUD_UPDATER_GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - WUD_DISCORD_WEBHOOK_URL=${WUD_DISCORD_WEBHOOK_URL}
+      - WUD_SMTP_HOST=${WUD_SMTP_HOST}
+      - WUD_SMTP_PORT=${WUD_SMTP_PORT}
+      - WUD_SMTP_USER=${WUD_SMTP_USER}
+      - WUD_SMTP_PASS=${WUD_SMTP_PASS}
+    ports:
+      # Localhost access
+      - "127.0.0.1:${WUD_PORT:-3003}:3000"
+      # Tailscale access ONLY
+      - "${TAILSCALE_IP:-127.0.0.1}:${WUD_PORT:-3003}:3000"
+    networks:
+      - default
+
+  # Pi-hole - LOCALHOST ONLY (Local Network Service)
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    volumes:
+      - ./config/pihole/etc:/etc/pihole
+      - ./config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+      - pihole_data:/etc/pihole
+    environment:
+      - TZ=${TIMEZONE}
+      - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
+      - PIHOLE_DNS_=8.8.8.8;1.1.1.1
+      - VIRTUAL_HOST=pihole.${DOMAIN}
+      - VIRTUAL_PORT=80
+    ports:
+      # Localhost access ONLY
+      - "127.0.0.1:${PIHOLE_WEB_PORT:-8054}:80"
+      - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/tcp"
+      - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/udp"
+    networks:
+      - default
+
+  # Node Exporter - LOCALHOST ONLY (System Metrics)
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
     restart: unless-stopped
-    ports:
-      - "${NODE_EXPORTER_PORT}:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -180,10 +223,23 @@ services:
       - '--path.rootfs=/rootfs'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      # Localhost access ONLY
+      - "127.0.0.1:${NODE_EXPORTER_PORT:-9100}:9100"
+    networks:
+      - default
 
 volumes:
   portainer_data:
+  grafana_data:
   prometheus_data:
   uptime_kuma_data:
   whats_up_docker_data:
+  pihole_data:
   stremio_cache:
+
+networks:
+  default:
+    driver: bridge
+  tailscale:
+    driver: bridge
