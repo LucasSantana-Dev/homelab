@@ -72,3 +72,4 @@ sudo tailscale set --accept-routes
 - ✅ Choose access method based on use case
 - ✅ Easy to add/remove services from public access
 - ✅ Granular control over service exposure
+
