@@ -195,4 +195,3 @@ config/homeassistant/config/.storage/
 config/homeassistant/config/secrets.yaml
 config/homeassistant/config/.ha_run.lock
 config/pihole/etc/gravity_old.db
-
