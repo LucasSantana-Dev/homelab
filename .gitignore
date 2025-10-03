@@ -190,6 +190,7 @@ config/pihole/
 # Additional sensitive files found
 config/homeassistant/config/home-assistant.log*
 config/homeassistant/config/home-assistant_v2.db*
+config/homeassistant/config/.HA_VERSION
 config/homeassistant/config/.storage/
 config/homeassistant/config/secrets.yaml
 config/homeassistant/config/.ha_run.lock
