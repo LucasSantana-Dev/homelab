@@ -186,3 +186,12 @@ appdata/
 config/homeassistant/config/home-assistant_v2.db-shm
 config/homeassistant/config/home-assistant_v2.db-wal
 config/pihole/
+
+# Additional sensitive files found
+config/homeassistant/config/home-assistant.log*
+config/homeassistant/config/home-assistant_v2.db*
+config/homeassistant/config/.storage/
+config/homeassistant/config/secrets.yaml
+config/homeassistant/config/.ha_run.lock
+config/pihole/etc/gravity_old.db
+
