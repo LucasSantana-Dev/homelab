@@ -11,9 +11,10 @@ services:
       - ./config/nginx/ssl:/etc/nginx/ssl:ro
       - ./config/nginx/auth:/etc/nginx/auth:ro
     ports:
-      # Bind to Tailscale IP for secure access and localhost for health checks
-      - "${TAILSCALE_IP}:80:80"
-      - "${TAILSCALE_IP}:443:443"
+      # Public access for Stremio integration with app.strem.io
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      # Localhost for health checks
       - "127.0.0.1:8080:80"
       - "127.0.0.1:8443:443"
     networks:
@@ -68,7 +69,7 @@ services:
     networks:
       - default
 
-  # Stremio - Tailscale Only
+  # Stremio - Public Access Required for app.strem.io
   stremio:
     image: stremio/server:latest
     container_name: stremio-server
@@ -78,13 +79,14 @@ services:
       - INTERNAL_IP=0.0.0.0
       - STREMIO_SERVER_PORT=11470
       - STREMIO_SERVER_HOST=0.0.0.0
+      - STREMIO_SERVER_URL=https://stremio.homelab.example.com
     volumes:
       - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/stremio:/root/.stremio-server
       - stremio_cache:/root/.stremio-server/stremio-cache
     ports:
-      # Bind only to Tailscale IP for secure access
-      - "${TAILSCALE_IP:-100.64.0.10}:${STREMIO_PORT:-8080}:11470"
+      # Public access required for app.strem.io integration
+      - "0.0.0.0:11470:11470"
     networks:
       - default
 
