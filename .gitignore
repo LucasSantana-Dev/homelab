@@ -27,7 +27,7 @@ appdata/homeassistant/config/device_registry.yaml
 appdata/homeassistant/config/area_registry.yaml
 appdata/homeassistant/config/person.yaml
 appdata/homeassistant/config/group.yaml
-appdata/homeassistant/config/automations.yaml
+config/homeassistant/config/automations.yaml
 appdata/homeassistant/config/scripts.yaml
 appdata/homeassistant/config/scenes.yaml
 appdata/homeassistant/config/blueprints/
