@@ -5,15 +5,17 @@ services:
     container_name: nginx-proxy
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/nginx/ssl:/etc/nginx/ssl:ro
       - ./config/nginx/auth:/etc/nginx/auth:ro
     ports:
-      - "127.0.0.1:80:80"
-      - "127.0.0.1:443:443"
+      # Bind to Tailscale IP for secure access and localhost for health checks
       - "${TAILSCALE_IP}:80:80"
       - "${TAILSCALE_IP}:443:443"
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:443"
     networks:
       - default
     depends_on:
@@ -22,19 +24,18 @@ services:
       - stremio
       - uptime-kuma
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Cloudflare Tunnel - Now running directly on host (not in Docker)
-
-  # Homepage Dashboard - Public + Tailscale + Localhost
+  # Homepage Dashboard - Tailscale Only
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/homepage:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -45,28 +46,29 @@ services:
       - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
       - DOMAIN=${DOMAIN}
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${HOMEPAGE_PORT:-3000}:3000"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${HOMEPAGE_PORT:-3000}:3000"
     networks:
       - default
 
-  # Home Assistant - Public + Tailscale + Localhost
+  # Home Assistant - Tailscale Only
   homeassistant:
     image: "ghcr.io/home-assistant/home-assistant:stable"
     container_name: homeassistant
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/homeassistant/config:/config
       - /etc/localtime:/etc/localtime:ro
     environment:
       - TZ=${TIMEZONE}
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${HOMEASSISTANT_PORT:-8123}:8123"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${HOMEASSISTANT_PORT:-8123}:8123"
     networks:
       - default
 
-  # Stremio - Public + Tailscale + Localhost
+  # Stremio - Tailscale Only
   stremio:
     image: stremio/server:latest
     container_name: stremio-server
@@ -77,20 +79,22 @@ services:
       - STREMIO_SERVER_PORT=11470
       - STREMIO_SERVER_HOST=0.0.0.0
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/stremio:/root/.stremio-server
       - stremio_cache:/root/.stremio-server/stremio-cache
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${STREMIO_PORT:-8080}:11470"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${STREMIO_PORT:-8080}:11470"
     networks:
       - default
 
-  # Uptime Kuma - Public + Tailscale + Localhost
+  # Uptime Kuma - Tailscale Only
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - uptime_kuma_data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -98,8 +102,8 @@ services:
       - PGID=${PGID}
       - TZ=${TIMEZONE}
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${UPTIME_KUMA_PORT:-3001}:3001"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${UPTIME_KUMA_PORT:-3001}:3001"
     networks:
       - default
 
@@ -109,11 +113,12 @@ services:
     container_name: portainer
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${PORTAINER_PORT:-9000}:9000"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${PORTAINER_PORT:-9000}:9000"
     networks:
       - default
 
@@ -123,6 +128,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - grafana_data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
@@ -130,8 +136,8 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_DOMAIN=grafana.${DOMAIN}
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${GRAFANA_PORT:-3002}:3000"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${GRAFANA_PORT:-3002}:3000"
     networks:
       - default
 
@@ -141,6 +147,7 @@ services:
     container_name: prometheus
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
     command:
@@ -164,6 +171,7 @@ services:
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - whats_up_docker_data:/app/data
     environment:
@@ -175,8 +183,8 @@ services:
       - WUD_SMTP_USER=${WUD_SMTP_USER}
       - WUD_SMTP_PASS=${WUD_SMTP_PASS}
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${WUD_PORT:-3003}:3000"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${WUD_PORT:-3003}:3000"
     networks:
       - default
 
@@ -186,6 +194,7 @@ services:
     container_name: pihole
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/pihole/etc:/etc/pihole
       - ./config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
       - pihole_data:/etc/pihole
@@ -196,8 +205,8 @@ services:
       - VIRTUAL_HOST=pihole.${DOMAIN}
       - VIRTUAL_PORT=80
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${PIHOLE_WEB_PORT:-8054}:80"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${PIHOLE_WEB_PORT:-8054}:80"
       - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/tcp"
       - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/udp"
     networks:
@@ -209,6 +218,7 @@ services:
     container_name: filebrowser
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - filebrowser_data:/database
       - /home/luk-server:/srv/home
       - /home/luk-server/media:/srv/media
@@ -218,8 +228,8 @@ services:
       - FB_DATABASE=/database/filebrowser.db
       - FB_ROOT=/srv
     ports:
-      # Bind to all interfaces for Cloudflared access
-      - "0.0.0.0:${FILEBROWSER_PORT:-8080}:80"
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP:-100.64.0.10}:${FILEBROWSER_PORT:-8080}:80"
     networks:
       - default
 
@@ -229,6 +239,7 @@ services:
     container_name: node-exporter
     restart: unless-stopped
     volumes:
+      - ./config/nginx/www/certbot:/var/www/certbot:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
@@ -242,6 +253,17 @@ services:
       - "127.0.0.1:${NODE_EXPORTER_PORT:-9100}:9100"
     networks:
       - default
+
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot:latest
+    container_name: certbot
+    volumes:
+      - ./config/nginx/ssl:/etc/letsencrypt
+      - ./config/nginx/www/certbot:/var/www/certbot
+    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@homelab.example.com --agree-tos --no-eff-email -d homelab.example.com -d www.homelab.example.com -d homeassistant.homelab.example.com -d stremio.homelab.example.com -d uptime.homelab.example.com -d portainer.homelab.example.com -d grafana.homelab.example.com -d files.homelab.example.com -d pihole.homelab.example.com
+    depends_on:
+      - nginx
 
 volumes:
   portainer_data:
