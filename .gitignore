@@ -28,6 +28,8 @@ appdata/homeassistant/config/area_registry.yaml
 appdata/homeassistant/config/person.yaml
 appdata/homeassistant/config/group.yaml
 config/homeassistant/config/automations.yaml
+config/homeassistant/config/scenes.yaml
+config/homeassistant/config/scripts.yaml
 appdata/homeassistant/config/scripts.yaml
 appdata/homeassistant/config/scenes.yaml
 appdata/homeassistant/config/blueprints/
