@@ -43,7 +43,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TIMEZONE}
-      - HOMEPAGE_ALLOWED_HOSTS=${HOMEPAGE_ALLOWED_HOSTS:-${DOMAIN},www.${DOMAIN},localhost,127.0.0.1,${TAILSCALE_IP}}
+      - HOMEPAGE_ALLOWED_HOSTS=homelab.example.com,www.homelab.example.com,localhost,127.0.0.1,100.64.0.10
       - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
       - DOMAIN=${DOMAIN}
     ports:
