@@ -254,7 +254,27 @@ services:
     networks:
       - default
 
-  # Certbot for SSL certificates
+  # Nginx Proxy Manager - Real admin dashboard
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      # Admin interface on port 81, proxy on different ports
+      - "0.0.0.0:81:81"
+      - "0.0.0.0:8081:80"
+      - "0.0.0.0:8444:443"
+    volumes:
+      - nginx_proxy_manager_data:/data
+      - nginx_proxy_manager_letsencrypt:/etc/letsencrypt
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+    networks:
+      - default
+
+  # Certbot for SSL certificates (keep for backup)
   certbot:
     image: certbot/certbot:latest
     container_name: certbot
@@ -274,6 +294,8 @@ volumes:
   pihole_data:
   stremio_cache:
   filebrowser_data:
+  nginx_proxy_manager_data:
+  nginx_proxy_manager_letsencrypt:
 
 networks:
   default:
