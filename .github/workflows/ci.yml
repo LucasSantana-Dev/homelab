@@ -95,6 +95,9 @@ jobs:
         DUCKDNS_TOKEN=dummy
         DUCKDNS_DOMAIN=example
         NETDATA_CLAIM_TOKEN=
+        PIHOLE_WEB_PASSWORD=K4%*rG$$dB!&8$$3V9
+        HOMEASSISTANT_KEY=VSx)5rVYP+wW?A#
+        GRAFANA_PASSWORD=5Vn7W2x3AHNQ4yA
         EOF
 
     - name: Set up Docker Buildx
@@ -166,6 +169,9 @@ jobs:
         DUCKDNS_TOKEN=dummy
         DUCKDNS_DOMAIN=example
         NETDATA_CLAIM_TOKEN=
+        PIHOLE_WEB_PASSWORD=K4%*rG$$dB!&8$$3V9
+        HOMEASSISTANT_KEY=VSx)5rVYP+wW?A#
+        GRAFANA_PASSWORD=5Vn7W2x3AHNQ4yA
         EOF
 
     - name: Set up Docker Buildx
