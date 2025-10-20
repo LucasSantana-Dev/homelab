@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
-from homelab_manager.container_manager import ContainerManager
+from homelab_manager.services.containers import ContainerManager
 
 
 class TestContainerManagerSimple:

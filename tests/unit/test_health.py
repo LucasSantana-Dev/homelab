@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 import requests
 
-from homelab_manager.health import HomelabHealthMonitor
+from homelab_manager.services.health import HomelabHealthMonitor
 
 
 class TestHomelabHealthMonitor:

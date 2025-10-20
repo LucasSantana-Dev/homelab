@@ -10,7 +10,7 @@ from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
-from homelab_manager.config import HomelabConfig
+from homelab_manager.core.config import HomelabConfig
 
 
 class TestHomelabConfig:

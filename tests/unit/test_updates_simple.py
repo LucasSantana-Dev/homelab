@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
-from homelab_manager.updates import HomelabUpdateManager
+from homelab_manager.services.updates import HomelabUpdateManager
 
 
 class TestHomelabUpdateManagerSimple:
