@@ -4,8 +4,8 @@ Container Status CLI
 Simple wrapper for container management
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Activate virtual environment
@@ -19,6 +19,7 @@ if venv_path.exists():
 sys.path.insert(0, str(Path(__file__).parent / "homelab_manager"))
 
 from container_manager import ContainerManager
+
 
 def main():
     """Main function for container status"""
@@ -35,6 +36,7 @@ def main():
     for container in containers:
         if container["running"]:
             manager.show_recent_logs(container["name"], lines=2)
+
 
 if __name__ == "__main__":
     main()

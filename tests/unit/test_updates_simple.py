@@ -84,7 +84,6 @@ class TestHomelabUpdateManagerSimple:
         with patch(
             "homelab_manager.updates.docker.from_env", return_value=mock_client
         ), patch("subprocess.run") as mock_run, patch("time.sleep"):
-
             mock_run.return_value = Mock(returncode=0)
 
             manager = HomelabUpdateManager()
@@ -97,7 +96,6 @@ class TestHomelabUpdateManagerSimple:
         with patch("homelab_manager.updates.docker.from_env"), patch(
             "subprocess.run"
         ) as mock_run:
-
             # Mock subprocess to raise CalledProcessError
             from subprocess import CalledProcessError
 
@@ -120,7 +118,6 @@ class TestHomelabUpdateManagerSimple:
         with patch(
             "homelab_manager.updates.docker.from_env", return_value=mock_client
         ), patch("subprocess.run") as mock_run, patch("time.sleep"):
-
             mock_run.return_value = Mock(returncode=0)
 
             manager = HomelabUpdateManager()
@@ -155,7 +152,6 @@ class TestHomelabUpdateManagerSimple:
         ), patch(
             "homelab_manager.updates.HomelabUpdateManager.check_all_updates"
         ) as mock_check:
-
             mock_check.return_value = []
 
             manager = HomelabUpdateManager()
@@ -256,7 +252,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = Exception("Subprocess failed")
 
             manager = HomelabUpdateManager()
@@ -270,7 +265,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = Exception("Subprocess failed")
 
             manager = HomelabUpdateManager()
@@ -328,7 +322,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = subprocess.CalledProcessError(1, "docker-compose")
 
             manager = HomelabUpdateManager()
@@ -344,7 +337,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = subprocess.CalledProcessError(1, "docker-compose")
 
             manager = HomelabUpdateManager()
@@ -398,7 +390,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -419,7 +410,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -437,7 +427,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -532,7 +521,6 @@ class TestHomelabUpdateManagerSimple:
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -557,7 +545,6 @@ class TestHomelabUpdateManagerSimple:
         ) as mock_automation, patch(
             "homelab_manager.health.HomelabHealthMonitor"
         ) as mock_monitor:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 

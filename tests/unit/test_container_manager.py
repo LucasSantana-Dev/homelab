@@ -157,7 +157,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.return_value = Mock(returncode=0)
 
             manager = ContainerManager()
@@ -188,7 +187,6 @@ class TestContainerManager:
         ) as mock_requests, patch(
             "time.sleep"
         ):
-
             mock_run.return_value = Mock(returncode=0)
 
             # Mock successful health check response
@@ -227,7 +225,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_client,
         ), patch("time.sleep"), patch("requests.get") as mock_requests:
-
             # Mock successful health check response
             mock_response = Mock()
             mock_response.status_code = 200
@@ -250,7 +247,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_client,
         ), patch("time.sleep"):
-
             manager = ContainerManager()
             result = manager.wait_for_container_health("homeassistant")
 
@@ -261,7 +257,6 @@ class TestContainerManager:
         with patch("homelab_manager.container_manager.docker.from_env"), patch(
             "subprocess.run"
         ) as mock_run:
-
             mock_run.return_value = Mock(returncode=0, stdout="Disk usage info")
 
             manager = ContainerManager()
@@ -377,7 +372,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             manager = ContainerManager()
 
             # Create test data directory
@@ -398,7 +392,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -417,7 +410,6 @@ class TestContainerManager:
         ), patch("subprocess.run") as mock_run, patch("time.sleep"), patch(
             "requests.get"
         ) as mock_requests:
-
             manager = ContainerManager()
 
             # Mock subprocess success
@@ -446,7 +438,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             manager = ContainerManager()
 
             # Mock subprocess failure
@@ -519,7 +510,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Create test data directory
             test_data_dir = temp_homelab_dir / "appdata" / "homeassistant"
             test_data_dir.mkdir(parents=True, exist_ok=True)
@@ -541,7 +531,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -558,7 +547,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run, patch("time.sleep"):
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -585,7 +573,6 @@ class TestContainerManager:
         ), patch("subprocess.run") as mock_run, patch("time.sleep"), patch(
             "requests.get"
         ) as mock_requests:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -613,7 +600,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("time.sleep"), patch("requests.get") as mock_requests:
-
             # Mock container with running status
             mock_container = Mock()
             mock_container.name = "homeassistant"
@@ -636,7 +622,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("time.sleep"):
-
             # Mock container with unhealthy status
             mock_container = Mock()
             mock_container.name = "homeassistant"
@@ -653,7 +638,6 @@ class TestContainerManager:
         with patch("homelab_manager.container_manager.docker.from_env"), patch(
             "subprocess.run"
         ) as mock_run:
-
             mock_run.return_value = Mock(returncode=0, stdout="Disk usage info")
 
             manager = ContainerManager()
@@ -700,7 +684,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -718,7 +701,6 @@ class TestContainerManager:
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess failure
             mock_run.side_effect = subprocess.CalledProcessError(1, "docker")
 

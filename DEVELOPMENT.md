@@ -5,11 +5,13 @@ This document provides comprehensive guidance for developing and maintaining the
 ## 🛠️ Development Environment Setup
 
 ### Prerequisites
+
 - Python 3.8 or higher
 - Docker and Docker Compose
 - Git
 
 ### Initial Setup
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -27,6 +29,7 @@ make install-hooks
 ```
 
 ### Development Commands
+
 ```bash
 # Setup development environment
 make setup
@@ -51,6 +54,7 @@ make clean        # Clean up generated files
 ## 🧪 Testing
 
 ### Test Structure
+
 ```
 tests/
 ├── __init__.py
@@ -67,6 +71,7 @@ tests/
 ### Writing Tests
 
 #### Unit Tests
+
 Unit tests focus on testing individual functions and methods in isolation:
 
 ```python
@@ -80,6 +85,7 @@ def test_automation_init(self, temp_homelab_dir, mock_docker_client):
 ```
 
 #### Test Fixtures
+
 Use the provided fixtures for consistent test setup:
 
 - `temp_homelab_dir`: Temporary homelab directory for testing
@@ -89,6 +95,7 @@ Use the provided fixtures for consistent test setup:
 - `mock_psutil`: Mock system resource monitoring
 
 #### Running Tests
+
 ```bash
 # Run all tests
 make test
@@ -106,6 +113,7 @@ pytest tests/unit/test_automation.py::TestHomelabAutomation::test_init -v
 ## 🔍 Code Quality
 
 ### Formatting
+
 We use **Black** for code formatting with 88-character line length:
 
 ```bash
@@ -113,6 +121,7 @@ make format
 ```
 
 ### Linting
+
 Multiple linting tools ensure code quality:
 
 - **flake8**: Style guide enforcement
@@ -124,6 +133,7 @@ make lint
 ```
 
 ### Type Checking
+
 We use **mypy** for static type checking:
 
 ```bash
@@ -131,6 +141,7 @@ make type-check
 ```
 
 Add type annotations to all functions:
+
 ```python
 def backup(self) -> Optional[str]:
     """Create backup of homelab data"""
@@ -138,6 +149,7 @@ def backup(self) -> Optional[str]:
 ```
 
 ### Security
+
 **bandit** scans for security vulnerabilities:
 
 ```bash
@@ -147,6 +159,7 @@ make security
 ## 🚀 CI/CD Pipeline
 
 ### GitHub Actions
+
 The project includes a comprehensive CI/CD pipeline:
 
 - **Multi-Python Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12
@@ -156,6 +169,7 @@ The project includes a comprehensive CI/CD pipeline:
 - **Pre-commit Hooks**: Automated quality gates
 
 ### Pre-commit Hooks
+
 Automated quality checks run before each commit:
 
 - Code formatting (Black, isort)
@@ -168,17 +182,20 @@ Automated quality checks run before each commit:
 ## 📝 Documentation
 
 ### Code Documentation
+
 - **Docstrings**: All functions and classes have docstrings
 - **Type Hints**: Comprehensive type annotations
 - **Comments**: Complex logic is documented
 
 ### Project Documentation
+
 - **README.md**: Project overview and quick start
 - **CHANGELOG.md**: Version history and changes
 - **DEVELOPMENT.md**: This development guide
 - **API Documentation**: Auto-generated from docstrings
 
 ### Writing Documentation
+
 ```python
 def backup(self) -> Optional[str]:
     """
@@ -195,6 +212,7 @@ def backup(self) -> Optional[str]:
 ## 🔧 Development Workflow
 
 ### 1. Feature Development
+
 ```bash
 # Create feature branch
 git checkout -b feature/new-feature
@@ -215,6 +233,7 @@ git commit -m "feat: add new feature"
 ```
 
 ### 2. Bug Fixes
+
 ```bash
 # Create bugfix branch
 git checkout -b fix/bug-description
@@ -228,6 +247,7 @@ git commit -m "fix: resolve bug description"
 ```
 
 ### 3. Code Review
+
 - All changes require code review
 - CI/CD must pass before merge
 - Security scan must pass
@@ -238,6 +258,7 @@ git commit -m "fix: resolve bug description"
 ### Common Issues
 
 #### Test Failures
+
 ```bash
 # Run specific test with verbose output
 pytest tests/unit/test_automation.py::TestHomelabAutomation::test_init -v -s
@@ -247,6 +268,7 @@ pytest --pdb tests/unit/test_automation.py
 ```
 
 #### Type Checking Issues
+
 ```bash
 # Run mypy on specific file
 mypy scripts/homelab_manager/automation.py
@@ -256,6 +278,7 @@ pip install types-requests types-docker types-psutil
 ```
 
 #### Security Issues
+
 ```bash
 # Run bandit on specific file
 bandit -r scripts/homelab_manager/automation.py
@@ -265,6 +288,7 @@ bandit -r scripts/homelab_manager/ -f json -o bandit-report.json
 ```
 
 ### Debugging Tools
+
 - **pdb**: Python debugger
 - **pytest --pdb**: Drop into debugger on test failure
 - **logging**: Comprehensive logging throughout the application
@@ -272,6 +296,7 @@ bandit -r scripts/homelab_manager/ -f json -o bandit-report.json
 ## 📦 Dependencies
 
 ### Production Dependencies
+
 ```txt
 docker>=6.0.0
 rich>=13.0.0
@@ -282,6 +307,7 @@ psutil>=5.9.0
 ```
 
 ### Development Dependencies
+
 ```txt
 pytest>=7.4.0
 pytest-cov>=4.1.0
@@ -298,6 +324,7 @@ safety>=2.3.0
 ## 🏗️ Architecture
 
 ### Module Structure
+
 ```
 scripts/homelab_manager/
 ├── __init__.py              # Package initialization
@@ -310,6 +337,7 @@ scripts/homelab_manager/
 ```
 
 ### Design Patterns
+
 - **Single Responsibility**: Each module has a specific purpose
 - **Dependency Injection**: Dependencies are injected via constructors
 - **Factory Pattern**: Object creation is centralized
@@ -318,12 +346,14 @@ scripts/homelab_manager/
 ## 🔒 Security Best Practices
 
 ### Code Security
+
 - **Input Validation**: All inputs are validated
 - **Subprocess Security**: Use `subprocess.run()` instead of `os.system()`
 - **Path Security**: Use `pathlib.Path` for path operations
 - **Environment Variables**: Never hardcode secrets
 
 ### Security Scanning
+
 - **Bandit**: Static security analysis
 - **Safety**: Dependency vulnerability scanning
 - **Trivy**: Container security scanning
@@ -331,11 +361,13 @@ scripts/homelab_manager/
 ## 📊 Performance
 
 ### Monitoring
+
 - **Resource Usage**: CPU, memory, disk monitoring
 - **Response Times**: Service health check timing
 - **Error Rates**: Failure tracking and alerting
 
 ### Optimization
+
 - **Async Operations**: Use async/await for I/O operations
 - **Caching**: Cache frequently accessed data
 - **Resource Limits**: Set appropriate resource limits
@@ -343,6 +375,7 @@ scripts/homelab_manager/
 ## 🚀 Deployment
 
 ### Production Deployment
+
 ```bash
 # Install production dependencies
 pip install -r scripts/requirements.txt
@@ -355,6 +388,7 @@ pip install -r scripts/requirements.txt
 ```
 
 ### Development Deployment
+
 ```bash
 # Install development dependencies
 make install-dev
@@ -370,12 +404,14 @@ make test
 ## 🤝 Contributing
 
 ### Code Standards
+
 - Follow PEP 8 style guide
 - Use type hints for all functions
 - Write comprehensive tests
 - Document all public APIs
 
 ### Pull Request Process
+
 1. Create feature branch
 2. Make changes with tests
 3. Run quality checks
@@ -384,7 +420,9 @@ make test
 6. Merge after approval
 
 ### Commit Messages
+
 Use conventional commits:
+
 - `feat:` New features
 - `fix:` Bug fixes
 - `docs:` Documentation changes
@@ -396,17 +434,20 @@ Use conventional commits:
 ## 📚 Resources
 
 ### Documentation
+
 - [Python Documentation](https://docs.python.org/3/)
 - [pytest Documentation](https://docs.pytest.org/)
 - [Black Documentation](https://black.readthedocs.io/)
 - [mypy Documentation](https://mypy.readthedocs.io/)
 
 ### Tools
+
 - [Docker Documentation](https://docs.docker.com/)
 - [Rich Documentation](https://rich.readthedocs.io/)
 - [Click Documentation](https://click.palletsprojects.com/)
 
 ### Best Practices
+
 - [Python Best Practices](https://docs.python-guide.org/)
 - [Testing Best Practices](https://docs.pytest.org/en/latest/goodpractices.html)
 - [Security Best Practices](https://bandit.readthedocs.io/)

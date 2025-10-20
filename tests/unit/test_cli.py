@@ -23,7 +23,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             cli = HomelabCLI()
             assert cli is not None
 
@@ -34,7 +33,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_automation.return_value.deploy.return_value = True
 
             cli = HomelabCLI()
@@ -49,7 +47,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_automation.return_value.update.return_value = True
 
             cli = HomelabCLI()
@@ -64,7 +61,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_automation.return_value.backup.return_value = "/path/to/backup"
 
             cli = HomelabCLI()
@@ -79,7 +75,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_automation.return_value.restore.return_value = True
 
             cli = HomelabCLI()
@@ -94,7 +89,6 @@ class TestHomelabCLI:
         ) as mock_health, patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_health.return_value.run_health_check.return_value = None
 
             cli = HomelabCLI()
@@ -110,7 +104,6 @@ class TestHomelabCLI:
         ) as mock_health, patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_health.return_value.quick_status.return_value = None
 
             cli = HomelabCLI()
@@ -126,7 +119,6 @@ class TestHomelabCLI:
         ) as mock_health, patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_health.return_value.monitor_continuous.return_value = None
 
             cli = HomelabCLI()
@@ -142,7 +134,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_updates.return_value.check_all_updates.return_value = []
 
             cli = HomelabCLI()
@@ -158,7 +149,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_updates.return_value.update_all_services.return_value = True
 
             cli = HomelabCLI()
@@ -173,7 +163,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_updates.return_value.update_service.return_value = True
 
             cli = HomelabCLI()
@@ -188,7 +177,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_updates.return_value.show_versions.return_value = None
 
             cli = HomelabCLI()
@@ -204,7 +192,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             mock_automation.return_value.cleanup.return_value = None
 
             cli = HomelabCLI()
@@ -220,7 +207,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ) as mock_config:
-
             mock_config.return_value.validate_environment.return_value = (True, [])
 
             cli = HomelabCLI()
@@ -236,7 +222,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ) as mock_config:
-
             mock_config.return_value.show_config_summary.return_value = None
 
             cli = HomelabCLI()
@@ -252,7 +237,6 @@ class TestHomelabCLI:
         ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
             "homelab_manager.cli.HomelabConfig"
         ):
-
             cli = HomelabCLI()
             result = cli.setup_cron()
 

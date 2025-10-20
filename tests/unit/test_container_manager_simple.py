@@ -75,7 +75,6 @@ class TestContainerManagerSimple:
         with patch("homelab_manager.container_manager.docker.from_env"), patch(
             "subprocess.run"
         ) as mock_run:
-
             mock_run.return_value = Mock(returncode=0, stdout="Disk usage info")
 
             manager = ContainerManager()

@@ -92,21 +92,25 @@ homelab/
 ## 🔄 **Key Changes Made**
 
 ### **1. Moved `homelab_manager` to Root**
+
 - **Before**: `scripts/homelab_manager/`
 - **After**: `homelab_manager/`
 - **Benefit**: Cleaner imports, better package structure
 
 ### **2. Created Centralized `config/` Directory**
+
 - **Before**: Scattered configuration files
 - **After**: Organized by service in `config/`
 - **Benefit**: Easy to find and manage configurations
 
 ### **3. Updated Import Paths**
+
 - **Before**: `from scripts.homelab_manager.module import Class`
 - **After**: `from homelab_manager.module import Class`
 - **Benefit**: Cleaner, more standard Python imports
 
 ### **4. Updated Docker Compose Paths**
+
 - **Before**: `./nginx.conf`, `./prometheus/prometheus.yml`
 - **After**: `./config/nginx/nginx.conf`, `./config/prometheus/prometheus.yml`
 - **Benefit**: Consistent configuration management
@@ -114,6 +118,7 @@ homelab/
 ## 📋 **Service Configuration Structure**
 
 ### **Nginx Configuration**
+
 ```
 config/nginx/
 ├── nginx.conf                 # Main Nginx configuration
@@ -123,6 +128,7 @@ config/nginx/
 ```
 
 ### **Homepage Configuration**
+
 ```
 config/homepage/
 ├── services.yaml             # Service definitions
@@ -135,6 +141,7 @@ config/homepage/
 ```
 
 ### **Prometheus Configuration**
+
 ```
 config/prometheus/
 └── prometheus.yml            # Prometheus configuration
@@ -143,21 +150,25 @@ config/prometheus/
 ## 🚀 **Benefits of New Structure**
 
 ### **1. Better Organization**
+
 - **Clear separation** between code, config, and data
 - **Service-specific** configuration folders
 - **Logical grouping** of related files
 
 ### **2. Easier Maintenance**
+
 - **Centralized configuration** management
 - **Standard Python package** structure
 - **Consistent file locations**
 
 ### **3. Improved Development**
+
 - **Cleaner imports** in Python code
 - **Better IDE support** with standard structure
 - **Easier testing** with proper package layout
 
 ### **4. Enhanced Security**
+
 - **Configuration isolation** from application data
 - **Clear separation** of concerns
 - **Easier backup** of configurations
@@ -165,6 +176,7 @@ config/prometheus/
 ## 🔧 **Usage Examples**
 
 ### **Accessing Configurations**
+
 ```python
 # In Python code
 from homelab_manager.config import HomelabConfig
@@ -174,6 +186,7 @@ config_path = Path("config/nginx/nginx.conf")
 ```
 
 ### **Docker Compose Integration**
+
 ```yaml
 # docker-compose.yml
 services:
@@ -184,6 +197,7 @@ services:
 ```
 
 ### **Interactive CLI**
+
 ```bash
 # Start the interactive CLI
 ./scripts/homelab
@@ -194,11 +208,13 @@ services:
 ## 📚 **Migration Guide**
 
 ### **For Developers**
+
 1. **Update imports**: Change `scripts.homelab_manager` to `homelab_manager`
 2. **Update paths**: Use `config/` instead of scattered config files
 3. **Update tests**: Fix import paths in test files
 
 ### **For Users**
+
 1. **No changes needed**: All functionality remains the same
 2. **Configurations**: Now organized in `config/` directory
 3. **Interactive CLI**: Enhanced with better organization
@@ -213,6 +229,7 @@ services:
 ## 🎉 **Summary**
 
 The new project structure provides:
+
 - **Better organization** with clear separation of concerns
 - **Easier maintenance** with centralized configuration management
 - **Improved development** experience with standard Python structure

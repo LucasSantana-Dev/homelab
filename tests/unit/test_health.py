@@ -166,7 +166,6 @@ class TestHomelabHealthMonitor:
             ) as mock_memory, patch(
                 "homelab_manager.health.psutil.disk_usage"
             ) as mock_disk:
-
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 
@@ -269,7 +268,6 @@ class TestHomelabHealthMonitor:
                 "homelab_manager.health.time.strftime",
                 return_value="2023-01-01 12:00:00",
             ):
-
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 
@@ -314,7 +312,6 @@ class TestHomelabHealthMonitor:
             ) as mock_get, patch(
                 "homelab_manager.health.console.print"
             ) as mock_print:
-
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 
@@ -347,7 +344,6 @@ class TestHomelabHealthMonitor:
             ) as mock_get, patch(
                 "homelab_manager.health.console.print"
             ) as mock_print:
-
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 
@@ -387,7 +383,6 @@ class TestHomelabHealthMonitor:
                 "homelab_manager.health.time.strftime",
                 return_value="2023-01-01 12:00:00",
             ):
-
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 

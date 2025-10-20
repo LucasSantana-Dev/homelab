@@ -25,6 +25,7 @@ This guide explains how to configure your homelab to be accessible only through 
 ```
 
 This script will:
+
 - Backup your current configuration
 - Configure all services to bind only to your Tailscale IP
 - Set up nginx reverse proxy for easier access
@@ -65,11 +66,13 @@ An optional nginx reverse proxy is included for easier access:
 ## 🔄 Switching Between Modes
 
 ### Switch to Tailscale-Only
+
 ```bash
 ./scripts/switch-to-tailscale.sh
 ```
 
 ### Switch Back to Public Access
+
 ```bash
 ./scripts/switch-to-public.sh
 ```
@@ -92,16 +95,19 @@ An optional nginx reverse proxy is included for easier access:
 ## 🛡️ Security Considerations
 
 ### Access Control
+
 - Only devices connected to your Tailscale network can access services
 - You can manage device access through Tailscale's admin console
 - Devices can be removed instantly if compromised
 
 ### Network Isolation
+
 - Services are isolated from the public internet
 - No need for complex firewall rules
 - Traffic is encrypted end-to-end
 
 ### Best Practices
+
 1. **Regular Updates**: Keep Tailscale and services updated
 2. **Device Management**: Remove unused devices from your network
 3. **Access Logs**: Monitor access through Tailscale's dashboard
@@ -112,16 +118,19 @@ An optional nginx reverse proxy is included for easier access:
 ### Services Not Accessible
 
 1. **Check Tailscale Status**:
+
    ```bash
    tailscale status
    ```
 
 2. **Verify IP Binding**:
+
    ```bash
    docker-compose -f docker-compose.tailscale.yml ps
    ```
 
 3. **Check Service Logs**:
+
    ```bash
    docker-compose -f docker-compose.tailscale.yml logs [service-name]
    ```
@@ -129,12 +138,14 @@ An optional nginx reverse proxy is included for easier access:
 ### Network Issues
 
 1. **Restart Tailscale**:
+
    ```bash
    sudo tailscale down
    sudo tailscale up
    ```
 
 2. **Check Network Connectivity**:
+
    ```bash
    ping YOUR_TAILSCALE_IP
    ```
@@ -150,11 +161,13 @@ If you need to revert to public access:
 ## 📊 Monitoring
 
 ### Service Health
+
 - Use Uptime Kuma to monitor service availability
 - Check Grafana dashboards for system metrics
 - Monitor through Portainer for container status
 
 ### Network Monitoring
+
 - Tailscale provides network usage statistics
 - Monitor device connections through Tailscale dashboard
 - Check service logs for access patterns
@@ -162,13 +175,17 @@ If you need to revert to public access:
 ## 🔧 Advanced Configuration
 
 ### Custom Domains
+
 You can set up custom domains by:
+
 1. Adding DNS records pointing to your Tailscale IP
 2. Configuring nginx with SSL certificates
 3. Using Tailscale's MagicDNS feature
 
 ### Access Control Lists (ACLs)
+
 Configure Tailscale ACLs for fine-grained access control:
+
 1. Access Tailscale admin console
 2. Configure ACLs to restrict access between devices
 3. Set up device-specific access rules
