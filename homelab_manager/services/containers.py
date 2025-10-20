@@ -8,7 +8,7 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 import docker
 from rich.console import Console
@@ -19,6 +19,7 @@ console = Console()
 
 class ServiceInfo(TypedDict):
     """Type definition for service information"""
+
     port: int
     health_url: str
     data_path: str
@@ -171,7 +172,7 @@ class ContainerManager:
             console.print(f"📦 Creating backup: {backup_name}")
 
             # Create backup of appdata directory
-            result = subprocess.run(
+            subprocess.run(
                 [
                     "tar",
                     "-czf",
@@ -214,7 +215,7 @@ class ContainerManager:
             )
 
             # Restore backup
-            result = subprocess.run(
+            subprocess.run(
                 ["tar", "-xzf", str(backup_file), "-C", str(self.project_root)],
                 capture_output=True,
                 text=True,
@@ -253,7 +254,7 @@ class ContainerManager:
         try:
             console.print(f"🔄 Restarting {service_name}...")
 
-            result = subprocess.run(
+            subprocess.run(
                 ["docker", "compose", "restart", service_name],
                 capture_output=True,
                 text=True,
