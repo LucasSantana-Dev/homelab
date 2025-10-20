@@ -4,10 +4,7 @@ Homelab Manager CLI
 Modern command-line interface for homelab management
 """
 
-import argparse
 import os
-import sys
-from pathlib import Path
 from typing import Optional
 
 import typer
@@ -345,7 +342,6 @@ def test():
 
     try:
         import subprocess
-        import time
 
         # Get domain from environment
         domain = os.getenv("DOMAIN", "homelab.example.com")
