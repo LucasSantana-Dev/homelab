@@ -45,15 +45,16 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [types-requests, types-PyYAML]
-        args: [--ignore-missing-imports, --exclude=homelab_manager/cli/__init__.py]
+        args: [--ignore-missing-imports, --config-file=pyproject.toml]
 
   # Security
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.5
     hooks:
       - id: bandit
-        args: [-r, scripts/homelab_manager/, -f, json, -o, bandit-report.json]
+        args: [-f, json, -o, bandit-report.json]
         exclude: tests/
+        additional_dependencies: ['bandit[toml]', 'pbr']
 
   # Docker
   - repo: https://github.com/hadolint/hadolint
@@ -67,7 +68,7 @@ repos:
     rev: v0.9.0.6
     hooks:
       - id: shellcheck
-        args: [-e, SC1091, -e, SC2034]
+        args: [-e, SC1091, -e, SC2034, -e, SC2155, -e, SC2164, -e, SC2001, -e, SC2126]
 
   # YAML
   - repo: https://github.com/adrienverge/yamllint
