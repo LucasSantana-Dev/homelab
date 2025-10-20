@@ -53,7 +53,10 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 explicit_package_bases = true
-exclude = ["homelab_manager/cli/"]
+exclude = [
+    "homelab_manager/cli/__init__.py",
+    "homelab_manager/cli/commands.py"
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
