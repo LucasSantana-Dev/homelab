@@ -4,9 +4,9 @@ Container Update CLI
 Simple wrapper for container updates
 """
 
-import sys
 import argparse
 import os
+import sys
 from pathlib import Path
 
 # Activate virtual environment
@@ -21,13 +21,19 @@ sys.path.insert(0, str(Path(__file__).parent / "homelab_manager"))
 
 from container_manager import ContainerManager
 
+
 def main():
     """Main function for container updates"""
     parser = argparse.ArgumentParser(description="Update homelab containers")
-    parser.add_argument("container", nargs="?", choices=["homeassistant", "homepage", "grafana", "filebrowser", "all"],
-                       help="Container to update (or 'all' for all containers)")
-    parser.add_argument("--check", "-c", action="store_true",
-                       help="Check for updates without updating")
+    parser.add_argument(
+        "container",
+        nargs="?",
+        choices=["homeassistant", "homepage", "grafana", "filebrowser", "all"],
+        help="Container to update (or 'all' for all containers)",
+    )
+    parser.add_argument(
+        "--check", "-c", action="store_true", help="Check for updates without updating"
+    )
 
     args = parser.parse_args()
 
@@ -51,6 +57,7 @@ def main():
         manager.display_container_status()
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

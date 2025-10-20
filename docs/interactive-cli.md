@@ -15,47 +15,55 @@ A comprehensive interactive console application for managing your homelab with a
 ## 🎯 **Features**
 
 ### 🏠 **Dashboard**
+
 - **System Overview**: Quick status of all services
 - **Mode Status**: Current access mode (public/tailscale)
 - **Service Health**: Running services and their status
 - **Resource Usage**: System resources at a glance
 
 ### 🔄 **Mode Management**
+
 - **Switch Modes**: Toggle between public and Tailscale-only access
 - **Current Mode**: View current access configuration
 - **Security Status**: Verify mode-specific security settings
 
 ### 🔒 **Security**
+
 - **Security Testing**: Comprehensive security verification
 - **Port Binding**: Check which ports are bound to public vs Tailscale
 - **Access Verification**: Test service accessibility
 - **Auto-Fix**: Automatically resolve common security issues
 
 ### 📊 **Health Monitoring**
+
 - **Quick Health Check**: Fast status check of all services
 - **Full Health Check**: Comprehensive health analysis
 - **System Resources**: CPU, memory, and disk usage
 - **Container Status**: Docker container health and status
 
 ### 🔄 **Updates**
+
 - **Check Updates**: Scan for available service updates
 - **Update Services**: Update all services to latest versions
 - **Version Management**: View current service versions
 - **Auto-Update**: Configure automatic update settings
 
 ### ⚙️ **Configuration**
+
 - **View Config**: Display current configuration
 - **Edit Environment**: Modify environment variables
 - **Secure Setup**: Setup secure environment variables
 - **Validation**: Validate configuration integrity
 
 ### 🐳 **Container Management**
+
 - **Container Status**: View all container statuses
 - **Service Control**: Start, stop, restart services
 - **Cleanup**: Remove unused containers and images
 - **Logs**: View container logs and output
 
 ### 📋 **Logs & Monitoring**
+
 - **Service Logs**: View logs for specific services
 - **System Logs**: Access system-level logs
 - **Log Search**: Search through log files
@@ -64,12 +72,14 @@ A comprehensive interactive console application for managing your homelab with a
 ## 🎮 **Navigation**
 
 ### **Menu Navigation**
+
 - **Arrow Keys**: Navigate through menu options
 - **Enter**: Select an option
 - **Ctrl+C**: Exit the application
 - **Back**: Return to previous menu
 
 ### **Interactive Prompts**
+
 - **Text Input**: Type responses to prompts
 - **Confirmation**: Yes/No questions for important actions
 - **Selection**: Choose from available options
@@ -121,6 +131,7 @@ A comprehensive interactive console application for managing your homelab with a
 ## 🎨 **Visual Features**
 
 ### **Rich Output**
+
 - **Colored Text**: Different colors for status, errors, and information
 - **Progress Bars**: Visual progress indicators for long operations
 - **Tables**: Structured data display
@@ -128,6 +139,7 @@ A comprehensive interactive console application for managing your homelab with a
 - **Icons**: Visual indicators for different types of information
 
 ### **Status Indicators**
+
 - **✅ Green**: Success, healthy, working
 - **❌ Red**: Error, failed, unhealthy
 - **⚠️ Yellow**: Warning, partial, attention needed
@@ -137,12 +149,14 @@ A comprehensive interactive console application for managing your homelab with a
 ## 🔧 **Technical Details**
 
 ### **Dependencies**
+
 - `rich` - Beautiful terminal output and formatting
 - `psutil` - System resource monitoring
 - `docker` - Docker container management
 - `subprocess` - System command execution
 
 ### **Architecture**
+
 ```
 scripts/homelab_manager/
 ├── interactive_cli.py    # Main interactive CLI
@@ -156,6 +170,7 @@ scripts/homelab_manager/
 ```
 
 ### **Error Handling**
+
 - **Graceful Failures**: Operations fail gracefully with helpful messages
 - **Retry Logic**: Automatic retry for transient failures
 - **User Feedback**: Clear error messages and suggestions
@@ -164,6 +179,7 @@ scripts/homelab_manager/
 ## 🚀 **Usage Examples**
 
 ### **Basic Usage**
+
 ```bash
 # Start the interactive CLI
 ./scripts/homelab
@@ -174,6 +190,7 @@ scripts/homelab_manager/
 ```
 
 ### **Advanced Usage**
+
 ```bash
 # Start with custom directory
 ./scripts/homelab --homelab-dir /custom/path
@@ -186,30 +203,35 @@ scripts/homelab_manager/
 ### **Common Issues**
 
 **1. Permission Errors:**
+
 ```bash
 # Make sure the script is executable
 chmod +x scripts/homelab
 ```
 
 **2. Missing Dependencies:**
+
 ```bash
 # Install required packages
 pip install rich psutil
 ```
 
 **3. Docker Not Running:**
+
 ```bash
 # Start Docker service
 sudo systemctl start docker
 ```
 
 **4. Tailscale Not Connected:**
+
 ```bash
 # Connect to Tailscale
 tailscale up
 ```
 
 ### **Getting Help**
+
 - **Help Menu**: Use the ❓ Help option in the main menu
 - **Error Messages**: Read error messages carefully for solutions
 - **Logs**: Check logs for detailed error information
@@ -217,12 +239,14 @@ tailscale up
 ## 🎯 **Benefits**
 
 ### **User Experience**
+
 - **Intuitive Navigation**: Easy-to-use menu system
 - **Visual Feedback**: Clear status indicators and progress
 - **Error Recovery**: Helpful error messages and suggestions
 - **Comprehensive**: All homelab functions in one place
 
 ### **Developer Experience**
+
 - **Modular Design**: Easy to extend with new features
 - **Rich Integration**: Beautiful output with minimal code
 - **Error Handling**: Robust error handling and recovery

@@ -120,7 +120,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("homelab_manager.automation.HomelabAutomation.check_health"):
-
             automation = HomelabAutomation()
             result = automation.deploy()
 
@@ -147,7 +146,6 @@ class TestHomelabAutomation:
         ), patch("subprocess.run") as mock_run, patch(
             "homelab_manager.automation.HomelabAutomation.get_service_status"
         ) as mock_status:
-
             # Mock subprocess calls with proper return values
             mock_result = Mock()
             mock_result.returncode = 0
@@ -170,7 +168,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run", side_effect=Exception("Backup failed")):
-
             automation = HomelabAutomation()
             backup_path = automation.backup()
 
@@ -188,7 +185,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("homelab_manager.automation.HomelabAutomation.check_health"):
-
             automation = HomelabAutomation()
             result = automation.restore(str(backup_dir))
 
@@ -274,7 +270,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.HomelabAutomation.check_health",
             return_value=False,
         ):
-
             automation = HomelabAutomation()
             result = automation.deploy()
 
@@ -287,7 +282,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess failure
             mock_result = Mock()
             mock_result.returncode = 1
@@ -307,7 +301,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess failure
             mock_result = Mock()
             mock_result.returncode = 1
@@ -327,7 +320,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess failure
             mock_result = Mock()
             mock_result.returncode = 1
@@ -346,7 +338,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess failure
             mock_result = Mock()
             mock_result.returncode = 1
@@ -365,7 +356,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_result = Mock()
             mock_result.returncode = 0
@@ -385,7 +375,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess failure
             mock_result = Mock()
             mock_result.returncode = 1
@@ -447,7 +436,6 @@ class TestHomelabAutomation:
         ), patch(
             "homelab_manager.automation.HomelabAutomation.create_networks"
         ) as mock_create_networks:
-
             mock_create_networks.side_effect = Exception("Network creation failed")
 
             automation = HomelabAutomation()
@@ -463,7 +451,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = subprocess.CalledProcessError(1, "docker-compose")
 
             automation = HomelabAutomation()
@@ -479,7 +466,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = subprocess.CalledProcessError(1, "docker-compose")
 
             automation = HomelabAutomation(str(temp_homelab_dir))
@@ -495,7 +481,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = subprocess.CalledProcessError(1, "tar")
 
             automation = HomelabAutomation(str(temp_homelab_dir))
@@ -513,7 +498,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = subprocess.CalledProcessError(1, "tar")
 
             automation = HomelabAutomation(str(temp_homelab_dir))
@@ -531,7 +515,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = subprocess.CalledProcessError(1, "docker")
 
             automation = HomelabAutomation(str(temp_homelab_dir))
@@ -589,7 +572,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             mock_run.side_effect = Exception("Health check failed")
 
             automation = HomelabAutomation(str(temp_homelab_dir))
@@ -607,7 +589,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.HomelabAutomation.check_health",
             return_value=True,
         ):
-
             mock_run.return_value = Mock(returncode=0)
 
             automation = HomelabAutomation()
@@ -624,7 +605,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.HomelabAutomation.check_health",
             return_value=False,
         ):
-
             mock_run.return_value = Mock(returncode=0)
 
             automation = HomelabAutomation()
@@ -640,7 +620,6 @@ class TestHomelabAutomation:
         ), patch("subprocess.run") as mock_run, patch(
             "homelab_manager.automation.HomelabAutomation.get_service_status"
         ) as mock_status:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -675,7 +654,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.HomelabAutomation.check_health",
             return_value=True,
         ):
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -699,7 +677,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.HomelabAutomation.check_health",
             return_value=False,
         ):
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
@@ -714,7 +691,6 @@ class TestHomelabAutomation:
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
         ), patch("subprocess.run") as mock_run:
-
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 

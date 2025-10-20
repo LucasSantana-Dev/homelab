@@ -201,7 +201,6 @@ class TestHomelabUpdateManager:
             ), patch("homelab_manager.updates.os.chdir"), patch(
                 "homelab_manager.updates.console.print"
             ) as mock_print:
-
                 mock_run.return_value = Mock(returncode=0)
 
                 manager = HomelabUpdateManager()
@@ -225,7 +224,6 @@ class TestHomelabUpdateManager:
             ), patch("homelab_manager.updates.os.chdir"), patch(
                 "homelab_manager.updates.console.print"
             ) as mock_print:
-
                 mock_run.return_value = Mock(returncode=0)
 
                 manager = HomelabUpdateManager()
@@ -246,7 +244,6 @@ class TestHomelabUpdateManager:
             ), patch("homelab_manager.updates.os.chdir"), patch(
                 "homelab_manager.updates.console.print"
             ) as mock_print:
-
                 manager = HomelabUpdateManager()
                 result = manager.update_service("test-service")
 
@@ -269,7 +266,6 @@ class TestHomelabUpdateManager:
             ) as mock_automation_class, patch(
                 "homelab_manager.updates.HomelabHealthMonitor"
             ) as mock_health_class:
-
                 # Mock backup
                 mock_automation = Mock()
                 mock_automation.backup.return_value = "/backup/path"
@@ -296,7 +292,6 @@ class TestHomelabUpdateManager:
             with patch("homelab_manager.updates.console.print") as mock_print, patch(
                 "homelab_manager.updates.HomelabAutomation"
             ) as mock_automation_class:
-
                 # Mock backup failure
                 mock_automation = Mock()
                 mock_automation.backup.return_value = None
@@ -324,7 +319,6 @@ class TestHomelabUpdateManager:
             ) as mock_print, patch(
                 "homelab_manager.updates.HomelabAutomation"
             ) as mock_automation_class:
-
                 # Mock backup
                 mock_automation = Mock()
                 mock_automation.backup.return_value = "/backup/path"
@@ -399,7 +393,6 @@ class TestHomelabUpdateManager:
             with patch("homelab_manager.updates.console.print") as mock_print, patch(
                 "builtins.open", mock_open()
             ) as mock_file:
-
                 manager = HomelabUpdateManager()
                 manager.auto_check()
 
@@ -503,7 +496,6 @@ class TestHomelabUpdateManager:
             ) as mock_print, patch(
                 "homelab_manager.updates.sys.exit"
             ) as mock_exit:
-
                 mock_args = Mock()
                 mock_args.action = "update-service"
                 mock_args.service = None

@@ -10,23 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔧 Bug Fixes and Improvements
 
 #### Removed
+
 - **DuckDNS Integration**: Completely removed DuckDNS cron job and dependencies
 - **Legacy Scripts**: Removed DuckDNS update script and log files
 - **Environment Variables**: Cleaned up DuckDNS token from system environment
 - **Cron Jobs**: Streamlined crontab to only include homelab automation tasks
 
 #### Fixed
+
 - **Security Issue**: Replaced `os.system()` with `subprocess.run()` for better security
 - **Test Issues**: Fixed hardcoded paths in test classes to use test directories
 - **Type Annotations**: Added missing type annotations for better type checking
 - **Test Mocking**: Improved test fixtures and mocking for more reliable tests
 
 #### Added
+
 - **Development Documentation**: Comprehensive development guide with best practices
 - **Fixed Test Files**: Separate test files with proper test directory handling
 - **Security Improvements**: Better subprocess handling and input validation
 
 #### Changed
+
 - **Test Architecture**: Tests now properly use temporary directories
 - **Security Scanning**: Enhanced security checks with better subprocess handling
 - **Development Workflow**: Improved development commands and documentation
@@ -36,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🎉 Major Release: Python-Based Automation System
 
 #### Added
+
 - **Python Automation System** - Complete rewrite in Python for better maintainability
 - **Rich CLI Interface** - Beautiful, colored command-line interface
 - **Comprehensive Health Monitoring** - Service health checks with system resource monitoring
@@ -46,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Service Version Tracking** - Current version monitoring for all services
 
 #### Changed
+
 - **Converted from Shell to Python** - All automation scripts now use Python
 - **Simplified Architecture** - Removed overkill components (Terraform, Ansible, complex monitoring)
 - **Enhanced Error Handling** - Comprehensive exception handling and user feedback
@@ -53,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Better Documentation** - Comprehensive README with examples and architecture
 
 #### Removed
+
 - **Terraform Infrastructure** - Too complex for homelab use case
 - **Ansible Playbooks** - Overkill for single-server deployment
 - **Complex Monitoring Stack** - ELK stack, Alertmanager, complex Prometheus alerts
@@ -61,12 +68,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DevOps Analysis Documentation** - Analysis complete, no longer needed
 
 #### Fixed
+
 - **Environment Variable Loading** - Safer parsing with special character support
 - **Docker Container Management** - Better error handling and status reporting
 - **Backup System** - Improved reliability and error handling
 - **Service Health Checks** - More robust HTTP endpoint checking
 
 #### Security
+
 - **Environment Variable Validation** - Comprehensive validation with security checks
 - **Secure Configuration Templates** - `.env.example` with placeholder values
 - **Improved Secret Management** - All sensitive data in environment variables
@@ -81,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🏠 Initial Release: Home Assistant Dashboard Setup
 
 #### Added
+
 - **Home Assistant Dashboard** - Custom dashboard with HACS components
 - **HACS Integration** - Home Assistant Community Store setup
 - **Mushroom Cards** - Modern card collection for Lovelace
@@ -92,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Basic Automation** - Shell scripts for container management
 
 #### Services
+
 - **Home Assistant** - Home automation hub
 - **Grafana** - Monitoring and dashboards
 - **Portainer** - Container management
@@ -101,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **What's Up Docker** - Container update monitoring
 
 #### Features
+
 - **Dashboard Configuration** - YAML-based dashboard setup
 - **Theme Integration** - Brazilian theme for Home Assistant
 - **Service Health Monitoring** - Basic health checks
@@ -141,6 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Future Roadmap
 
 ### Planned Features
+
 - **Web Dashboard** - Web-based management interface
 - **Mobile App** - Mobile management application
 - **Advanced Monitoring** - Custom Grafana dashboards
@@ -150,6 +163,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance Metrics** - Detailed performance monitoring
 
 ### Potential Improvements
+
 - **Kubernetes Support** - Optional Kubernetes deployment
 - **Multi-Node Support** - Distributed homelab setup
 - **Advanced Security** - Security scanning and hardening
