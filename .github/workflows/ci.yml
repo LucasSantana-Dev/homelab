@@ -74,16 +74,38 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up environment variables
+      run: |
+        cat > .env << EOF
+        PUID=1000
+        PGID=1000
+        TIMEZONE=America/Sao_Paulo
+        TAILSCALE_IP=127.0.0.1
+        HOMEASSISTANT_PORT=8123
+        PORTAINER_PORT=9000
+        GRAFANA_PORT=3000
+        PROMETHEUS_PORT=9090
+        PIHOLE_PORT=8054
+        UPTIME_KUMA_PORT=3001
+        WHATS_UP_DOCKER_PORT=3003
+        FILEBROWSER_PORT=80
+        STREMIO_PORT=8080
+        HOMEPAGE_PORT=3000
+        DUCKDNS_TOKEN=dummy
+        DUCKDNS_DOMAIN=example
+        NETDATA_CLAIM_TOKEN=
+        EOF
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
     - name: Build Docker Compose
       run: |
-        docker-compose config
+        docker compose config
 
     - name: Test Docker Compose syntax
       run: |
-        docker-compose config --quiet
+        docker compose config --quiet
 
   security:
     runs-on: ubuntu-latest
@@ -123,6 +145,28 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up environment variables
+      run: |
+        cat > .env << EOF
+        PUID=1000
+        PGID=1000
+        TIMEZONE=America/Sao_Paulo
+        TAILSCALE_IP=127.0.0.1
+        HOMEASSISTANT_PORT=8123
+        PORTAINER_PORT=9000
+        GRAFANA_PORT=3000
+        PROMETHEUS_PORT=9090
+        PIHOLE_PORT=8054
+        UPTIME_KUMA_PORT=3001
+        WHATS_UP_DOCKER_PORT=3003
+        FILEBROWSER_PORT=80
+        STREMIO_PORT=8080
+        HOMEPAGE_PORT=3000
+        DUCKDNS_TOKEN=dummy
+        DUCKDNS_DOMAIN=example
+        NETDATA_CLAIM_TOKEN=
+        EOF
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -136,11 +180,11 @@ jobs:
 
     - name: Scan container images
       run: |
-        # Install Trivy
+        # Install Trivy using modern gpg method
         sudo apt-get update
         sudo apt-get install wget apt-transport-https gnupg lsb-release
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/trivy-archive-keyring.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
         sudo apt-get update
         sudo apt-get install trivy
 
