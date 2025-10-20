@@ -1,0 +1,20 @@
+[flake8]
+max-line-length = 120
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    config/homeassistant/,
+    tests/
+ignore = 
+    E203,
+    W503,
+    E231,
+    E221,
+    F401,
+    F541,
+    F841,
+    F811,
+    E402,
+    F821

@@ -7,11 +7,9 @@ Environment variable loading and validation
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
 # Initialize console
 console = Console()
@@ -147,14 +145,14 @@ class HomelabConfig:
         domain = env_vars.get("DOMAIN", "localhost")
 
         return {
-            "homepage": f"http://localhost:3000",
-            "stremio": f"http://localhost:8080",
-            "homeassistant": f"http://localhost:8123",
-            "portainer": f"http://localhost:9000",
-            "pihole": f"http://localhost:8054",
-            "grafana": f"http://localhost:3002",
-            "uptime-kuma": f"http://localhost:3001",
-            "whats-up-docker": f"http://localhost:3003",
+            "homepage": "http://localhost:3000",
+            "stremio": "http://localhost:8080",
+            "homeassistant": "http://localhost:8123",
+            "portainer": "http://localhost:9000",
+            "pihole": "http://localhost:8054",
+            "grafana": "http://localhost:3002",
+            "uptime-kuma": "http://localhost:3001",
+            "whats-up-docker": "http://localhost:3003",
             "tailscale_homepage": f"http://{tailscale_ip}:3000",
             "tailscale_stremio": f"http://{tailscale_ip}:8080",
             "tailscale_homeassistant": f"http://{tailscale_ip}:8123",
