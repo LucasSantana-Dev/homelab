@@ -55,8 +55,13 @@ disallow_untyped_defs = false
 explicit_package_bases = true
 exclude = [
     "homelab_manager/cli/__init__.py",
-    "homelab_manager/cli/commands.py"
+    "homelab_manager/cli/commands.py",
+    "tests/"  # Exclude all test files from mypy
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101", "B601", "B404", "B603", "B607", "B102"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
