@@ -83,6 +83,7 @@ services:
     image: "ghcr.io/home-assistant/home-assistant:stable"
     container_name: homeassistant
     restart: unless-stopped
+    user: "${PUID}:${PGID}"
     volumes:
       - ./config/nginx/www/certbot:/var/www/certbot:ro
       - ./config/homeassistant/config:/config
