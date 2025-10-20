@@ -27,17 +27,24 @@ class TestContainerManager:
         mock_client = Mock()
         mock_client.ping.return_value = True
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             assert manager.check_docker_running() is True
 
     def test_check_docker_running_failure(self):
         """Test Docker running check failure"""
         import docker.errors
+
         mock_client = Mock()
         mock_client.ping.side_effect = docker.errors.APIError("Docker not running")
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             assert manager.check_docker_running() is False
 
@@ -53,7 +60,10 @@ class TestContainerManager:
         }
         mock_client.containers.get.return_value = mock_container
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             status = manager.get_container_status()
 
@@ -62,7 +72,9 @@ class TestContainerManager:
             # Find the homeassistant container
             homeassistant = next(c for c in status if c["name"] == "homeassistant")
             assert homeassistant["status"] == "running"
-            assert homeassistant["image"] == "ghcr.io/home-assistant/home-assistant:stable"
+            assert (
+                homeassistant["image"] == "ghcr.io/home-assistant/home-assistant:stable"
+            )
 
     def test_get_container_status_no_ports(self):
         """Test getting container status with no ports"""
@@ -79,7 +91,10 @@ class TestContainerManager:
             mock_containers[container_name] = mock_container
             mock_client.containers.get.return_value = mock_container
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             status = manager.get_container_status()
 
@@ -100,7 +115,10 @@ class TestContainerManager:
             mock_container.ports = {}
             mock_client.containers.get.return_value = mock_container
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             manager.display_container_status()
 
@@ -121,7 +139,10 @@ class TestContainerManager:
         mock_image.tags = ["test/image:newer"]
         mock_client.images.pull.return_value = mock_image
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             updates = manager.check_for_updates()
 
@@ -132,8 +153,10 @@ class TestContainerManager:
         """Test backing up container data"""
         mock_client = Mock()
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client), \
-             patch("subprocess.run") as mock_run:
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ), patch("subprocess.run") as mock_run:
 
             mock_run.return_value = Mock(returncode=0)
 
@@ -157,8 +180,14 @@ class TestContainerManager:
         mock_image.tags = ["test/image:newer"]
         mock_client.images.pull.return_value = mock_image
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client), \
-             patch("subprocess.run") as mock_run, patch("requests.get") as mock_requests, patch("time.sleep"):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ), patch("subprocess.run") as mock_run, patch(
+            "requests.get"
+        ) as mock_requests, patch(
+            "time.sleep"
+        ):
 
             mock_run.return_value = Mock(returncode=0)
 
@@ -177,7 +206,10 @@ class TestContainerManager:
         mock_client = Mock()
         mock_client.containers.get.side_effect = Exception("Container not found")
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             result = manager.update_container("nonexistent-container")
 
@@ -191,8 +223,10 @@ class TestContainerManager:
         mock_container.status = "running"  # Use status instead of health
         mock_client.containers.get.return_value = mock_container
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client), \
-             patch("time.sleep"), patch("requests.get") as mock_requests:
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ), patch("time.sleep"), patch("requests.get") as mock_requests:
 
             # Mock successful health check response
             mock_response = Mock()
@@ -212,8 +246,10 @@ class TestContainerManager:
         mock_container.status = "stopped"  # Use stopped status to simulate timeout
         mock_client.containers.get.return_value = mock_container
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client), \
-             patch("time.sleep"):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ), patch("time.sleep"):
 
             manager = ContainerManager()
             result = manager.wait_for_container_health("homeassistant")
@@ -222,8 +258,9 @@ class TestContainerManager:
 
     def test_show_disk_usage(self, capsys):
         """Test showing disk usage"""
-        with patch("homelab_manager.container_manager.docker.from_env"), \
-             patch("subprocess.run") as mock_run:
+        with patch("homelab_manager.container_manager.docker.from_env"), patch(
+            "subprocess.run"
+        ) as mock_run:
 
             mock_run.return_value = Mock(returncode=0, stdout="Disk usage info")
 
@@ -240,7 +277,10 @@ class TestContainerManager:
         mock_container.logs.return_value = b"Log line 1\nLog line 2\nLog line 3"
         mock_client.containers.get.return_value = mock_container
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             manager.show_recent_logs("test-container", lines=2)
 
@@ -254,7 +294,10 @@ class TestContainerManager:
         mock_image.tags = ["test/image:old"]
         mock_client.images.list.return_value = [mock_image]
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             manager.cleanup_old_images()
 
@@ -263,11 +306,12 @@ class TestContainerManager:
 
     def test_main_function(self):
         """Test the main function"""
-        from homelab_manager.container_manager import main
         from unittest.mock import patch
 
+        from homelab_manager.container_manager import main
+
         # Mock the argument parsing to avoid sys.argv conflicts
-        with patch('sys.argv', ['container_manager.py', 'status']):
+        with patch("sys.argv", ["container_manager.py", "status"]):
             # Should not raise any exceptions
             main()
             assert True
@@ -370,7 +414,9 @@ class TestContainerManager:
         with patch(
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("time.sleep"), patch("requests.get") as mock_requests:
+        ), patch("subprocess.run") as mock_run, patch("time.sleep"), patch(
+            "requests.get"
+        ) as mock_requests:
 
             manager = ContainerManager()
 
@@ -465,7 +511,9 @@ class TestContainerManager:
 
             assert isinstance(result, dict)
 
-    def test_backup_container_data_with_success(self, mock_docker_client, temp_homelab_dir):
+    def test_backup_container_data_with_success(
+        self, mock_docker_client, temp_homelab_dir
+    ):
         """Test backing up container data with success"""
         with patch(
             "homelab_manager.container_manager.docker.from_env",
@@ -485,7 +533,9 @@ class TestContainerManager:
 
             assert isinstance(result, Path)
 
-    def test_backup_container_data_with_no_data(self, mock_docker_client, temp_homelab_dir):
+    def test_backup_container_data_with_no_data(
+        self, mock_docker_client, temp_homelab_dir
+    ):
         """Test backing up container data when no data exists"""
         with patch(
             "homelab_manager.container_manager.docker.from_env",
@@ -525,12 +575,16 @@ class TestContainerManager:
 
             assert result is True
 
-    def test_update_container_with_health_check_failure(self, mock_docker_client, temp_homelab_dir):
+    def test_update_container_with_health_check_failure(
+        self, mock_docker_client, temp_homelab_dir
+    ):
         """Test updating a container with health check failure"""
         with patch(
             "homelab_manager.container_manager.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("time.sleep"), patch("requests.get") as mock_requests:
+        ), patch("subprocess.run") as mock_run, patch("time.sleep"), patch(
+            "requests.get"
+        ) as mock_requests:
 
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
@@ -596,8 +650,9 @@ class TestContainerManager:
 
     def test_show_disk_usage_with_success(self, capsys):
         """Test showing disk usage with success"""
-        with patch("homelab_manager.container_manager.docker.from_env"), \
-             patch("subprocess.run") as mock_run:
+        with patch("homelab_manager.container_manager.docker.from_env"), patch(
+            "subprocess.run"
+        ) as mock_run:
 
             mock_run.return_value = Mock(returncode=0, stdout="Disk usage info")
 
@@ -614,7 +669,10 @@ class TestContainerManager:
         mock_container.logs.return_value = b"test log output"
         mock_client.containers.get.return_value = mock_container
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             manager.show_recent_logs("test-container")
 
@@ -626,7 +684,10 @@ class TestContainerManager:
         mock_client = Mock()
         mock_client.containers.get.side_effect = Exception("Container not found")
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             manager.show_recent_logs("nonexistent-container")
 

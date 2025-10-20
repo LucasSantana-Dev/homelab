@@ -6,7 +6,7 @@ Tests for homelab_manager.config module
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
@@ -36,12 +36,23 @@ class TestHomelabConfig:
         config = HomelabConfig()
 
         expected_vars = [
-            "DOMAIN", "TIMEZONE", "PUID", "PGID", "TAILSCALE_IP",
-            "CF_API_TOKEN", "CF_TUNNEL_ID", "PIHOLE_WEB_PASSWORD",
-            "PIHOLE_LOCAL_IPV4", "GRAFANA_PASSWORD", "HOMEASSISTANT_KEY",
-            "LUKBOT_SENTRY_DSN", "LUKBOT_SENTRY_ORG_SLUG",
-            "LUKBOT_SENTRY_PROJECT_SLUG", "LUKBOT_SENTRY_AUTH_TOKEN",
-            "WUD_DISCORD_WEBHOOK_URL", "WUD_SMTP_PASS"
+            "DOMAIN",
+            "TIMEZONE",
+            "PUID",
+            "PGID",
+            "TAILSCALE_IP",
+            "CF_API_TOKEN",
+            "CF_TUNNEL_ID",
+            "PIHOLE_WEB_PASSWORD",
+            "PIHOLE_LOCAL_IPV4",
+            "GRAFANA_PASSWORD",
+            "HOMEASSISTANT_KEY",
+            "LUKBOT_SENTRY_DSN",
+            "LUKBOT_SENTRY_ORG_SLUG",
+            "LUKBOT_SENTRY_PROJECT_SLUG",
+            "LUKBOT_SENTRY_AUTH_TOKEN",
+            "WUD_DISCORD_WEBHOOK_URL",
+            "WUD_SMTP_PASS",
         ]
 
         for var in expected_vars:
@@ -53,8 +64,13 @@ class TestHomelabConfig:
         config = HomelabConfig()
 
         expected_vars = [
-            "WUD_SMTP_HOST", "WUD_SMTP_PORT", "WUD_SMTP_USER",
-            "WUD_SMTP_FROM", "WUD_SMTP_TO", "MEDIA_PATH", "USER_HOME"
+            "WUD_SMTP_HOST",
+            "WUD_SMTP_PORT",
+            "WUD_SMTP_USER",
+            "WUD_SMTP_FROM",
+            "WUD_SMTP_TO",
+            "MEDIA_PATH",
+            "USER_HOME",
         ]
 
         for var in expected_vars:
@@ -66,7 +82,7 @@ class TestHomelabConfig:
         with tempfile.TemporaryDirectory() as temp_dir:
             config = HomelabConfig(temp_dir)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 result = config.load_environment()
 
                 assert result == {}
@@ -91,7 +107,7 @@ CF_API_TOKEN=test_token_123
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 result = config.load_environment()
 
                 expected_vars = {
@@ -100,19 +116,21 @@ CF_API_TOKEN=test_token_123
                     "PUID": "1000",
                     "PGID": "1000",
                     "TAILSCALE_IP": "192.168.1.100",
-                    "CF_API_TOKEN": "test_token_123"
+                    "CF_API_TOKEN": "test_token_123",
                 }
 
                 assert result == expected_vars
-                mock_print.assert_called_with("✅ Environment variables loaded successfully", style="green")
+                mock_print.assert_called_with(
+                    "✅ Environment variables loaded successfully", style="green"
+                )
 
     def test_load_environment_with_quotes(self):
         """Test loading environment with quoted values"""
-        env_content = '''# Test environment file
+        env_content = """# Test environment file
 DOMAIN="example.com"
 TIMEZONE='UTC'
 PUID="1000"
-'''
+"""
 
         with tempfile.TemporaryDirectory() as temp_dir:
             config = HomelabConfig(temp_dir)
@@ -123,11 +141,7 @@ PUID="1000"
 
             result = config.load_environment()
 
-            expected_vars = {
-                "DOMAIN": "example.com",
-                "TIMEZONE": "UTC",
-                "PUID": "1000"
-            }
+            expected_vars = {"DOMAIN": "example.com", "TIMEZONE": "UTC", "PUID": "1000"}
 
             assert result == expected_vars
 
@@ -146,17 +160,16 @@ TIMEZONE=UTC
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 result = config.load_environment()
 
-                expected_vars = {
-                    "DOMAIN": "example.com",
-                    "TIMEZONE": "UTC"
-                }
+                expected_vars = {"DOMAIN": "example.com", "TIMEZONE": "UTC"}
 
                 assert result == expected_vars
                 # Should print warning for invalid line
-                mock_print.assert_any_call("⚠️ Invalid line 3: INVALID_LINE_NO_EQUALS", style="yellow")
+                mock_print.assert_any_call(
+                    "⚠️ Invalid line 3: INVALID_LINE_NO_EQUALS", style="yellow"
+                )
 
     def test_load_environment_file_error(self):
         """Test loading environment with file read error"""
@@ -168,12 +181,14 @@ TIMEZONE=UTC
             with open(env_file, "w") as f:
                 f.write("test")
 
-            with patch('builtins.open', side_effect=IOError("Read error")):
-                with patch('rich.console.Console.print') as mock_print:
+            with patch("builtins.open", side_effect=IOError("Read error")):
+                with patch("rich.console.Console.print") as mock_print:
                     result = config.load_environment()
 
                     assert result == {}
-                    mock_print.assert_called_with("❌ Error loading environment: Read error", style="red")
+                    mock_print.assert_called_with(
+                        "❌ Error loading environment: Read error", style="red"
+                    )
 
     def test_validate_environment_success(self):
         """Test successful environment validation"""
@@ -204,7 +219,7 @@ WUD_SMTP_PASS=strongpassword123
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 is_valid, errors = config.validate_environment()
 
                 assert is_valid is True
@@ -226,7 +241,7 @@ PGID=1000
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 is_valid, errors = config.validate_environment()
 
                 assert is_valid is False
@@ -249,7 +264,7 @@ TAILSCALE_IP=invalid_ip
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 is_valid, errors = config.validate_environment()
 
                 assert is_valid is False
@@ -291,7 +306,7 @@ USER_HOME=/home/user
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 is_valid, errors = config.validate_environment()
 
                 assert is_valid is True
@@ -326,7 +341,7 @@ WUD_SMTP_PASS=admin
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 is_valid, errors = config.validate_environment()
 
                 assert is_valid is False
@@ -361,11 +376,13 @@ WUD_SMTP_PASS=xyz
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 is_valid, errors = config.validate_environment()
 
                 assert is_valid is False
-                assert any("should be at least 8 characters" in error for error in errors)
+                assert any(
+                    "should be at least 8 characters" in error for error in errors
+                )
 
     def test_create_env_example_success(self):
         """Test successful creation of .env.example file"""
@@ -386,7 +403,7 @@ CF_API_TOKEN=test_token_123456789012345678901234567890
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 result = config.create_env_example()
 
                 assert result is True
@@ -399,14 +416,16 @@ CF_API_TOKEN=test_token_123456789012345678901234567890
                 assert "your_domain_here" in example_content
                 assert "your_timezone_here" in example_content
                 assert "your_puid_here" in example_content
-                mock_print.assert_called_with(f"✅ Created {example_file}", style="green")
+                mock_print.assert_called_with(
+                    f"✅ Created {example_file}", style="green"
+                )
 
     def test_create_env_example_file_not_found(self):
         """Test creating .env.example when .env file doesn't exist"""
         with tempfile.TemporaryDirectory() as temp_dir:
             config = HomelabConfig(temp_dir)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 result = config.create_env_example()
 
                 assert result is False
@@ -421,12 +440,14 @@ CF_API_TOKEN=test_token_123456789012345678901234567890
             with open(env_file, "w") as f:
                 f.write("test")
 
-            with patch('builtins.open', side_effect=IOError("Write error")):
-                with patch('rich.console.Console.print') as mock_print:
+            with patch("builtins.open", side_effect=IOError("Write error")):
+                with patch("rich.console.Console.print") as mock_print:
                     result = config.create_env_example()
 
                     assert result is False
-                    mock_print.assert_called_with("❌ Error creating example file: Write error", style="red")
+                    mock_print.assert_called_with(
+                        "❌ Error creating example file: Write error", style="red"
+                    )
 
     def test_show_config_summary(self):
         """Test showing configuration summary"""
@@ -457,7 +478,7 @@ WUD_SMTP_PASS=strongpassword123
             with open(env_file, "w") as f:
                 f.write(env_content)
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 config.show_config_summary()
 
                 # Should print panel and table
@@ -465,64 +486,68 @@ WUD_SMTP_PASS=strongpassword123
 
     def test_main_function_load(self):
         """Test main function with load action"""
-        with patch('homelab_manager.config.HomelabConfig') as mock_config_class:
+        with patch("homelab_manager.config.HomelabConfig") as mock_config_class:
             mock_config = Mock()
             mock_config_class.return_value = mock_config
 
-            with patch('argparse.ArgumentParser') as mock_parser:
+            with patch("argparse.ArgumentParser") as mock_parser:
                 mock_args = Mock()
                 mock_args.action = "load"
                 mock_parser.return_value.parse_args.return_value = mock_args
 
                 from homelab_manager.config import main
+
                 main()
 
                 mock_config.load_environment.assert_called_once()
 
     def test_main_function_validate(self):
         """Test main function with validate action"""
-        with patch('homelab_manager.config.HomelabConfig') as mock_config_class:
+        with patch("homelab_manager.config.HomelabConfig") as mock_config_class:
             mock_config = Mock()
             mock_config_class.return_value = mock_config
 
-            with patch('argparse.ArgumentParser') as mock_parser:
+            with patch("argparse.ArgumentParser") as mock_parser:
                 mock_args = Mock()
                 mock_args.action = "validate"
                 mock_parser.return_value.parse_args.return_value = mock_args
 
                 from homelab_manager.config import main
+
                 main()
 
                 mock_config.validate_environment.assert_called_once()
 
     def test_main_function_summary(self):
         """Test main function with summary action"""
-        with patch('homelab_manager.config.HomelabConfig') as mock_config_class:
+        with patch("homelab_manager.config.HomelabConfig") as mock_config_class:
             mock_config = Mock()
             mock_config_class.return_value = mock_config
 
-            with patch('argparse.ArgumentParser') as mock_parser:
+            with patch("argparse.ArgumentParser") as mock_parser:
                 mock_args = Mock()
                 mock_args.action = "summary"
                 mock_parser.return_value.parse_args.return_value = mock_args
 
                 from homelab_manager.config import main
+
                 main()
 
                 mock_config.show_config_summary.assert_called_once()
 
     def test_main_function_create_example(self):
         """Test main function with create-example action"""
-        with patch('homelab_manager.config.HomelabConfig') as mock_config_class:
+        with patch("homelab_manager.config.HomelabConfig") as mock_config_class:
             mock_config = Mock()
             mock_config_class.return_value = mock_config
 
-            with patch('argparse.ArgumentParser') as mock_parser:
+            with patch("argparse.ArgumentParser") as mock_parser:
                 mock_args = Mock()
                 mock_args.action = "create-example"
                 mock_parser.return_value.parse_args.return_value = mock_args
 
                 from homelab_manager.config import main
+
                 main()
 
                 mock_config.create_env_example.assert_called_once()

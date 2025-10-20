@@ -8,13 +8,20 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 import docker
 from rich.console import Console
 
 # Initialize console
 console = Console()
+
+
+class ServiceInfo(TypedDict):
+    """Type definition for service information"""
+    port: int
+    health_url: str
+    data_path: str
 
 
 class ContainerManager:
@@ -34,43 +41,43 @@ class ContainerManager:
             "homepage": {
                 "port": 3000,
                 "health_url": "http://localhost:3000",
-                "data_path": "homepage"
+                "data_path": "homepage",
             },
             "stremio": {
                 "port": 8080,
                 "health_url": "http://localhost:8080",
-                "data_path": "stremio"
+                "data_path": "stremio",
             },
             "homeassistant": {
                 "port": 8123,
                 "health_url": "http://localhost:8123",
-                "data_path": "homeassistant"
+                "data_path": "homeassistant",
             },
             "portainer": {
                 "port": 9000,
                 "health_url": "http://localhost:9000",
-                "data_path": "portainer"
+                "data_path": "portainer",
             },
             "pihole": {
                 "port": 8054,
                 "health_url": "http://localhost:8054",
-                "data_path": "pihole"
+                "data_path": "pihole",
             },
             "grafana": {
                 "port": 3002,
                 "health_url": "http://localhost:3002",
-                "data_path": "grafana"
+                "data_path": "grafana",
             },
             "uptime-kuma": {
                 "port": 3001,
                 "health_url": "http://localhost:3001",
-                "data_path": "uptime-kuma"
+                "data_path": "uptime-kuma",
             },
             "whats-up-docker": {
                 "port": 3003,
                 "health_url": "http://localhost:3003",
-                "data_path": "whats-up-docker"
-            }
+                "data_path": "whats-up-docker",
+            },
         }
 
     def get_container_status(self) -> List[Dict]:
@@ -82,23 +89,29 @@ class ContainerManager:
                 if any(service in container.name for service in self.services.keys()):
                     service_info = self._get_service_info(container.name)
                     if service_info:
-                        containers.append({
-                            "name": container.name,
-                            "status": container.status,
-                            "port": service_info.get("port"),
-                            "health": self._check_container_health(container.name),
-                            "image": container.image.tags[0] if container.image.tags else "unknown"
-                        })
+                        containers.append(
+                            {
+                                "name": container.name,
+                                "status": container.status,
+                                "port": service_info.get("port"),
+                                "health": self._check_container_health(container.name),
+                                "image": (
+                                    container.image.tags[0]
+                                    if container.image.tags
+                                    else "unknown"
+                                ),
+                            }
+                        )
         except Exception as e:
             console.print(f"Error getting container status: {e}")
 
         return containers
 
-    def _get_service_info(self, container_name: str) -> Optional[Dict]:
+    def _get_service_info(self, container_name: str) -> Optional[ServiceInfo]:
         """Get service information for a container"""
         for service, info in self.services.items():
             if service in container_name:
-                return info
+                return ServiceInfo(info)  # type: ignore
         return None
 
     def _check_container_health(self, container_name: str) -> str:
@@ -111,7 +124,7 @@ class ContainerManager:
             # Check if container has health status
             health = container.attrs.get("State", {}).get("Health", {})
             if health:
-                return health.get("Status", "unknown")
+                return str(health.get("Status", "unknown"))
 
             return "running"
         except Exception:
@@ -130,26 +143,23 @@ class ContainerManager:
                 ["docker", "compose", "up", "-d"],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
 
             return {
                 "success": True,
                 "message": "Homelab deployed successfully",
-                "output": result.stdout
+                "output": result.stdout,
             }
 
         except subprocess.CalledProcessError as e:
             return {
                 "success": False,
                 "error": f"Deployment failed: {e.stderr}",
-                "output": e.stdout
+                "output": e.stdout,
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Deployment error: {str(e)}"
-            }
+            return {"success": False, "error": f"Deployment error: {str(e)}"}
 
     def create_backup(self) -> Dict:
         """Create backup of homelab data"""
@@ -162,28 +172,29 @@ class ContainerManager:
 
             # Create backup of appdata directory
             result = subprocess.run(
-                ["tar", "-czf", str(backup_path), "-C", str(self.project_root), "appdata"],
+                [
+                    "tar",
+                    "-czf",
+                    str(backup_path),
+                    "-C",
+                    str(self.project_root),
+                    "appdata",
+                ],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
 
             return {
                 "success": True,
                 "backup_path": str(backup_path),
-                "message": f"Backup created: {backup_name}"
+                "message": f"Backup created: {backup_name}",
             }
 
         except subprocess.CalledProcessError as e:
-            return {
-                "success": False,
-                "error": f"Backup failed: {e.stderr}"
-            }
+            return {"success": False, "error": f"Backup failed: {e.stderr}"}
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Backup error: {str(e)}"
-            }
+            return {"success": False, "error": f"Backup error: {str(e)}"}
 
     def restore_backup(self, backup_path: str) -> Dict:
         """Restore homelab from backup"""
@@ -192,16 +203,14 @@ class ContainerManager:
             if not backup_file.exists():
                 return {
                     "success": False,
-                    "error": f"Backup file not found: {backup_path}"
+                    "error": f"Backup file not found: {backup_path}",
                 }
 
             console.print(f"🔄 Restoring from backup: {backup_file.name}")
 
             # Stop services first
             subprocess.run(
-                ["docker", "compose", "down"],
-                capture_output=True,
-                text=True
+                ["docker", "compose", "down"], capture_output=True, text=True
             )
 
             # Restore backup
@@ -209,31 +218,20 @@ class ContainerManager:
                 ["tar", "-xzf", str(backup_file), "-C", str(self.project_root)],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
 
             # Restart services
             subprocess.run(
-                ["docker", "compose", "up", "-d"],
-                capture_output=True,
-                text=True
+                ["docker", "compose", "up", "-d"], capture_output=True, text=True
             )
 
-            return {
-                "success": True,
-                "message": "Backup restored successfully"
-            }
+            return {"success": True, "message": "Backup restored successfully"}
 
         except subprocess.CalledProcessError as e:
-            return {
-                "success": False,
-                "error": f"Restore failed: {e.stderr}"
-            }
+            return {"success": False, "error": f"Restore failed: {e.stderr}"}
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Restore error: {str(e)}"
-            }
+            return {"success": False, "error": f"Restore error: {str(e)}"}
 
     def get_service_logs(self, service_name: str, lines: int = 50) -> str:
         """Get logs for a specific service"""
@@ -242,7 +240,7 @@ class ContainerManager:
                 ["docker", "compose", "logs", "--tail", str(lines), service_name],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
@@ -259,21 +257,21 @@ class ContainerManager:
                 ["docker", "compose", "restart", service_name],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
 
             return {
                 "success": True,
-                "message": f"{service_name} restarted successfully"
+                "message": f"{service_name} restarted successfully",
             }
 
         except subprocess.CalledProcessError as e:
             return {
                 "success": False,
-                "error": f"Restart failed for {service_name}: {e.stderr}"
+                "error": f"Restart failed for {service_name}: {e.stderr}",
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Restart error for {service_name}: {str(e)}"
+                "error": f"Restart error for {service_name}: {str(e)}",
             }

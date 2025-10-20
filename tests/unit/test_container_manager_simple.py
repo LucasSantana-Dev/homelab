@@ -21,25 +21,34 @@ class TestContainerManagerSimple:
         with patch("homelab_manager.container_manager.docker.from_env"):
             manager = ContainerManager()
             assert manager is not None
-            assert hasattr(manager, 'containers')
-            assert len(manager.containers) == 4  # homeassistant, homepage, grafana, filebrowser
+            assert hasattr(manager, "containers")
+            assert (
+                len(manager.containers) == 4
+            )  # homeassistant, homepage, grafana, filebrowser
 
     def test_check_docker_running_success(self):
         """Test Docker running check success"""
         mock_client = Mock()
         mock_client.ping.return_value = True
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             assert manager.check_docker_running() is True
 
     def test_check_docker_running_failure(self):
         """Test Docker running check failure"""
         import docker.errors
+
         mock_client = Mock()
         mock_client.ping.side_effect = docker.errors.APIError("Docker not running")
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             assert manager.check_docker_running() is False
 
@@ -49,7 +58,12 @@ class TestContainerManagerSimple:
             manager = ContainerManager()
 
             # Check that all expected containers are present
-            expected_containers = ["homeassistant", "homepage", "grafana", "filebrowser"]
+            expected_containers = [
+                "homeassistant",
+                "homepage",
+                "grafana",
+                "filebrowser",
+            ]
             for container in expected_containers:
                 assert container in manager.containers
                 assert "image" in manager.containers[container]
@@ -58,8 +72,9 @@ class TestContainerManagerSimple:
 
     def test_show_disk_usage(self, capsys):
         """Test showing disk usage"""
-        with patch("homelab_manager.container_manager.docker.from_env"), \
-             patch("subprocess.run") as mock_run:
+        with patch("homelab_manager.container_manager.docker.from_env"), patch(
+            "subprocess.run"
+        ) as mock_run:
 
             mock_run.return_value = Mock(returncode=0, stdout="Disk usage info")
 
@@ -76,7 +91,10 @@ class TestContainerManagerSimple:
         mock_image.tags = ["test/image:old"]
         mock_client.images.list.return_value = [mock_image]
 
-        with patch("homelab_manager.container_manager.docker.from_env", return_value=mock_client):
+        with patch(
+            "homelab_manager.container_manager.docker.from_env",
+            return_value=mock_client,
+        ):
             manager = ContainerManager()
             manager.cleanup_old_images()
 
@@ -85,11 +103,12 @@ class TestContainerManagerSimple:
 
     def test_main_function(self):
         """Test the main function"""
-        from homelab_manager.container_manager import main
         from unittest.mock import patch
 
+        from homelab_manager.container_manager import main
+
         # Mock the argument parsing to avoid sys.argv conflicts
-        with patch('sys.argv', ['container_manager.py', 'status']):
+        with patch("sys.argv", ["container_manager.py", "status"]):
             # Should not raise any exceptions
             main()
             assert True

@@ -50,17 +50,17 @@ class HomelabConfig:
         env_vars = {}
 
         if self.env_file.exists():
-            with open(self.env_file, 'r') as f:
+            with open(self.env_file, "r") as f:
                 for line in f:
                     line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
+                    if line and not line.startswith("#") and "=" in line:
+                        key, value = line.split("=", 1)
                         # Handle variable substitution syntax
-                        if value.startswith('${') and value.endswith('}'):
+                        if value.startswith("${") and value.endswith("}"):
                             # Extract the variable name and default value
                             var_content = value[2:-1]  # Remove ${ and }
-                            if ':-' in var_content:
-                                var_name, default_value = var_content.split(':-', 1)
+                            if ":-" in var_content:
+                                var_name, default_value = var_content.split(":-", 1)
                                 env_vars[key] = os.environ.get(var_name, default_value)
                             else:
                                 env_vars[key] = os.environ.get(var_content, value)
@@ -85,7 +85,11 @@ class HomelabConfig:
         # Check optional variables
         for var_name, pattern in self.optional_vars.items():
             value = env_vars.get(var_name, "")
-            if not value or value.startswith("your_") or value == "your_cloudflare_api_token_here":
+            if (
+                not value
+                or value.startswith("your_")
+                or value == "your_cloudflare_api_token_here"
+            ):
                 validation_results[var_name] = False
             else:
                 validation_results[var_name] = bool(re.match(pattern, value))
@@ -108,7 +112,7 @@ class HomelabConfig:
             summary[var_name] = {
                 "value": value,
                 "valid": validation_results.get(var_name, False),
-                "required": True
+                "required": True,
             }
 
         # Optional variables
@@ -120,7 +124,7 @@ class HomelabConfig:
             summary[var_name] = {
                 "value": value,
                 "valid": validation_results.get(var_name, False),
-                "required": False
+                "required": False,
             }
 
         return summary
@@ -166,5 +170,5 @@ class HomelabConfig:
             "public_stremio": f"https://stremio.{domain}",
             "public_grafana": f"https://grafana.{domain}",
             "public_uptime": f"https://uptime.{domain}",
-            "public_docker": f"https://docker.{domain}"
+            "public_docker": f"https://docker.{domain}",
         }

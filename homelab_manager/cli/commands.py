@@ -5,6 +5,7 @@ Command definitions for homelab management
 """
 
 from typing import Optional
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -26,7 +27,7 @@ def create_app() -> typer.Typer:
         name="homelab",
         help="Modern homelab management CLI",
         add_completion=False,
-        rich_markup_mode="rich"
+        rich_markup_mode="rich",
     )
 
     # Initialize managers
@@ -58,7 +59,7 @@ def create_app() -> typer.Typer:
                 container["name"],
                 f"{status_icon} {container['status']}",
                 str(container.get("port", "N/A")),
-                health_icon
+                health_icon,
             )
 
         console.print(table)
@@ -112,7 +113,7 @@ def create_app() -> typer.Typer:
 
             for service, status in health_status.items():
                 status_icon = "✅" if status["healthy"] else "❌"
-                response_time = status.get('response_time')
+                response_time = status.get("response_time")
                 if response_time is not None:
                     response_time = f"{response_time:.2f}ms"
                 else:
@@ -122,7 +123,7 @@ def create_app() -> typer.Typer:
                     service,
                     f"{status_icon} {'Healthy' if status['healthy'] else 'Unhealthy'}",
                     response_time,
-                    status.get("last_check", "Never")
+                    status.get("last_check", "Never"),
                 )
 
             console.print(table)
@@ -148,9 +149,7 @@ def create_app() -> typer.Typer:
             raise typer.Exit(1)
 
     @app.command()
-    def restore(
-        backup_path: str = typer.Argument(..., help="Path to backup file")
-    ):
+    def restore(backup_path: str = typer.Argument(..., help="Path to backup file")):
         """Restore homelab from backup"""
         console.print(Panel.fit("🔄 Restoring from Backup", style="bold yellow"))
 
@@ -167,7 +166,9 @@ def create_app() -> typer.Typer:
 
     @app.command()
     def logs(
-        service: Optional[str] = typer.Argument(None, help="Service name to get logs for")
+        service: Optional[str] = typer.Argument(
+            None, help="Service name to get logs for"
+        )
     ):
         """Show service logs"""
         console.print(Panel.fit("📋 Service Logs", style="bold cyan"))
@@ -209,7 +210,7 @@ def create_app() -> typer.Typer:
                 table.add_row(
                     setting,
                     info["value"],
-                    f"{status_icon} {'Valid' if info['valid'] else 'Invalid'}"
+                    f"{status_icon} {'Valid' if info['valid'] else 'Invalid'}",
                 )
 
             console.print(table)
@@ -234,8 +235,14 @@ def create_app() -> typer.Typer:
             table.add_column("Public", style="magenta")
 
             services = [
-                "homepage", "stremio", "homeassistant", "portainer",
-                "pihole", "grafana", "uptime-kuma", "whats-up-docker"
+                "homepage",
+                "stremio",
+                "homeassistant",
+                "portainer",
+                "pihole",
+                "grafana",
+                "uptime-kuma",
+                "whats-up-docker",
             ]
 
             for service in services:
@@ -243,12 +250,7 @@ def create_app() -> typer.Typer:
                 tailscale_url = urls.get(f"tailscale_{service}", "N/A")
                 public_url = urls.get(f"public_{service}", "N/A")
 
-                table.add_row(
-                    service.title(),
-                    localhost_url,
-                    tailscale_url,
-                    public_url
-                )
+                table.add_row(service.title(), localhost_url, tailscale_url, public_url)
 
             console.print(table)
 

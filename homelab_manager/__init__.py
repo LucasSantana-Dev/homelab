@@ -16,5 +16,5 @@ __all__ = [
     "HomelabConfig",
     "ContainerManager",
     "HealthMonitor",
-    "UpdateManager"
+    "UpdateManager",
 ]

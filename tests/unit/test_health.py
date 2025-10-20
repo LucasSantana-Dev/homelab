@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import requests
@@ -21,7 +21,7 @@ class TestHomelabHealthMonitor:
 
     def test_init_with_default_path(self):
         """Test initialization with default path"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor()
@@ -34,7 +34,7 @@ class TestHomelabHealthMonitor:
         """Test initialization with custom path"""
         custom_path = "/custom/homelab"
 
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor(custom_path)
@@ -44,17 +44,22 @@ class TestHomelabHealthMonitor:
 
     def test_init_docker_not_available(self):
         """Test initialization when Docker is not available"""
-        with patch('homelab_manager.health.docker.from_env', side_effect=Exception("Docker not available")):
-            with patch('rich.console.Console.print') as mock_print:
-                with patch('homelab_manager.health.sys.exit') as mock_exit:
+        with patch(
+            "homelab_manager.health.docker.from_env",
+            side_effect=Exception("Docker not available"),
+        ):
+            with patch("rich.console.Console.print") as mock_print:
+                with patch("homelab_manager.health.sys.exit") as mock_exit:
                     HomelabHealthMonitor()
 
-                    mock_print.assert_called_with("❌ Docker is not running or not accessible", style="red")
+                    mock_print.assert_called_with(
+                        "❌ Docker is not running or not accessible", style="red"
+                    )
                     mock_exit.assert_called_with(1)
 
     def test_services_defined(self):
         """Test that services are properly defined"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor()
@@ -74,17 +79,19 @@ class TestHomelabHealthMonitor:
 
     def test_check_service_health_success(self):
         """Test successful service health check"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor()
 
-            with patch('requests.get') as mock_get:
+            with patch("requests.get") as mock_get:
                 mock_response = Mock()
                 mock_response.status_code = 200
                 mock_get.return_value = mock_response
 
-                is_healthy, details = monitor.check_service_health("Test Service", "http://localhost:3000")
+                is_healthy, details = monitor.check_service_health(
+                    "Test Service", "http://localhost:3000"
+                )
 
                 assert is_healthy is True
                 assert details == "Status 200"
@@ -92,57 +99,73 @@ class TestHomelabHealthMonitor:
 
     def test_check_service_health_server_error(self):
         """Test service health check with server error"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor()
 
-            with patch('requests.get') as mock_get:
+            with patch("requests.get") as mock_get:
                 mock_response = Mock()
                 mock_response.status_code = 500
                 mock_get.return_value = mock_response
 
-                is_healthy, details = monitor.check_service_health("Test Service", "http://localhost:3000")
+                is_healthy, details = monitor.check_service_health(
+                    "Test Service", "http://localhost:3000"
+                )
 
                 assert is_healthy is False
                 assert details == "Status 500"
 
     def test_check_service_health_connection_error(self):
         """Test service health check with connection error"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor()
 
-            with patch('requests.get', side_effect=requests.exceptions.ConnectionError("Connection failed")):
-                is_healthy, details = monitor.check_service_health("Test Service", "http://localhost:3000")
+            with patch(
+                "requests.get",
+                side_effect=requests.exceptions.ConnectionError("Connection failed"),
+            ):
+                is_healthy, details = monitor.check_service_health(
+                    "Test Service", "http://localhost:3000"
+                )
 
                 assert is_healthy is False
                 assert "Connection failed" in details
 
     def test_check_service_health_timeout(self):
         """Test service health check with timeout"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor()
 
-            with patch('requests.get', side_effect=requests.exceptions.Timeout("Request timeout")):
-                is_healthy, details = monitor.check_service_health("Test Service", "http://localhost:3000")
+            with patch(
+                "requests.get",
+                side_effect=requests.exceptions.Timeout("Request timeout"),
+            ):
+                is_healthy, details = monitor.check_service_health(
+                    "Test Service", "http://localhost:3000"
+                )
 
                 assert is_healthy is False
                 assert "Request timeout" in details
 
     def test_check_system_resources(self):
         """Test system resource checking"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_docker.return_value = Mock()
 
             monitor = HomelabHealthMonitor()
 
-            with patch('homelab_manager.health.psutil.cpu_percent', return_value=50.0), \
-                 patch('homelab_manager.health.psutil.virtual_memory') as mock_memory, \
-                 patch('homelab_manager.health.psutil.disk_usage') as mock_disk:
+            with patch(
+                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
+            ), patch(
+                "homelab_manager.health.psutil.virtual_memory"
+            ) as mock_memory, patch(
+                "homelab_manager.health.psutil.disk_usage"
+            ) as mock_disk:
 
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
@@ -155,7 +178,7 @@ class TestHomelabHealthMonitor:
 
     def test_check_docker_containers_success(self):
         """Test successful Docker container checking"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
@@ -181,7 +204,7 @@ class TestHomelabHealthMonitor:
 
     def test_check_docker_containers_no_ports(self):
         """Test Docker container checking with no ports"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
@@ -202,22 +225,24 @@ class TestHomelabHealthMonitor:
 
     def test_check_docker_containers_exception(self):
         """Test Docker container checking with exception"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
             mock_client.containers.list.side_effect = Exception("Docker error")
 
-            with patch('rich.console.Console.print') as mock_print:
+            with patch("rich.console.Console.print") as mock_print:
                 monitor = HomelabHealthMonitor()
                 containers = monitor.check_docker_containers()
 
                 assert containers == []
-                mock_print.assert_called_with("⚠️ Error checking containers: Docker error", style="yellow")
+                mock_print.assert_called_with(
+                    "⚠️ Error checking containers: Docker error", style="yellow"
+                )
 
     def test_run_health_check(self):
         """Test comprehensive health check"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
@@ -230,12 +255,20 @@ class TestHomelabHealthMonitor:
 
             mock_client.containers.list.return_value = [mock_container]
 
-            with patch('homelab_manager.health.psutil.cpu_percent', return_value=50.0), \
-                 patch('homelab_manager.health.psutil.virtual_memory') as mock_memory, \
-                 patch('homelab_manager.health.psutil.disk_usage') as mock_disk, \
-                 patch('homelab_manager.health.requests.get') as mock_get, \
-                 patch('homelab_manager.health.console.print') as mock_print, \
-                 patch('homelab_manager.health.time.strftime', return_value="2023-01-01 12:00:00"):
+            with patch(
+                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
+            ), patch(
+                "homelab_manager.health.psutil.virtual_memory"
+            ) as mock_memory, patch(
+                "homelab_manager.health.psutil.disk_usage"
+            ) as mock_disk, patch(
+                "homelab_manager.health.requests.get"
+            ) as mock_get, patch(
+                "homelab_manager.health.console.print"
+            ) as mock_print, patch(
+                "homelab_manager.health.time.strftime",
+                return_value="2023-01-01 12:00:00",
+            ):
 
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
@@ -252,7 +285,7 @@ class TestHomelabHealthMonitor:
 
     def test_quick_status(self):
         """Test quick status overview"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
@@ -265,13 +298,22 @@ class TestHomelabHealthMonitor:
             mock_container2.name = "container2"
             mock_container2.status = "stopped"
 
-            mock_client.containers.list.return_value = [mock_container1, mock_container2]
+            mock_client.containers.list.return_value = [
+                mock_container1,
+                mock_container2,
+            ]
 
-            with patch('homelab_manager.health.psutil.cpu_percent', return_value=50.0), \
-                 patch('homelab_manager.health.psutil.virtual_memory') as mock_memory, \
-                 patch('homelab_manager.health.psutil.disk_usage') as mock_disk, \
-                 patch('homelab_manager.health.requests.get') as mock_get, \
-                 patch('homelab_manager.health.console.print') as mock_print:
+            with patch(
+                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
+            ), patch(
+                "homelab_manager.health.psutil.virtual_memory"
+            ) as mock_memory, patch(
+                "homelab_manager.health.psutil.disk_usage"
+            ) as mock_disk, patch(
+                "homelab_manager.health.requests.get"
+            ) as mock_get, patch(
+                "homelab_manager.health.console.print"
+            ) as mock_print:
 
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
@@ -288,17 +330,23 @@ class TestHomelabHealthMonitor:
 
     def test_quick_status_container_error(self):
         """Test quick status with container error"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
             mock_client.containers.list.side_effect = Exception("Container error")
 
-            with patch('homelab_manager.health.psutil.cpu_percent', return_value=50.0), \
-                 patch('homelab_manager.health.psutil.virtual_memory') as mock_memory, \
-                 patch('homelab_manager.health.psutil.disk_usage') as mock_disk, \
-                 patch('homelab_manager.health.requests.get') as mock_get, \
-                 patch('homelab_manager.health.console.print') as mock_print:
+            with patch(
+                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
+            ), patch(
+                "homelab_manager.health.psutil.virtual_memory"
+            ) as mock_memory, patch(
+                "homelab_manager.health.psutil.disk_usage"
+            ) as mock_disk, patch(
+                "homelab_manager.health.requests.get"
+            ) as mock_get, patch(
+                "homelab_manager.health.console.print"
+            ) as mock_print:
 
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
@@ -315,20 +363,30 @@ class TestHomelabHealthMonitor:
 
     def test_monitor_continuous(self):
         """Test continuous monitoring"""
-        with patch('homelab_manager.health.docker.from_env') as mock_docker:
+        with patch("homelab_manager.health.docker.from_env") as mock_docker:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
             mock_client.containers.list.return_value = []
 
-            with patch('homelab_manager.health.psutil.cpu_percent', return_value=50.0), \
-                 patch('homelab_manager.health.psutil.virtual_memory') as mock_memory, \
-                 patch('homelab_manager.health.psutil.disk_usage') as mock_disk, \
-                 patch('homelab_manager.health.requests.get') as mock_get, \
-                 patch('homelab_manager.health.console.print') as mock_print, \
-                 patch('homelab_manager.health.subprocess.run') as mock_subprocess, \
-                 patch('homelab_manager.health.time.sleep') as mock_sleep, \
-                 patch('homelab_manager.health.time.strftime', return_value="2023-01-01 12:00:00"):
+            with patch(
+                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
+            ), patch(
+                "homelab_manager.health.psutil.virtual_memory"
+            ) as mock_memory, patch(
+                "homelab_manager.health.psutil.disk_usage"
+            ) as mock_disk, patch(
+                "homelab_manager.health.requests.get"
+            ) as mock_get, patch(
+                "homelab_manager.health.console.print"
+            ) as mock_print, patch(
+                "homelab_manager.health.subprocess.run"
+            ) as mock_subprocess, patch(
+                "homelab_manager.health.time.sleep"
+            ) as mock_sleep, patch(
+                "homelab_manager.health.time.strftime",
+                return_value="2023-01-01 12:00:00",
+            ):
 
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
@@ -348,51 +406,54 @@ class TestHomelabHealthMonitor:
 
     def test_main_function_check(self):
         """Test main function with check action"""
-        with patch('homelab_manager.health.HomelabHealthMonitor') as mock_monitor_class:
+        with patch("homelab_manager.health.HomelabHealthMonitor") as mock_monitor_class:
             mock_monitor = Mock()
             mock_monitor_class.return_value = mock_monitor
 
-            with patch('argparse.ArgumentParser') as mock_parser:
+            with patch("argparse.ArgumentParser") as mock_parser:
                 mock_args = Mock()
                 mock_args.action = "check"
                 mock_args.interval = 60
                 mock_parser.return_value.parse_args.return_value = mock_args
 
                 from homelab_manager.health import main
+
                 main()
 
                 mock_monitor.run_health_check.assert_called_once()
 
     def test_main_function_status(self):
         """Test main function with status action"""
-        with patch('homelab_manager.health.HomelabHealthMonitor') as mock_monitor_class:
+        with patch("homelab_manager.health.HomelabHealthMonitor") as mock_monitor_class:
             mock_monitor = Mock()
             mock_monitor_class.return_value = mock_monitor
 
-            with patch('argparse.ArgumentParser') as mock_parser:
+            with patch("argparse.ArgumentParser") as mock_parser:
                 mock_args = Mock()
                 mock_args.action = "status"
                 mock_args.interval = 60
                 mock_parser.return_value.parse_args.return_value = mock_args
 
                 from homelab_manager.health import main
+
                 main()
 
                 mock_monitor.quick_status.assert_called_once()
 
     def test_main_function_monitor(self):
         """Test main function with monitor action"""
-        with patch('homelab_manager.health.HomelabHealthMonitor') as mock_monitor_class:
+        with patch("homelab_manager.health.HomelabHealthMonitor") as mock_monitor_class:
             mock_monitor = Mock()
             mock_monitor_class.return_value = mock_monitor
 
-            with patch('argparse.ArgumentParser') as mock_parser:
+            with patch("argparse.ArgumentParser") as mock_parser:
                 mock_args = Mock()
                 mock_args.action = "monitor"
                 mock_args.interval = 30
                 mock_parser.return_value.parse_args.return_value = mock_args
 
                 from homelab_manager.health import main
+
                 main()
 
                 mock_monitor.monitor_continuous.assert_called_once_with(30)

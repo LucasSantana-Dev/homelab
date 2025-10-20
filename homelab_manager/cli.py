@@ -28,7 +28,7 @@ app = typer.Typer(
     name="homelab",
     help="Modern homelab management CLI",
     add_completion=False,
-    rich_markup_mode="rich"
+    rich_markup_mode="rich",
 )
 
 # Global instances
@@ -61,7 +61,7 @@ def status():
             container["name"],
             f"{status_icon} {container['status']}",
             str(container.get("port", "N/A")),
-            health_icon
+            health_icon,
         )
 
     console.print(table)
@@ -118,7 +118,7 @@ def health():
 
         for service, status in health_status.items():
             status_icon = "✅" if status["healthy"] else "❌"
-            response_time = status.get('response_time')
+            response_time = status.get("response_time")
             if response_time is not None:
                 response_time = f"{response_time:.2f}ms"
             else:
@@ -128,7 +128,7 @@ def health():
                 service,
                 f"{status_icon} {'Healthy' if status['healthy'] else 'Unhealthy'}",
                 response_time,
-                status.get("last_check", "Never")
+                status.get("last_check", "Never"),
             )
 
         console.print(table)
@@ -156,9 +156,7 @@ def backup():
 
 
 @app.command()
-def restore(
-    backup_path: str = typer.Argument(..., help="Path to backup file")
-):
+def restore(backup_path: str = typer.Argument(..., help="Path to backup file")):
     """Restore homelab from backup"""
     console.print(Panel.fit("🔄 Restoring from Backup", style="bold yellow"))
 
@@ -219,7 +217,7 @@ def config():
             table.add_row(
                 setting,
                 info["value"],
-                f"{status_icon} {'Valid' if info['valid'] else 'Invalid'}"
+                f"{status_icon} {'Valid' if info['valid'] else 'Invalid'}",
             )
 
         console.print(table)
@@ -245,8 +243,14 @@ def urls():
         table.add_column("Public", style="magenta")
 
         services = [
-            "homepage", "stremio", "homeassistant", "portainer",
-            "pihole", "grafana", "uptime-kuma", "whats-up-docker"
+            "homepage",
+            "stremio",
+            "homeassistant",
+            "portainer",
+            "pihole",
+            "grafana",
+            "uptime-kuma",
+            "whats-up-docker",
         ]
 
         for service in services:
@@ -254,12 +258,7 @@ def urls():
             tailscale_url = urls.get(f"tailscale_{service}", "N/A")
             public_url = urls.get(f"public_{service}", "N/A")
 
-            table.add_row(
-                service.title(),
-                localhost_url,
-                tailscale_url,
-                public_url
-            )
+            table.add_row(service.title(), localhost_url, tailscale_url, public_url)
 
         console.print(table)
 
@@ -306,8 +305,9 @@ def tunnel():
     try:
         # Check if tunnel is running
         import subprocess
-        result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
-        tunnel_running = 'cloudflared' in result.stdout
+
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+        tunnel_running = "cloudflared" in result.stdout
 
         if tunnel_running:
             console.print("✅ Cloudflare tunnel is running")
@@ -316,14 +316,21 @@ def tunnel():
             console.print("🔄 Starting tunnel...")
 
             # Start tunnel
-            tunnel_id = os.getenv('CF_TUNNEL_ID', '5cefde7a-6cd0-4d56-a1e2-67f922433682')
+            tunnel_id = os.getenv(
+                "CF_TUNNEL_ID", "5cefde7a-6cd0-4d56-a1e2-67f922433682"
+            )
             tunnel_cmd = [
-                './cloudflared', 'tunnel',
-                '--config', '/home/luk-server/.cloudflared/config.yml',
-                'run', tunnel_id
+                "./cloudflared",
+                "tunnel",
+                "--config",
+                "/home/luk-server/.cloudflared/config.yml",
+                "run",
+                tunnel_id,
             ]
 
-            subprocess.Popen(tunnel_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                tunnel_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
             console.print("✅ Tunnel started in background")
 
     except Exception as e:
@@ -341,7 +348,7 @@ def test():
         import time
 
         # Get domain from environment
-        domain = os.getenv('DOMAIN', 'homelab.example.com')
+        domain = os.getenv("DOMAIN", "homelab.example.com")
 
         # Service URLs to test
         services = {
@@ -353,7 +360,7 @@ def test():
             "Portainer": f"https://portainer.{domain}/",
             "Pi-hole": f"https://pihole.{domain}/",
             "What's Up Docker": f"https://docker.{domain}/",
-            "FileBrowser": f"https://files.{domain}/"
+            "FileBrowser": f"https://files.{domain}/",
         }
 
         # Create test results table
@@ -366,13 +373,19 @@ def test():
             try:
                 # Test with curl
                 result = subprocess.run(
-                    ['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
-                    capture_output=True, text=True, timeout=10
+                    ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", url],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
 
                 if result.returncode == 0:
                     status_code = result.stdout.strip()
-                    if status_code in ['200', '302', '530']:  # 530 is Cloudflare response
+                    if status_code in [
+                        "200",
+                        "302",
+                        "530",
+                    ]:  # 530 is Cloudflare response
                         status_icon = "✅"
                         status_text = "Working"
                     else:
@@ -392,18 +405,14 @@ def test():
                 status_text = "Error"
                 status_code = "ERROR"
 
-            table.add_row(
-                service_name,
-                f"{status_icon} {status_text}",
-                status_code
-            )
+            table.add_row(service_name, f"{status_icon} {status_text}", status_code)
 
         console.print(table)
 
         # Show tunnel status
         console.print("\n🔍 Tunnel Status:")
-        result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
-        if 'cloudflared' in result.stdout:
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+        if "cloudflared" in result.stdout:
             console.print("✅ Cloudflare tunnel is running")
         else:
             console.print("❌ Cloudflare tunnel is not running")
@@ -422,7 +431,7 @@ def dns():
         import subprocess
 
         # Get domain from environment
-        domain = os.getenv('DOMAIN', 'homelab.example.com')
+        domain = os.getenv("DOMAIN", "homelab.example.com")
 
         # Service domains to check
         domains = [
@@ -435,7 +444,7 @@ def dns():
             f"homeassistant.{domain}",
             f"stremio.{domain}",
             f"docker.{domain}",
-            f"files.{domain}"
+            f"files.{domain}",
         ]
 
         # Create DNS results table
@@ -448,13 +457,12 @@ def dns():
             try:
                 # Test DNS resolution
                 result = subprocess.run(
-                    ['nslookup', domain],
-                    capture_output=True, text=True, timeout=5
+                    ["nslookup", domain], capture_output=True, text=True, timeout=5
                 )
 
                 if result.returncode == 0 and "Address:" in result.stdout:
                     # Extract IP address
-                    lines = result.stdout.split('\n')
+                    lines = result.stdout.split("\n")
                     ip_address = "N/A"
                     for line in lines:
                         if "Address:" in line and "127.0.0.53" not in line:
@@ -477,11 +485,7 @@ def dns():
                 status_text = "Error"
                 ip_address = "N/A"
 
-            table.add_row(
-                domain,
-                f"{status_icon} {status_text}",
-                ip_address
-            )
+            table.add_row(domain, f"{status_icon} {status_text}", ip_address)
 
         console.print(table)
 

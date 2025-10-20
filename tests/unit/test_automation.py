@@ -53,7 +53,9 @@ class TestHomelabAutomation:
     def test_init_with_docker_exception(self, temp_homelab_dir):
         """Test initialization with Docker exception"""
         with patch("homelab_manager.automation.docker.from_env") as mock_docker:
-            mock_docker.side_effect = docker.errors.DockerException("Docker not running")
+            mock_docker.side_effect = docker.errors.DockerException(
+                "Docker not running"
+            )
 
             with pytest.raises(SystemExit):
                 HomelabAutomation(str(temp_homelab_dir))
@@ -142,7 +144,9 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("homelab_manager.automation.HomelabAutomation.get_service_status") as mock_status:
+        ), patch("subprocess.run") as mock_run, patch(
+            "homelab_manager.automation.HomelabAutomation.get_service_status"
+        ) as mock_status:
 
             # Mock subprocess calls with proper return values
             mock_result = Mock()
@@ -259,12 +263,17 @@ class TestHomelabAutomation:
             # Should not raise any exceptions
             assert True
 
-    def test_deploy_with_health_check_failure(self, mock_docker_client, mock_subprocess):
+    def test_deploy_with_health_check_failure(
+        self, mock_docker_client, mock_subprocess
+    ):
         """Test deployment with health check failure"""
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("homelab_manager.automation.HomelabAutomation.check_health", return_value=False):
+        ), patch(
+            "homelab_manager.automation.HomelabAutomation.check_health",
+            return_value=False,
+        ):
 
             automation = HomelabAutomation()
             result = automation.deploy()
@@ -411,6 +420,7 @@ class TestHomelabAutomation:
 
             # Test with Path object instead of string
             from pathlib import Path
+
             size = automation.get_directory_size(Path("/nonexistent/directory"))
 
             assert size == "0.0 B"
@@ -434,7 +444,9 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("homelab_manager.automation.HomelabAutomation.create_networks") as mock_create_networks:
+        ), patch(
+            "homelab_manager.automation.HomelabAutomation.create_networks"
+        ) as mock_create_networks:
 
             mock_create_networks.side_effect = Exception("Network creation failed")
 
@@ -491,7 +503,9 @@ class TestHomelabAutomation:
 
             assert result is None
 
-    def test_restore_with_subprocess_failure(self, mock_docker_client, temp_homelab_dir):
+    def test_restore_with_subprocess_failure(
+        self, mock_docker_client, temp_homelab_dir
+    ):
         """Test restore with subprocess failure"""
         import subprocess
 
@@ -507,7 +521,9 @@ class TestHomelabAutomation:
 
             assert result is False
 
-    def test_cleanup_with_subprocess_failure(self, mock_docker_client, temp_homelab_dir):
+    def test_cleanup_with_subprocess_failure(
+        self, mock_docker_client, temp_homelab_dir
+    ):
         """Test cleanup with subprocess failure"""
         import subprocess
 
@@ -529,7 +545,9 @@ class TestHomelabAutomation:
             automation = HomelabAutomation()
 
             # Mock Path.rglob to raise exception
-            with patch("pathlib.Path.rglob", side_effect=PermissionError("Permission denied")):
+            with patch(
+                "pathlib.Path.rglob", side_effect=PermissionError("Permission denied")
+            ):
                 try:
                     size = automation.get_directory_size(temp_homelab_dir)
                     assert size == "0 B"
@@ -543,7 +561,9 @@ class TestHomelabAutomation:
             automation = HomelabAutomation()
 
             # Mock Path.glob to raise exception
-            with patch("pathlib.Path.glob", side_effect=PermissionError("Permission denied")):
+            with patch(
+                "pathlib.Path.glob", side_effect=PermissionError("Permission denied")
+            ):
                 automation.cleanup_old_backups()
 
                 # Should not raise any exceptions
@@ -583,7 +603,10 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("homelab_manager.automation.HomelabAutomation.check_health", return_value=True):
+        ), patch("subprocess.run") as mock_run, patch(
+            "homelab_manager.automation.HomelabAutomation.check_health",
+            return_value=True,
+        ):
 
             mock_run.return_value = Mock(returncode=0)
 
@@ -597,7 +620,10 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("homelab_manager.automation.HomelabAutomation.check_health", return_value=False):
+        ), patch("subprocess.run") as mock_run, patch(
+            "homelab_manager.automation.HomelabAutomation.check_health",
+            return_value=False,
+        ):
 
             mock_run.return_value = Mock(returncode=0)
 
@@ -611,14 +637,21 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("homelab_manager.automation.HomelabAutomation.get_service_status") as mock_status:
+        ), patch("subprocess.run") as mock_run, patch(
+            "homelab_manager.automation.HomelabAutomation.get_service_status"
+        ) as mock_status:
 
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
 
             # Mock get_service_status to return serializable data
             mock_status.return_value = [
-                {"name": "test-container", "status": "running", "image": "test-image", "ports": "80:80"}
+                {
+                    "name": "test-container",
+                    "status": "running",
+                    "image": "test-image",
+                    "ports": "80:80",
+                }
             ]
 
             automation = HomelabAutomation(str(temp_homelab_dir))
@@ -627,7 +660,9 @@ class TestHomelabAutomation:
             # The backup method may return None if it fails, so we just check it doesn't crash
             assert backup_path is None or (Path(backup_path)).exists()
 
-    def test_restore_with_health_check_success(self, mock_docker_client, temp_homelab_dir):
+    def test_restore_with_health_check_success(
+        self, mock_docker_client, temp_homelab_dir
+    ):
         """Test restore with successful health check"""
         backup_dir = temp_homelab_dir / "backups"
         backup_dir.mkdir(exist_ok=True)
@@ -636,7 +671,10 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("homelab_manager.automation.HomelabAutomation.check_health", return_value=True):
+        ), patch("subprocess.run") as mock_run, patch(
+            "homelab_manager.automation.HomelabAutomation.check_health",
+            return_value=True,
+        ):
 
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
@@ -646,7 +684,9 @@ class TestHomelabAutomation:
 
             assert result is True
 
-    def test_restore_with_health_check_failure(self, mock_docker_client, temp_homelab_dir):
+    def test_restore_with_health_check_failure(
+        self, mock_docker_client, temp_homelab_dir
+    ):
         """Test restore with failed health check"""
         backup_dir = temp_homelab_dir / "backups"
         backup_dir.mkdir(exist_ok=True)
@@ -655,7 +695,10 @@ class TestHomelabAutomation:
         with patch(
             "homelab_manager.automation.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("homelab_manager.automation.HomelabAutomation.check_health", return_value=False):
+        ), patch("subprocess.run") as mock_run, patch(
+            "homelab_manager.automation.HomelabAutomation.check_health",
+            return_value=False,
+        ):
 
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)
@@ -731,7 +774,7 @@ class TestHomelabAutomation:
             mock_container.image.tags = ["test-image:latest"]
             mock_container.ports = {
                 "80/tcp": [{"HostPort": "8080", "PrivatePort": "80"}],
-                "443/tcp": [{"HostPort": "8443", "PrivatePort": "443"}]
+                "443/tcp": [{"HostPort": "8443", "PrivatePort": "443"}],
             }
             mock_docker_client.containers.list.return_value = [mock_container]
 
@@ -760,7 +803,9 @@ class TestHomelabAutomation:
             mock_docker_client.containers.list.return_value = [mock_container]
 
             # Mock container.get to raise exception
-            mock_docker_client.containers.get.side_effect = Exception("Container not found")
+            mock_docker_client.containers.get.side_effect = Exception(
+                "Container not found"
+            )
 
             automation = HomelabAutomation()
             status = automation.get_service_status()

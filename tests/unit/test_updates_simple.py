@@ -21,7 +21,7 @@ class TestHomelabUpdateManagerSimple:
         with patch("homelab_manager.updates.docker.from_env"):
             manager = HomelabUpdateManager()
             assert manager is not None
-            assert hasattr(manager, 'services')
+            assert hasattr(manager, "services")
             assert isinstance(manager.services, list)
             assert len(manager.services) > 0
 
@@ -36,7 +36,9 @@ class TestHomelabUpdateManagerSimple:
 
         with patch("homelab_manager.updates.docker.from_env", return_value=mock_client):
             manager = HomelabUpdateManager()
-            has_update, current_id, latest_id = manager.check_image_updates("test/image:latest", "test/image:old")
+            has_update, current_id, latest_id = manager.check_image_updates(
+                "test/image:latest", "test/image:old"
+            )
 
             assert has_update is True
             assert current_id == "def456"
@@ -49,7 +51,9 @@ class TestHomelabUpdateManagerSimple:
 
         with patch("homelab_manager.updates.docker.from_env", return_value=mock_client):
             manager = HomelabUpdateManager()
-            has_update, current_id, latest_id = manager.check_image_updates("test/image:latest", "test/image:old")
+            has_update, current_id, latest_id = manager.check_image_updates(
+                "test/image:latest", "test/image:old"
+            )
 
             assert has_update is False
             assert current_id == "Error"
@@ -77,9 +81,9 @@ class TestHomelabUpdateManagerSimple:
         mock_container.name = "test-service"
         mock_client.containers.list.return_value = [mock_container]
 
-        with patch("homelab_manager.updates.docker.from_env", return_value=mock_client), \
-             patch("subprocess.run") as mock_run, \
-             patch("time.sleep"):
+        with patch(
+            "homelab_manager.updates.docker.from_env", return_value=mock_client
+        ), patch("subprocess.run") as mock_run, patch("time.sleep"):
 
             mock_run.return_value = Mock(returncode=0)
 
@@ -90,12 +94,16 @@ class TestHomelabUpdateManagerSimple:
 
     def test_update_service_failure(self):
         """Test failed service update"""
-        with patch("homelab_manager.updates.docker.from_env"), \
-             patch("subprocess.run") as mock_run:
+        with patch("homelab_manager.updates.docker.from_env"), patch(
+            "subprocess.run"
+        ) as mock_run:
 
             # Mock subprocess to raise CalledProcessError
             from subprocess import CalledProcessError
-            mock_run.side_effect = CalledProcessError(1, "docker-compose", "Command failed")
+
+            mock_run.side_effect = CalledProcessError(
+                1, "docker-compose", "Command failed"
+            )
 
             manager = HomelabUpdateManager()
             result = manager.update_service("nonexistent-service")
@@ -109,9 +117,9 @@ class TestHomelabUpdateManagerSimple:
         mock_container.name = "test-service"
         mock_client.containers.list.return_value = [mock_container]
 
-        with patch("homelab_manager.updates.docker.from_env", return_value=mock_client), \
-             patch("subprocess.run") as mock_run, \
-             patch("time.sleep"):
+        with patch(
+            "homelab_manager.updates.docker.from_env", return_value=mock_client
+        ), patch("subprocess.run") as mock_run, patch("time.sleep"):
 
             mock_run.return_value = Mock(returncode=0)
 
@@ -142,8 +150,11 @@ class TestHomelabUpdateManagerSimple:
         mock_image.tags = ["test/image:latest"]
         mock_client.images.pull.return_value = mock_image
 
-        with patch("homelab_manager.updates.docker.from_env", return_value=mock_client), \
-             patch("homelab_manager.updates.HomelabUpdateManager.check_all_updates") as mock_check:
+        with patch(
+            "homelab_manager.updates.docker.from_env", return_value=mock_client
+        ), patch(
+            "homelab_manager.updates.HomelabUpdateManager.check_all_updates"
+        ) as mock_check:
 
             mock_check.return_value = []
 
@@ -159,7 +170,7 @@ class TestHomelabUpdateManagerSimple:
             manager = HomelabUpdateManager()
 
             # Check that services are properly configured
-            assert hasattr(manager, 'services')
+            assert hasattr(manager, "services")
             assert isinstance(manager.services, list)
             assert len(manager.services) > 0
 
@@ -170,11 +181,12 @@ class TestHomelabUpdateManagerSimple:
 
     def test_main_function(self):
         """Test the main function"""
-        from homelab_manager.updates import main
         from unittest.mock import patch
 
+        from homelab_manager.updates import main
+
         # Mock the argument parsing to avoid sys.argv conflicts
-        with patch('sys.argv', ['updates.py', 'check']):
+        with patch("sys.argv", ["updates.py", "check"]):
             # Should not raise any exceptions
             main()
             assert True
@@ -190,7 +202,9 @@ class TestHomelabUpdateManagerSimple:
 
         with patch("homelab_manager.updates.docker.from_env", return_value=mock_client):
             manager = HomelabUpdateManager()
-            has_update, current_id, latest_id = manager.check_image_updates("test/image:latest", "test/image:latest")
+            has_update, current_id, latest_id = manager.check_image_updates(
+                "test/image:latest", "test/image:latest"
+            )
 
             # Should return False if same ID (no update needed)
             assert has_update is False
@@ -538,7 +552,11 @@ class TestHomelabUpdateManagerSimple:
         with patch(
             "homelab_manager.updates.docker.from_env",
             return_value=mock_docker_client,
-        ), patch("subprocess.run") as mock_run, patch("os.chdir"), patch("homelab_manager.automation.HomelabAutomation") as mock_automation, patch("homelab_manager.health.HomelabHealthMonitor") as mock_monitor:
+        ), patch("subprocess.run") as mock_run, patch("os.chdir"), patch(
+            "homelab_manager.automation.HomelabAutomation"
+        ) as mock_automation, patch(
+            "homelab_manager.health.HomelabHealthMonitor"
+        ) as mock_monitor:
 
             # Mock subprocess success
             mock_run.return_value = Mock(returncode=0)

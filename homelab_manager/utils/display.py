@@ -5,10 +5,11 @@ Rich display helpers for homelab management
 """
 
 from typing import Dict, List, Optional
+
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 # Initialize console
 console = Console()
@@ -34,7 +35,7 @@ class DisplayManager:
                 container["name"],
                 f"{status_icon} {container['status']}",
                 str(container.get("port", "N/A")),
-                health_icon
+                health_icon,
             )
 
         return table
@@ -50,7 +51,7 @@ class DisplayManager:
 
         for service, status in health_status.items():
             status_icon = "✅" if status["healthy"] else "❌"
-            response_time = status.get('response_time')
+            response_time = status.get("response_time")
             if response_time is not None:
                 response_time = f"{response_time:.2f}ms"
             else:
@@ -60,7 +61,7 @@ class DisplayManager:
                 service,
                 f"{status_icon} {'Healthy' if status['healthy'] else 'Unhealthy'}",
                 response_time,
-                status.get("last_check", "Never")
+                status.get("last_check", "Never"),
             )
 
         return table
@@ -79,7 +80,7 @@ class DisplayManager:
             table.add_row(
                 setting,
                 info["value"],
-                f"{status_icon} {'Valid' if info['valid'] else 'Invalid'}"
+                f"{status_icon} {'Valid' if info['valid'] else 'Invalid'}",
             )
 
         return table
@@ -94,8 +95,14 @@ class DisplayManager:
         table.add_column("Public", style="magenta")
 
         services = [
-            "homepage", "stremio", "homeassistant", "portainer",
-            "pihole", "grafana", "uptime-kuma", "whats-up-docker"
+            "homepage",
+            "stremio",
+            "homeassistant",
+            "portainer",
+            "pihole",
+            "grafana",
+            "uptime-kuma",
+            "whats-up-docker",
         ]
 
         for service in services:
@@ -103,12 +110,7 @@ class DisplayManager:
             tailscale_url = urls.get(f"tailscale_{service}", "N/A")
             public_url = urls.get(f"public_{service}", "N/A")
 
-            table.add_row(
-                service.title(),
-                localhost_url,
-                tailscale_url,
-                public_url
-            )
+            table.add_row(service.title(), localhost_url, tailscale_url, public_url)
 
         return table
 
@@ -138,5 +140,5 @@ class DisplayManager:
         return Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
-            console=console
+            console=console,
         )
