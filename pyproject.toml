@@ -7,13 +7,12 @@ name = "homelab-manager"
 version = "2.0.0"
 description = "Modern homelab management CLI"
 authors = [{name = "Luk Homelab", email = "luk@homelab.com"}]
-license = {text = "MIT"}
+license = "MIT"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -39,6 +38,10 @@ dev = [
 
 [project.scripts]
 homelab = "homelab_manager.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["homelab_manager*"]
+exclude = ["tests*", "docs*", "config*", "appdata*", "backups*", "logs*"]
 
 [tool.black]
 line-length = 88

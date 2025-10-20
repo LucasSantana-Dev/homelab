@@ -88,6 +88,7 @@ vault/
 # Security scan reports
 bandit-report.json
 safety-report.json
+security-reports/
 
 # Backup files
 backups/
