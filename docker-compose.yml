@@ -29,6 +29,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Homepage Dashboard - Tailscale Only
   homepage:
@@ -51,6 +64,19 @@ services:
       - "${TAILSCALE_IP:-100.64.0.10}:${HOMEPAGE_PORT:-3000}:3000"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Home Assistant - Tailscale Only
   homeassistant:
@@ -68,6 +94,19 @@ services:
       - "${TAILSCALE_IP:-100.64.0.10}:${HOMEASSISTANT_PORT:-8123}:8123"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Stremio - Public Access Required for app.strem.io
   stremio:
@@ -89,6 +128,19 @@ services:
       - "0.0.0.0:11470:11470"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Uptime Kuma - Tailscale Only
   uptime-kuma:
@@ -106,6 +158,19 @@ services:
       - "${TAILSCALE_IP:-100.64.0.10}:${UPTIME_KUMA_PORT:-3001}:3001"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Portainer - TAILSCALE ONLY (Sensitive Service)
   portainer:
@@ -121,6 +186,19 @@ services:
       - "${TAILSCALE_IP:-100.64.0.10}:${PORTAINER_PORT:-9000}:9000"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Grafana - TAILSCALE ONLY (Sensitive Service)
   grafana:
@@ -140,6 +218,19 @@ services:
       - "${TAILSCALE_IP:-100.64.0.10}:${GRAFANA_PORT:-3002}:3000"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Prometheus - TAILSCALE ONLY (Sensitive Service)
   prometheus:
@@ -164,6 +255,19 @@ services:
       - "${TAILSCALE_IP:-127.0.0.1}:${PROMETHEUS_PORT:-9091}:9090"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # What's Up Docker - TAILSCALE ONLY (Sensitive Service)
   whats-up-docker:
@@ -187,6 +291,19 @@ services:
       - "${TAILSCALE_IP:-100.64.0.10}:${WUD_PORT:-3003}:3000"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Pi-hole - LOCALHOST ONLY (Local Network Service)
   pihole:
@@ -211,6 +328,19 @@ services:
       - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/udp"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # FileBrowser - NAS-like File Manager
   filebrowser:
@@ -232,6 +362,19 @@ services:
       - "${TAILSCALE_IP:-100.64.0.10}:${FILEBROWSER_PORT:-8080}:80"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Node Exporter - LOCALHOST ONLY (System Metrics)
   node-exporter:
@@ -253,6 +396,84 @@ services:
       - "127.0.0.1:${NODE_EXPORTER_PORT:-9100}:9100"
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # cAdvisor - Container Metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "127.0.0.1:8082:8080"
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Netdata - Real-time System Monitoring
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    environment:
+      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
+    ports:
+      - "${TAILSCALE_IP:-127.0.0.1}:19999:19999"
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Nginx Proxy Manager - Real admin dashboard
   nginx-proxy-manager:
@@ -273,6 +494,19 @@ services:
       - TZ=${TIMEZONE}
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Certbot for SSL certificates (keep for backup)
   certbot:
@@ -281,9 +515,22 @@ services:
     volumes:
       - ./config/nginx/ssl:/etc/letsencrypt
       - ./config/nginx/www/certbot:/var/www/certbot
-    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@homelab.example.com --agree-tos --no-eff-email -d homelab.example.com -d www.homelab.example.com -d homeassistant.homelab.example.com -d stremio.homelab.example.com -d uptime.homelab.example.com -d portainer.homelab.example.com -d grafana.homelab.example.com -d files.homelab.example.com -d pihole.homelab.example.com -d docker.homelab.example.com
+    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@homelab.example.com --agree-tos --no-eff-email -d homelab.example.com -d www.homelab.example.com -d homeassistant.homelab.example.com -d stremio.homelab.example.com -d uptime.homelab.example.com -d portainer.homelab.example.com -d grafana.homelab.example.com -d files.homelab.example.com -d pihole.homelab.example.com -d docker.homelab.example.com -d prometheus.homelab.example.com -d netdata.homelab.example.com -d cadvisor.homelab.example.com
     depends_on:
       - nginx
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   portainer_data:
@@ -296,6 +543,9 @@ volumes:
   filebrowser_data:
   nginx_proxy_manager_data:
   nginx_proxy_manager_letsencrypt:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
 
 networks:
   default:
