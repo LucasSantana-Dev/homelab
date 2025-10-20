@@ -33,32 +33,18 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r scripts/requirements-dev.txt
+        pip install pre-commit
 
-    - name: Lint with flake8
+    # Run all quality checks via pre-commit for consistency with local development
+    # This ensures the same checks run locally and in CI using a single source of truth
+    - name: Run pre-commit checks
       run: |
-        flake8 homelab_manager/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 homelab_manager/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
-
-    - name: Format check with black
-      run: |
-        black --check homelab_manager/ tests/
-
-    - name: Import sorting check with isort
-      run: |
-        isort --check-only homelab_manager/ tests/
-
-    - name: Type check with mypy
-      run: |
-        mypy homelab_manager/
+        pre-commit run --all-files
 
     - name: Test with pytest
       continue-on-error: true
       run: |
         pytest tests/ --cov=homelab_manager --cov-report=xml --cov-report=html --tb=short -v
-
-    - name: Security check with bandit
-      run: |
-        bandit -r homelab_manager/ -f json -o bandit-report.json
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
