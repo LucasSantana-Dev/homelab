@@ -3,8 +3,7 @@ global:
   evaluation_interval: 15s
 
 rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  - "alerts.yml"
 
 scrape_configs:
   # Prometheus itself
@@ -19,7 +18,7 @@ scrape_configs:
     scrape_interval: 15s
     metrics_path: /metrics
 
-  # Docker containers via cAdvisor (if available)
+  # Docker containers via cAdvisor
   - job_name: 'cadvisor'
     static_configs:
       - targets: ['cadvisor:8080']
@@ -29,13 +28,15 @@ scrape_configs:
   # Homelab services health check
   - job_name: 'homelab-services'
     static_configs:
-      - targets: 
+      - targets:
           - 'homepage:3000'
-          - 'stremio:8080'
           - 'homeassistant:8123'
           - 'portainer:9000'
           - 'pihole:8054'
           - 'grafana:3000'
+          - 'uptime-kuma:3001'
+          - 'whats-up-docker:3003'
+          - 'filebrowser:80'
     scrape_interval: 30s
     metrics_path: /metrics
     scheme: http

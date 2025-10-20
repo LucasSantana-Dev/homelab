@@ -1,0 +1,167 @@
+groups:
+  - name: homelab_alerts
+    interval: 30s
+    rules:
+      # Container Down Alerts
+      - alert: ContainerDown
+        expr: up{job="homelab-services"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.instance }} is down"
+          description: "Container {{ $labels.instance }} has been down for more than 5 minutes."
+
+      - alert: ContainerDown
+        expr: up{job="cadvisor"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cAdvisor container is down"
+          description: "cAdvisor container has been down for more than 5 minutes."
+
+      # High Memory Usage Alerts
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory usage > 90%"
+          description: "Container {{ $labels.name }} is using more than 90% of its memory limit."
+
+      - alert: CriticalMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} memory usage > 95%"
+          description: "Container {{ $labels.name }} is using more than 95% of its memory limit."
+
+      # High CPU Usage Alerts
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} CPU usage > 80%"
+          description: "Container {{ $labels.name }} is using more than 80% CPU for more than 5 minutes."
+
+      - alert: CriticalCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.9
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} CPU usage > 90%"
+          description: "Container {{ $labels.name }} is using more than 90% CPU for more than 2 minutes."
+
+      # Disk Space Alerts
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk space is below 20% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
+
+      - alert: CriticalDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}"
+          description: "Disk space is below 10% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
+
+      # Service Response Time Alerts
+      - alert: HighResponseTime
+        expr: probe_duration_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time for {{ $labels.instance }}"
+          description: "Response time for {{ $labels.instance }} is above 5 seconds."
+
+      - alert: ServiceDown
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.instance }} is down"
+          description: "Service {{ $labels.instance }} is not responding to health checks."
+
+      # Docker Container Restart Alerts
+      - alert: ContainerRestarting
+        expr: rate(container_start_time_seconds[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting frequently"
+          description: "Container {{ $labels.name }} has restarted in the last 5 minutes."
+
+      # Network Connectivity Alerts
+      - alert: NetworkConnectivityIssues
+        expr: rate(container_network_receive_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Network errors on {{ $labels.name }}"
+          description: "Container {{ $labels.name }} is experiencing network receive errors."
+
+      # Prometheus Self-Monitoring
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus monitoring system is not responding."
+
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus config reload failed"
+          description: "Prometheus configuration reload has failed."
+
+      # Node Exporter Alerts
+      - alert: NodeExporterDown
+        expr: up{job="node-exporter"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Exporter is down"
+          description: "Node Exporter on {{ $labels.instance }} is not responding."
+
+      # High Load Average
+      - alert: HighLoadAverage
+        expr: node_load1 > 4
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High load average on {{ $labels.instance }}"
+          description: "Load average on {{ $labels.instance }} is above 4."
+
+      # Memory Pressure
+      - alert: HighMemoryPressure
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory pressure on {{ $labels.instance }}"
+          description: "Memory usage on {{ $labels.instance }} is above 90%."
