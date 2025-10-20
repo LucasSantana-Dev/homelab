@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from homelab_manager.services.updates import HomelabUpdateManager
+from homelab_manager.services.updates import UpdateManager
 
 
 class TestHomelabUpdateManager:
