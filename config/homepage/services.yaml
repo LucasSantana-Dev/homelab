@@ -6,6 +6,12 @@
         description: Streaming Service
         container: stremio-server
 
+    - Jellyfin:
+        icon: jellyfin
+        href: https://jellyfin.homelab.example.com
+        description: Media Server
+        container: jellyfin
+
     - Home Assistant:
         icon: https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/New_Home_Assistant_logo.svg/1200px-New_Home_Assistant_logo.svg.png
         href: https://homeassistant.homelab.example.com
@@ -43,7 +49,19 @@
         description: NAS-like File Manager
         container: filebrowser
 
-- Monitoring Tools:
+    - Vaultwarden:
+        icon: https://raw.githubusercontent.com/dani-garcia/vaultwarden/main/resources/vaultwarden-icon.svg
+        href: https://vault.homelab.example.com
+        description: Password Manager
+        container: vaultwarden
+
+    - n8n:
+        icon: n8n
+        href: https://n8n.homelab.example.com
+        description: Workflow Automation
+        container: n8n
+
+- Monitoring & Observability:
     - Grafana:
         icon: grafana
         href: https://grafana.homelab.example.com
@@ -55,3 +73,15 @@
         href: https://prometheus.homelab.example.com
         description: Metrics Collection
         container: prometheus
+
+    - Loki:
+        icon: https://grafana.com/static/img/logos/logo-loki.svg
+        href: https://grafana.homelab.example.com/explore
+        description: Log Aggregation
+        container: loki
+
+    - Netdata:
+        icon: netdata
+        href: http://{{HOMEPAGE_VAR_TAILSCALE_IP}}:19999
+        description: Real-time System Monitoring
+        container: netdata
