@@ -213,7 +213,16 @@ config/whats-up-docker/wud-config.json
 # All service appdata
 config/*/
 
-# Keep only our nginx config
+# Keep monitoring and proxy configurations
 !config/nginx/
+!config/prometheus/
+!config/grafana/
+!config/loki/
+!config/promtail/
+!config/alertmanager/
+!config/blackbox/
+!config/homepage/
+
+# But still ignore these nginx subdirectories
 config/nginx/ssl/
 config/nginx/logs/

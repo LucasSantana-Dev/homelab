@@ -25,37 +25,37 @@ scrape_configs:
             stream: stream
             attrs:
             time: time
-      
+
       # Extract container name
       - json:
           expressions:
             tag:
           source: attrs
-      
+
       - regex:
           expression: (?P<container_name>(?:[^|]*[^|]))
           source: tag
-      
+
       # Parse log levels (ERROR, WARN, INFO, DEBUG)
       - regex:
           expression: '.*(?P<level>ERROR|WARN|INFO|DEBUG|FATAL|CRITICAL).*'
           source: output
-      
+
       # Timestamp parsing
       - timestamp:
           format: RFC3339Nano
           source: time
-      
+
       # Apply labels
       - labels:
           container_name:
           stream:
           level:
-      
+
       # Output the log message
       - output:
           source: output
-      
+
       # Drop noisy logs
       - drop:
           expression: '.*healthcheck.*'
@@ -73,16 +73,16 @@ scrape_configs:
       # Parse syslog format
       - regex:
           expression: '^(?P<timestamp>\S+\s+\d+\s+\S+)\s+(?P<host>\S+)\s+(?P<app>\S+)(?::|\[(?P<pid>\d+)\])?:\s+(?P<message>.*)$'
-      
+
       - timestamp:
           source: timestamp
           format: "Jan _2 15:04:05"
-      
+
       - labels:
           host:
           app:
           pid:
-      
+
       - output:
           source: message
 
@@ -97,12 +97,12 @@ scrape_configs:
     pipeline_stages:
       - regex:
           expression: '^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[\w-]+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<request>[^"]+) (?P<protocol>[^"]+)" (?P<status>\d+) (?P<body_bytes_sent>\d+).*$'
-      
+
       - labels:
           remote_addr:
           method:
           status:
-      
+
       - output:
           source: request
 
@@ -117,6 +117,6 @@ scrape_configs:
     pipeline_stages:
       - regex:
           expression: '.*\[(?P<level>\w+)\].*'
-      
+
       - labels:
           level:
