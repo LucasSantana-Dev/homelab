@@ -5,6 +5,22 @@ All notable changes to Luk's Homelab will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Vaultwarden Health Check**: Changed from `wget` to `curl` for health check compatibility
+- **Promtail**: Recreated container to clear unhealthy status (no health endpoint by design)
+- **Container Cleanup**: Removed old Discord bot containers (discord-bot, discord-bot-postgres, discord-bot-redis)
+
+### Changed
+
+- **Certbot SSL**: Documented incompatibility with Tailscale-only DNS setup
+  - Certbot requires public DNS resolution for HTTP-01 challenge
+  - Domain `homelab.example.com` is intentionally private (Tailscale-only)
+  - Current setup uses existing wildcard SSL certificates
+  - Future: Configure DNS-01 challenge with DNS provider API integration
+
 ## [2.2.0] - 2025-11-02
 
 ### 🚀 Major Expansion: New Services and Infrastructure Improvements
