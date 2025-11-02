@@ -2,6 +2,19 @@
 
 Modern Python CLI for homelab management with Docker, Tailscale, and Cloudflare integration.
 
+## 🔒 Security Notice
+
+**This repository contains NO secrets or credentials.** All sensitive information must be configured locally using a `.env` file (which is gitignored).
+
+### Before Deploying:
+1. Copy `.env.example` to `.env`
+2. Fill in all required credentials and tokens
+3. **Never commit `.env` to version control**
+
+All services are accessible **only via Tailscale network** (100.0.0.0/8) - no public internet exposure by default.
+
+See `.env.example` for all required variables and refer to our [Security Policy](.github/SECURITY.md) for reporting vulnerabilities.
+
 ## ✨ Features
 
 - **Modern CLI**: Clean, intuitive command-line interface with rich output
@@ -135,13 +148,24 @@ homelab/
 - **Pi-hole** - DNS filtering (port 8054)
 - **Vaultwarden** - Password manager (port 8200) - https://vault.homelab.example.com
 
+#### Security & Identity
+- **Authentik** - SSO & Identity Provider (ports 9100, 9443) - https://auth.homelab.example.com
+
 #### Monitoring & Observability
 - **Grafana** - Metrics visualization (port 3002)
 - **Prometheus** - Metrics collection (port 9091)
 - **Netdata** - Real-time monitoring (port 19999)
+- **Alertmanager** - Alert routing (port 9093) - https://alertmanager.homelab.example.com
+- **Loki** - Log aggregation (port 3100)
 
 #### Automation
 - **n8n** - Workflow automation (port 5678) - https://n8n.homelab.example.com
+
+#### Document Management
+- **Paperless-ngx** - Document Management & OCR (port 8400) - https://docs.homelab.example.com
+
+#### Cloud Storage
+- **Nextcloud** - Cloud Storage & File Sharing (port 8300) - https://cloud.homelab.example.com
 
 ## 🔧 Configuration
 
@@ -172,6 +196,19 @@ HOMEASSISTANT_KEY=your_homeassistant_key_here
 VAULTWARDEN_ADMIN_TOKEN=your_vaultwarden_admin_token_here
 N8N_USER=admin
 N8N_PASSWORD=your_n8n_password_here
+
+# Authentik SSO Configuration
+AUTHENTIK_SECRET_KEY=<openssl rand -base64 50>
+AUTHENTIK_DB_PASSWORD=<secure password>
+
+# Paperless-ngx Document Management
+PAPERLESS_SECRET_KEY=<openssl rand -base64 50>
+PAPERLESS_DB_PASSWORD=<secure password>
+PAPERLESS_ADMIN_PASSWORD=<secure password>
+
+# Nextcloud Cloud Storage
+NEXTCLOUD_DB_ROOT_PASSWORD=<secure password>
+NEXTCLOUD_DB_PASSWORD=<secure password>
 ```
 
 ### Access Methods
