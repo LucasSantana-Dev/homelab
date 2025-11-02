@@ -927,7 +927,7 @@ services:
       - authentik-db
       - authentik-redis
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9000/-/health/live/"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/-/health/live/"]
       interval: 30s
       timeout: 10s
       retries: 3
