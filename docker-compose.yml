@@ -233,6 +233,77 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Alertmanager - Alert routing and notifications - TAILSCALE ONLY
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./config/alertmanager:/etc/alertmanager
+      - ./appdata/alertmanager:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "127.0.0.1:9093:9093"
+      - "${TAILSCALE_IP}:9093:9093"
+    networks:
+      - default
+    environment:
+      - ALERTMANAGER_DISCORD_WEBHOOK=${ALERTMANAGER_DISCORD_WEBHOOK}
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Blackbox Exporter - HTTP/TCP endpoint monitoring - Localhost only
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    volumes:
+      - ./config/blackbox:/etc/blackbox_exporter
+    command:
+      - '--config.file=/etc/blackbox_exporter/blackbox.yml'
+    ports:
+      - "127.0.0.1:9115:9115"
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9115/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+        reservations:
+          memory: 32M
+          cpus: '0.05'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Prometheus - TAILSCALE ONLY (Sensitive Service)
   prometheus:
     image: prom/prometheus:latest
@@ -256,6 +327,8 @@ services:
       - "${TAILSCALE_IP}:${PROMETHEUS_PORT:-9091}:9090"
     networks:
       - default
+    depends_on:
+      - alertmanager
     deploy:
       resources:
         limits:
@@ -476,63 +549,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Nginx Proxy Manager - Real admin dashboard
-  nginx-proxy-manager:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: nginx-proxy-manager
-    restart: unless-stopped
-    ports:
-      # Admin interface on port 81, proxy on different ports
-      - "0.0.0.0:81:81"
-      - "0.0.0.0:8081:80"
-      - "0.0.0.0:8444:443"
-    volumes:
-      - nginx_proxy_manager_data:/data
-      - nginx_proxy_manager_letsencrypt:/etc/letsencrypt
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TIMEZONE}
-    networks:
-      - default
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-        reservations:
-          memory: 128M
-          cpus: '0.1'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Certbot for SSL certificates (keep for backup)
-  certbot:
-    image: certbot/certbot:latest
-    container_name: certbot
-    volumes:
-      - ./config/nginx/ssl:/etc/letsencrypt
-      - ./config/nginx/www/certbot:/var/www/certbot
-    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@homelab.example.com --agree-tos --no-eff-email -d homelab.example.com -d www.homelab.example.com -d homeassistant.homelab.example.com -d stremio.homelab.example.com -d uptime.homelab.example.com -d portainer.homelab.example.com -d grafana.homelab.example.com -d files.homelab.example.com -d pihole.homelab.example.com -d docker.homelab.example.com -d prometheus.homelab.example.com -d netdata.homelab.example.com -d cadvisor.homelab.example.com
-    depends_on:
-      - nginx
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-        reservations:
-          memory: 128M
-          cpus: '0.1'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   # Vaultwarden Password Manager - Tailscale Only
   vaultwarden:
     image: vaultwarden/server:latest
@@ -722,7 +738,7 @@ services:
     networks:
       - default
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -827,14 +843,30 @@ volumes:
   pihole_data:
   stremio_cache:
   filebrowser_data:
-  nginx_proxy_manager_data:
-  nginx_proxy_manager_letsencrypt:
   netdataconfig:
   netdatalib:
   netdatacache:
 
 networks:
-  default:
+  frontend:
     driver: bridge
-  tailscale:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  backend:
     driver: bridge
+    internal: true  # No internet access
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+  database:
+    driver: bridge
+    internal: true  # No internet access
+    ipam:
+      config:
+        - subnet: 172.23.0.0/24
