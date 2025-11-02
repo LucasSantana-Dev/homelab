@@ -570,6 +570,40 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Jellyfin Media Server - Tailscale Only
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    volumes:
+      - ./appdata/jellyfin/config:/config
+      - ./appdata/jellyfin/cache:/cache
+      - ./media:/media:ro  # Read-only media directory
+    environment:
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:8096:8096"
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   portainer_data:
   grafana_data:
