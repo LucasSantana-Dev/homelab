@@ -5,6 +5,51 @@ All notable changes to Luk's Homelab will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-11-02
+
+### 🚀 Major Expansion: New Services and Infrastructure Improvements
+
+#### Added
+
+- **Vaultwarden** - Self-hosted password manager (Bitwarden-compatible)
+  - Accessible at https://vault.homelab.example.com (Tailscale only)
+  - Admin panel with token authentication
+  - WebSocket support for real-time notifications
+  - Resource limits: 256M RAM max, 0.25 CPU max
+
+- **Jellyfin** - Media server for streaming content
+  - Accessible at https://jellyfin.homelab.example.com (Tailscale only)
+  - Read-only media directory mounting
+  - WebSocket support for live interface updates
+  - Optimized proxy settings for streaming (no buffering, 300s timeouts)
+  - Resource limits: 2G RAM max, 1.0 CPU max
+
+- **n8n** - Workflow automation platform (configuration ready)
+  - Accessible at https://n8n.homelab.example.com (Tailscale only)
+  - Basic authentication enabled
+  - WebSocket support for real-time workflow updates
+  - Resource limits: 512M RAM max, 0.5 CPU max
+  - Deployment pending Docker Hub rate limit reset
+
+#### Fixed
+
+- **SSL Certificate Renewal** - Added Let's Encrypt ACME challenge exception to nginx IP restrictions
+- **Prometheus Monitoring** - Removed FileBrowser from scrape targets (no metrics endpoint)
+- **Container Updates** - Updated all 11 existing containers to latest versions
+- **Security** - Enhanced nginx IP restrictions to allow only Tailscale network and localhost access
+
+#### Manual Tasks Required
+
+- **Home Assistant**: Xiaomi OAuth integration requires token refresh via UI (Settings > Devices & Services)
+- **Uptime Kuma**: Monitor timeout adjustments needed via UI for Home Page monitor (increase to 120s)
+
+### Infrastructure Notes
+
+- All new services bound exclusively to Tailscale IP for secure access
+- Nginx reverse proxy configured for all new subdomains with SSL support
+- Health checks and resource limits applied to all new services
+- Comprehensive logging configured for all services
+
 ## [2.1.0] - 2025-01-09
 
 ### 🔧 Bug Fixes and Improvements

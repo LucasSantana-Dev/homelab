@@ -118,14 +118,30 @@ homelab/
 
 ### Services
 
+#### Core Infrastructure
 - **Homepage** - Dashboard (port 3000)
-- **Stremio** - Media streaming (port 8080)
-- **Home Assistant** - Home automation (port 8123)
 - **Portainer** - Container management (port 9000)
-- **Pi-hole** - DNS filtering (port 8054)
-- **Grafana** - Monitoring (port 3002)
 - **Uptime Kuma** - Uptime monitoring (port 3001)
 - **What's Up Docker** - Container monitoring (port 3003)
+
+#### Media & Entertainment
+- **Stremio** - Media streaming (port 8080)
+- **Jellyfin** - Media server (port 8096) - https://jellyfin.homelab.example.com
+
+#### Home Automation
+- **Home Assistant** - Home automation (port 8123)
+
+#### Networking & Security
+- **Pi-hole** - DNS filtering (port 8054)
+- **Vaultwarden** - Password manager (port 8200) - https://vault.homelab.example.com
+
+#### Monitoring & Observability
+- **Grafana** - Metrics visualization (port 3002)
+- **Prometheus** - Metrics collection (port 9091)
+- **Netdata** - Real-time monitoring (port 19999)
+
+#### Automation
+- **n8n** - Workflow automation (port 5678) - https://n8n.homelab.example.com
 
 ## 🔧 Configuration
 
@@ -149,9 +165,13 @@ DOMAIN=your-domain.com
 CF_API_TOKEN=your_cloudflare_api_token_here
 CF_TUNNEL_ID=your_tunnel_id_here
 
-# Service Passwords
+# Service Passwords & Tokens
 PIHOLE_WEB_PASSWORD=your_pihole_password_here
 GRAFANA_PASSWORD=your_grafana_password_here
+HOMEASSISTANT_KEY=your_homeassistant_key_here
+VAULTWARDEN_ADMIN_TOKEN=your_vaultwarden_admin_token_here
+N8N_USER=admin
+N8N_PASSWORD=your_n8n_password_here
 ```
 
 ### Access Methods
