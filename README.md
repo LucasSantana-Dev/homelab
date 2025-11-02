@@ -135,7 +135,7 @@ Create a `.env` file with your configuration:
 
 ```bash
 # Network Configuration
-TAILSCALE_IP=100.64.0.10
+TAILSCALE_IP=YOUR_TAILSCALE_IP_HERE
 TIMEZONE=America/Sao_Paulo
 
 # User Configuration
