@@ -51,9 +51,14 @@ health: ## Check health of all services
 		python3 -m homelab_manager health; \
 	else \
 		echo "Checking service endpoints..."; \
-		curl -s -o /dev/null -w "Homepage: %{http_code}\n" http://100.64.0.10:3000 || echo "Homepage: ❌"; \
-		curl -s -o /dev/null -w "Grafana: %{http_code}\n" http://100.64.0.10:3002 || echo "Grafana: ❌"; \
-		curl -s -o /dev/null -w "Pi-hole: %{http_code}\n" http://100.64.0.10:8054 || echo "Pi-hole: ❌"; \
+		TAILSCALE_IP=$$(grep TAILSCALE_IP .env 2>/dev/null | cut -d'=' -f2 || echo ""); \
+		if [ -z "$$TAILSCALE_IP" ]; then \
+			echo "⚠️  TAILSCALE_IP not set in .env file"; \
+		else \
+			curl -s -o /dev/null -w "Homepage: %{http_code}\n" http://$$TAILSCALE_IP:3000 || echo "Homepage: ❌"; \
+			curl -s -o /dev/null -w "Grafana: %{http_code}\n" http://$$TAILSCALE_IP:3002 || echo "Grafana: ❌"; \
+			curl -s -o /dev/null -w "Pi-hole: %{http_code}\n" http://$$TAILSCALE_IP:8054 || echo "Pi-hole: ❌"; \
+		fi; \
 	fi
 
 monitor: ## Open monitoring dashboards

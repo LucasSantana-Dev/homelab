@@ -9,7 +9,7 @@
 │                    ACCESS METHODS                           │
 ├─────────────────────────────────────────────────────────────┤
 │ 1. LOCALHOST    │ 127.0.0.1:PORT  │ Server-only access      │
-│ 2. TAILSCALE    │ 100.64.0.10  │ Private network access  │
+│ 2. TAILSCALE    │ YOUR_TAILSCALE_IP  │ Private network access  │
 │ 3. CLOUDFLARE   │ *.domain.com    │ Public internet access  │
 └─────────────────────────────────────────────────────────────┘
 ```
