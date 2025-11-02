@@ -533,6 +533,43 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Vaultwarden Password Manager - Tailscale Only
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    volumes:
+      - ./appdata/vaultwarden:/data
+    environment:
+      - DOMAIN=https://vault.${DOMAIN}
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+      - SIGNUPS_ALLOWED=false
+      - WEBSOCKET_ENABLED=true
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:8200:80"
+      - "${TAILSCALE_IP}:3012:3012"  # WebSocket port
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/alive"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   portainer_data:
   grafana_data:
