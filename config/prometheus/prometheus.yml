@@ -36,7 +36,8 @@ scrape_configs:
           - 'grafana:3000'
           - 'uptime-kuma:3001'
           - 'whats-up-docker:3003'
-          - 'filebrowser:80'
+          # FileBrowser doesn't expose Prometheus metrics endpoint
+          # - 'filebrowser:80'
     scrape_interval: 30s
     metrics_path: /metrics
     scheme: http
