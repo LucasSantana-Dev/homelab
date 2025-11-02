@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - Future Enhancements - Network Segmentation, Authentik SSO & Paperless-ngx
+
+### Added
+
+- **Network Segmentation Guide** - Manual deployment guide for service-to-network assignments
+  - Created `docs/network-migration-guide.md` with detailed migration steps
+  - 4 networks defined: frontend (172.20.0.0/24), backend (172.21.0.0/24), monitoring (172.22.0.0/24), database (172.23.0.0/24)
+  - Database networks configured as internal-only (no internet access)
+  - Service connectivity validation checklist and rollback procedures
+  - **DEFERRED**: Network assignment to maintenance window (requires service disruption)
+
+- **Authentik SSO** - Enterprise single sign-on identity provider
+  - Created `docs/authentik-sso-setup.md` with complete OAuth2/OIDC integration guide
+  - PostgreSQL 15 database for user data
+  - Redis cache for session management
+  - Configured for Grafana, Portainer, and n8n OAuth2/OIDC integration
+  - Accessible at https://auth.homelab.example.com (Tailscale only)
+  - Ports: 9100 (HTTP), 9443 (HTTPS) - Changed from 9000 to avoid conflict with Portainer
+  - Resource limits: Server (1G RAM max, 1.0 CPU max), Worker (512M RAM max, 0.5 CPU max), DB (512M RAM max, 0.5 CPU max), Redis (128M RAM max, 0.25 CPU max)
+  - Total additional resources: ~1.5GB RAM, ~1.5 CPU cores
+
+- **Paperless-ngx** - Document management system with OCR
+  - PostgreSQL 15 database for metadata
+  - Redis broker for async tasks
+  - OCR support for English and Portuguese languages
+  - Accessible at https://docs.homelab.example.com (Tailscale only)
+  - Consume directory for automatic document import: `appdata/paperless/consume`
+  - Resource limits: Paperless (2G RAM max, 1.5 CPU max), DB (512M RAM max, 0.5 CPU max), Redis (128M RAM max, 0.25 CPU max)
+  - Total additional resources: ~2.5GB RAM, ~2 CPU cores
+  - Client upload size limit: 100M (for large document files)
+
+### Changed
+
+- **Homepage Dashboard**: Reorganized with new sections
+  - Added "Security & Identity" section with Authentik
+  - Added "Document Management" section with Paperless-ngx
+  - Added "Storage" section with Nextcloud (moved from Management Tools)
+
+- **Docker Compose**: Added 7 new services (authentik-db, authentik-redis, authentik-server, authentik-worker, paperless-db, paperless-redis, paperless-ngx)
+
+- **Nginx Proxy**: Added reverse proxy configurations for Authentik and Paperless with Tailscale-only IP restrictions
+
+- **Environment Variables**: Added configuration for Authentik and Paperless in `.env` and `.env.example`
+
+### Security
+
+- **Network Segmentation Design**: Infrastructure prepared for 4-tier network isolation (pending maintenance window deployment)
+  - Frontend network for user-facing services
+  - Backend network for processing services (internal-only)
+  - Monitoring network for observability stack
+  - Database network for data services (internal-only)
+
+### Manual Actions Required
+
+**CRITICAL - Complete these steps before deploying:**
+
+1. **Create Required Directories**:
+   ```bash
+   cd /home/luk-server/homelab
+   sudo mkdir -p appdata/authentik/{db,redis,media,certs,custom-templates}
+   sudo mkdir -p appdata/paperless/{db,redis,data,media,export,consume}
+   sudo chown -R $USER:$USER appdata/authentik appdata/paperless
+   ```
+
+2. **Deploy Services**:
+   ```bash
+   # Deploy Authentik
+   docker compose up -d authentik-db authentik-redis authentik-server authentik-worker
+
+   # Deploy Paperless
+   docker compose up -d paperless-db paperless-redis paperless-ngx
+   ```
+
+3. **Test Nginx Configuration**:
+   ```bash
+   docker exec nginx-proxy nginx -t
+   docker compose restart nginx
+   ```
+
+4. **Configure Authentik SSO** (see `docs/authentik-sso-setup.md`):
+   - Access https://auth.homelab.example.com
+   - Create admin account
+   - Create OAuth2 providers for Grafana, Portainer, n8n
+   - Update service configurations with OAuth credentials
+
+5. **Apply Network Segmentation** (see `docs/network-migration-guide.md`):
+   - Schedule maintenance window (30-60 minutes)
+   - Follow step-by-step migration guide
+   - Validate service connectivity
+   - **OPTIONAL**: Can be deferred to future maintenance window
+
+### Notes
+
+- **Total New Resources**: ~4GB RAM, ~3.5 CPU cores across 7 new containers
+- **Network Segmentation**: Documented but not yet applied (requires downtime)
+- **Authentik Configuration**: Requires manual OAuth setup after initial deployment
+- **Paperless Default Credentials**: admin / see `PAPERLESS_ADMIN_PASSWORD` in `.env`
+
+## [Unreleased - Previous Features]
+
 ### Added
 
 - **Alertmanager** - Alert routing and notification management
@@ -325,4 +425,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Backup created: `backups/homelab_pre-cleanup_TIMESTAMP.tar.gz`
 - Docker cleanup savings: ~2GB disk space, reduced from 50 to 14 volumes
 - Network segmentation defined but service assignments deferred to prevent disruption
-
