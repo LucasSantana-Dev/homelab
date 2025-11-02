@@ -834,6 +834,277 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Authentik PostgreSQL Database
+  authentik-db:
+    image: postgres:15-alpine
+    container_name: authentik-db
+    restart: unless-stopped
+    volumes:
+      - ./appdata/authentik/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=authentik
+      - POSTGRES_USER=authentik
+      - POSTGRES_PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - TZ=${TIMEZONE}
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authentik Redis Cache
+  authentik-redis:
+    image: redis:alpine
+    container_name: authentik-redis
+    restart: unless-stopped
+    volumes:
+      - ./appdata/authentik/redis:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authentik Server - SSO Identity Provider
+  authentik-server:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    volumes:
+      - ./appdata/authentik/media:/media
+      - ./appdata/authentik/custom-templates:/templates
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-db
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_REDIS__HOST=authentik-redis
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=false
+      - AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true
+      - AUTHENTIK_AVATARS=initials
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:9100:9000"
+      - "${TAILSCALE_IP}:9443:9443"
+    networks:
+      - frontend
+      - database
+    depends_on:
+      - authentik-db
+      - authentik-redis
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9000/-/health/live/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authentik Worker - Background tasks
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    volumes:
+      - ./appdata/authentik/media:/media
+      - ./appdata/authentik/certs:/certs
+      - ./appdata/authentik/custom-templates:/templates
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-db
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_REDIS__HOST=authentik-redis
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=false
+      - AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true
+      - TZ=${TIMEZONE}
+    networks:
+      - frontend
+      - database
+    depends_on:
+      - authentik-db
+      - authentik-redis
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Paperless PostgreSQL Database
+  paperless-db:
+    image: postgres:15-alpine
+    container_name: paperless-db
+    restart: unless-stopped
+    volumes:
+      - ./appdata/paperless/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=paperless
+      - POSTGRES_USER=paperless
+      - POSTGRES_PASSWORD=${PAPERLESS_DB_PASSWORD}
+      - TZ=${TIMEZONE}
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d paperless -U paperless"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Paperless Redis Broker
+  paperless-redis:
+    image: redis:alpine
+    container_name: paperless-redis
+    restart: unless-stopped
+    volumes:
+      - ./appdata/paperless/redis:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Paperless-ngx Document Management
+  paperless-ngx:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless-ngx
+    restart: unless-stopped
+    volumes:
+      - ./appdata/paperless/data:/usr/src/paperless/data
+      - ./appdata/paperless/media:/usr/src/paperless/media
+      - ./appdata/paperless/export:/usr/src/paperless/export
+      - ./appdata/paperless/consume:/usr/src/paperless/consume
+    environment:
+      - PAPERLESS_REDIS=redis://paperless-redis:6379
+      - PAPERLESS_DBHOST=paperless-db
+      - PAPERLESS_DBNAME=paperless
+      - PAPERLESS_DBUSER=paperless
+      - PAPERLESS_DBPASS=${PAPERLESS_DB_PASSWORD}
+      - PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET_KEY}
+      - PAPERLESS_URL=https://docs.${DOMAIN}
+      - PAPERLESS_ADMIN_USER=admin
+      - PAPERLESS_ADMIN_PASSWORD=${PAPERLESS_ADMIN_PASSWORD}
+      - PAPERLESS_ADMIN_MAIL=admin@${DOMAIN}
+      - PAPERLESS_OCR_LANGUAGE=eng+por
+      - PAPERLESS_TIME_ZONE=${TIMEZONE}
+      - PAPERLESS_ENABLE_HTTP_REMOTE_USER=false
+      - PAPERLESS_TRUSTED_PROXIES=${TAILSCALE_IP}
+      - PAPERLESS_CORS_ALLOWED_HOSTS=https://docs.${DOMAIN}
+      - USERMAP_UID=${PUID}
+      - USERMAP_GID=${PGID}
+    ports:
+      - "${TAILSCALE_IP}:8400:8000"
+    networks:
+      - frontend
+      - database
+    depends_on:
+      - paperless-db
+      - paperless-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   portainer_data:
   grafana_data:

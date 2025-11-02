@@ -91,3 +91,24 @@
         href: http://{{HOMEPAGE_VAR_TAILSCALE_IP}}:19999
         description: Real-time System Monitoring
         container: netdata
+
+- Security & Identity:
+    - Authentik:
+        icon: authentik
+        href: https://auth.homelab.example.com
+        description: SSO & Identity Provider
+        container: authentik-server
+
+- Document Management:
+    - Paperless-ngx:
+        icon: paperless
+        href: https://docs.homelab.example.com
+        description: Document Management & OCR
+        container: paperless-ngx
+
+- Storage:
+    - Nextcloud:
+        icon: nextcloud
+        href: https://cloud.homelab.example.com
+        description: Cloud Storage & File Sharing
+        container: nextcloud
