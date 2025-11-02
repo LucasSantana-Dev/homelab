@@ -7,11 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Nextcloud** - Self-hosted cloud storage and productivity platform
+  - Accessible at https://cloud.homelab.example.com (Tailscale only)
+  - Integrated with MariaDB for database and Redis for caching
+  - Configured with trusted domains and proxy settings
+  - Resource limits: Nextcloud (1G RAM max, 1.0 CPU max), MariaDB (512M RAM max, 0.5 CPU max), Redis (128M RAM max, 0.25 CPU max)
+
 ### Fixed
 
 - **Vaultwarden Health Check**: Changed from `wget` to `curl` for health check compatibility
 - **Promtail**: Recreated container to clear unhealthy status (no health endpoint by design)
 - **Container Cleanup**: Removed old Discord bot containers (discord-bot, discord-bot-postgres, discord-bot-redis)
+- **Nextcloud SSL**: Updated nginx configuration to use correct SSL certificate paths (`/etc/nginx/ssl/`)
 
 ### Changed
 
