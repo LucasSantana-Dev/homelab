@@ -74,6 +74,12 @@
         description: Metrics Collection
         container: prometheus
 
+    - Alertmanager:
+        icon: https://raw.githubusercontent.com/prometheus/docs/main/static/prometheus_logo_grey.svg
+        href: https://alertmanager.homelab.example.com
+        description: Alert Management & Routing
+        container: alertmanager
+
     - Loki:
         icon: https://grafana.com/static/img/logos/logo-loki.svg
         href: https://grafana.homelab.example.com/explore

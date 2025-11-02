@@ -2,6 +2,13 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
 rule_files:
   - "alerts.yml"
 
@@ -32,6 +39,13 @@ scrape_configs:
     scrape_interval: 15s
     metrics_path: /metrics
 
+  # Alertmanager - Alert management metrics
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
   # Homelab services health check
   - job_name: 'homelab-services'
     static_configs:
@@ -51,3 +65,27 @@ scrape_configs:
     scrape_interval: 30s
     metrics_path: /metrics
     scheme: http
+
+  # Blackbox Exporter - HTTP endpoint monitoring
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://homelab.example.com
+          - https://stremio.homelab.example.com
+          - https://homeassistant.homelab.example.com
+          - https://grafana.homelab.example.com
+          - https://portainer.homelab.example.com
+          - https://jellyfin.homelab.example.com
+          - https://vault.homelab.example.com
+          - https://n8n.homelab.example.com
+          - https://cloud.homelab.example.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
