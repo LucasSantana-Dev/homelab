@@ -552,10 +552,11 @@ services:
     networks:
       - default
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/alive"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -687,11 +688,7 @@ services:
       - default
     depends_on:
       - loki
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9080/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # Promtail doesn't expose a health endpoint, monitoring via logs only
     deploy:
       resources:
         limits:
@@ -700,6 +697,118 @@ services:
         reservations:
           memory: 128M
           cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nextcloud Database - MariaDB
+  nextcloud-db:
+    image: mariadb:latest
+    container_name: nextcloud-db
+    restart: unless-stopped
+    volumes:
+      - ./appdata/nextcloud/db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NEXTCLOUD_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - TZ=${TIMEZONE}
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nextcloud Redis Cache
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    volumes:
+      - ./appdata/nextcloud/redis:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nextcloud Cloud Storage - Tailscale Only
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    volumes:
+      - ./appdata/nextcloud/html:/var/www/html
+      - ./appdata/nextcloud/data:/var/www/html/data
+      - ./appdata/nextcloud/config:/var/www/html/config
+      - ./appdata/nextcloud/apps:/var/www/html/custom_apps
+    environment:
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - REDIS_HOST=nextcloud-redis
+      - NEXTCLOUD_TRUSTED_DOMAINS=cloud.${DOMAIN} ${TAILSCALE_IP}
+      - TRUSTED_PROXIES=${TAILSCALE_IP}
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITEHOST=cloud.${DOMAIN}
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:8300:80"
+    networks:
+      - default
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/status.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
     logging:
       driver: "json-file"
       options:
