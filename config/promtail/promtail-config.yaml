@@ -1,0 +1,122 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Docker container logs with enhanced parsing
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker_logs
+          __path__: /var/lib/docker/containers/*/*.log
+    pipeline_stages:
+      # Parse Docker JSON format
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs:
+            time: time
+      
+      # Extract container name
+      - json:
+          expressions:
+            tag:
+          source: attrs
+      
+      - regex:
+          expression: (?P<container_name>(?:[^|]*[^|]))
+          source: tag
+      
+      # Parse log levels (ERROR, WARN, INFO, DEBUG)
+      - regex:
+          expression: '.*(?P<level>ERROR|WARN|INFO|DEBUG|FATAL|CRITICAL).*'
+          source: output
+      
+      # Timestamp parsing
+      - timestamp:
+          format: RFC3339Nano
+          source: time
+      
+      # Apply labels
+      - labels:
+          container_name:
+          stream:
+          level:
+      
+      # Output the log message
+      - output:
+          source: output
+      
+      # Drop noisy logs
+      - drop:
+          expression: '.*healthcheck.*'
+          drop_counter_reason: healthcheck_logs
+
+  # System logs with multiline support
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          __path__: /var/log/syslog
+    pipeline_stages:
+      # Parse syslog format
+      - regex:
+          expression: '^(?P<timestamp>\S+\s+\d+\s+\S+)\s+(?P<host>\S+)\s+(?P<app>\S+)(?::|\[(?P<pid>\d+)\])?:\s+(?P<message>.*)$'
+      
+      - timestamp:
+          source: timestamp
+          format: "Jan _2 15:04:05"
+      
+      - labels:
+          host:
+          app:
+          pid:
+      
+      - output:
+          source: message
+
+  # Nginx access logs
+  - job_name: nginx_access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx_access
+          __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[\w-]+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<request>[^"]+) (?P<protocol>[^"]+)" (?P<status>\d+) (?P<body_bytes_sent>\d+).*$'
+      
+      - labels:
+          remote_addr:
+          method:
+          status:
+      
+      - output:
+          source: request
+
+  # Nginx error logs
+  - job_name: nginx_error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx_error
+          __path__: /var/log/nginx/error.log
+    pipeline_stages:
+      - regex:
+          expression: '.*\[(?P<level>\w+)\].*'
+      
+      - labels:
+          level:
