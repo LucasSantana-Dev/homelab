@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Authentik Healthcheck** - Fixed Authentik server healthcheck failure
+  - Replaced `curl`-based healthcheck with Python-based check (curl not available in container)
+  - Updated healthcheck to accept HTTP 200 or 204 status codes from `/-/health/live/` endpoint
+  - Authentik server now reports healthy status correctly
+
+- **Container Updates** - Updated all homelab containers to latest versions
+  - Pulled latest images for all services using `docker compose pull`
+  - Restarted all services to apply updates
+  - Cleaned up 14.91GB of unused Docker images
+  - All containers now running latest available versions
+
+- **Authentik DNS Resolution and Access** - Fixed network isolation and IP restrictions preventing access to Authentik
+  - Added `frontend` network to nginx service in docker-compose.yml for Nginx-Authentik communication
+  - Removed redundant nginx IP restrictions (services already bound to Tailscale IP at Docker level)
+  - Fixed 403 Forbidden errors caused by Docker bridge network IPs being blocked
+  - Created comprehensive DNS setup guide at `docs/dns-setup.md`
+  - Documented three DNS configuration options: Tailscale MagicDNS (recommended), local /etc/hosts, DuckDNS
+  - Resolved permission issues with Authentik Redis and PostgreSQL by restarting services
+  - Authentik SSO now fully accessible at https://auth.homelab.example.com
+
+### Security
+
+- **Removed Hardcoded IP Addresses** - Enhanced security by removing exposed Tailscale IP from codebase
+  - Replaced hardcoded IPs in nginx config comments with reference to `.env` file
+  - Updated DNS documentation to use `<YOUR_TAILSCALE_IP>` placeholders
+  - Updated README examples to reference `.env` variables
+  - All sensitive IPs now only stored in `.env` file (git-ignored)
+
 ## [3.0.0] - Future Enhancements - Network Segmentation, Authentik SSO & Paperless-ngx
 
 ### Added
