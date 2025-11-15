@@ -211,10 +211,41 @@ NEXTCLOUD_DB_ROOT_PASSWORD=<secure password>
 NEXTCLOUD_DB_PASSWORD=<secure password>
 ```
 
+### DNS Configuration
+
+All services use custom domains (e.g., `auth.homelab.example.com`, `grafana.homelab.example.com`) that need DNS resolution. You have three options:
+
+**Option 1: Tailscale MagicDNS (Recommended)**
+- Configure wildcard DNS in Tailscale admin console
+- Works across all devices on your Tailscale network automatically
+- Most reliable for multi-device access
+- See `docs/dns-setup.md` for detailed instructions
+
+**Option 2: Local /etc/hosts File (Testing)**
+- Quick setup for testing from a single machine
+- Add entries mapping domains to your Tailscale IP
+- Must be configured on each device
+- See `docs/dns-setup.md` for all domain entries
+
+**Option 3: DuckDNS (Not Recommended)**
+- External DNS service (token already in `.env`)
+- NOT recommended for Tailscale-only setup
+- Would expose services to public internet
+
+**Quick Start with /etc/hosts:**
+```bash
+# Add this line to /etc/hosts (Linux/Mac) or C:\Windows\System32\drivers\etc\hosts (Windows)
+<YOUR_TAILSCALE_IP> auth.homelab.example.com
+
+# Replace <YOUR_TAILSCALE_IP> with the value from your .env file
+```
+
+For complete DNS setup including all services, see `docs/dns-setup.md`.
+
 ### Access Methods
 
 1. **Localhost**: `http://localhost:PORT`
-2. **Tailscale**: `http://TAILSCALE_IP:PORT`
+2. **Tailscale**: `http://TAILSCALE_IP:PORT` or `https://service.DOMAIN` (with DNS configured)
 3. **Public**: `https://service.DOMAIN` (with Cloudflare tunnel)
 
 ## 🛠️ Development
