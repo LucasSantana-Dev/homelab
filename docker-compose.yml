@@ -1052,7 +1052,10 @@ services:
 
   # Paperless-ngx Document Management
   paperless-ngx:
-    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    build:
+      context: ./dockerfiles/paperless-ngx
+      dockerfile: Dockerfile
+    image: paperless-ngx:custom
     container_name: paperless-ngx
     restart: unless-stopped
     volumes:
