@@ -14,11 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated healthcheck to accept HTTP 200 or 204 status codes from `/-/health/live/` endpoint
   - Authentik server now reports healthy status correctly
 
-- **Container Updates** - Updated all homelab containers to latest versions
-  - Pulled latest images for all services using `docker compose pull`
-  - Restarted all services to apply updates
-  - Cleaned up 14.91GB of unused Docker images
-  - All containers now running latest available versions
+- **Container Updates** - Updated 25 outdated homelab containers to latest versions (2025-12-23)
+  - Updated 23 homelab compose services: alertmanager, authentik-db, authentik-redis, blackbox-exporter, filebrowser, grafana, homeassistant, homepage, jellyfin, loki, n8n, netdata, nextcloud, nextcloud-db, nextcloud-redis, nginx-proxy, paperless-db, paperless-redis, pihole, portainer, prometheus, promtail, stremio-server
+  - Removed 2 orphan cloudflared containers (silly_hoover, pedantic_brahmagupta) that were using outdated images
+  - Pulled latest images using `docker compose pull` and recreated containers with `docker compose up -d --remove-orphans`
+  - Cleaned up 10.79GB of unused Docker images
+  - All containers verified healthy and running latest available versions
 
 - **Authentik DNS Resolution and Access** - Fixed network isolation and IP restrictions preventing access to Authentik
   - Added `frontend` network to nginx service in docker-compose.yml for Nginx-Authentik communication
