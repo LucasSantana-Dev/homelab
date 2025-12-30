@@ -5,12 +5,12 @@ Manage updates for homelab services
 """
 
 import subprocess
-import time
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.table import Table
+
+from ..models.service import ServiceRegistry
 
 # Initialize console
 console = Console()
@@ -19,19 +19,8 @@ console = Console()
 class UpdateManager:
     """Manage updates for homelab services"""
 
-    def __init__(self):
-        self.services = [
-            "homepage",
-            "stremio",
-            "homeassistant",
-            "portainer",
-            "pihole",
-            "grafana",
-            "uptime-kuma",
-            "whats-up-docker",
-            "prometheus",
-            "node-exporter",
-        ]
+    def __init__(self, registry: Optional[ServiceRegistry] = None):
+        self.registry = registry or ServiceRegistry()
 
     def check_updates(self) -> Dict:
         """Check for available updates"""
@@ -105,7 +94,13 @@ class UpdateManager:
 
     def update_service(self, service_name: str) -> Dict:
         """Update a specific service"""
-        if service_name not in self.services:
+        # Validate service exists in registry
+        service = self.registry.get_service(service_name)
+        if not service:
+            # Also check by container name
+            service = self.registry.get_service_by_container(service_name)
+
+        if not service:
             return {"success": False, "error": f"Unknown service: {service_name}"}
 
         try:
@@ -159,16 +154,21 @@ class UpdateManager:
                 if line.strip():
                     parts = line.split()
                     if len(parts) >= 3:
-                        service_name = parts[0]
+                        container_name = parts[0]
                         image = parts[1]
                         tag = parts[2]
+
+                        # Try to find service in registry
+                        service = self.registry.get_service_by_container(container_name)
+                        service_name = service.name if service else container_name
 
                         services.append(
                             {
                                 "name": service_name,
+                                "container": container_name,
                                 "image": image,
                                 "tag": tag,
-                                "status": "up_to_date",  # This would need more sophisticated checking
+                                "status": "up_to_date",
                             }
                         )
 
@@ -185,3 +185,7 @@ class UpdateManager:
             }
         except Exception as e:
             return {"success": False, "error": f"Update status error: {str(e)}"}
+
+    def get_all_service_names(self):
+        """Get all service names from registry"""
+        return [s.id for s in self.registry.services.values()]

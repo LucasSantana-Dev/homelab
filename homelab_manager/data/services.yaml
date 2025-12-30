@@ -1,0 +1,335 @@
+# Homelab Service Registry
+# Declarative definition of all homelab services
+# This file is the single source of truth for service configurations
+
+categories:
+  core:
+    description: "Core infrastructure services"
+    compose_file: "compose/core.yml"
+  monitoring:
+    description: "Monitoring and observability stack"
+    compose_file: "compose/monitoring.yml"
+  media:
+    description: "Media streaming services"
+    compose_file: "compose/media.yml"
+  apps:
+    description: "Application services"
+    compose_file: "compose/apps.yml"
+  security:
+    description: "Security and authentication services"
+    compose_file: "compose/security.yml"
+  automation:
+    description: "Home automation services"
+    compose_file: "compose/automation.yml"
+
+services:
+  # Core Infrastructure
+  nginx:
+    name: "Nginx Proxy"
+    category: core
+    container_name: nginx-proxy
+    port: 80
+    internal_port: 80
+    health_endpoint: "/health"
+    description: "Reverse proxy for all services"
+    sensitive: false
+
+  homepage:
+    name: "Homepage"
+    category: core
+    container_name: homepage
+    port: 3000
+    internal_port: 3000
+    health_endpoint: "/"
+    description: "Dashboard for all services"
+    sensitive: false
+    url_path: ""
+
+  portainer:
+    name: "Portainer"
+    category: core
+    container_name: portainer
+    port: 9000
+    internal_port: 9000
+    health_endpoint: "/"
+    description: "Docker container management UI"
+    sensitive: true
+
+  uptime-kuma:
+    name: "Uptime Kuma"
+    category: core
+    container_name: uptime-kuma
+    port: 3001
+    internal_port: 3001
+    health_endpoint: "/"
+    description: "Uptime monitoring"
+    sensitive: false
+    url_path: "uptime"
+
+  whats-up-docker:
+    name: "What's Up Docker"
+    category: core
+    container_name: whats-up-docker
+    port: 3003
+    internal_port: 3000
+    health_endpoint: "/"
+    description: "Docker container update monitoring"
+    sensitive: true
+    url_path: "docker"
+
+  filebrowser:
+    name: "FileBrowser"
+    category: core
+    container_name: filebrowser
+    port: 8080
+    internal_port: 80
+    health_endpoint: "/"
+    description: "Web-based file manager"
+    sensitive: true
+    url_path: "files"
+
+  # Monitoring Stack
+  grafana:
+    name: "Grafana"
+    category: monitoring
+    container_name: grafana
+    port: 3002
+    internal_port: 3000
+    health_endpoint: "/api/health"
+    description: "Metrics visualization"
+    sensitive: true
+
+  prometheus:
+    name: "Prometheus"
+    category: monitoring
+    container_name: prometheus
+    port: 9091
+    internal_port: 9090
+    health_endpoint: "/-/healthy"
+    description: "Metrics collection and storage"
+    sensitive: true
+
+  alertmanager:
+    name: "Alertmanager"
+    category: monitoring
+    container_name: alertmanager
+    port: 9093
+    internal_port: 9093
+    health_endpoint: "/-/healthy"
+    description: "Alert routing and notifications"
+    sensitive: true
+
+  loki:
+    name: "Loki"
+    category: monitoring
+    container_name: loki
+    port: 3100
+    internal_port: 3100
+    health_endpoint: "/ready"
+    description: "Log aggregation"
+    sensitive: true
+
+  netdata:
+    name: "Netdata"
+    category: monitoring
+    container_name: netdata
+    port: 19999
+    internal_port: 19999
+    health_endpoint: "/"
+    description: "Real-time system monitoring"
+    sensitive: false
+
+  node-exporter:
+    name: "Node Exporter"
+    category: monitoring
+    container_name: node-exporter
+    port: 9100
+    internal_port: 9100
+    health_endpoint: "/metrics"
+    description: "System metrics exporter"
+    sensitive: true
+    localhost_only: true
+
+  cadvisor:
+    name: "cAdvisor"
+    category: monitoring
+    container_name: cadvisor
+    port: 8082
+    internal_port: 8080
+    health_endpoint: "/"
+    description: "Container metrics"
+    sensitive: true
+    localhost_only: true
+
+  blackbox-exporter:
+    name: "Blackbox Exporter"
+    category: monitoring
+    container_name: blackbox-exporter
+    port: 9115
+    internal_port: 9115
+    health_endpoint: "/-/healthy"
+    description: "Endpoint monitoring"
+    sensitive: true
+    localhost_only: true
+
+  promtail:
+    name: "Promtail"
+    category: monitoring
+    container_name: promtail
+    description: "Log collection agent"
+    sensitive: true
+    has_port: false
+
+  # Media Services
+  jellyfin:
+    name: "Jellyfin"
+    category: media
+    container_name: jellyfin
+    port: 8096
+    internal_port: 8096
+    health_endpoint: "/health"
+    description: "Media streaming server"
+    sensitive: false
+
+  stremio:
+    name: "Stremio"
+    category: media
+    container_name: stremio-server
+    port: 11470
+    internal_port: 11470
+    health_endpoint: "/"
+    description: "Stremio streaming server"
+    sensitive: false
+
+  # Application Services
+  n8n:
+    name: "n8n"
+    category: apps
+    container_name: n8n
+    port: 5678
+    internal_port: 5678
+    health_endpoint: "/healthz"
+    description: "Workflow automation"
+    sensitive: true
+
+  nextcloud:
+    name: "Nextcloud"
+    category: apps
+    container_name: nextcloud
+    port: 8300
+    internal_port: 80
+    health_endpoint: "/status.php"
+    description: "Cloud storage and collaboration"
+    sensitive: true
+    url_path: "cloud"
+
+  nextcloud-db:
+    name: "Nextcloud DB"
+    category: apps
+    container_name: nextcloud-db
+    description: "MariaDB for Nextcloud"
+    sensitive: true
+    has_port: false
+
+  nextcloud-redis:
+    name: "Nextcloud Redis"
+    category: apps
+    container_name: nextcloud-redis
+    description: "Redis cache for Nextcloud"
+    sensitive: true
+    has_port: false
+
+  paperless-ngx:
+    name: "Paperless-ngx"
+    category: apps
+    container_name: paperless-ngx
+    port: 8400
+    internal_port: 8000
+    health_endpoint: "/"
+    description: "Document management system"
+    sensitive: true
+    url_path: "docs"
+
+  paperless-db:
+    name: "Paperless DB"
+    category: apps
+    container_name: paperless-db
+    description: "PostgreSQL for Paperless"
+    sensitive: true
+    has_port: false
+
+  paperless-redis:
+    name: "Paperless Redis"
+    category: apps
+    container_name: paperless-redis
+    description: "Redis broker for Paperless"
+    sensitive: true
+    has_port: false
+
+  # Security Services
+  pihole:
+    name: "Pi-hole"
+    category: security
+    container_name: pihole
+    port: 8054
+    internal_port: 80
+    health_endpoint: "/admin/"
+    description: "DNS filtering and ad blocking"
+    sensitive: true
+
+  vaultwarden:
+    name: "Vaultwarden"
+    category: security
+    container_name: vaultwarden
+    port: 8200
+    internal_port: 80
+    health_endpoint: "/"
+    description: "Password manager (Bitwarden compatible)"
+    sensitive: true
+    url_path: "vault"
+
+  authentik-server:
+    name: "Authentik"
+    category: security
+    container_name: authentik-server
+    port: 9100
+    internal_port: 9000
+    health_endpoint: "/-/health/live/"
+    description: "SSO and Identity Provider"
+    sensitive: true
+    url_path: "auth"
+
+  authentik-worker:
+    name: "Authentik Worker"
+    category: security
+    container_name: authentik-worker
+    description: "Authentik background worker"
+    sensitive: true
+    has_port: false
+
+  authentik-db:
+    name: "Authentik DB"
+    category: security
+    container_name: authentik-db
+    description: "PostgreSQL for Authentik"
+    sensitive: true
+    has_port: false
+
+  authentik-redis:
+    name: "Authentik Redis"
+    category: security
+    container_name: authentik-redis
+    description: "Redis cache for Authentik"
+    sensitive: true
+    has_port: false
+
+  # Automation Services
+  homeassistant:
+    name: "Home Assistant"
+    category: automation
+    container_name: homeassistant
+    port: 8123
+    internal_port: 8123
+    health_endpoint: "/"
+    description: "Home automation platform"
+    sensitive: false

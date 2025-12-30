@@ -11,6 +11,8 @@ from typing import Dict, List, Optional
 
 from rich.console import Console
 
+from ..models.service import ServiceRegistry
+
 # Initialize console
 console = Console()
 
@@ -24,6 +26,9 @@ class HomelabConfig:
         )
         self.env_file = self.homelab_dir / ".env"
         self.env_example = self.homelab_dir / ".env.example"
+
+        # Load service registry
+        self.registry = ServiceRegistry()
 
         # Required variables with validation patterns
         self.required_vars = {
@@ -139,34 +144,53 @@ class HomelabConfig:
         return missing
 
     def get_service_urls(self) -> Dict[str, str]:
-        """Get service URLs based on configuration"""
+        """Get service URLs based on configuration and service registry"""
         env_vars = self.load_env()
         tailscale_ip = env_vars.get("TAILSCALE_IP", "127.0.0.1")
         domain = env_vars.get("DOMAIN", "localhost")
 
-        return {
-            "homepage": "http://localhost:3000",
-            "stremio": "http://localhost:8080",
-            "homeassistant": "http://localhost:8123",
-            "portainer": "http://localhost:9000",
-            "pihole": "http://localhost:8054",
-            "grafana": "http://localhost:3002",
-            "uptime-kuma": "http://localhost:3001",
-            "whats-up-docker": "http://localhost:3003",
-            "tailscale_homepage": f"https://{domain}",
-            "tailscale_stremio": f"https://stremio.{domain}",
-            "tailscale_homeassistant": f"https://homeassistant.{domain}",
-            "tailscale_portainer": f"https://portainer.{domain}",
-            "tailscale_pihole": f"https://pihole.{domain}",
-            "tailscale_grafana": f"https://grafana.{domain}",
-            "tailscale_uptime-kuma": f"https://uptime.{domain}",
-            "tailscale_whats-up-docker": f"https://docker.{domain}",
-            "public_homepage": f"https://{domain}",
-            "public_homeassistant": f"https://homeassistant.{domain}",
-            "public_portainer": f"https://portainer.{domain}",
-            "public_pihole": f"https://pihole.{domain}",
-            "public_stremio": f"https://stremio.{domain}",
-            "public_grafana": f"https://grafana.{domain}",
-            "public_uptime": f"https://uptime.{domain}",
-            "public_docker": f"https://docker.{domain}",
-        }
+        urls = {}
+
+        # Generate URLs from service registry
+        for service_id, service in self.registry.services.items():
+            if service.has_port and service.port:
+                # Localhost URL
+                urls[service_id] = f"http://localhost:{service.port}"
+
+                # Tailscale URL
+                if not service.localhost_only:
+                    tailscale_url = service.get_tailscale_url(tailscale_ip)
+                    if tailscale_url:
+                        urls[f"tailscale_{service_id}"] = tailscale_url
+
+                    # Public URL
+                    public_url = service.get_public_url(domain)
+                    if public_url:
+                        urls[f"public_{service_id}"] = public_url
+
+        return urls
+
+    def get_services_for_display(self) -> List[Dict]:
+        """Get services formatted for display in CLI"""
+        env_vars = self.load_env()
+        tailscale_ip = env_vars.get("TAILSCALE_IP", "127.0.0.1")
+        domain = env_vars.get("DOMAIN", "localhost")
+
+        services = []
+        for service in self.registry.get_services_with_ports():
+            if service.localhost_only:
+                continue
+
+            services.append(
+                {
+                    "name": service.name,
+                    "id": service.id,
+                    "category": service.category,
+                    "localhost": f"http://localhost:{service.port}",
+                    "tailscale": service.get_tailscale_url(tailscale_ip),
+                    "public": service.get_public_url(domain),
+                    "sensitive": service.sensitive,
+                }
+            )
+
+        return services

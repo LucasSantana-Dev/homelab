@@ -12,6 +12,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ..core.config import HomelabConfig
+from ..models.service import ServiceRegistry
 from ..services.containers import ContainerManager
 from ..services.health import HealthMonitor
 from ..services.updates import UpdateManager
@@ -20,8 +21,22 @@ from ..services.updates import UpdateManager
 console = Console()
 
 
-def create_app() -> typer.Typer:
-    """Create the main CLI app with all commands"""
+def create_app(
+    config_manager: Optional[HomelabConfig] = None,
+    container_manager: Optional[ContainerManager] = None,
+    health_monitor: Optional[HealthMonitor] = None,
+    update_manager: Optional[UpdateManager] = None,
+    registry: Optional[ServiceRegistry] = None,
+) -> typer.Typer:
+    """Create the main CLI app with all commands
+
+    Args:
+        config_manager: Optional HomelabConfig instance for testing
+        container_manager: Optional ContainerManager instance for testing
+        health_monitor: Optional HealthMonitor instance for testing
+        update_manager: Optional UpdateManager instance for testing
+        registry: Optional ServiceRegistry instance for testing
+    """
 
     app = typer.Typer(
         name="homelab",
@@ -30,11 +45,12 @@ def create_app() -> typer.Typer:
         rich_markup_mode="rich",
     )
 
-    # Initialize managers
-    config_manager = HomelabConfig()
-    container_manager = ContainerManager()
-    health_monitor = HealthMonitor()
-    update_manager = UpdateManager()
+    # Initialize managers with dependency injection
+    _registry = registry or ServiceRegistry()
+    _config_manager = config_manager or HomelabConfig()
+    _container_manager = container_manager or ContainerManager()
+    _health_monitor = health_monitor or HealthMonitor(registry=_registry)
+    _update_manager = update_manager or UpdateManager(registry=_registry)
 
     @app.command()
     def status():
@@ -42,7 +58,7 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("🏠 Homelab Status", style="bold blue"))
 
         # Get container status
-        containers = container_manager.get_container_status()
+        containers = _container_manager.get_container_status()
 
         # Create status table
         table = Table(title="Service Status")
@@ -70,7 +86,7 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("🚀 Deploying Homelab", style="bold green"))
 
         try:
-            result = container_manager.deploy()
+            result = _container_manager.deploy()
             if result["success"]:
                 console.print("✅ Homelab deployed successfully!")
             else:
@@ -86,7 +102,7 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("🔄 Updating Homelab", style="bold yellow"))
 
         try:
-            result = update_manager.update_all()
+            result = _update_manager.update_all()
             if result["success"]:
                 console.print("✅ Homelab updated successfully!")
             else:
@@ -102,7 +118,7 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("🏥 Health Check", style="bold red"))
 
         try:
-            health_status = health_monitor.check_all_services()
+            health_status = _health_monitor.check_all_services()
 
             # Create health table
             table = Table(title="Health Status")
@@ -138,7 +154,7 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("💾 Creating Backup", style="bold blue"))
 
         try:
-            result = container_manager.create_backup()
+            result = _container_manager.create_backup()
             if result["success"]:
                 console.print(f"✅ Backup created: {result['backup_path']}")
             else:
@@ -154,7 +170,7 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("🔄 Restoring from Backup", style="bold yellow"))
 
         try:
-            result = container_manager.restore_backup(backup_path)
+            result = _container_manager.restore_backup(backup_path)
             if result["success"]:
                 console.print("✅ Homelab restored successfully!")
             else:
@@ -175,15 +191,14 @@ def create_app() -> typer.Typer:
 
         try:
             if service:
-                logs = container_manager.get_service_logs(service)
+                logs = _container_manager.get_service_logs(service)
                 console.print(f"Logs for {service}:")
                 console.print(logs)
             else:
-                # Show all services
-                services = container_manager.get_container_status()
+                # Show all services from registry
                 console.print("Available services:")
-                for container in services:
-                    console.print(f"  - {container['name']}")
+                for svc in _registry.get_services_with_ports():
+                    console.print(f"  - {svc.id} ({svc.name})")
                 console.print("\nUse: homelab logs <service-name>")
 
         except Exception as e:
@@ -196,7 +211,7 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("⚙️  Configuration", style="bold magenta"))
 
         try:
-            config_info = config_manager.get_config_summary()
+            config_info = _config_manager.get_config_summary()
 
             # Create config table
             table = Table(title="Configuration")
@@ -225,32 +240,25 @@ def create_app() -> typer.Typer:
         console.print(Panel.fit("🔗 Service URLs", style="bold blue"))
 
         try:
-            urls = config_manager.get_service_urls()
+            # Get services from config (which uses registry)
+            services = _config_manager.get_services_for_display()
 
             # Create URLs table
             table = Table(title="Service Access URLs")
             table.add_column("Service", style="cyan")
+            table.add_column("Category", style="white")
             table.add_column("Localhost", style="green")
             table.add_column("Tailscale", style="yellow")
             table.add_column("Public", style="magenta")
 
-            services = [
-                "homepage",
-                "stremio",
-                "homeassistant",
-                "portainer",
-                "pihole",
-                "grafana",
-                "uptime-kuma",
-                "whats-up-docker",
-            ]
-
-            for service in services:
-                localhost_url = urls.get(service, "N/A")
-                tailscale_url = urls.get(f"tailscale_{service}", "N/A")
-                public_url = urls.get(f"public_{service}", "N/A")
-
-                table.add_row(service.title(), localhost_url, tailscale_url, public_url)
+            for svc in services:
+                table.add_row(
+                    svc["name"],
+                    svc["category"],
+                    svc.get("localhost", "N/A"),
+                    svc.get("tailscale", "N/A"),
+                    svc.get("public", "N/A"),
+                )
 
             console.print(table)
 
@@ -267,7 +275,7 @@ def create_app() -> typer.Typer:
 
         try:
             if service:
-                result = container_manager.restart_service(service)
+                result = _container_manager.restart_service(service)
                 if result["success"]:
                     console.print(f"✅ {service} restarted successfully!")
                 else:
@@ -276,7 +284,7 @@ def create_app() -> typer.Typer:
             else:
                 # Restart all services
                 console.print("🔄 Restarting all services...")
-                result = container_manager.deploy()
+                result = _container_manager.deploy()
                 if result["success"]:
                     console.print("✅ All services restarted successfully!")
                 else:
@@ -286,5 +294,20 @@ def create_app() -> typer.Typer:
         except Exception as e:
             console.print(f"❌ Restart error: {str(e)}")
             raise typer.Exit(1)
+
+    @app.command()
+    def services():
+        """List all registered services"""
+        console.print(Panel.fit("📦 Registered Services", style="bold blue"))
+
+        # Group by category
+        categories = _registry.categories
+        for cat_id, category in categories.items():
+            console.print(f"\n[bold]{category.description}[/bold]")
+            cat_services = _registry.get_services_by_category(cat_id)
+            for svc in cat_services:
+                port_info = f":{svc.port}" if svc.port else ""
+                sensitive_badge = " [red](sensitive)[/red]" if svc.sensitive else ""
+                console.print(f"  • {svc.name}{port_info}{sensitive_badge}")
 
     return app
