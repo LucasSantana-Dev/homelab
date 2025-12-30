@@ -1,0 +1,74 @@
+# Media Services
+# Jellyfin, Stremio
+
+services:
+  # Stremio - Public Access Required for app.strem.io
+  stremio:
+    image: stremio/server:latest
+    container_name: stremio-server
+    restart: unless-stopped
+    environment:
+      - NO_CORS=1
+      - INTERNAL_IP=0.0.0.0
+      - STREMIO_SERVER_PORT=11470
+      - STREMIO_SERVER_HOST=0.0.0.0
+      - STREMIO_SERVER_URL=https://stremio.homelab.example.com
+    volumes:
+      - ../config/nginx/www/certbot:/var/www/certbot:ro
+      - ../config/stremio:/root/.stremio-server
+      - stremio_cache:/root/.stremio-server/stremio-cache
+    ports:
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP}:11470:11470"
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Jellyfin Media Server - Tailscale Only
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    volumes:
+      - ../appdata/jellyfin/config:/config
+      - ../appdata/jellyfin/cache:/cache
+      - ../media:/media:ro  # Read-only media directory
+    environment:
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:8096:8096"
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  stremio_cache:

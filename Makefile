@@ -1,7 +1,8 @@
 # Homelab Management Makefile
 # Provides convenient targets for homelab operations
 
-.PHONY: help install deploy status logs health backup restore security-scan monitor clean test
+.PHONY: help install deploy status logs health backup restore security-scan monitor clean test \
+        update update-safe update-timer-install update-timer-status update-timer-enable update-timer-disable
 
 # Default target
 help: ## Show this help message
@@ -80,8 +81,8 @@ monitor: ## Open monitoring dashboards
 # Backup and restore
 backup: ## Create backup of homelab data
 	@echo "💾 Creating backup..."
-	@if [ -f "./scripts/automated-backup.sh" ]; then \
-		./scripts/automated-backup.sh; \
+	@if [ -f "./scripts/maintenance/automated-backup.sh" ]; then \
+		./scripts/maintenance/automated-backup.sh; \
 	elif command -v python3 >/dev/null 2>&1 && python3 -c "import homelab_manager" 2>/dev/null; then \
 		python3 -m homelab_manager backup; \
 	else \
@@ -112,8 +113,8 @@ restore: ## Restore from backup (usage: make restore BACKUP=backup_file.tar.gz)
 # Security
 security-scan: ## Run security scan on containers and images
 	@echo "🔒 Running security scan..."
-	@if [ -f "./scripts/security-scan.sh" ]; then \
-		./scripts/security-scan.sh; \
+	@if [ -f "./scripts/security/security-scan.sh" ]; then \
+		./scripts/security/security-scan.sh; \
 	else \
 		echo "❌ Security scan script not found"; \
 		echo "Please run: make install"; \
@@ -156,19 +157,88 @@ format: ## Format code
 	fi
 
 # Maintenance
-clean: ## Clean up old logs and temporary files
-	@echo "🧹 Cleaning up..."
-	@find logs/ -name "*.log" -mtime +7 -delete 2>/dev/null || true
-	@find . -name "*.pyc" -delete 2>/dev/null || true
-	@find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+clean: ## Clean up caches, temp files, and old backups
+	@./scripts/maintenance/cleanup-project.sh --all
+
+clean-quick: ## Quick cleanup (caches and temp files only)
+	@./scripts/maintenance/cleanup-project.sh
+
+clean-dry: ## Show what would be cleaned (dry run)
+	@./scripts/maintenance/cleanup-project.sh --dry-run --all
+
+docker-clean: ## Clean Docker system (prune unused images/containers)
+	@echo "🐳 Cleaning Docker system..."
 	@docker system prune -f
 	@echo "✅ Cleanup complete"
 
-update: ## Update all container images
+update: ## Update all container images (fast mode)
 	@echo "🔄 Updating container images..."
 	docker compose pull
 	docker compose up -d
 	@echo "✅ Update complete"
+
+update-safe: ## Update containers with health checks (safe rolling update)
+	@echo "🔄 Running safe container update..."
+	@if [ -f "./scripts/maintenance/update-containers.sh" ]; then \
+		./scripts/maintenance/update-containers.sh; \
+	else \
+		echo "❌ Update script not found"; \
+		exit 1; \
+	fi
+
+update-dry-run: ## Preview what would be updated without making changes
+	@echo "🔍 Running update dry run..."
+	@if [ -f "./scripts/maintenance/update-containers.sh" ]; then \
+		./scripts/maintenance/update-containers.sh --dry-run; \
+	else \
+		echo "❌ Update script not found"; \
+		exit 1; \
+	fi
+
+update-timer-install: ## Install and enable the container update timer
+	@echo "📦 Installing update timer..."
+	@sudo cp ./scripts/systemd/homelab-update.service /etc/systemd/system/
+	@sudo cp ./scripts/systemd/homelab-update.timer /etc/systemd/system/
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable homelab-update.timer
+	@sudo systemctl start homelab-update.timer
+	@echo "✅ Update timer installed and enabled"
+	@echo "Next run: $$(systemctl list-timers homelab-update.timer --no-pager | grep homelab || echo 'Check with: systemctl list-timers')"
+
+update-timer-status: ## Show status of the container update timer
+	@echo "📊 Update Timer Status"
+	@echo "======================"
+	@systemctl status homelab-update.timer --no-pager 2>/dev/null || echo "Timer not installed"
+	@echo ""
+	@echo "📅 Timer Schedule:"
+	@systemctl list-timers homelab-update.timer --no-pager 2>/dev/null || echo "Timer not found"
+
+update-timer-enable: ## Enable the container update timer
+	@sudo systemctl enable homelab-update.timer
+	@sudo systemctl start homelab-update.timer
+	@echo "✅ Update timer enabled"
+
+update-timer-disable: ## Disable the container update timer
+	@sudo systemctl stop homelab-update.timer
+	@sudo systemctl disable homelab-update.timer
+	@echo "✅ Update timer disabled"
+
+update-timer-run-now: ## Manually trigger the update timer immediately
+	@echo "🚀 Triggering manual update..."
+	@sudo systemctl start homelab-update.service
+	@echo "✅ Update triggered. Check logs with: make update-logs"
+
+update-logs: ## Show recent container update logs
+	@echo "📋 Recent Update Logs"
+	@echo "====================="
+	@if [ -f "./logs/update.log" ]; then \
+		tail -100 ./logs/update.log; \
+	else \
+		echo "No update logs found"; \
+	fi
+	@echo ""
+	@echo "📋 Systemd Journal Logs:"
+	@journalctl -u homelab-update.service --no-pager -n 50 2>/dev/null || echo "No journal logs found"
 
 restart: ## Restart all services
 	@echo "🔄 Restarting all services..."
@@ -230,5 +300,5 @@ quick-backup: ## Quick backup with verification
 	@echo "Verifying latest backup..."
 	@latest=$$(ls -t backups/homelab_backup_*.tar.gz 2>/dev/null | head -1); \
 	if [ -n "$$latest" ]; then \
-		./scripts/automated-backup.sh --verify "$$latest"; \
+		./scripts/maintenance/automated-backup.sh --verify "$$latest"; \
 	fi
