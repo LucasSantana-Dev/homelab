@@ -52,12 +52,12 @@ The script will install the following HACS add-ons:
 If the automated script doesn't work, you can install add-ons manually:
 
 1. **Access Home Assistant:**
-   - Navigate to `http://100.64.0.10:8123`
+   - Navigate to `http://${TAILSCALE_IP}:8123` (replace with your Tailscale IP from `.env`)
    - Log in with your credentials
 
 2. **Open HACS:**
    - Click on "HACS" in the sidebar
-   - Or navigate to `http://100.64.0.10:8123/hacs`
+   - Or navigate to `http://${TAILSCALE_IP}:8123/hacs`
 
 3. **Install Integrations:**
    - Go to "Integrations" tab

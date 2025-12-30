@@ -6,6 +6,7 @@ Uses Selenium to navigate HACS and install add-ons automatically
 
 import time
 import sys
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -60,8 +61,8 @@ HACS_ADDONS = [
     },
 ]
 
-# Home Assistant URL
-HA_URL = "http://100.64.0.10:8123"
+# Home Assistant URL - loaded from environment variable
+HA_URL = os.environ.get("HA_URL", f"http://{os.environ.get('TAILSCALE_IP', 'localhost')}:8123")
 
 class HACSInstaller:
     def __init__(self, username, password, headless=False):

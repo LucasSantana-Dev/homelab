@@ -12,8 +12,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+import os
 
-HA_URL = "http://100.64.0.10:8123"
+HA_URL = os.environ.get("HA_URL", f"http://{os.environ.get('TAILSCALE_IP', 'localhost')}:8123")
 
 # HACS Add-ons to install
 ADDONS = {
