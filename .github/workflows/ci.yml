@@ -17,23 +17,22 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r scripts/requirements-dev.txt
-        pip install pre-commit
+        pip install -e ".[dev]"
 
     # Run all quality checks via pre-commit for consistency with local development
     # This ensures the same checks run locally and in CI using a single source of truth
@@ -47,7 +46,7 @@ jobs:
         pytest tests/ --cov=homelab_manager --cov-report=xml --cov-report=html --tb=short -v
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
         flags: unittests
@@ -68,32 +67,46 @@ jobs:
         PGID=1000
         TIMEZONE=America/Sao_Paulo
         TAILSCALE_IP=127.0.0.1
+        DOMAIN=example.com
         HOMEASSISTANT_PORT=8123
+        HOMEASSISTANT_KEY=dummy_key
         PORTAINER_PORT=9000
-        GRAFANA_PORT=3000
-        PROMETHEUS_PORT=9090
-        PIHOLE_PORT=8054
-        UPTIME_KUMA_PORT=3001
-        WHATS_UP_DOCKER_PORT=3003
-        FILEBROWSER_PORT=80
-        STREMIO_PORT=8080
-        HOMEPAGE_PORT=3000
-        DUCKDNS_TOKEN=dummy
-        DUCKDNS_DOMAIN=example
-        NETDATA_CLAIM_TOKEN=
-        PIHOLE_WEB_PASSWORD=test_password_123
-        HOMEASSISTANT_KEY=test_key_123
+        GRAFANA_PORT=3002
         GRAFANA_PASSWORD=test_password_123
+        PROMETHEUS_PORT=9091
+        PIHOLE_WEB_PORT=8054
+        PIHOLE_DNS_PORT=53
+        PIHOLE_WEB_PASSWORD=test_password_123
+        UPTIME_KUMA_PORT=3001
+        WUD_PORT=3003
+        FILEBROWSER_PORT=8081
+        HOMEPAGE_PORT=3000
+        NODE_EXPORTER_PORT=9100
+        NETDATA_CLAIM_TOKEN=
+        ALERTMANAGER_DISCORD_WEBHOOK=
+        DOCKER_HUB_TOKEN=
+        GITHUB_TOKEN=
+        WUD_DISCORD_WEBHOOK_URL=
+        WUD_SMTP_HOST=
+        WUD_SMTP_PORT=
+        WUD_SMTP_USER=
+        WUD_SMTP_PASS=
+        N8N_USER=admin
+        N8N_PASSWORD=test_password_123
+        NEXTCLOUD_DB_ROOT_PASSWORD=test_password_123
+        NEXTCLOUD_DB_PASSWORD=test_password_123
+        PAPERLESS_DB_PASSWORD=test_password_123
+        PAPERLESS_SECRET_KEY=test_secret_key_123
+        PAPERLESS_ADMIN_PASSWORD=test_password_123
+        AUTHENTIK_SECRET_KEY=test_secret_key_123
+        AUTHENTIK_DB_PASSWORD=test_password_123
+        VAULTWARDEN_ADMIN_TOKEN=test_token_123
         EOF
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build Docker Compose
-      run: |
-        docker compose config
-
-    - name: Test Docker Compose syntax
+    - name: Validate Docker Compose configuration
       run: |
         docker compose config --quiet
 
@@ -105,14 +118,14 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r scripts/requirements-dev.txt
+        pip install -e ".[dev]"
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -143,22 +156,40 @@ jobs:
         PGID=1000
         TIMEZONE=America/Sao_Paulo
         TAILSCALE_IP=127.0.0.1
+        DOMAIN=example.com
         HOMEASSISTANT_PORT=8123
+        HOMEASSISTANT_KEY=dummy_key
         PORTAINER_PORT=9000
-        GRAFANA_PORT=3000
-        PROMETHEUS_PORT=9090
-        PIHOLE_PORT=8054
-        UPTIME_KUMA_PORT=3001
-        WHATS_UP_DOCKER_PORT=3003
-        FILEBROWSER_PORT=80
-        STREMIO_PORT=8080
-        HOMEPAGE_PORT=3000
-        DUCKDNS_TOKEN=dummy
-        DUCKDNS_DOMAIN=example
-        NETDATA_CLAIM_TOKEN=
-        PIHOLE_WEB_PASSWORD=test_password_123
-        HOMEASSISTANT_KEY=test_key_123
+        GRAFANA_PORT=3002
         GRAFANA_PASSWORD=test_password_123
+        PROMETHEUS_PORT=9091
+        PIHOLE_WEB_PORT=8054
+        PIHOLE_DNS_PORT=53
+        PIHOLE_WEB_PASSWORD=test_password_123
+        UPTIME_KUMA_PORT=3001
+        WUD_PORT=3003
+        FILEBROWSER_PORT=8081
+        HOMEPAGE_PORT=3000
+        NODE_EXPORTER_PORT=9100
+        NETDATA_CLAIM_TOKEN=
+        ALERTMANAGER_DISCORD_WEBHOOK=
+        DOCKER_HUB_TOKEN=
+        GITHUB_TOKEN=
+        WUD_DISCORD_WEBHOOK_URL=
+        WUD_SMTP_HOST=
+        WUD_SMTP_PORT=
+        WUD_SMTP_USER=
+        WUD_SMTP_PASS=
+        N8N_USER=admin
+        N8N_PASSWORD=test_password_123
+        NEXTCLOUD_DB_ROOT_PASSWORD=test_password_123
+        NEXTCLOUD_DB_PASSWORD=test_password_123
+        PAPERLESS_DB_PASSWORD=test_password_123
+        PAPERLESS_SECRET_KEY=test_secret_key_123
+        PAPERLESS_ADMIN_PASSWORD=test_password_123
+        AUTHENTIK_SECRET_KEY=test_secret_key_123
+        AUTHENTIK_DB_PASSWORD=test_password_123
+        VAULTWARDEN_ADMIN_TOKEN=test_token_123
         EOF
 
     - name: Set up Docker Buildx
@@ -204,14 +235,14 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r scripts/requirements-dev.txt
+        pip install -e ".[dev]"
 
     - name: Run pre-commit
-      uses: pre-commit/action@v3.0.0
+      uses: pre-commit/action@v3.0.1
