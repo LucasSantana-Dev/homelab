@@ -1,0 +1,35 @@
+# Automation Services
+# Home Assistant
+
+services:
+  # Home Assistant - Tailscale Only
+  homeassistant:
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    container_name: homeassistant
+    restart: unless-stopped
+    user: "root"  # Running as root to allow package installation for integrations like Meross Cloud
+    volumes:
+      - ../config/nginx/www/certbot:/var/www/certbot:ro
+      - ../config/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=${TIMEZONE}
+      - PYTHONUSERBASE=/config/deps
+    ports:
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP}:${HOMEASSISTANT_PORT:-8123}:8123"
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

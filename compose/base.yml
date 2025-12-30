@@ -1,0 +1,39 @@
+# Base Configuration - Networks and Volumes
+# This file defines shared infrastructure used by all service modules
+
+networks:
+  frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  backend:
+    driver: bridge
+    internal: true  # No internet access
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+  database:
+    driver: bridge
+    internal: true  # No internet access
+    ipam:
+      config:
+        - subnet: 172.23.0.0/24
+
+volumes:
+  portainer_data:
+  grafana_data:
+  prometheus_data:
+  uptime_kuma_data:
+  whats_up_docker_data:
+  pihole_data:
+  stremio_cache:
+  filebrowser_data:
+  netdataconfig:
+  netdatalib:
+  netdatacache:

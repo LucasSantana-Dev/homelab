@@ -1,0 +1,276 @@
+# Application Services
+# n8n, Paperless-ngx, Nextcloud
+
+services:
+  # n8n Workflow Automation - Tailscale Only
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    user: "root"  # Run as root to avoid permission issues with volume
+    volumes:
+      - ../appdata/n8n:/home/node/.n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - WEBHOOK_URL=https://n8n.${DOMAIN}
+      - TZ=${TIMEZONE}
+      - PUID=1000
+      - PGID=1000
+    ports:
+      - "${TAILSCALE_IP}:5678:5678"
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nextcloud Database - MariaDB
+  nextcloud-db:
+    image: mariadb:latest
+    container_name: nextcloud-db
+    restart: unless-stopped
+    volumes:
+      - ../appdata/nextcloud/db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NEXTCLOUD_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - TZ=${TIMEZONE}
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nextcloud Redis Cache
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    volumes:
+      - ../appdata/nextcloud/redis:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nextcloud Cloud Storage - Tailscale Only
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    volumes:
+      - ../appdata/nextcloud/html:/var/www/html
+      - ../appdata/nextcloud/data:/var/www/html/data
+      - ../appdata/nextcloud/config:/var/www/html/config
+      - ../appdata/nextcloud/apps:/var/www/html/custom_apps
+    environment:
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - REDIS_HOST=nextcloud-redis
+      - NEXTCLOUD_TRUSTED_DOMAINS=cloud.${DOMAIN} ${TAILSCALE_IP}
+      - TRUSTED_PROXIES=${TAILSCALE_IP}
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITEHOST=cloud.${DOMAIN}
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:8300:80"
+    networks:
+      - default
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/status.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Paperless PostgreSQL Database
+  paperless-db:
+    image: postgres:15-alpine
+    container_name: paperless-db
+    restart: unless-stopped
+    volumes:
+      - ../appdata/paperless/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=paperless
+      - POSTGRES_USER=paperless
+      - POSTGRES_PASSWORD=${PAPERLESS_DB_PASSWORD}
+      - TZ=${TIMEZONE}
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d paperless -U paperless"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Paperless Redis Broker
+  paperless-redis:
+    image: redis:alpine
+    container_name: paperless-redis
+    restart: unless-stopped
+    volumes:
+      - ../appdata/paperless/redis:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Paperless-ngx Document Management
+  paperless-ngx:
+    build:
+      context: ../dockerfiles/paperless-ngx
+      dockerfile: Dockerfile
+    image: paperless-ngx:custom
+    container_name: paperless-ngx
+    restart: unless-stopped
+    volumes:
+      - ../appdata/paperless/data:/usr/src/paperless/data
+      - ../appdata/paperless/media:/usr/src/paperless/media
+      - ../appdata/paperless/export:/usr/src/paperless/export
+      - ../appdata/paperless/consume:/usr/src/paperless/consume
+    environment:
+      - PAPERLESS_REDIS=redis://paperless-redis:6379
+      - PAPERLESS_DBHOST=paperless-db
+      - PAPERLESS_DBNAME=paperless
+      - PAPERLESS_DBUSER=paperless
+      - PAPERLESS_DBPASS=${PAPERLESS_DB_PASSWORD}
+      - PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET_KEY}
+      - PAPERLESS_URL=https://docs.${DOMAIN}
+      - PAPERLESS_ADMIN_USER=admin
+      - PAPERLESS_ADMIN_PASSWORD=${PAPERLESS_ADMIN_PASSWORD}
+      - PAPERLESS_ADMIN_MAIL=admin@${DOMAIN}
+      - PAPERLESS_OCR_LANGUAGE=eng+por
+      - PAPERLESS_TIME_ZONE=${TIMEZONE}
+      - PAPERLESS_ENABLE_HTTP_REMOTE_USER=false
+      - PAPERLESS_TRUSTED_PROXIES=${TAILSCALE_IP}
+      - PAPERLESS_CORS_ALLOWED_HOSTS=https://docs.${DOMAIN}
+      - USERMAP_UID=${PUID}
+      - USERMAP_GID=${PGID}
+    ports:
+      - "${TAILSCALE_IP}:8400:8000"
+    networks:
+      - frontend
+      - database
+    depends_on:
+      - paperless-db
+      - paperless-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

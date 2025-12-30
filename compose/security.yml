@@ -1,0 +1,233 @@
+# Security Services
+# Authentik, Vaultwarden, Pi-hole
+
+services:
+  # Pi-hole - LOCALHOST ONLY (Local Network Service)
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    volumes:
+      - ../config/nginx/www/certbot:/var/www/certbot:ro
+      - ../config/pihole/etc:/etc/pihole
+      - ../config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+      - pihole_data:/etc/pihole
+    environment:
+      - TZ=${TIMEZONE}
+      - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
+      - PIHOLE_DNS_=8.8.8.8;1.1.1.1
+      - VIRTUAL_HOST=pihole.${DOMAIN}
+      - VIRTUAL_PORT=80
+    ports:
+      # Bind only to Tailscale IP for secure access
+      - "${TAILSCALE_IP}:${PIHOLE_WEB_PORT:-8054}:80"
+      - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/tcp"
+      - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/udp"
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Vaultwarden Password Manager - Tailscale Only
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    volumes:
+      - ../appdata/vaultwarden:/data
+    environment:
+      - DOMAIN=https://vault.${DOMAIN}
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+      - SIGNUPS_ALLOWED=false
+      - WEBSOCKET_ENABLED=true
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:8200:80"
+      - "${TAILSCALE_IP}:3012:3012"  # WebSocket port
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authentik PostgreSQL Database
+  authentik-db:
+    image: postgres:15-alpine
+    container_name: authentik-db
+    restart: unless-stopped
+    volumes:
+      - ../appdata/authentik/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=authentik
+      - POSTGRES_USER=authentik
+      - POSTGRES_PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - TZ=${TIMEZONE}
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authentik Redis Cache
+  authentik-redis:
+    image: redis:alpine
+    container_name: authentik-redis
+    restart: unless-stopped
+    volumes:
+      - ../appdata/authentik/redis:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authentik Server - SSO Identity Provider
+  authentik-server:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    volumes:
+      - ../appdata/authentik/media:/media
+      - ../appdata/authentik/custom-templates:/templates
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-db
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_REDIS__HOST=authentik-redis
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=false
+      - AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true
+      - AUTHENTIK_AVATARS=initials
+      - TZ=${TIMEZONE}
+    ports:
+      - "${TAILSCALE_IP}:9100:9000"
+      - "${TAILSCALE_IP}:9443:9443"
+    networks:
+      - frontend
+      - database
+    depends_on:
+      - authentik-db
+      - authentik-redis
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; r=urllib.request.urlopen('http://localhost:9000/-/health/live/'); exit(0 if r.getcode() in [200, 204] else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Authentik Worker - Background tasks
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    volumes:
+      - ../appdata/authentik/media:/media
+      - ../appdata/authentik/certs:/certs
+      - ../appdata/authentik/custom-templates:/templates
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-db
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_REDIS__HOST=authentik-redis
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=false
+      - AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true
+      - TZ=${TIMEZONE}
+    networks:
+      - frontend
+      - database
+    depends_on:
+      - authentik-db
+      - authentik-redis
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pihole_data:
