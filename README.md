@@ -26,14 +26,34 @@ See `.env.example` for all required variables and refer to our [Security Policy]
 
 ## 🚀 Quick Start
 
+### Auto-Start Configuration
+
+To enable automatic startup of all services on boot:
+
+1. **Install systemd services:**
+   ```bash
+   cd /home/luk-server/homelab
+   sudo ./scripts/deployment/install-systemd-services.sh
+   ```
+
+2. **Configure BIOS for power-on after AC loss:**
+   - See `docs/bios-power-on-setup.md` for detailed instructions
+   - Enable "Power On After AC Loss" in BIOS/UEFI settings
+   - This ensures the server automatically boots when power is restored
+
+3. **Verify services are enabled:**
+   ```bash
+   ./scripts/monitoring/status-services.sh
+   ```
+
 ### Installation
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Or install in development mode
+# Install in production mode
 pip install -e .
+
+# Or install with development dependencies
+pip install -e ".[dev]"
 ```
 
 ### Basic Usage
@@ -70,7 +90,8 @@ python -m homelab_manager --help
 
 - `status` - Show homelab status and service information
 - `deploy` - Deploy homelab services
-- `update` - Update homelab services
+- `update` - Update homelab services (fast mode)
+- `update-safe` - Safe rolling update with health checks
 - `health` - Check homelab health
 - `backup` - Create homelab backup
 - `restore <backup-path>` - Restore from backup
@@ -78,6 +99,18 @@ python -m homelab_manager --help
 - `config` - Show configuration information
 - `urls` - Show service URLs and access methods
 - `restart [service]` - Restart services
+
+### Update Commands (Makefile)
+
+- `make update` - Fast update (pull all images, restart all containers)
+- `make update-safe` - Safe rolling update with health checks between restarts
+- `make update-dry-run` - Preview what would be updated without making changes
+- `make update-timer-install` - Install and enable the automatic update timer
+- `make update-timer-status` - Show status of the update timer
+- `make update-timer-enable` - Enable the automatic update timer
+- `make update-timer-disable` - Disable the automatic update timer
+- `make update-timer-run-now` - Manually trigger an update immediately
+- `make update-logs` - Show recent container update logs
 
 ### Examples
 
@@ -113,20 +146,36 @@ python -m homelab_manager urls
 
 ```
 homelab/
-├── homelab_manager/          # Python CLI package
-│   ├── __init__.py
-│   ├── cli.py               # Main CLI interface
-│   ├── config.py            # Configuration management
-│   ├── container_manager.py # Container operations
-│   ├── health.py            # Health monitoring
-│   └── updates.py           # Update management
-├── scripts/                 # Utility scripts
-│   └── homelab             # CLI wrapper
-├── config/                  # Service configurations
-├── appdata/                 # Service data
-├── docker-compose.yml       # Main compose file
-├── .env                     # Environment variables
-└── requirements.txt         # Python dependencies
+├── compose/                      # Modular Docker Compose files
+│   ├── base.yml                 # Networks and volumes
+│   ├── core.yml                 # Nginx, Homepage, Portainer, etc.
+│   ├── monitoring.yml           # Prometheus, Grafana, Loki, etc.
+│   ├── media.yml                # Jellyfin, Stremio
+│   ├── apps.yml                 # n8n, Paperless, Nextcloud
+│   ├── security.yml             # Authentik, Vaultwarden, Pi-hole
+│   └── automation.yml           # Home Assistant
+├── homelab_manager/              # Python CLI package
+│   ├── cli/                     # CLI commands
+│   ├── core/                    # Configuration management
+│   ├── services/                # Container and health services
+│   ├── models/                  # Data models
+│   │   └── service.py          # Service dataclass
+│   ├── data/                    # Static data files
+│   │   └── services.yaml       # Service registry
+│   └── utils/                   # Utility functions
+├── scripts/                      # Utility scripts (organized)
+│   ├── homelab                  # Main CLI wrapper
+│   ├── containers               # Container management wrapper
+│   ├── deployment/              # Service lifecycle scripts
+│   ├── maintenance/             # Backup and update scripts
+│   ├── monitoring/              # Status and health scripts
+│   ├── security/                # Security scanning
+│   └── systemd/                 # Systemd service files
+├── config/                       # Service configurations
+├── appdata/                      # Service data (volumes)
+├── docker-compose.yml            # Main orchestrator (includes modules)
+├── pyproject.toml                # Python project config (single source)
+└── .env                          # Environment variables
 ```
 
 ### Services
@@ -168,6 +217,41 @@ homelab/
 - **Nextcloud** - Cloud Storage & File Sharing (port 8300) - https://cloud.homelab.example.com
 
 ## 🔧 Configuration
+
+### Auto-Start Services
+
+The homelab is configured to automatically start all services on boot using systemd:
+
+- **homelab-docker.service** - Main homelab stack (nginx, grafana, prometheus, etc.)
+- **satisfactory-server.service** - Satisfactory game server with Cloudflared tunnel
+- **lukbot.service** - LukBot Discord bot
+
+**Service Management:**
+```bash
+# Check service status
+./scripts/monitoring/status-services.sh
+
+# Manually start all services
+./scripts/deployment/startup-services.sh
+
+# Gracefully shutdown all services
+./scripts/deployment/shutdown-services.sh
+
+# View service logs
+sudo journalctl -u homelab-docker -n 50
+sudo journalctl -u satisfactory-server -n 50
+sudo journalctl -u lukbot -n 50
+```
+
+**Boot Sequence:**
+1. BIOS auto power-on (if configured)
+2. Ubuntu system boot
+3. Docker service starts
+4. Tailscale daemon starts
+5. Network becomes available
+6. Homelab services start (10s delay)
+7. Satisfactory server starts (5s delay after homelab)
+8. LukBot starts (5s delay after homelab)
 
 ### Environment Variables
 
@@ -254,7 +338,7 @@ For complete DNS setup including all services, see `docs/dns-setup.md`.
 
 ```bash
 # Install development dependencies
-pip install -r requirements.txt
+pip install -e ".[dev]"
 
 # Run tests
 pytest
@@ -271,10 +355,10 @@ mypy homelab_manager/
 
 ### Adding New Services
 
-1. Add service to `docker-compose.yml`
-2. Update service configuration in `container_manager.py`
-3. Add health check URL in `health.py`
-4. Update service list in CLI commands
+1. Add service to the appropriate `compose/*.yml` module
+2. Add service definition to `homelab_manager/data/services.yaml`
+3. Update nginx configuration if needed
+4. Restart services: `docker compose up -d`
 
 ## 📊 Monitoring
 
@@ -293,6 +377,48 @@ The CLI provides comprehensive health monitoring:
 - **Data Protection**: Backup all service data
 - **Easy Restore**: Restore from any backup point
 
+### Automated Container Updates
+
+The homelab includes an automated container update system that runs every 5 days:
+
+**Features:**
+- **Safe Rolling Updates**: Updates containers in priority groups with health checks
+- **Update Order**: Databases → Core Services → Applications → Monitoring → Utilities
+- **Health Checks**: Waits for container health between updates
+- **Pre-Update Backup**: Creates backup of critical configs before updating
+- **Discord Notifications**: Sends update status to Discord webhook
+- **Lock File**: Prevents concurrent update runs
+
+**Container Update Groups:**
+| Group | Wait Time | Containers |
+|-------|-----------|------------|
+| Databases | 30s | nextcloud-db, authentik-db, paperless-db, *-redis |
+| Core | 20s | nginx, homepage, homeassistant, vaultwarden |
+| Applications | 20s | jellyfin, stremio, n8n, nextcloud, paperless-ngx |
+| Monitoring | 15s | prometheus, grafana, loki, alertmanager, netdata |
+| Utilities | 10s | portainer, uptime-kuma, whats-up-docker, pihole |
+
+**Setup Automated Updates:**
+```bash
+# Install the systemd timer (runs every 5 days at 3 AM)
+make update-timer-install
+
+# Check timer status
+make update-timer-status
+
+# Run a manual safe update
+make update-safe
+
+# Preview what would be updated
+make update-dry-run
+
+# View update logs
+make update-logs
+```
+
+**Configuration:**
+Set `WUD_DISCORD_WEBHOOK_URL` in `.env` to receive Discord notifications about updates.
+
 ## 🔒 Security
 
 - **Network Isolation**: Services bound to localhost and Tailscale
@@ -305,6 +431,9 @@ The CLI provides comprehensive health monitoring:
 - **CLI Help**: `python -m homelab_manager --help`
 - **Command Help**: `python -m homelab_manager <command> --help`
 - **Configuration**: Check `.env.example` for all options
+- **Auto-Start Setup**: See `docs/bios-power-on-setup.md` for BIOS configuration
+- **Service Management**: Scripts in `scripts/deployment/`, `scripts/monitoring/`
+- **Scripts README**: See `scripts/README.md` for script documentation
 
 ## 🤝 Contributing
 
