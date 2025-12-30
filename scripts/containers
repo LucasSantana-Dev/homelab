@@ -2,9 +2,11 @@
 # Container Management Wrapper
 # Modern Python-based container management
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 case "$1" in
     "status")
-        python3 /home/luk-server/homelab/scripts/container-status.py
+        python3 "$SCRIPT_DIR/monitoring/container-status.py"
         ;;
     "update")
         if [ -z "$2" ]; then
@@ -12,10 +14,10 @@ case "$1" in
             echo "Available containers: homeassistant, homepage, grafana, filebrowser"
             exit 1
         fi
-        python3 /home/luk-server/homelab/scripts/update-containers.py "$2"
+        python3 "$SCRIPT_DIR/maintenance/update-containers.py" "$2"
         ;;
     "check")
-        python3 /home/luk-server/homelab/scripts/update-containers.py --check
+        python3 "$SCRIPT_DIR/maintenance/update-containers.py" --check
         ;;
     *)
         echo "🏠 Homelab Container Management"

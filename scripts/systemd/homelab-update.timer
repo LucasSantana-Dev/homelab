@@ -1,0 +1,20 @@
+[Unit]
+Description=Homelab Container Update Timer (Every 5 Days)
+Documentation=https://github.com/luk-homeserver/homelab
+Requires=homelab-update.service
+
+[Timer]
+# Run every 5 days at 3:00 AM
+OnCalendar=*-*-01,06,11,16,21,26 03:00:00
+
+# Add randomized delay up to 15 minutes to prevent thundering herd
+RandomizedDelaySec=900
+
+# If system was off when timer should have triggered, run on next boot
+Persistent=true
+
+# Accuracy (allow some delay for system load balancing)
+AccuracySec=60
+
+[Install]
+WantedBy=timers.target
