@@ -1,4 +1,3 @@
-
 # Loads default set of integrations. Do not remove.
 default_config:
 
@@ -17,3 +16,34 @@ http:
     - 172.18.0.0/16  # Docker network range
     - 127.0.0.1
     - ::1
+
+# Recorder configuration
+recorder: !include recorder.yaml
+
+# Input helpers - split into separate files
+input_boolean: !include input_boolean.yaml
+input_number: !include input_number.yaml
+input_select: !include input_select.yaml
+
+# Energy monitoring
+template: !include energy_templates.yaml
+sensor: !include energy_sensors.yaml
+utility_meter: !include utility_meters.yaml
+
+# Voice assistants (see voice_assistants.yaml)
+# Uncomment and configure after setting up Google Cloud Project and Alexa Skill
+# google_assistant: !include voice_assistants.yaml
+# alexa: !include voice_assistants.yaml
+
+# Zones for presence detection (configure coordinates in secrets.yaml)
+# zone:
+#   - name: Home
+#     latitude: !secret home_latitude
+#     longitude: !secret home_longitude
+#     radius: 100
+#     icon: mdi:home
+#   - name: Work
+#     latitude: !secret work_latitude
+#     longitude: !secret work_longitude
+#     radius: 200
+#     icon: mdi:briefcase

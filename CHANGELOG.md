@@ -7,6 +7,148 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Complete ServiceRegistry Integration** - All service managers now use the centralized registry
+  - `HealthMonitor` refactored to use `ServiceRegistry` for health checks
+  - `UpdateManager` refactored to use `ServiceRegistry` for service validation
+  - CLI `urls` command now dynamically generates URLs from registry
+  - Added new `services` command to list all registered services by category
+
+- **Dependency Injection in CLI** - Improved testability with DI pattern
+  - `create_app()` now accepts optional manager instances for testing
+  - All managers (config, container, health, update) can be injected
+  - ServiceRegistry can be shared across managers
+
+- **Dynamic Version Management** - Single source of truth for version
+  - Version now read from installed package metadata via `importlib.metadata`
+  - Fallback to hardcoded version for development mode
+  - Eliminates version drift between `__init__.py` and `pyproject.toml`
+
+- **Environment Validation Script** - New `scripts/security/validate-env.sh`
+  - Validates required environment variables (TAILSCALE_IP, DOMAIN, etc.)
+  - Checks for placeholder values in configuration
+  - Optional strict mode for CI/CD pipelines
+  - Color-coded output for easy reading
+
+- **Modular Docker Compose Architecture** - Split monolithic docker-compose.yml into domain-specific modules
+  - `compose/base.yml` - Networks and volumes definitions
+  - `compose/core.yml` - Nginx, Homepage, Portainer, Uptime Kuma, What's Up Docker, FileBrowser
+  - `compose/monitoring.yml` - Prometheus, Grafana, Loki, Alertmanager, Netdata, Node-exporter, cAdvisor
+  - `compose/media.yml` - Jellyfin, Stremio
+  - `compose/apps.yml` - n8n, Paperless-ngx, Nextcloud (with databases and Redis)
+  - `compose/security.yml` - Authentik, Vaultwarden, Pi-hole
+  - `compose/automation.yml` - Home Assistant
+  - Main `docker-compose.yml` now uses `include:` directive for unified deployment
+  - Selective module deployment: `docker compose -f compose/core.yml up -d`
+
+- **Service Registry** - Declarative service definitions in YAML
+  - New `homelab_manager/data/services.yaml` with all 31 services
+  - Service model with category, port, health endpoint, sensitivity flag
+  - Python dataclass in `homelab_manager/models/service.py`
+  - Container manager now uses registry instead of hardcoded values
+
+- **Consolidated Dependency Management** - Single source of truth for Python dependencies
+  - Updated `pyproject.toml` with all dependencies and optional groups
+  - Removed duplicate `scripts/requirements.txt` and `scripts/requirements-dev.txt`
+  - Optional dependency groups: `[dev]`, `[docs]`, `[profile]`
+  - Install with: `pip install -e ".[dev]"`
+
+- **Reorganized Scripts Directory** - Functional subdirectories for better organization
+  - `scripts/deployment/` - startup-services.sh, shutdown-services.sh, install-systemd-services.sh
+  - `scripts/maintenance/` - automated-backup.sh, update-containers.sh, update-containers.py
+  - `scripts/monitoring/` - container-status.py, status-services.sh
+  - `scripts/security/` - security-scan.sh
+  - `scripts/systemd/` - Service unit files (renamed from systemd-services)
+  - `scripts/hacs/` - Home Assistant specific scripts
+  - Added `scripts/README.md` documenting the new structure
+
+### Changed
+
+- **CI/CD Pipeline** - Updated to use pyproject.toml
+  - Uses `pip install -e ".[dev]"` for dependency installation
+  - Runs pre-commit hooks for code quality
+  - Updated cache keys to use pyproject.toml hash
+
+- **Makefile** - Updated script paths for reorganized structure
+  - Backup: `scripts/maintenance/automated-backup.sh`
+  - Security: `scripts/security/security-scan.sh`
+  - Updates: `scripts/maintenance/update-containers.sh`
+  - Systemd: `scripts/systemd/` directory
+
+- **Configuration Management** - Enhanced with service registry
+  - `core/config.py` now uses ServiceRegistry for URL generation
+  - Dynamic service URL generation from registry
+
+### Fixed
+
+- **Network Conflicts** - Removed duplicate network definitions in compose modules
+- **Systemd Service** - Updated homelab-update.service with new script path
+
+### Changed
+
+- **Pre-commit Hooks Updated** - Synchronized versions with pyproject.toml
+  - black: 23.7.0 -> 24.8.0
+  - isort: 5.12.0 -> 5.13.2
+  - flake8: 6.0.0 -> 7.1.1
+  - mypy: 1.5.1 -> 1.11.2
+  - bandit: 1.7.5 -> 1.7.9
+  - shellcheck: 0.9.0.6 -> 0.10.0.1
+  - yamllint: 1.32.0 -> 1.35.1
+  - markdownlint: 0.35.0 -> 0.41.0
+  - commitizen: 3.13.0 -> 3.29.0
+
+### Removed
+
+- **Duplicate Test Files** - Removed broken `test_*_simple.py` files
+  - `test_container_manager_simple.py` - referenced non-existent modules
+  - `test_updates_simple.py` - referenced non-existent modules
+- **Backup Files** - Cleaned up `docker-compose.yml.backup` and `docker-compose.yml.pre-modularization.backup`
+  - Added backup file patterns to `.gitignore`
+
+### Smart Home Integrations (Previous) - Comprehensive Home Assistant integration setup
+  - Configured Xiaomi Home integration (4 devices: 3 Yeelight bulbs, 1 robot vacuum)
+  - Configured LG ThinQ integration (1 device: air conditioner)
+  - Configured Tuya integration (2 devices: smart switches)
+  - Installed HACS add-ons: Adaptive Lighting, Node-RED Companion, Auto Backup, card-mod, Mushroom
+  - Created voice assistant templates for Google Assistant and Amazon Alexa
+  - Created comprehensive automations for climate, lighting, energy, and media
+  - Created dashboard YAML configurations (main, energy, climate, security, media)
+  - Fixed Home Assistant configuration syntax errors in YAML files
+  - Updated secrets.yaml with placeholder values for all integrations
+  - Created integration setup documentation at `docs/homeassistant-integrations-guide.md`
+
+### Fixed
+
+- **Home Assistant Configuration** - Fixed multiple YAML configuration issues
+  - Fixed recorder.yaml structure (removed nested key issue)
+  - Fixed input_helpers.yaml by splitting into separate files (input_boolean, input_number, input_select)
+  - Fixed energy.yaml by splitting into energy_sensors.yaml and utility_meters.yaml
+  - Fixed automations.yaml to use persistent_notification instead of placeholder device names
+  - Fixed scripts.yaml with valid notification services
+  - Removed invalid configuration parameters from mobile_app include
+  - Fixed Docker Compose network_mode and networks conflict
+
+- **Automated Container Updates** - Safe rolling update system with systemd timer
+  - New `scripts/update-containers.sh` script with safe update orchestration
+  - Updates containers in priority groups: databases → core → apps → monitoring → utilities
+  - Health checks between each container restart to ensure service stability
+  - Pre-update backup of critical configuration files
+  - Discord webhook notifications for update start/completion/failures
+  - Systemd timer runs every 5 days at 3:00 AM with randomized delay
+  - Dry-run mode for preview without making changes
+  - New Makefile targets: `update-safe`, `update-dry-run`, `update-timer-install`, `update-timer-status`, `update-logs`
+  - Lock file prevents concurrent update runs
+
+- **Auto-Start Services** - Configured automatic startup for all Docker Compose stacks on boot
+  - Created systemd services for homelab-docker, satisfactory-server, and lukbot
+  - Services automatically start after Docker and Tailscale are ready
+  - All services configured with proper dependencies and startup delays
+  - Helper scripts for manual service management (startup, shutdown, status)
+  - BIOS power-on configuration guide for Intel N100 systems
+  - Installation script for easy systemd service setup
+  - See `docs/bios-power-on-setup.md` for BIOS configuration instructions
+
 ### Fixed
 
 - **Authentik Healthcheck** - Fixed Authentik server healthcheck failure
