@@ -9,7 +9,8 @@ from typing import Dict, List, Optional
 
 import requests
 from rich.console import Console
-from rich.table import Table
+
+from ..models.service import ServiceRegistry
 
 # Initialize console
 console = Console()
@@ -18,17 +19,8 @@ console = Console()
 class HealthMonitor:
     """Monitor health of homelab services"""
 
-    def __init__(self):
-        self.services = {
-            "homepage": "http://localhost:3000",
-            "stremio": "http://localhost:8080",
-            "homeassistant": "http://localhost:8123",
-            "portainer": "http://localhost:9000",
-            "pihole": "http://localhost:8054",
-            "grafana": "http://localhost:3002",
-            "uptime-kuma": "http://localhost:3001",
-            "whats-up-docker": "http://localhost:3003",
-        }
+    def __init__(self, registry: Optional[ServiceRegistry] = None):
+        self.registry = registry or ServiceRegistry()
         self.timeout = 5
 
     def check_service(self, service_name: str, url: str) -> Dict:
@@ -57,11 +49,12 @@ class HealthMonitor:
             }
 
     def check_all_services(self) -> Dict[str, Dict]:
-        """Check health of all services"""
+        """Check health of all services from the registry"""
         results = {}
 
-        for service_name, url in self.services.items():
-            results[service_name] = self.check_service(service_name, url)
+        for service in self.registry.get_services_with_ports():
+            if service.health_url:
+                results[service.id] = self.check_service(service.id, service.health_url)
 
         return results
 
@@ -93,3 +86,10 @@ class HealthMonitor:
             for service, status in health_status.items()
             if not status["healthy"]
         ]
+
+    def check_service_by_id(self, service_id: str) -> Optional[Dict]:
+        """Check health of a specific service by its ID"""
+        service = self.registry.get_service(service_id)
+        if not service or not service.health_url:
+            return None
+        return self.check_service(service_id, service.health_url)

@@ -8,21 +8,15 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional
 
 import docker
 from rich.console import Console
 
+from ..models.service import ServiceRegistry
+
 # Initialize console
 console = Console()
-
-
-class ServiceInfo(TypedDict):
-    """Type definition for service information"""
-
-    port: int
-    health_url: str
-    data_path: str
 
 
 class ContainerManager:
@@ -37,49 +31,8 @@ class ContainerManager:
         # Ensure backup directory exists
         self.backup_dir.mkdir(exist_ok=True)
 
-        # Service configurations
-        self.services = {
-            "homepage": {
-                "port": 3000,
-                "health_url": "http://localhost:3000",
-                "data_path": "homepage",
-            },
-            "stremio": {
-                "port": 8080,
-                "health_url": "http://localhost:8080",
-                "data_path": "stremio",
-            },
-            "homeassistant": {
-                "port": 8123,
-                "health_url": "http://localhost:8123",
-                "data_path": "homeassistant",
-            },
-            "portainer": {
-                "port": 9000,
-                "health_url": "http://localhost:9000",
-                "data_path": "portainer",
-            },
-            "pihole": {
-                "port": 8054,
-                "health_url": "http://localhost:8054",
-                "data_path": "pihole",
-            },
-            "grafana": {
-                "port": 3002,
-                "health_url": "http://localhost:3002",
-                "data_path": "grafana",
-            },
-            "uptime-kuma": {
-                "port": 3001,
-                "health_url": "http://localhost:3001",
-                "data_path": "uptime-kuma",
-            },
-            "whats-up-docker": {
-                "port": 3003,
-                "health_url": "http://localhost:3003",
-                "data_path": "whats-up-docker",
-            },
-        }
+        # Load service registry
+        self.registry = ServiceRegistry()
 
     def get_container_status(self) -> List[Dict]:
         """Get status of all homelab containers"""
@@ -87,20 +40,43 @@ class ContainerManager:
 
         try:
             for container in self.docker_client.containers.list(all=True):
-                if any(service in container.name for service in self.services.keys()):
-                    service_info = self._get_service_info(container.name)
-                    if service_info:
+                # Try to match container to a known service
+                service = self.registry.get_service_by_container(container.name)
+
+                if service:
+                    containers.append(
+                        {
+                            "name": container.name,
+                            "service_name": service.name,
+                            "category": service.category,
+                            "status": container.status,
+                            "port": service.port,
+                            "health": self._check_container_health(container.name),
+                            "image": (
+                                container.image.tags[0]
+                                if container.image.tags
+                                else "unknown"
+                            ),
+                            "sensitive": service.sensitive,
+                        }
+                    )
+                else:
+                    # Include containers that might be part of homelab but not in registry
+                    if self._is_homelab_container(container.name):
                         containers.append(
                             {
                                 "name": container.name,
+                                "service_name": container.name,
+                                "category": "unknown",
                                 "status": container.status,
-                                "port": service_info.get("port"),
+                                "port": None,
                                 "health": self._check_container_health(container.name),
                                 "image": (
                                     container.image.tags[0]
                                     if container.image.tags
                                     else "unknown"
                                 ),
+                                "sensitive": False,
                             }
                         )
         except Exception as e:
@@ -108,12 +84,36 @@ class ContainerManager:
 
         return containers
 
-    def _get_service_info(self, container_name: str) -> Optional[ServiceInfo]:
-        """Get service information for a container"""
-        for service, info in self.services.items():
-            if service in container_name:
-                return ServiceInfo(info)  # type: ignore
-        return None
+    def _is_homelab_container(self, container_name: str) -> bool:
+        """Check if a container belongs to the homelab stack"""
+        # Known container name patterns
+        homelab_patterns = [
+            "nginx",
+            "homepage",
+            "portainer",
+            "grafana",
+            "prometheus",
+            "pihole",
+            "homeassistant",
+            "jellyfin",
+            "stremio",
+            "uptime",
+            "whats-up",
+            "netdata",
+            "loki",
+            "promtail",
+            "alertmanager",
+            "cadvisor",
+            "node-exporter",
+            "vaultwarden",
+            "authentik",
+            "paperless",
+            "nextcloud",
+            "n8n",
+            "filebrowser",
+            "blackbox",
+        ]
+        return any(pattern in container_name.lower() for pattern in homelab_patterns)
 
     def _check_container_health(self, container_name: str) -> str:
         """Check if a container is healthy"""
@@ -276,3 +276,34 @@ class ContainerManager:
                 "success": False,
                 "error": f"Restart error for {service_name}: {str(e)}",
             }
+
+    def get_service_info(self, service_id: str) -> Optional[Dict]:
+        """Get detailed information about a service from the registry"""
+        service = self.registry.get_service(service_id)
+        if not service:
+            return None
+
+        return {
+            "id": service.id,
+            "name": service.name,
+            "category": service.category,
+            "container_name": service.container_name,
+            "port": service.port,
+            "health_url": service.health_url,
+            "sensitive": service.sensitive,
+            "description": service.description,
+        }
+
+    def get_services_by_category(self, category: str) -> List[Dict]:
+        """Get all services in a category"""
+        services = self.registry.get_services_by_category(category)
+        return [
+            {
+                "id": s.id,
+                "name": s.name,
+                "container_name": s.container_name,
+                "port": s.port,
+                "sensitive": s.sensitive,
+            }
+            for s in services
+        ]
