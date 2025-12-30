@@ -1,0 +1,34 @@
+[Unit]
+Description=Homelab Container Update Service
+Documentation=https://github.com/luk-homeserver/homelab
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/luk-server/homelab
+ExecStart=/home/luk-server/homelab/scripts/maintenance/update-containers.sh
+User=luk-server
+Group=luk-server
+
+# Environment
+Environment=HOME=/home/luk-server
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Timeout (30 minutes max for updates)
+TimeoutStartSec=1800
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homelab-update
+
+# Security hardening
+NoNewPrivileges=false
+ProtectSystem=false
+ProtectHome=false
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
