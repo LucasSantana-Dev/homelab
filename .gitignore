@@ -150,6 +150,11 @@ appdata/homeassistant/config/.hypothesis/
 cloudflared
 *.deb
 *.log
+
+# Backup files (created during refactoring/migrations)
+docker-compose.yml.backup
+docker-compose.yml.*.backup
+*.pre-modularization.backup
 config/homeassistant/config/.storage/
 config/homeassistant/config/auth
 
