@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Container Updates** - Updated all homelab containers to latest versions (2026-01-01)
+  - **Core Services**: nginx, homepage, portainer, uptime-kuma, whats-up-docker, filebrowser
+  - **Monitoring Stack**: prometheus, grafana, loki, promtail, alertmanager, netdata, blackbox-exporter, node-exporter, cadvisor
+  - **Media Services**: jellyfin, stremio
+  - **Application Services**: n8n, nextcloud, nextcloud-db, nextcloud-redis, paperless-ngx, paperless-db, paperless-redis
+  - **Security Services**: pihole, vaultwarden, authentik-server, authentik-worker, authentik-db, authentik-redis
+  - **Automation Services**: homeassistant
+  - All containers restarted to apply latest image updates
+
 ### Added
 
 - **Complete ServiceRegistry Integration** - All service managers now use the centralized registry
