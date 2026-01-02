@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Automated Weekly Container Updates** - Cron job for automatic container updates
+  - Weekly cron job runs every Sunday at 3:00 AM
+  - Uses safe rolling update script with health checks
+  - Wrapper script (`update-containers-cron.sh`) ensures correct environment
+  - Fixed HOMELAB_DIR path calculation in update script
+  - Logs to `logs/update-cron.log`
+  - Prevents concurrent updates with lock file mechanism
+
 - **Complete ServiceRegistry Integration** - All service managers now use the centralized registry
   - `HealthMonitor` refactored to use `ServiceRegistry` for health checks
   - `UpdateManager` refactored to use `ServiceRegistry` for service validation
