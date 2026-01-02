@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOMELAB_DIR="$(dirname "$SCRIPT_DIR")"
+HOMELAB_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 LOG_FILE="$HOMELAB_DIR/logs/update.log"
 BACKUP_DIR="$HOMELAB_DIR/backups"
 LOCK_FILE="/tmp/homelab-update.lock"
