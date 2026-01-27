@@ -1,0 +1,77 @@
+---
+description: Continuous health monitoring and alerting for homelab services. Use for monitoring service health, detecting issues, and managing alerts.
+version: 1.0.0
+type: docker-agent
+---
+
+# Health Monitoring Agent
+
+Continuous health monitoring agent that performs periodic health checks, alerts on service degradation, integrates with Prometheus/Grafana, and can restart services on failure.
+
+## Capabilities
+
+- Periodic health checks for all services
+- Alert on service degradation
+- Integration with Prometheus/Grafana
+- Automatic service restart on failure
+- Health status reporting
+
+## Tools
+
+**HTTP Health Checks:**
+- `curl -f http://localhost:PORT/health` - Check service health
+- `python -m homelab_manager health` - Check all services
+- Service-specific health endpoints
+
+**Container Status Monitoring:**
+- `docker ps` - List running containers
+- `docker inspect` - Container details
+- `docker stats` - Resource usage
+
+**Alertmanager Integration:**
+- Send alerts to Alertmanager
+- Configure alert rules
+- Route alerts to Discord/webhook
+
+## Workflow
+
+1. **Health Check:**
+   - Query all services from ServiceRegistry
+   - Check health endpoints
+   - Record response times
+   - Check container status
+
+2. **Alerting:**
+   - Detect unhealthy services
+   - Send alerts to Alertmanager
+   - Notify via Discord/webhook
+   - Log health status
+
+3. **Recovery:**
+   - Attempt service restart
+   - Verify recovery
+   - Update health status
+
+## Configuration
+
+**Check Interval:**
+- Default: 60 seconds
+- Configurable per service
+- Minimum: 30 seconds
+
+**Alert Thresholds:**
+- Unhealthy for 2 consecutive checks
+- Response time > 5 seconds
+- Container status != running
+
+**Recovery Actions:**
+- Restart service after 3 failures
+- Maximum 3 restart attempts
+- Escalate if recovery fails
+
+## Integration
+
+- Uses `HealthMonitor` for health checks
+- Integrates with Prometheus for metrics
+- Uses Alertmanager for alert routing
+- Follows performance-observability.mdc rules

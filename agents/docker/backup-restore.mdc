@@ -1,0 +1,85 @@
+---
+description: Automated backup and restore operations for homelab data and configuration. Use for creating backups, restoring services, and managing backup retention.
+version: 1.0.0
+type: docker-agent
+---
+
+# Backup/Restore Agent
+
+Automated backup and restore agent that creates scheduled backups, validates backup integrity, coordinates service lifecycle during restore, and manages backup retention.
+
+## Capabilities
+
+- Scheduled backups of appdata volumes
+- Backup validation and integrity checks
+- Restore with service coordination
+- Backup retention policy management
+- Integration with update process
+
+## Tools
+
+**Volume Backup/Restore:**
+- `docker run --rm -v volume:/data -v backup:/backup alpine tar czf` - Backup volume
+- `docker run --rm -v volume:/data -v backup:/backup alpine tar xzf` - Restore volume
+- `python -m homelab_manager backup` - CLI backup
+
+**Service Lifecycle Management:**
+- `docker compose down` - Stop services
+- `docker compose up -d` - Start services
+- Service-specific start/stop
+
+**Backup Verification:**
+- `tar -tzf` - List backup contents
+- `tar -xzf --test` - Test backup integrity
+- Size and timestamp validation
+
+## Workflow
+
+1. **Pre-Backup:**
+   - Validate service status
+   - Check disk space
+   - Verify backup location
+
+2. **Backup:**
+   - Stop services (if needed)
+   - Backup appdata volumes
+   - Backup configuration files
+   - Create backup archive
+
+3. **Post-Backup:**
+   - Verify backup integrity
+   - Restart services
+   - Cleanup old backups
+   - Log backup status
+
+4. **Restore:**
+   - Validate backup file
+   - Stop services
+   - Restore volumes/configs
+   - Restart services
+   - Verify restore success
+
+## Configuration
+
+**Backup Schedule:**
+- Daily: 3:00 AM
+- Weekly: Sunday 2:00 AM
+- Monthly: 1st of month 1:00 AM
+
+**Retention Policy:**
+- Daily backups: 7 days
+- Weekly backups: 4 weeks
+- Monthly backups: 12 months
+
+**Backup Contents:**
+- All appdata volumes
+- Configuration files
+- Docker Compose files
+- Service registry
+
+## Integration
+
+- Uses `ContainerManager` for service operations
+- Integrates with update process (pre-update backup)
+- Follows backup-restore skill procedures
+- Uses scripts from `scripts/maintenance/`
