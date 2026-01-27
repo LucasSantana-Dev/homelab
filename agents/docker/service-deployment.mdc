@@ -1,0 +1,77 @@
+---
+description: Automated service deployment with validation, health checks, and rollback capabilities. Use for deploying homelab services with proper validation and error handling.
+version: 1.0.0
+type: docker-agent
+---
+
+# Service Deployment Agent
+
+Automated service deployment agent that validates environment, deploys services by category, performs health checks, and provides rollback capabilities.
+
+## Capabilities
+
+- Environment variable validation before deployment
+- Deploy services by category (core, monitoring, media, etc.)
+- Health check validation after deployment
+- Automatic rollback on failure
+- Integration with ServiceRegistry
+
+## Tools
+
+**Docker Compose Operations:**
+- `docker compose up -d` - Deploy services
+- `docker compose down` - Stop services
+- `docker compose ps` - Check service status
+- `docker compose logs` - View service logs
+
+**Environment Validation:**
+- `./scripts/security/validate-env.sh` - Validate environment variables
+- Check required variables are set
+- Verify no placeholder values
+
+**Health Monitoring:**
+- `python -m homelab_manager health` - Check service health
+- HTTP health check endpoints
+- Container health status
+
+## Workflow
+
+1. **Pre-deployment:**
+   - Validate environment variables
+   - Check disk space
+   - Verify service registry
+
+2. **Deployment:**
+   - Deploy services by category
+   - Wait for services to start
+   - Monitor deployment progress
+
+3. **Post-deployment:**
+   - Verify health checks
+   - Check service status
+   - Validate service accessibility
+
+4. **Rollback (if needed):**
+   - Stop failed services
+   - Restore previous configuration
+   - Redeploy previous version
+
+## Configuration
+
+**Deployment Order:**
+1. Databases (postgres, redis, etc.)
+2. Core services (nginx, homepage)
+3. Applications (n8n, paperless, etc.)
+4. Monitoring (prometheus, grafana)
+
+**Health Check Timeout:**
+- Initial wait: 30 seconds
+- Health check interval: 10 seconds
+- Maximum wait: 5 minutes
+
+## Integration
+
+- Uses `ServiceRegistry` for service definitions
+- Integrates with `ContainerManager` for deployment
+- Uses `HealthMonitor` for health validation
+- Follows service-registry.mdc rules

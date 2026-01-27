@@ -1,0 +1,87 @@
+---
+description: Safe container updates with health checks, rolling updates, and rollback capabilities. Use for updating containers safely with validation and recovery options.
+version: 1.0.0
+type: docker-agent
+---
+
+# Update Management Agent
+
+Safe container update agent that performs rolling updates by service priority, creates pre-update backups, validates health between updates, and provides rollback on failure.
+
+## Capabilities
+
+- Rolling updates by service priority
+- Pre-update backups
+- Health validation between updates
+- Rollback on update failure
+- Update notifications
+
+## Tools
+
+**Container Update Operations:**
+- `docker compose pull` - Pull latest images
+- `docker compose up -d` - Update containers
+- `docker compose restart` - Restart services
+- `docker images` - Check image versions
+
+**Health Monitoring:**
+- `python -m homelab_manager health` - Check service health
+- HTTP health checks
+- Container status checks
+
+**Backup Integration:**
+- `python -m homelab_manager backup` - Create backup
+- Pre-update backup creation
+- Backup verification
+
+## Workflow
+
+1. **Pre-Update:**
+   - Check for available updates
+   - Create backup
+   - Validate current health
+   - Plan update order
+
+2. **Update:**
+   - Update by priority groups
+   - Wait for health check between groups
+   - Monitor update progress
+   - Verify each service
+
+3. **Post-Update:**
+   - Verify all services healthy
+   - Check for errors
+   - Send update notification
+   - Log update results
+
+4. **Rollback (if needed):**
+   - Stop updated services
+   - Restore from backup
+   - Redeploy previous version
+   - Verify rollback success
+
+## Configuration
+
+**Update Priority Groups:**
+1. Databases (30s wait)
+2. Core services (20s wait)
+3. Applications (20s wait)
+4. Monitoring (15s wait)
+5. Utilities (10s wait)
+
+**Health Check:**
+- Wait time: 30 seconds per group
+- Health check interval: 10 seconds
+- Maximum wait: 5 minutes per service
+
+**Rollback Trigger:**
+- Health check fails after update
+- Service won't start
+- Critical error detected
+
+## Integration
+
+- Uses `UpdateManager` for update operations
+- Integrates with `HealthMonitor` for health checks
+- Uses `ContainerManager` for container operations
+- Follows update-containers.sh script patterns
