@@ -110,5 +110,5 @@
     - Nextcloud:
         icon: nextcloud
         href: https://cloud.homelab.example.com
-        description: Cloud Storage & File Sharing
+        description: NAS & Cloud Storage with Mobile Apps (iOS/Android) - File sync, sharing, and collaboration
         container: nextcloud

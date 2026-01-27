@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Nextcloud as Primary NAS Service** - Enhanced Nextcloud configuration and documentation for Network Attached Storage use case
+  - Updated service description to highlight NAS capabilities and mobile app support
+  - Added comprehensive mobile app setup documentation (iOS and Android)
+  - Documented NAS features: file sync, sharing, external storage (SMB/CIFS, NFS, WebDAV), automatic photo backup
+  - Updated homepage configuration to emphasize NAS and mobile app capabilities
+  - Mobile app links: [iOS App Store](https://apps.apple.com/app/nextcloud/id1125420102) and [Google Play Store](https://play.google.com/store/apps/details?id=com.nextcloud.client)
+
+- **Cursor Rules, Agents, and Skills** - Comprehensive AI assistance framework for homelab management
+  - **New Rules** (`.cursor/rules/`):
+    - `python-patterns.mdc` - Python code patterns: ServiceRegistry usage, DI patterns, type hints, Rich console
+    - `docker-compose-patterns.mdc` - Docker Compose standards: networks, volumes, health checks, resource limits
+    - `service-registry.mdc` - Service registry as single source of truth enforcement
+    - `testing-patterns.mdc` - Testing standards: mocking patterns, test structure, fixtures
+  - **New Skills** (`.cursor/skills/`):
+    - `service-deployment/` - Service deployment workflow with templates and checklists
+    - `health-checks/` - Health check automation with Prometheus/Grafana templates
+    - `backup-restore/` - Backup/restore procedures with retention policies
+    - `service-troubleshooting/` - Systematic troubleshooting workflow
+    - `configuration-management/` - Configuration validation and change management
+  - **Cursor Sub-Agents** (`.cursor/agents/`):
+    - `service-management.yml` - Specialized agent for service operations
+    - `monitoring.yml` - Observability and health monitoring agent
+    - `security-audit.yml` - Security compliance and audit agent
+  - **Docker Agents** (`agents/docker/`):
+    - `service-deployment.yml` - Automated deployment with validation and rollback
+    - `health-monitoring.yml` - Continuous health monitoring with alerting
+    - `backup-restore.yml` - Automated backup/restore with retention
+    - `update-management.yml` - Safe container updates with health checks
+
 ### Changed
 
 - **Container Updates** - Updated all homelab containers to latest versions (2026-01-01)

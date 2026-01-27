@@ -219,7 +219,7 @@ services:
     port: 8300
     internal_port: 80
     health_endpoint: "/status.php"
-    description: "Cloud storage and collaboration"
+    description: "Cloud Storage & NAS with Mobile Apps (iOS/Android)"
     sensitive: true
     url_path: "cloud"
 
