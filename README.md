@@ -213,8 +213,77 @@ homelab/
 #### Document Management
 - **Paperless-ngx** - Document Management & OCR (port 8400) - https://docs.homelab.example.com
 
-#### Cloud Storage
-- **Nextcloud** - Cloud Storage & File Sharing (port 8300) - https://cloud.homelab.example.com
+#### Network Attached Storage (NAS)
+- **Nextcloud** - NAS & Cloud Storage with Mobile Apps (port 8300) - https://cloud.homelab.example.com
+  - **Mobile Apps**: Official iOS and Android apps available
+    - [iOS App Store](https://apps.apple.com/app/nextcloud/id1125420102)
+    - [Google Play Store](https://play.google.com/store/apps/details?id=com.nextcloud.client)
+  - **Features**: File sync, sharing, collaboration, external storage (SMB/CIFS, NFS, WebDAV)
+  - **NAS Capabilities**: Automatic photo backup, file versioning, end-to-end encryption, 2FA support
+
+### 📱 Nextcloud Mobile App Setup
+
+Nextcloud serves as the primary NAS solution with full mobile app support:
+
+1. **Install Mobile App**:
+   - iOS: Download from [App Store](https://apps.apple.com/app/nextcloud/id1125420102)
+   - Android: Download from [Google Play](https://play.google.com/store/apps/details?id=com.nextcloud.client)
+
+2. **Connect to Server**:
+   - Open the Nextcloud app
+   - Enter server URL: `https://cloud.homelab.example.com`
+   - Authenticate with your Nextcloud credentials
+
+3. **Configure Sync**:
+   - Enable automatic photo/video backup (optional)
+   - Configure file sync preferences
+   - Set up offline access for important files
+
+4. **NAS Features**:
+   - **File Sharing**: Share files with links, passwords, and expiration dates
+   - **External Storage**: Connect SMB/CIFS, NFS, WebDAV shares via Nextcloud web interface
+   - **Collaboration**: Real-time document editing, calendar, contacts
+   - **Security**: Enable 2FA and end-to-end encryption for sensitive files
+   - **Backup**: Built-in file versioning and recovery
+
+### 🔧 Troubleshooting: "Server with specified hostname could not be found" or "Requested resource could not be found"
+
+If you see these errors in the Nextcloud mobile app:
+
+**Error 1: "Server with specified hostname could not be found"**
+- This is a DNS resolution issue
+- **Solution**: Configure Tailscale MagicDNS (see below) or use domain name in app
+
+**Error 2: "Requested resource could not be found" (404)**
+- This means DNS works but Nextcloud doesn't trust the domain/IP
+- **Solution**: Trusted domains are already configured. If issue persists, run:
+  ```bash
+  ./scripts/fix-nextcloud-trusted-domains.sh
+  ```
+
+**Quick Fix Options:**
+
+1. **Use Domain Name** (Recommended):
+   - Server URL: `https://cloud.homelab.example.com`
+   - This requires DNS to be configured (see below)
+
+2. **Configure Tailscale MagicDNS** (Recommended for domain access):
+   - Go to: https://login.tailscale.com/admin/dns
+   - Add nameserver: `100.100.100.100` (Custom)
+   - Add DNS record: `homelab.example.com` → `100.64.0.10` (A record)
+   - Add wildcard: `*.homelab.example.com` → `100.64.0.10` (A record)
+   - Enable MagicDNS for your tailnet
+   - On device: Tailscale app → Settings → Enable "Use Tailscale DNS"
+
+3. **Add to /etc/hosts** (Desktop only):
+   - Add: `100.64.0.10 cloud.homelab.example.com`
+   - Linux/macOS: `sudo nano /etc/hosts`
+   - Windows: `C:\Windows\System32\drivers\etc\hosts` (Run Notepad as Admin)
+
+**Diagnostic Script:**
+```bash
+./scripts/diagnose-nextcloud-dns.sh
+```
 
 ## 🔧 Configuration
 
@@ -434,6 +503,42 @@ Set `WUD_DISCORD_WEBHOOK_URL` in `.env` to receive Discord notifications about u
 - **Auto-Start Setup**: See `docs/bios-power-on-setup.md` for BIOS configuration
 - **Service Management**: Scripts in `scripts/deployment/`, `scripts/monitoring/`
 - **Scripts README**: See `scripts/README.md` for script documentation
+
+## 🤖 AI Assistance Framework
+
+This project includes comprehensive Cursor IDE rules, agents, and skills for AI-assisted development:
+
+### Rules (`.cursor/rules/`)
+
+Project-specific coding standards and patterns:
+- **Python Patterns** - ServiceRegistry usage, dependency injection, type hints
+- **Docker Compose Patterns** - Network usage, volume strategy, health checks
+- **Service Registry** - Single source of truth enforcement
+- **Testing Patterns** - Mocking patterns, test structure, fixtures
+
+### Skills (`.cursor/skills/`)
+
+Workflow guides for common tasks:
+- **Service Deployment** - Adding and deploying new services
+- **Health Checks** - Implementing and automating health monitoring
+- **Backup/Restore** - Backup procedures and restore workflows
+- **Service Troubleshooting** - Systematic issue resolution
+- **Configuration Management** - Environment and config management
+
+### Cursor Sub-Agents (`.cursor/agents/`)
+
+Specialized AI agents for specific domains:
+- **Service Management** - Service operations and configuration
+- **Monitoring** - Health monitoring and observability
+- **Security Audit** - Security compliance and validation
+
+### Docker Agents (`agents/docker/`)
+
+Automated agents for infrastructure operations:
+- **Service Deployment** - Automated deployment with validation
+- **Health Monitoring** - Continuous health checks and alerting
+- **Backup/Restore** - Automated backup and restore operations
+- **Update Management** - Safe container updates with health checks
 
 ## 🤝 Contributing
 
