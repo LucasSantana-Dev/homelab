@@ -4,17 +4,18 @@ Home Assistant HACS Add-on Installer
 Uses Selenium to navigate HACS and install add-ons automatically
 """
 
-import time
-import sys
+import json
 import os
+import sys
+import time
+
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import json
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 # HACS Add-ons to install
 HACS_ADDONS = [
@@ -22,47 +23,50 @@ HACS_ADDONS = [
     {
         "type": "integration",
         "name": "Adaptive Lighting",
-        "repository": "https://github.com/basnijholt/adaptive-lighting"
+        "repository": "https://github.com/basnijholt/adaptive-lighting",
     },
     {
         "type": "integration",
         "name": "Auto-entities",
-        "repository": "https://github.com/thomasloven/lovelace-auto-entities"
+        "repository": "https://github.com/thomasloven/lovelace-auto-entities",
     },
     {
         "type": "plugin",
         "name": "Card Mod",
-        "repository": "https://github.com/thomasloven/lovelace-card-mod"
+        "repository": "https://github.com/thomasloven/lovelace-card-mod",
     },
     {
         "type": "plugin",
         "name": "Mini Graph Card",
-        "repository": "https://github.com/kalkih/mini-graph-card"
+        "repository": "https://github.com/kalkih/mini-graph-card",
     },
     {
         "type": "plugin",
         "name": "Mushroom Cards",
-        "repository": "https://github.com/piitaya/lovelace-mushroom"
+        "repository": "https://github.com/piitaya/lovelace-mushroom",
     },
     {
         "type": "plugin",
         "name": "Layout Card",
-        "repository": "https://github.com/thomasloven/lovelace-layout-card"
+        "repository": "https://github.com/thomasloven/lovelace-layout-card",
     },
     {
         "type": "plugin",
         "name": "State Switch",
-        "repository": "https://github.com/thomasloven/lovelace-state-switch"
+        "repository": "https://github.com/thomasloven/lovelace-state-switch",
     },
     {
         "type": "plugin",
         "name": "Button Card",
-        "repository": "https://github.com/custom-cards/button-card"
+        "repository": "https://github.com/custom-cards/button-card",
     },
 ]
 
 # Home Assistant URL - loaded from environment variable
-HA_URL = os.environ.get("HA_URL", f"http://{os.environ.get('TAILSCALE_IP', 'localhost')}:8123")
+HA_URL = os.environ.get(
+    "HA_URL", f"http://{os.environ.get('TAILSCALE_IP', 'localhost')}:8123"
+)
+
 
 class HACSInstaller:
     def __init__(self, username, password, headless=False):
@@ -81,7 +85,9 @@ class HACSInstaller:
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+        chrome_options.add_argument(
+            "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+        )
 
         try:
             self.driver = webdriver.Chrome(options=chrome_options)
@@ -102,25 +108,34 @@ class HACSInstaller:
             time.sleep(2)
 
             # Check if already logged in
-            if "lovelace" in self.driver.current_url or "dashboard" in self.driver.current_url:
+            if (
+                "lovelace" in self.driver.current_url
+                or "dashboard" in self.driver.current_url
+            ):
                 print("✓ Already logged in")
                 return True
 
             # Find and fill username
             print("Entering credentials...")
             username_field = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text'], input[name='username']"))
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "input[type='text'], input[name='username']")
+                )
             )
             username_field.clear()
             username_field.send_keys(self.username)
 
             # Find and fill password
-            password_field = self.driver.find_element(By.CSS_SELECTOR, "input[type='password']")
+            password_field = self.driver.find_element(
+                By.CSS_SELECTOR, "input[type='password']"
+            )
             password_field.clear()
             password_field.send_keys(self.password)
 
             # Click login button
-            login_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], button:contains('Log in')")
+            login_button = self.driver.find_element(
+                By.CSS_SELECTOR, "button[type='submit'], button:contains('Log in')"
+            )
             login_button.click()
 
             # Wait for login to complete
@@ -128,7 +143,10 @@ class HACSInstaller:
             time.sleep(5)
 
             # Check if login was successful
-            if "lovelace" in self.driver.current_url or "dashboard" in self.driver.current_url:
+            if (
+                "lovelace" in self.driver.current_url
+                or "dashboard" in self.driver.current_url
+            ):
                 print("✓ Login successful")
                 return True
             else:
@@ -165,21 +183,31 @@ class HACSInstaller:
             try:
                 # Try clicking on sidebar
                 sidebar_button = self.wait.until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, "ha-menu-button, button[aria-label*='menu'], .menu"))
+                    EC.element_to_be_clickable(
+                        (
+                            By.CSS_SELECTOR,
+                            "ha-menu-button, button[aria-label*='menu'], .menu",
+                        )
+                    )
                 )
                 sidebar_button.click()
                 time.sleep(1)
 
                 # Look for HACS link
                 hacs_link = self.wait.until(
-                    EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'HACS') or contains(text(), 'hacs')]"))
+                    EC.element_to_be_clickable(
+                        (
+                            By.XPATH,
+                            "//a[contains(text(), 'HACS') or contains(text(), 'hacs')]",
+                        )
+                    )
                 )
                 hacs_link.click()
                 time.sleep(3)
                 print("✓ Navigated to HACS via sidebar")
                 return True
-            except:
-                pass
+            except Exception as e:
+                print(f"  ⚠ Sidebar navigation path failed, retrying direct URL: {e}")
 
             # Try direct navigation again
             self.driver.get(hacs_url)
@@ -200,53 +228,76 @@ class HACSInstaller:
             time.sleep(2)
 
             # Click on the appropriate tab (Integrations, Frontend, etc.)
-            tab_name = "Integrations" if addon['type'] == "integration" else "Frontend"
+            tab_name = "Integrations" if addon["type"] == "integration" else "Frontend"
             try:
                 tab = self.wait.until(
-                    EC.element_to_be_clickable((By.XPATH, f"//button[contains(text(), '{tab_name}')]"))
+                    EC.element_to_be_clickable(
+                        (By.XPATH, f"//button[contains(text(), '{tab_name}')]")
+                    )
                 )
                 tab.click()
                 time.sleep(2)
-            except:
+            except Exception:
                 print(f"  ⚠ Could not find {tab_name} tab, trying search...")
 
             # Search for the addon
             try:
-                search_box = self.driver.find_element(By.CSS_SELECTOR, "input[type='search'], input[placeholder*='search'], ha-textfield")
+                search_box = self.driver.find_element(
+                    By.CSS_SELECTOR,
+                    "input[type='search'], input[placeholder*='search'], ha-textfield",
+                )
                 search_box.clear()
-                search_box.send_keys(addon['name'])
+                search_box.send_keys(addon["name"])
                 time.sleep(2)
-            except:
+            except Exception:
                 print(f"  ⚠ Could not find search box")
 
             # Look for the addon card/button
             try:
                 addon_element = self.wait.until(
-                    EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{addon['name']}')]"))
+                    EC.element_to_be_clickable(
+                        (By.XPATH, f"//*[contains(text(), '{addon['name']}')]")
+                    )
                 )
                 addon_element.click()
                 time.sleep(2)
-            except:
+            except Exception:
                 # Try using repository URL
                 print(f"  Trying to add via repository URL...")
                 try:
                     # Look for "Add Repository" or "Custom Repository" button
                     add_repo_button = self.wait.until(
-                        EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Add') or contains(text(), 'Repository')]"))
+                        EC.element_to_be_clickable(
+                            (
+                                By.XPATH,
+                                "//*[contains(text(), 'Add') or contains(text(), 'Repository')]",
+                            )
+                        )
                     )
                     add_repo_button.click()
                     time.sleep(1)
 
                     # Enter repository URL
                     repo_input = self.wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='url'], input[placeholder*='repository'], input[placeholder*='URL']"))
+                        EC.presence_of_element_located(
+                            (
+                                By.CSS_SELECTOR,
+                                "input[type='url'], input[placeholder*='repository'], input[placeholder*='URL']",
+                            )
+                        )
                     )
                     repo_input.clear()
-                    repo_input.send_keys(addon['repository'])
+                    repo_input.send_keys(addon["repository"])
                     time.sleep(1)
 
                     # Submit
-                    submit_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Add') or contains(text(), 'Install') or contains(text(), 'Submit')]")
+                    submit_button = self.driver.find_element(
+                        By.XPATH,
+                        (
+                            "//button[contains(text(), 'Add') or contains(text(), 'Install') "
+                            "or contains(text(), 'Submit')]"
+                        ),
+                    )
                     submit_button.click()
                     time.sleep(3)
                 except Exception as e:
@@ -256,18 +307,26 @@ class HACSInstaller:
             # Look for Install/Download button
             try:
                 install_button = self.wait.until(
-                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Install') or contains(text(), 'Download')]"))
+                    EC.element_to_be_clickable(
+                        (
+                            By.XPATH,
+                            "//button[contains(text(), 'Install') or contains(text(), 'Download')]",
+                        )
+                    )
                 )
                 install_button.click()
                 time.sleep(2)
 
                 # Confirm installation if needed
                 try:
-                    confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Install') or contains(text(), 'Confirm')]")
+                    confirm_button = self.driver.find_element(
+                        By.XPATH,
+                        "//button[contains(text(), 'Install') or contains(text(), 'Confirm')]",
+                    )
                     confirm_button.click()
                     time.sleep(3)
-                except:
-                    pass
+                except Exception as e:
+                    print(f"  ⚠ Install confirmation prompt not shown: {e}")
 
                 print(f"  ✓ {addon['name']} installation initiated")
 
@@ -308,18 +367,23 @@ class HACSInstaller:
                     success_count += 1
                 time.sleep(2)  # Brief pause between installations
 
-            print(f"\n✓ Installation complete: {success_count}/{len(HACS_ADDONS)} add-ons installed")
+            print(
+                f"\n✓ Installation complete: {success_count}/{len(HACS_ADDONS)} add-ons installed"
+            )
             return success_count == len(HACS_ADDONS)
 
         finally:
             if self.driver:
                 self.driver.quit()
 
+
 def main():
     """Main function"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Install HACS add-ons via browser automation")
+    parser = argparse.ArgumentParser(
+        description="Install HACS add-ons via browser automation"
+    )
     parser.add_argument("--username", required=True, help="Home Assistant username")
     parser.add_argument("--password", required=True, help="Home Assistant password")
     parser.add_argument("--headless", action="store_true", help="Run in headless mode")
@@ -328,6 +392,7 @@ def main():
 
     installer = HACSInstaller(args.username, args.password, args.headless)
     installer.install_all_addons()
+
 
 if __name__ == "__main__":
     main()

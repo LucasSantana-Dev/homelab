@@ -11,11 +11,75 @@ This guide documents the setup and configuration of Authentik as a centralized S
 - SSL certificate valid for `*.homelab.example.com`
 - Admin access to all services to be integrated
 
+## Phase 1 Edge Policy (Required Defaults)
+
+Use these defaults for the homelab public edge rollout:
+
+- Primary login source: **GitHub**
+- Keep one **local break-glass admin** account
+- Access allowlist: exact email + exact GitHub username
+- MFA: required for interactive logins
+- Session validity: 7 days
+
+### GitHub Source + Break-Glass Local Account
+
+1. Go to **Directory > Federation and Social login > Sources > Create**.
+2. Select **GitHub Source**.
+3. Configure your GitHub OAuth app callback URL:
+   - `https://auth.homelab.example.com/source/oauth/callback/github/`
+4. Keep local username/password auth enabled for one emergency admin account only.
+
+### Allowlist Policy (Email + GitHub Username)
+
+Create an **Expression Policy** and attach it to the Authentik flow used by protected applications:
+
+```python
+allowed_email = "YOUR_ALLOWED_EMAIL"
+allowed_github = "YOUR_ALLOWED_GITHUB_USERNAME"
+
+email_ok = request.user.email == allowed_email
+github_ok = False
+
+for ident in request.user.identities.all():
+    if ident.provider and ident.provider.name.lower().startswith("github"):
+        username = ident.extra_data.get("login", "")
+        github_ok = username == allowed_github
+        break
+
+return email_ok and github_ok
+```
+
+Set values from `.env`:
+
+- `AUTHENTIK_ALLOWED_EMAIL`
+- `AUTHENTIK_ALLOWED_GITHUB_USERNAME`
+
+### MFA + Session Policy
+
+1. MFA:
+   - **System > Settings > Security** -> enforce MFA for interactive users.
+2. Session lifetime:
+   - Set interactive session validity to 7 days (`AUTHENTIK_SESSION_DAYS=7`).
+3. Keep one break-glass account enrolled in MFA and stored in password manager.
+
+### Proxy Provider / Outpost for Nginx Forward Auth
+
+Nginx forward-auth requires the outpost endpoint to exist. If
+`/outpost.goauthentik.io/auth/nginx` returns 404, create/attach a proxy provider:
+
+1. **Applications > Providers > Create** -> **Proxy Provider**.
+2. Set **External host** to the protected domain(s) (one provider per domain or grouped design).
+3. Attach provider to corresponding **Application**.
+4. Ensure an **Outpost** is deployed for proxy integration.
+5. Re-check:
+   - `curl -I https://auth.homelab.example.com/outpost.goauthentik.io/auth/nginx`
+   - Expected: not `404` (typically `401/302` for unauthenticated requests).
+
 ## Initial Configuration
 
 ### 1. Access Authentik Admin Interface
 
-1. Navigate to: https://auth.homelab.example.com
+1. Navigate to: <https://auth.homelab.example.com>
 2. On first access, you'll be prompted to create an admin account
 3. Username: `admin` (or your preference)
 4. Password: Use a strong password (store in password manager)
@@ -54,11 +118,11 @@ Navigate to **Directory > Groups > Create**:
 
 #### Editor/Viewer Groups
 
-4. **Grafana Editors**
+1. **Grafana Editors**
    - Name: `Grafana Editors`
    - Description: Edit dashboards in Grafana
 
-5. **Grafana Viewers**
+2. **Grafana Viewers**
    - Name: `Grafana Viewers`
    - Description: View-only access to Grafana dashboards
 
@@ -120,6 +184,9 @@ token_url = https://auth.homelab.example.com/application/o/token/
 api_url = https://auth.homelab.example.com/application/o/userinfo/
 role_attribute_path = contains(groups[*], 'Grafana Admins') && 'Admin' || contains(groups[*], 'Grafana Editors') && 'Editor' || 'Viewer'
 allow_assign_grafana_admin = true
+
+[auth]
+disable_login_form = true
 ```
 
 #### Step 4: Restart Grafana
@@ -130,10 +197,12 @@ docker compose restart grafana
 
 #### Step 5: Test Login
 
-1. Navigate to https://grafana.homelab.example.com
+1. Navigate to <https://grafana.homelab.example.com>
 2. Click **Sign in with Authentik**
 3. Login with your Authentik credentials
 4. Verify role assignment (Admin/Editor/Viewer based on group membership)
+
+> Recovery path: temporarily set `disable_login_form = false` (or `GRAFANA_DISABLE_LOGIN_FORM=false`) and restart Grafana to regain local admin access if SSO is misconfigured.
 
 ---
 
@@ -163,7 +232,7 @@ docker compose restart grafana
 
 #### Step 3: Configure Portainer
 
-1. Access Portainer: https://portainer.homelab.example.com
+1. Access Portainer: <https://portainer.homelab.example.com>
 2. Navigate to **Settings > Authentication**
 3. Enable **OAuth**:
    - **Provider**: Custom
@@ -178,9 +247,12 @@ docker compose restart grafana
    - **Scopes**: `openid profile email groups`
 4. Click **Save settings**
 
+> Keep one local Portainer admin account as break-glass fallback.
+
 #### Step 4: Configure Team Mappings (Optional)
 
 In Portainer Settings > Authentication > OAuth:
+
 - Map Authentik groups to Portainer teams
 - Example: `Portainer Admins` → Portainer `administrators` team
 
@@ -242,7 +314,7 @@ docker compose restart n8n
 
 #### Step 5: Test Login
 
-1. Navigate to https://n8n.homelab.example.com
+1. Navigate to <https://n8n.homelab.example.com>
 2. Login with Authentik credentials
 3. Verify workflow access
 
@@ -293,15 +365,18 @@ Note: Vaultwarden (Bitwarden) doesn't support OAuth/OIDC SSO. Consider using Aut
 ### Managing User Access
 
 **Grant Admin Access**:
+
 1. Add user to `Grafana Admins`, `Portainer Admins`, or `n8n Admins` groups
 
 **Revoke Access**:
+
 1. Remove user from service groups
 2. Or disable user account: **Directory > Users > [User] > Disable**
 
 ### Password Reset
 
 Users can reset passwords via:
+
 1. **Forgot Password** link on Authentik login page
 2. Or admin can reset: **Directory > Users > [User] > Set password**
 
@@ -327,6 +402,7 @@ Users can reset passwords via:
 ### Audit Logs
 
 Monitor authentication events:
+
 1. **Events > System Tasks**
 2. Review login attempts, failures, and policy violations
 3. Export logs for external SIEM (optional)
@@ -334,6 +410,7 @@ Monitor authentication events:
 ### API Access Tokens
 
 For automation:
+
 1. **Directory > Tokens & App passwords**
 2. Create tokens for service accounts
 3. Store securely in environment variables
@@ -347,6 +424,7 @@ For automation:
 **Symptom**: Redirects endlessly between Grafana and Authentik
 
 **Solution**:
+
 1. Verify `root_url` in `grafana.ini` matches Nginx proxy URL
 2. Check redirect URI in Authentik provider exactly matches Grafana callback
 3. Ensure `enforce_domain = true` in Grafana config
@@ -356,6 +434,7 @@ For automation:
 **Symptom**: Error after OAuth login
 
 **Solution**:
+
 1. Verify redirect URI in Authentik is exactly: `https://portainer.homelab.example.com`
 2. No trailing slash
 3. Must match Nginx server_name
@@ -365,6 +444,7 @@ For automation:
 **Symptom**: Failed to complete OAuth flow
 
 **Solution**:
+
 1. Ensure n8n callback URL is correct: `https://n8n.homelab.example.com/rest/oauth2-credential/callback`
 2. Check n8n environment variables are properly set
 3. Restart n8n after environment changes
@@ -374,6 +454,7 @@ For automation:
 **Symptom**: All users login as Viewer
 
 **Solution**:
+
 1. Verify users are in correct Authentik groups (`Grafana Admins`, `Grafana Editors`)
 2. Check `role_attribute_path` in grafana.ini exactly matches group names
 3. Group names are case-sensitive
@@ -383,6 +464,7 @@ For automation:
 **Symptom**: 502 Bad Gateway or connection refused
 
 **Solution**:
+
 1. Check Authentik containers are running: `docker ps | grep authentik`
 2. Verify database connectivity: `docker logs authentik-server`
 3. Check Nginx reverse proxy config: `docker exec nginx-proxy nginx -t`

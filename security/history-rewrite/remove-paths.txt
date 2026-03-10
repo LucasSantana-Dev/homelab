@@ -1,0 +1,4 @@
+grafana/plugins/grafana-sentry-datasource/MANIFEST.txt
+grafana/plugins/grafana-exploretraces-app/43.js.map
+grafana/provisioning/datasources/datasources.yml
+config/whats-up-docker/wud-config.json

@@ -11,7 +11,7 @@ TAILSCALE_IP=$(grep TAILSCALE_IP .env 2>/dev/null | cut -d'=' -f2 || echo "100.6
 
 echo "1️⃣  Testing direct HTTP (bypassing Nginx):"
 echo "   http://${TAILSCALE_IP}:11470"
-curl -sI http://${TAILSCALE_IP}:11470/ 2>&1 | head -5
+curl -sI "http://${TAILSCALE_IP}:11470/" 2>&1 | head -5
 echo ""
 
 echo "2️⃣  Testing HTTPS via domain:"

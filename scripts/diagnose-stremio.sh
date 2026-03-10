@@ -76,7 +76,7 @@ echo ""
 echo "6️⃣  Testing direct Tailscale IP access..."
 TAILSCALE_IP=$(grep TAILSCALE_IP .env 2>/dev/null | cut -d'=' -f2 || echo "")
 if [[ -n "$TAILSCALE_IP" ]]; then
-    DIRECT_RESPONSE=$(curl -sI http://${TAILSCALE_IP}:11470 2>&1 | head -1)
+    DIRECT_RESPONSE=$(curl -sI "http://${TAILSCALE_IP}:11470" 2>&1 | head -1)
     if echo "$DIRECT_RESPONSE" | grep -q "HTTP"; then
         echo -e "${GREEN}✅ Direct Tailscale IP access works${NC}"
         echo "  Response: $DIRECT_RESPONSE"

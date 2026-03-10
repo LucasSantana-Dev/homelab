@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Added (Automation and Registry)
 
 - **Nextcloud as Primary NAS Service** - Enhanced Nextcloud configuration and documentation for Network Attached Storage use case
   - Updated service description to highlight NAS capabilities and mobile app support
@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `backup-restore.yml` - Automated backup/restore with retention
     - `update-management.yml` - Safe container updates with health checks
 
-### Changed
+### Changed (CI and Build)
 
 - **Container Updates** - Updated all homelab containers to latest versions (2026-01-01)
   - **Core Services**: nginx, homepage, portainer, uptime-kuma, whats-up-docker, filebrowser
@@ -113,7 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `scripts/hacs/` - Home Assistant specific scripts
   - Added `scripts/README.md` documenting the new structure
 
-### Changed
+### Changed (Tooling)
 
 - **CI/CD Pipeline** - Updated to use pyproject.toml
   - Uses `pip install -e ".[dev]"` for dependency installation
@@ -130,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `core/config.py` now uses ServiceRegistry for URL generation
   - Dynamic service URL generation from registry
 
-### Fixed
+### Fixed (Home Assistant and Updates)
 
 - **Network Conflicts** - Removed duplicate network definitions in compose modules
 - **Systemd Service** - Updated homelab-update.service with new script path
@@ -157,18 +157,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added backup file patterns to `.gitignore`
 
 ### Smart Home Integrations (Previous) - Comprehensive Home Assistant integration setup
-  - Configured Xiaomi Home integration (4 devices: 3 Yeelight bulbs, 1 robot vacuum)
-  - Configured LG ThinQ integration (1 device: air conditioner)
-  - Configured Tuya integration (2 devices: smart switches)
-  - Installed HACS add-ons: Adaptive Lighting, Node-RED Companion, Auto Backup, card-mod, Mushroom
-  - Created voice assistant templates for Google Assistant and Amazon Alexa
-  - Created comprehensive automations for climate, lighting, energy, and media
-  - Created dashboard YAML configurations (main, energy, climate, security, media)
-  - Fixed Home Assistant configuration syntax errors in YAML files
-  - Updated secrets.yaml with placeholder values for all integrations
-  - Created integration setup documentation at `docs/homeassistant-integrations-guide.md`
 
-### Fixed
+- Configured Xiaomi Home integration (4 devices: 3 Yeelight bulbs, 1 robot vacuum)
+- Configured LG ThinQ integration (1 device: air conditioner)
+- Configured Tuya integration (2 devices: smart switches)
+- Installed HACS add-ons: Adaptive Lighting, Node-RED Companion, Auto Backup, card-mod, Mushroom
+- Created voice assistant templates for Google Assistant and Amazon Alexa
+- Created comprehensive automations for climate, lighting, energy, and media
+- Created dashboard YAML configurations (main, energy, climate, security, media)
+- Fixed Home Assistant configuration syntax errors in YAML files
+- Updated secrets.yaml with placeholder values for all integrations
+- Created integration setup documentation at `docs/homeassistant-integrations-guide.md`
+
+### Fixed (Auth, Containers, and DNS)
 
 - **Home Assistant Configuration** - Fixed multiple YAML configuration issues
   - Fixed recorder.yaml structure (removed nested key issue)
@@ -220,7 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created comprehensive DNS setup guide at `docs/dns-setup.md`
   - Documented three DNS configuration options: Tailscale MagicDNS (recommended), local /etc/hosts, DuckDNS
   - Resolved permission issues with Authentik Redis and PostgreSQL by restarting services
-  - Authentik SSO now fully accessible at https://auth.homelab.example.com
+  - Authentik SSO now fully accessible at <https://auth.homelab.example.com>
 
 ### Security
 
@@ -246,7 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - PostgreSQL 15 database for user data
   - Redis cache for session management
   - Configured for Grafana, Portainer, and n8n OAuth2/OIDC integration
-  - Accessible at https://auth.homelab.example.com (Tailscale only)
+  - Accessible at <https://auth.homelab.example.com> (Tailscale only)
   - Ports: 9100 (HTTP), 9443 (HTTPS) - Changed from 9000 to avoid conflict with Portainer
   - Resource limits: Server (1G RAM max, 1.0 CPU max), Worker (512M RAM max, 0.5 CPU max), DB (512M RAM max, 0.5 CPU max), Redis (128M RAM max, 0.25 CPU max)
   - Total additional resources: ~1.5GB RAM, ~1.5 CPU cores
@@ -255,7 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - PostgreSQL 15 database for metadata
   - Redis broker for async tasks
   - OCR support for English and Portuguese languages
-  - Accessible at https://docs.homelab.example.com (Tailscale only)
+  - Accessible at <https://docs.homelab.example.com> (Tailscale only)
   - Consume directory for automatic document import: `appdata/paperless/consume`
   - Resource limits: Paperless (2G RAM max, 1.5 CPU max), DB (512M RAM max, 0.5 CPU max), Redis (128M RAM max, 0.25 CPU max)
   - Total additional resources: ~2.5GB RAM, ~2 CPU cores
@@ -287,6 +288,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **CRITICAL - Complete these steps before deploying:**
 
 1. **Create Required Directories**:
+
    ```bash
    cd /home/luk-server/homelab
    sudo mkdir -p appdata/authentik/{db,redis,media,certs,custom-templates}
@@ -295,6 +297,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    ```
 
 2. **Deploy Services**:
+
    ```bash
    # Deploy Authentik
    docker compose up -d authentik-db authentik-redis authentik-server authentik-worker
@@ -304,13 +307,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    ```
 
 3. **Test Nginx Configuration**:
+
    ```bash
    docker exec nginx-proxy nginx -t
    docker compose restart nginx
    ```
 
 4. **Configure Authentik SSO** (see `docs/authentik-sso-setup.md`):
-   - Access https://auth.homelab.example.com
+   - Access <https://auth.homelab.example.com>
    - Create admin account
    - Create OAuth2 providers for Grafana, Portainer, n8n
    - Update service configurations with OAuth credentials
@@ -333,7 +337,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Alertmanager** - Alert routing and notification management
-  - Accessible at https://alertmanager.homelab.example.com (Tailscale only)
+  - Accessible at <https://alertmanager.homelab.example.com> (Tailscale only)
   - Integrated with Prometheus for alert management
   - Configured for Discord/Email/Slack webhook notifications (webhook URL must be configured in .env)
   - Alert grouping by severity (critical/warning) with smart repeat intervals
@@ -347,7 +351,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Resource limits: 128M RAM max, 0.1 CPU max
 
 - **Nextcloud** - Self-hosted cloud storage and productivity platform
-  - Accessible at https://cloud.homelab.example.com (Tailscale only)
+  - Accessible at <https://cloud.homelab.example.com> (Tailscale only)
   - Integrated with MariaDB for database and Redis for caching
   - Configured with trusted domains and proxy settings
   - Resource limits: Nextcloud (1G RAM max, 1.0 CPU max), MariaDB (512M RAM max, 0.5 CPU max), Redis (128M RAM max, 0.25 CPU max)
@@ -398,20 +402,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Added
 
 - **Vaultwarden** - Self-hosted password manager (Bitwarden-compatible)
-  - Accessible at https://vault.homelab.example.com (Tailscale only)
+  - Accessible at <https://vault.homelab.example.com> (Tailscale only)
   - Admin panel with token authentication
   - WebSocket support for real-time notifications
   - Resource limits: 256M RAM max, 0.25 CPU max
 
 - **Jellyfin** - Media server for streaming content
-  - Accessible at https://jellyfin.homelab.example.com (Tailscale only)
+  - Accessible at <https://jellyfin.homelab.example.com> (Tailscale only)
   - Read-only media directory mounting
   - WebSocket support for live interface updates
   - Optimized proxy settings for streaming (no buffering, 300s timeouts)
   - Resource limits: 2G RAM max, 1.0 CPU max
 
 - **n8n** - Workflow automation platform (configuration ready)
-  - Accessible at https://n8n.homelab.example.com (Tailscale only)
+  - Accessible at <https://n8n.homelab.example.com> (Tailscale only)
   - Basic authentication enabled
   - WebSocket support for real-time workflow updates
   - Resource limits: 512M RAM max, 0.5 CPU max
@@ -606,8 +610,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *This changelog follows [Keep a Changelog](https://keepachangelog.com/) format and [Semantic Versioning](https://semver.org/) principles.*
 
-
-##  [2.3.0] - Infrastructure Cleanup and Security Hardening
+## [2.3.0] - Infrastructure Cleanup and Security Hardening
 
 ### Removed
 
