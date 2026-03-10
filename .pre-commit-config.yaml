@@ -92,3 +92,17 @@ repos:
     hooks:
       - id: commitizen
         stages: [commit-msg]
+
+  # Local security gates (require gitleaks installed on host)
+  - repo: local
+    hooks:
+      - id: gitleaks-secret-gate
+        name: gitleaks secret gate (tracked snapshot)
+        entry: ./scripts/security/secret-gate.sh
+        language: system
+        pass_filenames: false
+      - id: public-safety-gate
+        name: public identifier safety gate
+        entry: ./scripts/security/public-safety-gate.sh
+        language: system
+        pass_filenames: false

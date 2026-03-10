@@ -60,12 +60,12 @@ if command -v tailscale &> /dev/null; then
     echo "Tailscale status:"
     tailscale status 2>&1 | head -5 || echo "Tailscale not running or not installed"
     echo ""
-    
+
     echo "Tailscale IP check:"
     TAILSCALE_CURRENT_IP=$(tailscale ip -4 2>/dev/null || echo "NOT_FOUND")
     echo "Current Tailscale IP: $TAILSCALE_CURRENT_IP"
     echo "Expected IP: $TAILSCALE_IP"
-    
+
     if [ "$TAILSCALE_CURRENT_IP" = "$TAILSCALE_IP" ]; then
         echo "✅ Tailscale IP matches"
     else
@@ -85,13 +85,13 @@ echo ""
 if command -v curl &> /dev/null; then
     echo "Testing direct IP connection (bypassing DNS)..."
     echo "Note: This will fail SSL validation but tests connectivity"
-    
+
     # Test HTTP on port 8300 (Nextcloud direct port)
-    HTTP_RESULT=$(curl -I -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://$TAILSCALE_IP:8300 2>&1 || echo "FAILED")
+    HTTP_RESULT=$(curl -I -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://${TAILSCALE_IP}:8300" 2>&1 || echo "FAILED")
     echo "HTTP (port 8300): $HTTP_RESULT"
-    
+
     # Test HTTPS on port 443 (via nginx)
-    HTTPS_RESULT=$(curl -I -k -s -o /dev/null -w "%{http_code}" --connect-timeout 5 https://$TAILSCALE_IP:443 2>&1 || echo "FAILED")
+    HTTPS_RESULT=$(curl -I -k -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "https://${TAILSCALE_IP}:443" 2>&1 || echo "FAILED")
     echo "HTTPS (port 443): $HTTPS_RESULT"
     echo ""
 else
@@ -109,15 +109,15 @@ if [ "$SERVER_MODE" = true ]; then
     docker ps --filter "name=nginx-proxy" --format "{{.Names}} {{.Status}}" || echo "nginx-proxy not running"
     docker ps --filter "name=nextcloud" --format "{{.Names}} {{.Status}}" || echo "nextcloud not running"
     echo ""
-    
+
     echo "Testing nginx configuration..."
     docker exec nginx-proxy nginx -t 2>&1 || echo "nginx config test failed"
     echo ""
-    
+
     echo "Checking nginx can reach Nextcloud..."
     docker exec nginx-proxy ping -c 2 nextcloud 2>&1 || echo "Cannot ping nextcloud container"
     echo ""
-    
+
     echo "Testing internal connection..."
     docker exec nginx-proxy curl -I http://nextcloud:80/status.php 2>&1 | head -3 || echo "Internal connection failed"
     echo ""
@@ -157,7 +157,7 @@ echo ""
 echo "🔧 Solution 2: Use /etc/hosts (Quick Fix)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "Add this line to /etc/hosts (Linux/macOS) or C:\\Windows\\System32\\drivers\\etc\\hosts (Windows):"
+printf '%s\n' 'Add this line to /etc/hosts (Linux/macOS) or C:\Windows\System32\drivers\etc\hosts (Windows):'
 echo ""
 echo "$TAILSCALE_IP $DOMAIN"
 echo ""

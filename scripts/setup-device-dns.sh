@@ -46,7 +46,7 @@ echo "On Linux/macOS (run with sudo):"
 echo "  sudo nano /etc/hosts"
 echo ""
 echo "On Windows (Run as Administrator):"
-echo "  notepad C:\\Windows\\System32\\drivers\\etc\\hosts"
+printf '%s\n' '  notepad C:\Windows\System32\drivers\etc\hosts'
 echo ""
 echo "Add these lines:"
 echo ""

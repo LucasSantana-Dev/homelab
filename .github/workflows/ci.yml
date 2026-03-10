@@ -7,11 +7,34 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  repo-hygiene:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install gitleaks
+      run: |
+        GITLEAKS_VERSION=8.18.2
+        curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+          | tar -xz
+        sudo mv gitleaks /usr/local/bin/gitleaks
+        gitleaks version
+
+    - name: Run secret gate
+      run: |
+        ./scripts/security/secret-gate.sh
+
+    - name: Run public safety gate
+      run: |
+        ./scripts/security/public-safety-gate.sh
+
   test:
     runs-on: ubuntu-latest
+    needs: repo-hygiene
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v4
@@ -101,6 +124,12 @@ jobs:
         AUTHENTIK_SECRET_KEY=test_secret_key_123
         AUTHENTIK_DB_PASSWORD=test_password_123
         VAULTWARDEN_ADMIN_TOKEN=test_token_123
+        FORGE_MCP_JWT_SECRET_KEY=test_forge_jwt_secret_key_123
+        FORGE_MCP_BASIC_AUTH_PASSWORD=test_forge_basic_auth_password_123
+        FORGE_MCP_ADMIN_PASSWORD=test_forge_admin_password_123
+        CF_TUNNEL_TOKEN=test_cf_tunnel_token_123
+        AUTHENTIK_GRAFANA_CLIENT_ID=test_authentik_client_id_123
+        AUTHENTIK_GRAFANA_CLIENT_SECRET=test_authentik_client_secret_123
         EOF
 
     - name: Set up Docker Buildx
@@ -190,6 +219,12 @@ jobs:
         AUTHENTIK_SECRET_KEY=test_secret_key_123
         AUTHENTIK_DB_PASSWORD=test_password_123
         VAULTWARDEN_ADMIN_TOKEN=test_token_123
+        FORGE_MCP_JWT_SECRET_KEY=test_forge_jwt_secret_key_123
+        FORGE_MCP_BASIC_AUTH_PASSWORD=test_forge_basic_auth_password_123
+        FORGE_MCP_ADMIN_PASSWORD=test_forge_admin_password_123
+        CF_TUNNEL_TOKEN=test_cf_tunnel_token_123
+        AUTHENTIK_GRAFANA_CLIENT_ID=test_authentik_client_id_123
+        AUTHENTIK_GRAFANA_CLIENT_SECRET=test_authentik_client_secret_123
         EOF
 
     - name: Set up Docker Buildx
@@ -230,6 +265,7 @@ jobs:
 
   pre-commit:
     runs-on: ubuntu-latest
+    needs: repo-hygiene
 
     steps:
     - uses: actions/checkout@v4

@@ -1,0 +1,15 @@
+title = "homelab-secret-scan-policy"
+
+[allowlist]
+description = "Allow known non-production test fixtures and dummy CI values"
+paths = [
+  '''^tests/conftest\.py$''',
+  '''^tests/unit/test_config\.py$''',
+  '''^\.github/workflows/ci\.yml$''',
+]
+regexes = [
+  '''test_(?:token|secret|password)_[A-Za-z0-9_]+''',
+  '''https://discord\.com/api/webhooks/123[0-9]*/test[_A-Za-z0-9-]*''',
+  '''^AUTHENTIK_SECRET_KEY=test_secret_key_123$''',
+  '''^PAPERLESS_SECRET_KEY=test_secret_key_123$''',
+]

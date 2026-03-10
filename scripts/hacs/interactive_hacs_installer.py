@@ -4,17 +4,20 @@ Interactive HACS Add-on Installer using Selenium
 This script will guide you through installing HACS add-ons with browser automation
 """
 
-import time
 import getpass
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import os
+import time
 
-HA_URL = os.environ.get("HA_URL", f"http://{os.environ.get('TAILSCALE_IP', 'localhost')}:8123")
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
+HA_URL = os.environ.get(
+    "HA_URL", f"http://{os.environ.get('TAILSCALE_IP', 'localhost')}:8123"
+)
 
 # HACS Add-ons to install
 ADDONS = {
@@ -29,8 +32,9 @@ ADDONS = {
         {"name": "Layout Card", "repo": "thomasloven/lovelace-layout-card"},
         {"name": "State Switch", "repo": "thomasloven/lovelace-state-switch"},
         {"name": "Button Card", "repo": "custom-cards/button-card"},
-    ]
+    ],
 }
+
 
 def setup_browser(headless=False):
     """Setup Chrome browser"""
@@ -50,6 +54,7 @@ def setup_browser(headless=False):
         print("  sudo apt-get install chromium-browser chromium-chromedriver")
         return None
 
+
 def login_to_ha(driver, username, password):
     """Login to Home Assistant"""
     print(f"\nNavigating to {HA_URL}...")
@@ -65,7 +70,9 @@ def login_to_ha(driver, username, password):
         print("Logging in...")
         # Find username field
         username_field = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text'], input[name='username']"))
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "input[type='text'], input[name='username']")
+            )
         )
         username_field.clear()
         username_field.send_keys(username)
@@ -76,7 +83,9 @@ def login_to_ha(driver, username, password):
         password_field.send_keys(password)
 
         # Click login
-        login_btn = driver.find_element(By.CSS_SELECTOR, "button[type='submit'], button:contains('Log in')")
+        login_btn = driver.find_element(
+            By.CSS_SELECTOR, "button[type='submit'], button:contains('Log in')"
+        )
         login_btn.click()
 
         time.sleep(5)
@@ -90,6 +99,7 @@ def login_to_ha(driver, username, password):
     except Exception as e:
         print(f"✗ Login error: {e}")
         return False
+
 
 def navigate_to_hacs(driver):
     """Navigate to HACS"""
@@ -107,21 +117,32 @@ def navigate_to_hacs(driver):
         driver.get(HA_URL)
         time.sleep(2)
         sidebar = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "ha-menu-button, button[aria-label*='menu']"))
+            EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, "ha-menu-button, button[aria-label*='menu']")
+            )
         )
         sidebar.click()
         time.sleep(1)
 
         hacs_link = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "//a[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'hacs')]"))
+            EC.element_to_be_clickable(
+                (
+                    By.XPATH,
+                    (
+                        "//a[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
+                        "'abcdefghijklmnopqrstuvwxyz'), 'hacs')]"
+                    ),
+                )
+            )
         )
         hacs_link.click()
         time.sleep(3)
         print("✓ Navigated to HACS")
         return True
-    except:
+    except Exception:
         print("✗ Could not navigate to HACS")
         return False
+
 
 def install_addon_via_repo(driver, addon_name, repo):
     """Install addon by adding repository"""
@@ -135,20 +156,29 @@ def install_addon_via_repo(driver, addon_name, repo):
         # Click on "Custom Repositories" or "Add Repository"
         try:
             add_repo_btn = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Custom') or contains(text(), 'Repository') or contains(text(), 'Add')]"))
+                EC.element_to_be_clickable(
+                    (
+                        By.XPATH,
+                        "//*[contains(text(), 'Custom') or contains(text(), 'Repository') or contains(text(), 'Add')]",
+                    )
+                )
             )
             add_repo_btn.click()
             time.sleep(2)
-        except:
+        except Exception:
             # Try three dots menu
             try:
-                menu_btn = driver.find_element(By.CSS_SELECTOR, "ha-icon-button, button[aria-label*='menu']")
+                menu_btn = driver.find_element(
+                    By.CSS_SELECTOR, "ha-icon-button, button[aria-label*='menu']"
+                )
                 menu_btn.click()
                 time.sleep(1)
-                add_repo = driver.find_element(By.XPATH, "//*[contains(text(), 'Repository')]")
+                add_repo = driver.find_element(
+                    By.XPATH, "//*[contains(text(), 'Repository')]"
+                )
                 add_repo.click()
                 time.sleep(2)
-            except:
+            except Exception:
                 print(f"    ⚠ Could not find 'Add Repository' button")
                 return False
 
@@ -156,26 +186,42 @@ def install_addon_via_repo(driver, addon_name, repo):
         repo_url = f"https://github.com/{repo}"
         try:
             repo_input = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='url'], input[placeholder*='repository'], input[placeholder*='URL'], ha-textfield"))
+                EC.presence_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        "input[type='url'], input[placeholder*='repository'], input[placeholder*='URL'], ha-textfield",
+                    )
+                )
             )
             repo_input.clear()
             repo_input.send_keys(repo_url)
             time.sleep(1)
 
             # Select category (Integration or Plugin)
-            category = "Integration" if "adaptive" in repo.lower() or "auto" in repo.lower() else "Plugin"
+            category = (
+                "Integration"
+                if "adaptive" in repo.lower() or "auto" in repo.lower()
+                else "Plugin"
+            )
             try:
-                category_dropdown = driver.find_element(By.CSS_SELECTOR, "ha-select, select")
+                category_dropdown = driver.find_element(
+                    By.CSS_SELECTOR, "ha-select, select"
+                )
                 category_dropdown.click()
                 time.sleep(1)
-                category_option = driver.find_element(By.XPATH, f"//*[contains(text(), '{category}')]")
+                category_option = driver.find_element(
+                    By.XPATH, f"//*[contains(text(), '{category}')]"
+                )
                 category_option.click()
                 time.sleep(1)
-            except:
-                pass
+            except Exception as e:
+                print(f"    ⚠ Could not select category automatically: {e}")
 
             # Submit
-            submit_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Add') or contains(text(), 'Install') or contains(text(), 'Save')]")
+            submit_btn = driver.find_element(
+                By.XPATH,
+                "//button[contains(text(), 'Add') or contains(text(), 'Install') or contains(text(), 'Save')]",
+            )
             submit_btn.click()
             time.sleep(3)
 
@@ -187,32 +233,44 @@ def install_addon_via_repo(driver, addon_name, repo):
 
             # Search for the addon
             try:
-                search_box = driver.find_element(By.CSS_SELECTOR, "input[type='search'], input[placeholder*='search']")
+                search_box = driver.find_element(
+                    By.CSS_SELECTOR,
+                    "input[type='search'], input[placeholder*='search']",
+                )
                 search_box.clear()
                 search_box.send_keys(addon_name)
                 time.sleep(2)
-            except:
-                pass
+            except Exception as e:
+                print(f"    ⚠ Search box unavailable, continuing without search: {e}")
 
             # Find and click the addon
             try:
                 addon_card = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{addon_name}')]"))
+                    EC.element_to_be_clickable(
+                        (By.XPATH, f"//*[contains(text(), '{addon_name}')]")
+                    )
                 )
                 addon_card.click()
                 time.sleep(2)
 
                 # Click Download/Install
                 install_btn = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Download') or contains(text(), 'Install')]"))
+                    EC.element_to_be_clickable(
+                        (
+                            By.XPATH,
+                            "//button[contains(text(), 'Download') or contains(text(), 'Install')]",
+                        )
+                    )
                 )
                 install_btn.click()
                 time.sleep(5)
 
                 print(f"    ✓ {addon_name} installed successfully!")
                 return True
-            except:
-                print(f"    ⚠ {addon_name} may already be installed or installation button not found")
+            except Exception:
+                print(
+                    f"    ⚠ {addon_name} may already be installed or installation button not found"
+                )
                 return True
 
         except Exception as e:
@@ -223,6 +281,7 @@ def install_addon_via_repo(driver, addon_name, repo):
         print(f"    ✗ Failed to install {addon_name}: {e}")
         return False
 
+
 def main():
     print("=" * 60)
     print("Home Assistant HACS Add-on Installer")
@@ -231,7 +290,7 @@ def main():
     # Get credentials
     username = input("\nHome Assistant Username: ")
     password = getpass.getpass("Home Assistant Password: ")
-    headless = input("Run in headless mode? (y/N): ").lower() == 'y'
+    headless = input("Run in headless mode? (y/N): ").lower() == "y"
 
     # Setup browser
     driver = setup_browser(headless)
@@ -246,7 +305,9 @@ def main():
 
         # Navigate to HACS
         if not navigate_to_hacs(driver):
-            print("\n✗ Could not access HACS. Make sure HACS is installed in Home Assistant.")
+            print(
+                "\n✗ Could not access HACS. Make sure HACS is installed in Home Assistant."
+            )
             print("  Install HACS first: https://hacs.xyz/docs/setup/download")
             return
 
@@ -284,6 +345,7 @@ def main():
         if not headless:
             input("\nPress Enter to close the browser...")
         driver.quit()
+
 
 if __name__ == "__main__":
     main()

@@ -548,17 +548,7 @@ acquire_lock() {
     echo $$ > "$LOCK_FILE"
 }
 
-# Release lock
-release_lock() {
-    rm -f "$LOCK_FILE"
-}
-
-# Cleanup on exit
-cleanup() {
-    release_lock
-}
-
-trap cleanup EXIT
+trap 'rm -f "$LOCK_FILE"' EXIT
 
 # Main execution
 main() {
