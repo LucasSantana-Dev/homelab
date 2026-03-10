@@ -16,9 +16,11 @@ jobs:
     - name: Install gitleaks
       run: |
         GITLEAKS_VERSION=8.18.2
+        TMP_DIR="$(mktemp -d)"
         curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-          | tar -xz
-        sudo mv gitleaks /usr/local/bin/gitleaks
+          | tar -xz -C "${TMP_DIR}" gitleaks
+        sudo install "${TMP_DIR}/gitleaks" /usr/local/bin/gitleaks
+        rm -rf "${TMP_DIR}"
         gitleaks version
 
     - name: Run secret gate
@@ -60,9 +62,11 @@ jobs:
     - name: Install gitleaks
       run: |
         GITLEAKS_VERSION=8.18.2
+        TMP_DIR="$(mktemp -d)"
         curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-          | tar -xz
-        sudo mv gitleaks /usr/local/bin/gitleaks
+          | tar -xz -C "${TMP_DIR}" gitleaks
+        sudo install "${TMP_DIR}/gitleaks" /usr/local/bin/gitleaks
+        rm -rf "${TMP_DIR}"
         gitleaks version
 
     # Run all quality checks via pre-commit for consistency with local development
@@ -291,9 +295,11 @@ jobs:
     - name: Install gitleaks
       run: |
         GITLEAKS_VERSION=8.18.2
+        TMP_DIR="$(mktemp -d)"
         curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-          | tar -xz
-        sudo mv gitleaks /usr/local/bin/gitleaks
+          | tar -xz -C "${TMP_DIR}" gitleaks
+        sudo install "${TMP_DIR}/gitleaks" /usr/local/bin/gitleaks
+        rm -rf "${TMP_DIR}"
         gitleaks version
 
     - name: Run pre-commit
