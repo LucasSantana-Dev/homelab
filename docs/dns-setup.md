@@ -7,6 +7,7 @@ The homelab uses custom domains like `auth.homelab.example.com` that need DNS re
 ## Option 1: Tailscale MagicDNS (Recommended)
 
 **Pros:**
+
 - Works across all devices on your Tailscale network
 - No manual configuration needed on client machines
 - Automatic updates when IP changes
@@ -14,7 +15,7 @@ The homelab uses custom domains like `auth.homelab.example.com` that need DNS re
 
 **Setup Steps:**
 
-1. Access your Tailscale admin console at https://login.tailscale.com/admin/dns
+1. Access your Tailscale admin console at <https://login.tailscale.com/admin/dns>
 
 2. Navigate to **DNS** settings
 
@@ -23,15 +24,18 @@ The homelab uses custom domains like `auth.homelab.example.com` that need DNS re
    - Address: `100.100.100.100` (Tailscale's built-in DNS)
 
 4. Add DNS records for your domain:
+
    ```
    homelab.example.com               A    <YOUR_TAILSCALE_IP>
    *.homelab.example.com             A    <YOUR_TAILSCALE_IP>
    ```
+
    Replace `<YOUR_TAILSCALE_IP>` with the value from your `.env` file
 
 5. Enable MagicDNS for your tailnet
 
 6. Test from any device on your Tailscale network:
+
    ```bash
    ping auth.homelab.example.com
    ```
@@ -39,10 +43,12 @@ The homelab uses custom domains like `auth.homelab.example.com` that need DNS re
 ## Option 2: Local /etc/hosts File (Testing Only)
 
 **Pros:**
+
 - Quick setup for testing
 - No external dependencies
 
 **Cons:**
+
 - Must be configured on every device
 - Doesn't work on mobile devices easily
 - Must be updated manually
@@ -50,16 +56,19 @@ The homelab uses custom domains like `auth.homelab.example.com` that need DNS re
 **Setup Steps:**
 
 On Linux/macOS:
+
 ```bash
 sudo nano /etc/hosts
 ```
 
 On Windows (Run as Administrator):
+
 ```
 notepad C:\Windows\System32\drivers\etc\hosts
 ```
 
 Add these lines (replace `<YOUR_TAILSCALE_IP>` with the value from your `.env` file):
+
 ```
 <YOUR_TAILSCALE_IP> homelab.example.com www.homelab.example.com
 <YOUR_TAILSCALE_IP> auth.homelab.example.com
@@ -83,6 +92,7 @@ Add these lines (replace `<YOUR_TAILSCALE_IP>` with the value from your `.env` f
 ```
 
 Save the file and test:
+
 ```bash
 ping auth.homelab.example.com
 ```
@@ -92,6 +102,7 @@ ping auth.homelab.example.com
 **Note:** You already have a DuckDNS token in your `.env` file but it's not configured. This option is NOT recommended for Tailscale-only setups.
 
 **Why not recommended:**
+
 - Exposes your domain to the public internet
 - Requires port forwarding (security risk)
 - Conflicts with Tailscale-only network design
@@ -131,17 +142,38 @@ curl -I https://auth.homelab.example.com
 
 ### SSL certificate errors
 
-Your wildcard cert at `/etc/nginx/ssl/live/homelab.example.com/` covers all subdomains. If you see SSL errors:
+The stack should serve a trusted wildcard cert for `*.homelab.example.com`.
+If you see `NET::ERR_CERT_AUTHORITY_INVALID`:
 
-1. Verify cert files exist in nginx container:
+1. Check what certificate is currently served:
+
+   ```bash
+   cd /home/luk-server/homelab
+   make ssl-status
+   ```
+
+2. Verify cert files exist in nginx container:
+
    ```bash
    docker exec nginx-proxy ls -la /etc/nginx/ssl/live/homelab.example.com/
    ```
 
-2. Check cert expiration:
+3. Check cert expiration:
+
    ```bash
    docker exec nginx-proxy openssl x509 -in /etc/nginx/ssl/live/homelab.example.com/fullchain.pem -noout -dates
    ```
+
+4. Re-issue/renew wildcard cert with DNS-01 (Cloudflare token required):
+
+   ```bash
+   cd /home/luk-server/homelab
+   make ssl-renew
+   ```
+
+5. Validate DNS intent:
+   - **Tailscale-only access**: hostname can resolve to your Tailscale IP.
+   - **Public access via Cloudflare Tunnel**: hostname must resolve through Cloudflare/tunnel, not directly to your Tailscale IP.
 
 ## Recommended Setup
 

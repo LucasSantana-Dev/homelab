@@ -14,6 +14,7 @@ This guide provides comprehensive instructions for setting up and configuring Ho
 ### Accessing Home Assistant
 
 Home Assistant is accessible via:
+
 - **Tailscale Network**: `http://${TAILSCALE_IP}:8123`
 - **Note**: Replace `${TAILSCALE_IP}` with your actual Tailscale IP from your `.env` file
 
@@ -27,11 +28,13 @@ Home Assistant is accessible via:
 ### Configuration Files
 
 All Home Assistant configuration files are located in:
+
 ```
 /home/luk-server/homelab/config/homeassistant/config/
 ```
 
 Key configuration files:
+
 - `configuration.yaml` - Main configuration file
 - `automations.yaml` - Automation definitions
 - `scripts.yaml` - Reusable scripts
@@ -44,6 +47,7 @@ Key configuration files:
 The Meross Cloud integration allows control of Meross smart devices.
 
 **Configuration:**
+
 1. Go to Settings → Devices & Services
 2. Click "Add Integration"
 3. Search for "Meross Cloud"
@@ -57,6 +61,7 @@ The Meross Cloud integration allows control of Meross smart devices.
 The Xiaomi Home integration connects Xiaomi/Mijia devices.
 
 **Configuration:**
+
 1. Go to Settings → Devices & Services
 2. Click "Add Integration"
 3. Search for "Xiaomi Home"
@@ -70,17 +75,20 @@ If you encounter "invalid refresh token" errors, see `xiaomi_token_refresh.md` f
 The weather integration uses the MET (Norwegian Meteorological Institute) platform.
 
 **Configuration:**
+
 - Configured in `configuration.yaml`
 - Entity ID: `weather.home`
 
 ### Mobile App Integration
 
 The mobile app integration enables:
+
 - Push notifications
 - Location tracking
 - Actionable notifications
 
 **Setup:**
+
 1. Install the Home Assistant mobile app
 2. Open the app and scan the QR code or enter the Home Assistant URL
 3. Log in with your credentials
@@ -91,6 +99,7 @@ The mobile app integration enables:
 #### Google Assistant
 
 **Configuration:**
+
 1. Set up a Google Cloud Project
 2. Enable the Google Assistant API
 3. Create a service account
@@ -100,6 +109,7 @@ The mobile app integration enables:
 #### Alexa
 
 **Configuration:**
+
 1. Create an Alexa skill
 2. Obtain client ID and secret
 3. Add to `secrets.yaml`
@@ -110,6 +120,7 @@ The mobile app integration enables:
 ### Climate Control
 
 Automations for climate control include:
+
 - Temperature-based HVAC control
 - Time-based schedules
 - Energy-saving modes
@@ -119,6 +130,7 @@ See `automations.yaml` for detailed examples.
 ### Lighting
 
 Lighting automations include:
+
 - Motion-activated lighting
 - Time-based schedules
 - Adaptive brightness
@@ -127,6 +139,7 @@ Lighting automations include:
 ### Energy Management
 
 Energy automations include:
+
 - High usage alerts
 - Peak hour optimization
 - Daily cost notifications
@@ -134,6 +147,7 @@ Energy automations include:
 ### Media Control
 
 Media automations include:
+
 - Presence-based control
 - Time-based volume adjustment
 - Night mode
@@ -143,12 +157,14 @@ Media automations include:
 ### Permission Errors
 
 If you encounter permission errors (e.g., with Meross Cloud integration):
+
 - The container runs as `root` to allow package installation
 - Check Docker Compose configuration in `docker-compose.yml`
 
 ### Integration Failures
 
 1. Check Home Assistant logs:
+
    ```bash
    docker logs homeassistant
    ```
@@ -156,6 +172,7 @@ If you encounter permission errors (e.g., with Meross Cloud integration):
 2. Verify integration configuration in `configuration.yaml`
 
 3. Restart Home Assistant:
+
    ```bash
    docker restart homeassistant
    ```
@@ -163,12 +180,14 @@ If you encounter permission errors (e.g., with Meross Cloud integration):
 ### Token Refresh Issues
 
 For Xiaomi Home integration token issues:
+
 - See `xiaomi_token_refresh.md` for refresh instructions
 - Tokens expire periodically and need manual refresh
 
 ### Weather Integration Duplicate ID
 
 If you see "Platform met does not generate unique IDs":
+
 - Ensure only one weather platform is configured
 - Check `configuration.yaml` for duplicate entries
 

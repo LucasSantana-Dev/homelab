@@ -3,9 +3,11 @@
 ## Meross Cloud Integration Fix
 
 ### Issue
+
 The Meross Cloud integration was failing with permission errors when trying to install the `meross_iot` Python package.
 
 ### Solution
+
 1. **Updated Docker Compose configuration** to set `PYTHONUSERBASE=/config/deps` environment variable
    - This tells Python to install packages in the config directory instead of system directories
    - The deps directory is writable by the container user
@@ -15,7 +17,9 @@ The Meross Cloud integration was failing with permission errors when trying to i
    - Permissions set to 755 for proper access
 
 ### How to Apply
+
 1. Restart the Home Assistant container:
+
    ```bash
    cd /home/luk-server/homelab
    docker compose restart homeassistant
@@ -30,7 +34,9 @@ The Meross Cloud integration was failing with permission errors when trying to i
    - Follow the setup wizard
 
 ### Verification
+
 Check Home Assistant logs for successful package installation:
+
 ```bash
 docker logs homeassistant | grep -i meross
 ```
@@ -40,9 +46,11 @@ You should see successful package installation instead of permission errors.
 ## Xiaomi Home Integration Token Refresh
 
 ### Issue
+
 Xiaomi Home integration shows "invalid refresh token" error, requiring token refresh.
 
 ### Solution
+
 1. **Access Xiaomi Home integration settings:**
    - Go to Settings > Devices & Services
    - Find "Xiaomi Home" integration
@@ -58,6 +66,7 @@ Xiaomi Home integration shows "invalid refresh token" error, requiring token ref
    - You'll need to re-authenticate with Xiaomi account
 
 ### Prevention
+
 - Tokens expire after a period of inactivity
 - Set up periodic checks to refresh tokens before expiration
 - Monitor integration status in Home Assistant
@@ -65,9 +74,11 @@ Xiaomi Home integration shows "invalid refresh token" error, requiring token ref
 ## Weather Integration Duplicate ID Fix
 
 ### Issue
+
 Weather integration shows duplicate entity ID error: "Platform met does not generate unique IDs. ID home already exists"
 
 ### Solution
+
 1. **Remove duplicate weather entities:**
    - Go to Settings > Devices & Services
    - Find weather integrations
@@ -78,6 +89,7 @@ Weather integration shows duplicate entity ID error: "Platform met does not gene
    - Use location-specific names (e.g., "weather_home", "weather_office")
 
 3. **Update configuration.yaml if using YAML:**
+
    ```yaml
    weather:
      - platform: met
@@ -87,7 +99,9 @@ Weather integration shows duplicate entity ID error: "Platform met does not gene
    ```
 
 ### Verification
+
 Check for duplicate entities:
+
 ```bash
 docker logs homeassistant | grep -i "duplicate\|weather"
 ```

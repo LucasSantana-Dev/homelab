@@ -47,6 +47,7 @@ codex mcp get forge-space --json
 ```
 
 The setup uses a Dockerized stdio bridge:
+
 - image: `ghcr.io/ibm/mcp-context-forge:1.0.0-BETA-2`
 - command: `python -m mcpgateway.wrapper --url=... --auth="Bearer ..."`
 

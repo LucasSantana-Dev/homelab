@@ -5,12 +5,14 @@ This script uses Selenium to automatically navigate Home Assistant and install H
 ## Prerequisites
 
 1. **Install Chrome/Chromium and ChromeDriver:**
+
    ```bash
    sudo apt-get update
    sudo apt-get install -y chromium-browser chromium-chromedriver
    ```
 
 2. **Install Python dependencies:**
+
    ```bash
    cd /home/luk-server/homelab/scripts
    pip3 install -r requirements-hacs-installer.txt
@@ -36,10 +38,12 @@ python3 install_hacs_addons.py --username YOUR_USERNAME --password YOUR_PASSWORD
 The script will install the following HACS add-ons:
 
 ### Integrations
+
 - **Adaptive Lighting** - Circadian lighting automation
 - **Auto-entities** - Dynamic dashboard entities
 
 ### Frontend Plugins (Lovelace Cards)
+
 - **Card Mod** - Advanced card styling
 - **Mini Graph Card** - Enhanced graphs
 - **Mushroom Cards** - Modern card collection
@@ -78,6 +82,7 @@ If the automated script doesn't work, you can install add-ons manually:
 ### ChromeDriver Issues
 
 If you get ChromeDriver errors:
+
 ```bash
 # Check ChromeDriver version
 chromedriver --version

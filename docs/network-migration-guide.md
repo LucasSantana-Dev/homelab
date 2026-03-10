@@ -25,7 +25,9 @@ This guide documents the migration of 27 services from a single default bridge n
 ## Service-to-Network Mapping
 
 ### Frontend Network (172.20.0.0/24)
+
 User-facing services accessible via Nginx reverse proxy:
+
 - `nginx` (also monitoring) - Routes to all services, Prometheus metrics
 - `homepage` - Dashboard
 - `homeassistant` - Home automation
@@ -38,7 +40,9 @@ User-facing services accessible via Nginx reverse proxy:
 - `filebrowser` - File manager
 
 ### Monitoring Network (172.22.0.0/24)
+
 Observability and monitoring services:
+
 - `prometheus` (also frontend, database) - Metrics collection, scrapes all services
 - `grafana` (also frontend) - Dashboards, user access via frontend
 - `alertmanager` - Alert routing
@@ -53,11 +57,15 @@ Observability and monitoring services:
 - `portainer` (also frontend) - Container management
 
 ### Backend Network (172.21.0.0/24, Internal)
+
 Processing services without internet access:
+
 - `promtail` (also monitoring) - Log collection only
 
 ### Database Network (172.23.0.0/24, Internal)
+
 Database services without internet access:
+
 - `nextcloud-db` - MariaDB for Nextcloud
 - `nextcloud-redis` - Redis cache for Nextcloud
 - `prometheus` (also frontend, monitoring) - Scrapes database metrics
@@ -66,6 +74,7 @@ Database services without internet access:
 ## Pre-Migration Checklist
 
 - [ ] **Backup current state**
+
   ```bash
   cd /home/luk-server/homelab
   ./scripts/backup-automation.sh  # If available
@@ -78,6 +87,7 @@ Database services without internet access:
   ```
 
 - [ ] **Verify all services healthy**
+
   ```bash
   docker ps --filter "health=healthy" | wc -l
   docker ps --format "table {{.Names}}\t{{.Status}}" | grep -i unhealthy
@@ -89,6 +99,7 @@ Database services without internet access:
   - Notify users of downtime window
 
 - [ ] **Review current network state**
+
   ```bash
   docker network ls
   docker compose config | grep -A 2 "networks:"
@@ -142,11 +153,13 @@ filebrowser:
 ```
 
 **Deploy frontend services:**
+
 ```bash
 docker compose up -d --no-deps nginx homepage homeassistant stremio vaultwarden jellyfin n8n pihole filebrowser
 ```
 
 **Validation:**
+
 ```bash
 # Check services are up
 docker ps | grep -E 'nginx|homepage|homeassistant|stremio|vaultwarden|jellyfin|n8n|pihole|filebrowser'
@@ -216,11 +229,13 @@ portainer:
 ```
 
 **Deploy monitoring services:**
+
 ```bash
 docker compose up -d --no-deps prometheus grafana alertmanager blackbox-exporter loki node-exporter cadvisor netdata uptime-kuma whats-up-docker portainer
 ```
 
 **Validation:**
+
 ```bash
 # Check Prometheus targets
 curl -s http://localhost:9091/api/v1/targets | jq '.data.activeTargets | length'
@@ -256,11 +271,13 @@ nextcloud-redis:
 ```
 
 **Deploy backend/database services:**
+
 ```bash
 docker compose up -d --no-deps promtail nextcloud nextcloud-db nextcloud-redis
 ```
 
 **Validation:**
+
 ```bash
 # Verify database connectivity
 docker exec nextcloud-db mariadb-admin ping -h localhost
@@ -272,6 +289,7 @@ curl -I https://cloud.homelab.example.com
 ### Step 4: Final Validation
 
 **Health Checks:**
+
 ```bash
 # All services should be healthy
 docker ps --format "table {{.Names}}\t{{.Status}}" | grep -v "Up.*healthy"
@@ -281,6 +299,7 @@ docker ps -a --filter "status=exited"
 ```
 
 **Connectivity Tests:**
+
 ```bash
 # Test Prometheus scraping
 curl -s http://localhost:9091/api/v1/targets | \
@@ -294,6 +313,7 @@ curl -s https://homelab.example.com | grep -q "Homepage" && echo "✅ Homepage a
 ```
 
 **Service Connectivity Matrix:**
+
 - [ ] Homepage → All frontend services
 - [ ] Nginx → All proxied services
 - [ ] Prometheus → All scrape targets
@@ -348,15 +368,20 @@ docker logs --since 1h grafana 2>&1 | grep -i "error"
 **Symptom**: Service logs show connection refused or timeout errors
 
 **Solution**:
+
 1. Verify both services are on the same network:
+
    ```bash
    docker inspect <service1> | grep -A 10 "Networks"
    docker inspect <service2> | grep -A 10 "Networks"
    ```
+
 2. Check network connectivity:
+
    ```bash
    docker exec <service1> ping <service2>
    ```
+
 3. If connectivity fails, add the missing network to docker-compose.yml
 
 ### Prometheus Cannot Scrape Targets
@@ -364,6 +389,7 @@ docker logs --since 1h grafana 2>&1 | grep -i "error"
 **Symptom**: Targets show as "down" in Prometheus UI
 
 **Solution**:
+
 1. Ensure Prometheus is on the same network as the target
 2. For frontend services, Prometheus needs `frontend` network
 3. For database services, Prometheus needs `database` network
@@ -373,9 +399,11 @@ docker logs --since 1h grafana 2>&1 | grep -i "error"
 **Symptom**: 502 Bad Gateway errors
 
 **Solution**:
+
 1. Verify Nginx is on the `frontend` network
 2. Ensure proxied services are also on `frontend` network
 3. Check Nginx logs:
+
    ```bash
    docker logs nginx 2>&1 | grep -i "upstream"
    ```
