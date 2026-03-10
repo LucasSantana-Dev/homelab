@@ -12,16 +12,36 @@ scripts/
 ├── deployment/          # Service lifecycle management
 │   ├── startup-services.sh
 │   ├── shutdown-services.sh
-│   └── install-systemd-services.sh
+│   ├── install-systemd-services.sh
+│   ├── setup-serena-mcp.sh
+│   └── setup-forge-space-mcp.sh
 ├── maintenance/         # Backup and update operations
 │   ├── automated-backup.sh
+│   ├── stabilize-host-prep.sh
+│   ├── swap-recover.sh
+│   ├── convert-to-server-mode.sh
+│   ├── post-reboot-validate.sh
 │   ├── update-containers.sh
 │   └── update-containers.py
+├── migration/           # K3s/Terraform migration workflow scripts
+│   ├── preflight.sh
+│   ├── install-tooling.sh
+│   ├── bootstrap-k3s.sh
+│   ├── wave-a-gate.sh
+│   ├── cutover-checks.sh
+│   ├── rollback-checks.sh
+│   ├── check-resource-budget.sh
+│   ├── sops-age-init.sh
+│   └── encrypt-k8s-secret.sh
 ├── monitoring/          # Status and health monitoring
 │   ├── container-status.py
 │   └── status-services.sh
-├── security/            # Security scanning
-│   └── security-scan.sh
+├── security/            # Security scanning and public release gates
+│   ├── security-scan.sh
+│   ├── secret-gate.sh
+│   ├── public-safety-gate.sh
+│   ├── pre-release-checkpoint.sh
+│   └── rewrite-history.sh
 ├── systemd/             # Systemd service unit files
 │   ├── homelab-docker.service
 │   ├── homelab-update.service
@@ -38,6 +58,7 @@ scripts/
 ## Entry Point Scripts
 
 ### `homelab`
+
 Main CLI wrapper for the Python homelab_manager package.
 
 ```bash
@@ -47,6 +68,7 @@ Main CLI wrapper for the Python homelab_manager package.
 ```
 
 ### `containers`
+
 Container management wrapper for quick container operations.
 
 ```bash
@@ -58,17 +80,29 @@ Container management wrapper for quick container operations.
 ## Deployment Scripts
 
 ### `deployment/startup-services.sh`
+
 Start all homelab services with proper ordering.
 
 ### `deployment/shutdown-services.sh`
+
 Gracefully stop all homelab services.
 
 ### `deployment/install-systemd-services.sh`
+
 Install systemd service files for auto-start on boot.
+
+### `deployment/setup-serena-mcp.sh`
+
+Build and register a Serena MCP runtime image with node and terraform dependencies.
+
+### `deployment/setup-forge-space-mcp.sh`
+
+Register Forge Space MCP gateway in Codex using Dockerized `python -m mcpgateway.wrapper`.
 
 ## Maintenance Scripts
 
 ### `maintenance/automated-backup.sh`
+
 Create automated backups of homelab data.
 
 ```bash
@@ -77,6 +111,7 @@ Create automated backups of homelab data.
 ```
 
 ### `maintenance/update-containers.sh`
+
 Safe container update with health checks and rollback.
 
 ```bash
@@ -87,15 +122,68 @@ Safe container update with health checks and rollback.
 ## Monitoring Scripts
 
 ### `monitoring/status-services.sh`
+
 Show systemd service status for homelab services.
 
 ### `monitoring/container-status.py`
+
 Python script for detailed container status and health checks.
+
+### `maintenance/stabilize-host-prep.sh`
+
+Creates a recovery point before host package cleanup (app backup, baseline metrics, package/service snapshot, optional privileged `/etc` tarball). By default it runs backup through `sudo` to include root-owned container volumes.
+
+### `maintenance/swap-recover.sh`
+
+Performs controlled swap reset (`swapoff -a && swapon -a`) and logs before/after pressure metrics.
+
+### `maintenance/convert-to-server-mode.sh`
+
+Converts desktop host to server mode in place. Default is preview; use `--apply` to execute package purge and service target changes.
+
+### `maintenance/post-reboot-validate.sh`
+
+Validates server-mode reboot outcome, core services, timers, k3s context, and homelab health.
+
+## Migration Scripts
+
+### `migration/preflight.sh`
+
+Runs migration readiness checks for tools, compose edge state, Terraform, and Helm charts.
+
+### `migration/install-tooling.sh`
+
+Installs migration prerequisites (`kubectl`, `helm`, `sops`, `age`) into `~/.local/bin` without sudo.
+
+### `migration/bootstrap-k3s.sh`
+
+Installs k3s (if needed) and applies baseline namespaces plus resource policies.
+
+### `migration/cutover-checks.sh`
+
+Validates Helm release health and endpoint availability after wave cutover.
+
+### `migration/rollback-checks.sh`
+
+Prints rollback status/history checks and validates compose edge fallback path.
+
+### `migration/wave-a-gate.sh`
+
+Deploys Wave A releases and enforces a configurable burn-in stability gate before traffic shift.
 
 ## Security Scripts
 
 ### `security/security-scan.sh`
+
 Run security scans on containers and images using Trivy.
+
+### `security/secret-gate.sh`
+
+Run gitleaks against tracked content (and optionally history) using `.gitleaks.toml`.
+
+### `security/public-safety-gate.sh`
+
+Fail when private infrastructure identifiers appear in tracked public files.
 
 ## Systemd Integration
 

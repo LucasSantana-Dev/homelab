@@ -1,6 +1,7 @@
 # Weather Integration Duplicate ID Fix
 
 ## Issue
+
 Error: `Platform met does not generate unique IDs. ID home already exists - ignoring weather.forecast_casa`
 
 This occurs when multiple weather integrations try to use the same entity ID.
@@ -63,9 +64,11 @@ weather:
    - Verify all weather entities have unique IDs
 
 2. **Check Logs**
+
    ```bash
    docker logs homeassistant | grep -i weather
    ```
+
    - Should not show duplicate ID errors
 
 3. **Test Dashboard**
