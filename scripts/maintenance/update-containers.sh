@@ -15,12 +15,13 @@ LOCK_FILE="/tmp/homelab-update.lock"
 # Load environment variables (handle special characters)
 if [[ -f "$HOMELAB_DIR/.env" ]]; then
     # Only load specific variables we need, avoiding syntax issues with special chars
-    DISCORD_WEBHOOK_URL=$(grep -E "^WUD_DISCORD_WEBHOOK_URL=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    UPDATE_DISCORD_WEBHOOK_URL=$(grep -E "^UPDATE_DISCORD_WEBHOOK_URL=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    WUD_DISCORD_WEBHOOK_URL=$(grep -E "^WUD_DISCORD_WEBHOOK_URL=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
     TAILSCALE_IP=$(grep -E "^TAILSCALE_IP=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
 fi
 
-# Discord webhook URL (loaded from .env above)
-DISCORD_WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-}"
+# Discord webhook URL (prefer dedicated update webhook, fallback to legacy WUD webhook)
+DISCORD_WEBHOOK_URL="${UPDATE_DISCORD_WEBHOOK_URL:-${WUD_DISCORD_WEBHOOK_URL:-}}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -50,8 +51,10 @@ declare -A GROUP_WAIT_TIMES=(
 UPDATED_CONTAINERS=0
 FAILED_CONTAINERS=0
 SKIPPED_CONTAINERS=0
+UNCHANGED_CONTAINERS=0
 declare -a UPDATED_LIST=()
 declare -a FAILED_LIST=()
+declare -a UNCHANGED_LIST=()
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -174,35 +177,119 @@ get_image_digest() {
     docker inspect --format='{{.Image}}' "$container_name" 2>/dev/null || echo ""
 }
 
+# Resolve compose service name from container labels
+get_compose_service_name() {
+    local container_name="$1"
+    local service_name
+
+    service_name=$(docker inspect --format='{{index .Config.Labels "com.docker.compose.service"}}' "$container_name" 2>/dev/null || true)
+
+    if [[ -n "$service_name" && "$service_name" != "<no value>" ]]; then
+        echo "$service_name"
+        return 0
+    fi
+
+    return 1
+}
+
+# Resolve image reference for a compose service
+get_service_image_ref() {
+    local service_name="$1"
+
+    docker compose -f "$HOMELAB_DIR/docker-compose.yml" config "$service_name" 2>/dev/null | awk -v svc="$service_name" '
+        $0 ~ "^  " svc ":" {in_service=1; next}
+        in_service && $0 ~ "^  [a-zA-Z0-9_.-]+:" {in_service=0}
+        in_service && $0 ~ /^    image:/ {
+            sub(/^    image:[[:space:]]*/, "", $0)
+            print $0
+            exit
+        }
+    '
+}
+
+# Check whether a compose service has a local build configuration
+service_uses_build() {
+    local service_name="$1"
+
+    docker compose -f "$HOMELAB_DIR/docker-compose.yml" config "$service_name" 2>/dev/null | awk -v svc="$service_name" '
+        $0 ~ "^  " svc ":" {in_service=1; next}
+        in_service && $0 ~ "^  [a-zA-Z0-9_.-]+:" {in_service=0}
+        in_service && $0 ~ /^    build:/ {found=1}
+        END {exit(found ? 0 : 1)}
+    '
+}
+
 # Update a single container
 update_container() {
     local container_name="$1"
-    local service_name="$2"
 
     if ! container_exists "$container_name"; then
         log_warning "Container $container_name does not exist, skipping"
-        ((SKIPPED_CONTAINERS++))
+        SKIPPED_CONTAINERS=$((SKIPPED_CONTAINERS + 1))
         return 0
+    fi
+
+    local service_name
+    if ! service_name=$(get_compose_service_name "$container_name"); then
+        log_error "Unable to resolve compose service for container $container_name"
+        FAILED_LIST+=("$container_name")
+        FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
+        return 1
     fi
 
     local old_digest
     old_digest=$(get_image_digest "$container_name")
+    local target_image_ref
+    local target_image_id
 
-    log "Updating $container_name..."
+    log "Updating $container_name (service: $service_name)..."
 
-    # Pull new image
-    if ! docker compose -f "$HOMELAB_DIR/docker-compose.yml" pull "$service_name" 2>&1 | tee -a "$LOG_FILE"; then
-        log_error "Failed to pull image for $container_name"
+    target_image_ref="$(get_service_image_ref "$service_name")"
+    if [[ -z "$target_image_ref" ]]; then
+        log_error "Unable to resolve image reference for compose service $service_name"
         FAILED_LIST+=("$container_name")
-        ((FAILED_CONTAINERS++))
+        FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
         return 1
     fi
 
-    # Restart container with new image
-    if ! docker compose -f "$HOMELAB_DIR/docker-compose.yml" up -d --no-deps "$service_name" 2>&1 | tee -a "$LOG_FILE"; then
+    if service_uses_build "$service_name"; then
+        log_info "Service $service_name uses local build, running docker compose build"
+        if ! docker compose -f "$HOMELAB_DIR/docker-compose.yml" build "$service_name" 2>&1 | tee -a "$LOG_FILE"; then
+            log_error "Failed to build image for $container_name"
+            FAILED_LIST+=("$container_name")
+            FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
+            return 1
+        fi
+    else
+        # Pull new image
+        if ! docker compose -f "$HOMELAB_DIR/docker-compose.yml" pull "$service_name" 2>&1 | tee -a "$LOG_FILE"; then
+            log_error "Failed to pull image for $container_name"
+            FAILED_LIST+=("$container_name")
+            FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
+            return 1
+        fi
+    fi
+
+    target_image_id="$(docker image inspect --format='{{.Id}}' "$target_image_ref" 2>/dev/null || true)"
+    if [[ -z "$target_image_id" ]]; then
+        log_error "Unable to inspect target image for $service_name ($target_image_ref)"
+        FAILED_LIST+=("$container_name")
+        FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
+        return 1
+    fi
+
+    if [[ -n "$old_digest" && "$old_digest" == "$target_image_id" ]]; then
+        log_info "$container_name unchanged (image digest match), skipping recreate"
+        UNCHANGED_LIST+=("$container_name")
+        UNCHANGED_CONTAINERS=$((UNCHANGED_CONTAINERS + 1))
+        return 0
+    fi
+
+    # Recreate only when image/build output changed.
+    if ! docker compose -f "$HOMELAB_DIR/docker-compose.yml" up -d --no-deps --force-recreate "$service_name" 2>&1 | tee -a "$LOG_FILE"; then
         log_error "Failed to restart $container_name"
         FAILED_LIST+=("$container_name")
-        ((FAILED_CONTAINERS++))
+        FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
         return 1
     fi
 
@@ -212,9 +299,11 @@ update_container() {
     if [[ "$old_digest" != "$new_digest" ]]; then
         log_success "$container_name updated to new image"
         UPDATED_LIST+=("$container_name")
-        ((UPDATED_CONTAINERS++))
+        UPDATED_CONTAINERS=$((UPDATED_CONTAINERS + 1))
     else
-        log_info "$container_name already up to date"
+        log_info "$container_name recreated but image digest did not change"
+        UNCHANGED_LIST+=("$container_name")
+        UNCHANGED_CONTAINERS=$((UNCHANGED_CONTAINERS + 1))
     fi
 
     return 0
@@ -232,18 +321,7 @@ update_group() {
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     for container in "${containers[@]}"; do
-        # Derive service name from container name (remove suffixes like -server, -proxy)
-        local service_name="${container%-server}"
-        service_name="${service_name%-proxy}"
-
-        # Handle special cases where container name differs from service name
-        case "$container" in
-            "nginx-proxy") service_name="nginx" ;;
-            "stremio-server") service_name="stremio" ;;
-            *) ;;
-        esac
-
-        update_container "$container" "$service_name"
+        update_container "$container"
 
         # Wait and check health
         log "Waiting ${wait_time}s for $container health check..."
@@ -322,7 +400,7 @@ create_backup() {
         backup_size=$(du -h "$backup_path" | cut -f1)
         log_success "Pre-update backup created: $backup_name ($backup_size)"
     else
-        log_warning "Failed to create backup, continuing anyway"
+        log_warning "Non-blocking backup step failed (see tar errors above); continuing with updates"
     fi
 
     echo "" | tee -a "$LOG_FILE"
@@ -354,13 +432,26 @@ cleanup_old_images() {
     local before_size
     before_size=$(docker system df --format '{{.Size}}' | head -1)
 
-    # Remove dangling images
-    docker image prune -f 2>&1 | tee -a "$LOG_FILE"
+    # Remove dangling images (best-effort; cleanup must not fail the entire update run)
+    local prune_output
+    if prune_output=$(docker image prune -f 2>&1); then
+        printf "%s\n" "$prune_output" | tee -a "$LOG_FILE"
+    else
+        printf "%s\n" "$prune_output" | tee -a "$LOG_FILE"
+
+        if printf "%s\n" "$prune_output" | grep -qiE "prune operation is already running|a prune operation is already running|conflict.*prune"; then
+            log_warning "Non-blocking cleanup skipped: another Docker prune operation is already running"
+        else
+            local prune_tail
+            prune_tail=$(printf "%s\n" "$prune_output" | tail -n 1)
+            log_warning "Non-blocking cleanup failed during image prune: ${prune_tail}"
+        fi
+    fi
 
     local after_size
     after_size=$(docker system df --format '{{.Size}}' | head -1)
 
-    log_success "Cleanup complete (Before: $before_size, After: $after_size)"
+    log_success "Cleanup stage complete (Before: $before_size, After: $after_size)"
     echo "" | tee -a "$LOG_FILE"
 }
 
@@ -375,6 +466,7 @@ generate_summary() {
     log "Updated containers: $UPDATED_CONTAINERS"
     log "Failed containers: $FAILED_CONTAINERS"
     log "Skipped containers: $SKIPPED_CONTAINERS"
+    log "Unchanged containers: $UNCHANGED_CONTAINERS"
 
     if [[ ${#UPDATED_LIST[@]} -gt 0 ]]; then
         log "Updated: ${UPDATED_LIST[*]}"
@@ -382,6 +474,10 @@ generate_summary() {
 
     if [[ ${#FAILED_LIST[@]} -gt 0 ]]; then
         log_error "Failed: ${FAILED_LIST[*]}"
+    fi
+
+    if [[ ${#UNCHANGED_LIST[@]} -gt 0 ]]; then
+        log "Unchanged: ${UNCHANGED_LIST[*]}"
     fi
 
     echo "" | tee -a "$LOG_FILE"
@@ -413,6 +509,11 @@ send_final_notification() {
         failed_text="${FAILED_LIST[*]}"
     fi
 
+    local unchanged_text="None"
+    if [[ ${#UNCHANGED_LIST[@]} -gt 0 ]]; then
+        unchanged_text="${UNCHANGED_LIST[*]}"
+    fi
+
     local fields
     fields=$(cat <<EOF
 [
@@ -420,8 +521,10 @@ send_final_notification() {
     {"name": "Duration", "value": "${duration}s", "inline": true},
     {"name": "Updated", "value": "$UPDATED_CONTAINERS containers", "inline": true},
     {"name": "Failed", "value": "$FAILED_CONTAINERS containers", "inline": true},
+    {"name": "Unchanged", "value": "$UNCHANGED_CONTAINERS containers", "inline": true},
     {"name": "Updated Containers", "value": "$updated_text", "inline": false},
-    {"name": "Failed Containers", "value": "$failed_text", "inline": false}
+    {"name": "Failed Containers", "value": "$failed_text", "inline": false},
+    {"name": "Unchanged Containers", "value": "$unchanged_text", "inline": false}
 ]
 EOF
 )
@@ -535,7 +638,8 @@ case "${1:-}" in
         echo "  --force         Force update even if lock file exists"
         echo ""
         echo "Environment variables:"
-        echo "  WUD_DISCORD_WEBHOOK_URL   Discord webhook for notifications"
+        echo "  UPDATE_DISCORD_WEBHOOK_URL   Dedicated Discord webhook for update notifications"
+        echo "  WUD_DISCORD_WEBHOOK_URL      Legacy fallback if update webhook is unset"
         exit 0
         ;;
     --dry-run)

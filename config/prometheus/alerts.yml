@@ -12,7 +12,7 @@ groups:
           summary: "Container {{ $labels.instance }} is down"
           description: "Container {{ $labels.instance }} has been down for more than 5 minutes."
 
-      - alert: ContainerDown
+      - alert: CadvisorDown
         expr: up{job="cadvisor"} == 0
         for: 5m
         labels:
@@ -23,8 +23,17 @@ groups:
 
       # High Memory Usage Alerts
       - alert: HighMemoryUsage
-        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
-        for: 5m
+        expr: |
+          (
+            max by (name, image, instance, job) (
+              container_memory_usage_bytes{name!="", image!=""}
+            )
+            /
+            max by (name, image, instance, job) (
+              container_spec_memory_limit_bytes{name!="", image!=""} > 0
+            )
+          ) > 0.9
+        for: 10m
         labels:
           severity: warning
         annotations:
@@ -32,8 +41,17 @@ groups:
           description: "Container {{ $labels.name }} is using more than 90% of its memory limit."
 
       - alert: CriticalMemoryUsage
-        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.95
-        for: 2m
+        expr: |
+          (
+            max by (name, image, instance, job) (
+              container_memory_usage_bytes{name!="", image!=""}
+            )
+            /
+            max by (name, image, instance, job) (
+              container_spec_memory_limit_bytes{name!="", image!=""} > 0
+            )
+          ) > 0.95
+        for: 5m
         labels:
           severity: critical
         annotations:
@@ -92,7 +110,7 @@ groups:
         expr: probe_success == 0
         for: 5m
         labels:
-          severity: critical
+          severity: warning
         annotations:
           summary: "Service {{ $labels.instance }} is down"
           description: "Service {{ $labels.instance }} is not responding to health checks."
@@ -165,3 +183,33 @@ groups:
         annotations:
           summary: "High memory pressure on {{ $labels.instance }}"
           description: "Memory usage on {{ $labels.instance }} is above 90%."
+
+      # cAdvisor Restart/OOM Loop
+      - alert: CadvisorRestartLoop
+        expr: increase(container_oom_events_total{name=~".*cadvisor.*"}[5m]) >= 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cAdvisor OOM/restart loop detected"
+          description: "cAdvisor has triggered at least 3 OOM events in the last 5 minutes."
+
+      # Host swap pressure
+      - alert: HighSwapUsage
+        expr: node_memory_SwapTotal_bytes > 0 and (1 - (node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes)) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High swap usage on {{ $labels.instance }}"
+          description: "Swap usage is above 80% on {{ $labels.instance }}."
+
+      # Docker daemon health from system metrics (requires node_exporter systemd collector)
+      - alert: DockerServiceDown
+        expr: max by (instance) (node_systemd_unit_state{name="docker.service", state="active"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Docker service is down on {{ $labels.instance }}"
+          description: "node_systemd_unit_state reports docker.service is not active for at least 2 minutes."

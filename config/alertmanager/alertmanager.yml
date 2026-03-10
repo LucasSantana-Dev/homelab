@@ -4,29 +4,66 @@ global:
 route:
   receiver: 'discord-notifications'
   group_by: ['alertname', 'severity']
-  group_wait: 10s
-  group_interval: 5m
-  repeat_interval: 4h
+  group_wait: 60s
+  group_interval: 30m
+  repeat_interval: 12h
   routes:
-    - match:
-        severity: critical
+    - matchers:
+        - severity="critical"
       receiver: 'discord-notifications'
-      repeat_interval: 1h
-    - match:
-        severity: warning
+      group_wait: 15s
+      group_interval: 10m
+      repeat_interval: 2h
+    - matchers:
+        - severity="warning"
       receiver: 'discord-notifications'
-      repeat_interval: 4h
+      group_wait: 60s
+      group_interval: 30m
+      repeat_interval: 12h
 
 receivers:
   - name: 'discord-notifications'
-    # Discord webhook configuration (configure ALERTMANAGER_DISCORD_WEBHOOK in .env)
-    # webhook_configs:
-    #   - url: 'https://discord.com/api/webhooks/REDACTED/REDACTED'
-    #     send_resolved: true
+    discord_configs:
+      - webhook_url_file: '/etc/alertmanager/discord_webhook_url'
+        send_resolved: true
+        title: >-
+          [{{ toUpper .Status }}] {{ .CommonLabels.alertname }} ({{ toUpper .CommonLabels.severity }})
+        message: >-
+          Alerts in group: {{ len .Alerts }}
+
+          {{- if .CommonLabels.job }}Job: `{{ .CommonLabels.job }}`{{ end }}
+          {{- if .CommonLabels.instance }} | Instance: `{{ .CommonLabels.instance }}`{{ end }}
+
+          {{- range $idx, $alert := .Alerts }}
+          {{- if lt $idx 6 }}
+          • `{{ or $alert.Labels.name $alert.Labels.instance "unknown" }}` - {{ or $alert.Annotations.summary $alert.Annotations.description "No summary" }}
+          {{- end }}
+          {{- end }}
+          {{- if gt (len .Alerts) 6 }}
+          • Additional alerts omitted for brevity.
+          {{- end }}
+
+          Source: {{ .ExternalURL }}
 
 inhibit_rules:
   - source_match:
       severity: 'critical'
+      alertname: 'CriticalMemoryUsage'
     target_match:
       severity: 'warning'
-    equal: ['alertname', 'instance']
+      alertname: 'HighMemoryUsage'
+    equal: ['name', 'instance']
+  - source_match:
+      severity: 'critical'
+      alertname: 'CriticalCPUUsage'
+    target_match:
+      severity: 'warning'
+      alertname: 'HighCPUUsage'
+    equal: ['name', 'instance']
+  - source_match:
+      severity: 'critical'
+      alertname: 'CriticalDiskSpace'
+    target_match:
+      severity: 'warning'
+      alertname: 'LowDiskSpace'
+    equal: ['instance', 'mountpoint']
