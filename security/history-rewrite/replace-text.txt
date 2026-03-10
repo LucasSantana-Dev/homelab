@@ -3,3 +3,9 @@ regex:(?i)(authToken:\s*)(["']?)[A-Za-z0-9_\-]{20,}\2==>\1${SENTRY_AUTH_TOKEN}
 regex:(?i)(token["']?\s*[:=]\s*["']?)[A-Za-z0-9_\-]{20,}["']?==>\1REDACTED
 regex:(?i)(client_secret["']?\s*[:=]\s*["']?)[A-Za-z0-9_\-]{12,}["']?==>\1REDACTED
 regex:(?i)(password["']?\s*[:=]\s*["']?)[^"'\n]{8,}["']?==>\1REDACTED
+regex:luk-homeserver\\\.com\\\.br==>homelab.example.com
+regex:homelab.example.com==>homelab.example.com
+regex:tailab88e9\\\.ts\\\.net==>tailnet.example.ts.net
+regex:tailnet.example.ts.net==>tailnet.example.ts.net
+100.64.0.10==>100.64.0.10
+homelab-node==>homelab-node
