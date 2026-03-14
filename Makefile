@@ -6,7 +6,8 @@
         image-lock-status image-lock-refresh image-lock-refresh-dry-run \
         watchdog-install watchdog-status watchdog-run-now watchdog-disable automation-reconcile \
         host-stabilize-prep host-swap-recover server-mode-plan server-mode-apply post-reboot-validate \
-        concurrency-guard pressure-watch pressure-checkpoint-gate pressure-gates-status baseline-bundle \
+        concurrency-guard pressure-watch pressure-checkpoint-gate pressure-gates-status schedule-pressure-gate-checkpoints \
+        baseline-bundle \
         post-t24-terraform-apply schedule-post-t24-terraform-apply \
         ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
         serena-mcp-setup migration-toolchain migration-preflight k3s-bootstrap migration-budget \
@@ -468,6 +469,26 @@ pressure-gates-status: ## Evaluate both timed checkpoints from watch artifacts (
 	   exit 2; \
 	 fi; \
 	 echo "✅ Checkpoint evaluation completed (WAITING/GREENLIGHT only)"
+
+schedule-pressure-gate-checkpoints: ## Schedule timed gate-token snapshots (TPLUS6_GATE_ON_CALENDAR / TPLUS24_GATE_ON_CALENDAR)
+	@set -e; \
+	 watch_dir="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}"; \
+	 swap_threshold="$${SWAP_THRESHOLD_GIB:-2.0}"; \
+	 t6_calendar="$${TPLUS6_GATE_ON_CALENDAR:-2026-03-14 18:21:10}"; \
+	 t24_calendar="$${TPLUS24_GATE_ON_CALENDAR:-2026-03-15 12:21:10}"; \
+	 systemctl --user stop homelab-pressure-gate-tplus6h.timer homelab-pressure-gate-tplus6h.service >/dev/null 2>&1 || true; \
+	 systemctl --user stop homelab-pressure-gate-tplus24h.timer homelab-pressure-gate-tplus24h.service >/dev/null 2>&1 || true; \
+	 systemctl --user reset-failed homelab-pressure-gate-tplus6h.timer homelab-pressure-gate-tplus6h.service >/dev/null 2>&1 || true; \
+	 systemctl --user reset-failed homelab-pressure-gate-tplus24h.timer homelab-pressure-gate-tplus24h.service >/dev/null 2>&1 || true; \
+	 echo "⏱️ Scheduling T+6 gate evaluation on: $$t6_calendar"; \
+	 systemd-run --user --on-calendar="$$t6_calendar" --unit=homelab-pressure-gate-tplus6h \
+	   /usr/bin/bash -lc "WATCH_DIR=$$watch_dir LABEL=TPLUS6H PREV_LABEL=T0 SWAP_THRESHOLD_GIB=$$swap_threshold '$(CURDIR)/scripts/maintenance/pressure-checkpoint-gate.sh' | tee $$watch_dir/TPLUS6H-gate.txt" \
+	   >/dev/null; \
+	 echo "⏱️ Scheduling T+24 gate evaluation on: $$t24_calendar"; \
+	 systemd-run --user --on-calendar="$$t24_calendar" --unit=homelab-pressure-gate-tplus24h \
+	   /usr/bin/bash -lc "WATCH_DIR=$$watch_dir LABEL=TPLUS24H PREV_LABEL=TPLUS6H SWAP_THRESHOLD_GIB=$$swap_threshold '$(CURDIR)/scripts/maintenance/pressure-checkpoint-gate.sh' | tee $$watch_dir/TPLUS24H-gate.txt" \
+	   >/dev/null; \
+	 echo "✅ Gate timers scheduled"
 
 baseline-bundle: ## Capture baseline evidence bundle (health, burn-in, budget, preflight)
 	@echo "📦 Capturing baseline bundle..."
