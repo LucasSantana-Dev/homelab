@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 WATCH_DIR="${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}"
 SWAP_THRESHOLD_GIB="${SWAP_THRESHOLD_GIB:-2.0}"
+EXPECTED_PLAN_ADDS="${EXPECTED_PLAN_ADDS:-7}"
 LOG_DIR="${PROJECT_ROOT}/logs/terraform-phase1"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_DIR}/post-t24-apply-${TIMESTAMP}.log"
@@ -27,11 +28,6 @@ require_file() {
   fi
 }
 
-to_bytes() {
-  local value="$1"
-  numfmt --from=iec "${value}"
-}
-
 if [[ -f "${DONE_MARKER}" ]]; then
   log "Already completed (${DONE_MARKER}); exiting."
   exit 0
@@ -40,33 +36,45 @@ fi
 T24_SWAP="${WATCH_DIR}/TPLUS24H-swapon-show.txt"
 T24_BURNIN="${WATCH_DIR}/TPLUS24H-burnin-30m.txt"
 T24_META="${WATCH_DIR}/TPLUS24H-meta.txt"
+TF_DIR="${PROJECT_ROOT}/infra/terraform"
 
 require_file "${T24_SWAP}"
 require_file "${T24_BURNIN}"
 require_file "${T24_META}"
 
-if ! grep -Eq '^Overall:[[:space:]]+PASS' "${T24_BURNIN}"; then
-  log "T+24 burn-in is not PASS. Blocking apply."
-  log "Escalation: consider host maintenance path (server-mode-apply + reboot + post-reboot validate)."
+log "Evaluating T+24 gate token from watch artifacts"
+set +e
+gate_output="$(
+  WATCH_DIR="${WATCH_DIR}" \
+    LABEL="TPLUS24H" \
+    PREV_LABEL="TPLUS6H" \
+    SWAP_THRESHOLD_GIB="${SWAP_THRESHOLD_GIB}" \
+    "${PROJECT_ROOT}/scripts/maintenance/pressure-checkpoint-gate.sh" 2>&1
+)"
+gate_exit=$?
+set -e
+printf '%s\n' "${gate_output}" > "${BUNDLE_DIR}/tplus24-gate.txt"
+
+gate_token="$(awk -F= '/^GATE_TOKEN=/{print $2}' <<< "${gate_output}" | tail -n1)"
+gate_reason="$(awk -F= '/^REASON=/{print $2}' <<< "${gate_output}" | tail -n1)"
+log "T+24 gate token=${gate_token:-unknown} reason=${gate_reason:-unknown}"
+
+if [[ "${gate_exit}" -eq 2 || "${gate_token}" == "BLOCKED" ]]; then
+  log "T+24 checkpoint is BLOCKED. Escalation: phase-2 maintenance window (server-mode-apply + reboot + post-reboot validate)."
+  exit 22
+fi
+if [[ "${gate_exit}" -ne 0 ]]; then
+  log "T+24 gate evaluation failed unexpectedly (exit=${gate_exit})."
+  exit 21
+fi
+if [[ "${gate_token}" != "GREENLIGHT" ]]; then
+  log "T+24 gate token is ${gate_token:-unknown}; expected GREENLIGHT."
   exit 20
 fi
 
-swap_used_human="$(awk 'NR==2 {print $4}' "${T24_SWAP}")"
-if [[ -z "${swap_used_human}" ]]; then
-  log "Could not parse T+24 swap usage from ${T24_SWAP}"
-  exit 21
-fi
-
-swap_used_bytes="$(to_bytes "${swap_used_human}")"
-threshold_bytes="$(awk -v g="${SWAP_THRESHOLD_GIB}" 'BEGIN {printf "%.0f", g * 1024 * 1024 * 1024}')"
-
-log "T+24 swap usage: ${swap_used_human} (bytes=${swap_used_bytes})"
-log "Threshold: ${SWAP_THRESHOLD_GIB} GiB (bytes=${threshold_bytes})"
-
-if (( swap_used_bytes > threshold_bytes )); then
-  log "Swap is above threshold at T+24. Blocking apply."
-  log "Escalation: phase-2 maintenance window (server-mode-apply + reboot + post-reboot validate)."
-  exit 22
+if [[ -n "$(git -C "${PROJECT_ROOT}" status --porcelain)" ]]; then
+  log "Working tree is not clean. Blocking apply until repo drift is reconciled."
+  exit 23
 fi
 
 log "Capturing pre-apply evidence bundle: ${BUNDLE_DIR}"
@@ -79,12 +87,26 @@ swapon --show > "${BUNDLE_DIR}/swapon-show.txt"
 make -C "${PROJECT_ROOT}" migration-budget > "${BUNDLE_DIR}/migration-budget.txt"
 make -C "${PROJECT_ROOT}" migration-preflight > "${BUNDLE_DIR}/migration-preflight.txt"
 
-TF_DIR="${PROJECT_ROOT}/infra/terraform"
 DOMAIN="$(grep '^DOMAIN=' "${PROJECT_ROOT}/.env" | cut -d= -f2-)"
 CLOUDFLARE_API_TOKEN="$(grep '^CLOUDFLARE_API_TOKEN=' "${PROJECT_ROOT}/.env" | cut -d= -f2-)"
 ZONE_ID="$(awk -F'"' '/^zone_id/{print $2}' "${TF_DIR}/terraform.tfvars")"
 TUNNEL_ID="$(awk -F'"' '/^tunnel_id/{print $2}' "${TF_DIR}/terraform.tfvars")"
 EXPECTED_CONTENT="${TUNNEL_ID}.cfargotunnel.com"
+
+log "Running Terraform fmt -check and validate"
+set +e
+(
+  cd "${TF_DIR}"
+  terraform fmt -check -no-color
+  terraform validate -no-color
+) > "${BUNDLE_DIR}/terraform-prechecks.txt" 2>&1
+precheck_exit=$?
+set -e
+
+if [[ "${precheck_exit}" -ne 0 ]]; then
+  log "Terraform prechecks failed (fmt/validate)."
+  exit 24
+fi
 
 log "Running Terraform pre-apply plan (detailed exit code)"
 set +e
@@ -100,15 +122,31 @@ if [[ "${plan_exit}" -eq 1 ]]; then
   exit 30
 fi
 
-if [[ "${plan_exit}" -eq 0 ]]; then
-  log "Terraform plan is already no-op before apply; skipping apply."
-else
-  log "Executing terraform apply"
-  (
-    cd "${TF_DIR}"
-    CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}" terraform apply -input=false -auto-approve -no-color
-  ) > "${BUNDLE_DIR}/terraform-apply.txt" 2>&1
+if [[ "${plan_exit}" -ne 2 ]]; then
+  log "Terraform pre-apply plan exit=${plan_exit}. Expected exit=2 before apply."
+  exit 32
 fi
+
+plan_summary="$(grep -E '^Plan: [0-9]+ to add, [0-9]+ to change, [0-9]+ to destroy\.$' "${BUNDLE_DIR}/terraform-plan-preapply.txt" | tail -n1 || true)"
+if [[ -z "${plan_summary}" ]]; then
+  log "Terraform pre-apply plan summary line not found."
+  exit 33
+fi
+
+actual_adds="$(awk '{print $2}' <<< "${plan_summary}")"
+actual_changes="$(awk '{print $5}' <<< "${plan_summary}")"
+actual_destroy="$(awk '{print $8}' <<< "${plan_summary}" | tr -d '.')"
+if [[ "${actual_adds}" != "${EXPECTED_PLAN_ADDS}" || "${actual_changes}" != "0" || "${actual_destroy}" != "0" ]]; then
+  log "Unexpected Terraform pre-apply plan summary: ${plan_summary}"
+  log "Expected: Plan: ${EXPECTED_PLAN_ADDS} to add, 0 to change, 0 to destroy."
+  exit 34
+fi
+
+log "Executing terraform apply"
+(
+  cd "${TF_DIR}"
+  CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}" terraform apply -input=false -auto-approve -no-color
+) > "${BUNDLE_DIR}/terraform-apply.txt" 2>&1
 
 log "Running Terraform post-apply no-op check"
 set +e

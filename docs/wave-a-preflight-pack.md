@@ -1,6 +1,8 @@
 # Wave A Preflight Pack (Homepage + Blackbox)
 
-Prepared on March 14, 2026 for execution after the active host-pressure watch.
+Prepared on March 14, 2026.
+
+This cycle is preflight-only. Wave A deployment is deferred to a separate maintenance window after Terraform post-gate checks are clean.
 
 ## Current Preconditions
 
@@ -10,6 +12,21 @@ Prepared on March 14, 2026 for execution after the active host-pressure watch.
 - `apps` and `observability` namespaces exist with resource quotas.
 - Helm lint/template sanity was captured in:
   - `/tmp/homelab-wave-a-preflight-20260314_121221`
+
+## Preflight Refresh Commands (No Cutover)
+
+Use these during the watch/apply window to keep preflight current without deploying:
+
+```bash
+cd /home/luk-server/homelab
+
+helm lint ./k8s/helm/homepage
+helm lint ./k8s/helm/blackbox-exporter
+helm template homepage ./k8s/helm/homepage -n apps -f ./k8s/helm/environments/lab-values.yaml >/tmp/wave-a-homepage-template.yaml
+helm template blackbox-exporter ./k8s/helm/blackbox-exporter -n observability -f ./k8s/helm/environments/lab-values.yaml >/tmp/wave-a-blackbox-template.yaml
+make migration-preflight
+make migration-budget
+```
 
 ## Release Command Set
 
@@ -35,7 +52,7 @@ Notes:
 
 ## Burn-In/Gate Command Set
 
-Use the existing gate for rollout/endpoints stability:
+Use this only in the later Wave A deployment window:
 
 ```bash
 cd /home/luk-server/homelab
@@ -46,7 +63,7 @@ If host pressure is borderline, run with a shorter observation first, then rerun
 
 ## Cutover Check Prerequisites
 
-After deploy (before declaring cutover complete):
+After deploy (in the separate Wave A window, before declaring cutover complete):
 
 ```bash
 cd /home/luk-server/homelab
@@ -75,6 +92,10 @@ helm rollback -n observability blackbox-exporter 1
 
 ## Execution Guardrails
 
-- Do not run Wave A deploy/gate before the pressure-watch T+24 checkpoint is accepted.
+- Do not run Wave A deploy/gate in this cycle.
+- Only schedule Wave A window after:
+  - T+24 pressure checkpoint is `GREENLIGHT`
+  - Terraform apply path completes with post-plan no-op
+  - Post-apply health, burn-in, migration-budget, and migration-preflight are green
 - If swap trend worsens above ~2.0 Gi with upward trend or burn-in degrades, pause Wave A and schedule phase-2 host maintenance.
 - Keep compose edge (`nginx-proxy`, `cloudflared`) running for rollback safety.

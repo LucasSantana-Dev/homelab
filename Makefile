@@ -6,7 +6,8 @@
         image-lock-status image-lock-refresh image-lock-refresh-dry-run \
         watchdog-install watchdog-status watchdog-run-now watchdog-disable automation-reconcile \
         host-stabilize-prep host-swap-recover server-mode-plan server-mode-apply post-reboot-validate \
-        concurrency-guard pressure-watch baseline-bundle post-t24-terraform-apply schedule-post-t24-terraform-apply \
+        concurrency-guard pressure-watch pressure-checkpoint-gate pressure-gates-status baseline-bundle \
+        post-t24-terraform-apply schedule-post-t24-terraform-apply \
         ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
         serena-mcp-setup migration-toolchain migration-preflight k3s-bootstrap migration-budget \
         wave-a-deploy wave-a-gate wave-b-deploy wave-rollback \
@@ -441,14 +442,42 @@ pressure-watch: ## Run pressure watch (defaults: 6 samples, 4h interval, 2.0 GiB
 	if [ -n "$${BURNIN_SINCE:-}" ]; then args="$$args --burnin-since \"$${BURNIN_SINCE}\""; fi; \
 	eval ./scripts/maintenance/pressure-watch.sh $$args
 
+pressure-checkpoint-gate: ## Evaluate one timed checkpoint (LABEL=TPLUS6H|TPLUS24H WATCH_DIR=/tmp/... [PREV_LABEL=T0] [SWAP_THRESHOLD_GIB=2.0])
+	@if [ -z "$(LABEL)" ]; then \
+		echo "❌ Usage: make pressure-checkpoint-gate LABEL=<TPLUS6H|TPLUS24H|...> [WATCH_DIR=/tmp/... PREV_LABEL=<label> SWAP_THRESHOLD_GIB=2.0]"; \
+		exit 1; \
+	fi
+	@WATCH_DIR="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}" \
+	 LABEL="$(LABEL)" \
+	 PREV_LABEL="$(PREV_LABEL)" \
+	 SWAP_THRESHOLD_GIB="$${SWAP_THRESHOLD_GIB:-2.0}" \
+	 "$(CURDIR)/scripts/maintenance/pressure-checkpoint-gate.sh"
+
+pressure-gates-status: ## Evaluate both timed checkpoints from watch artifacts (always prints status)
+	@set +e; \
+	 WATCH_DIR="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}"; \
+	 SWAP_THRESHOLD_GIB="$${SWAP_THRESHOLD_GIB:-2.0}"; \
+	 echo "🔎 T+6 checkpoint"; \
+	 WATCH_DIR="$$WATCH_DIR" LABEL=TPLUS6H PREV_LABEL=T0 SWAP_THRESHOLD_GIB="$$SWAP_THRESHOLD_GIB" "$(CURDIR)/scripts/maintenance/pressure-checkpoint-gate.sh"; rc6=$$?; \
+	 echo; \
+	 echo "🔎 T+24 checkpoint"; \
+	 WATCH_DIR="$$WATCH_DIR" LABEL=TPLUS24H PREV_LABEL=TPLUS6H SWAP_THRESHOLD_GIB="$$SWAP_THRESHOLD_GIB" "$(CURDIR)/scripts/maintenance/pressure-checkpoint-gate.sh"; rc24=$$?; \
+	 echo; \
+	 if [ "$$rc6" -eq 2 ] || [ "$$rc24" -eq 2 ]; then \
+	   echo "❌ At least one checkpoint is BLOCKED"; \
+	   exit 2; \
+	 fi; \
+	 echo "✅ Checkpoint evaluation completed (WAITING/GREENLIGHT only)"
+
 baseline-bundle: ## Capture baseline evidence bundle (health, burn-in, budget, preflight)
 	@echo "📦 Capturing baseline bundle..."
 	@./scripts/maintenance/capture-baseline-bundle.sh
 
-post-t24-terraform-apply: ## Run gated Terraform apply using pressure-watch T+24 artifacts (WATCH_DIR=/tmp/... SWAP_THRESHOLD_GIB=2.0)
+post-t24-terraform-apply: ## Run gated Terraform apply using pressure-watch T+24 artifacts (WATCH_DIR=/tmp/... SWAP_THRESHOLD_GIB=2.0 EXPECTED_PLAN_ADDS=7)
 	@echo "🧭 Running post-T+24 gated Terraform apply"
 	@WATCH_DIR="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}" \
 	 SWAP_THRESHOLD_GIB="$${SWAP_THRESHOLD_GIB:-2.0}" \
+	 EXPECTED_PLAN_ADDS="$${EXPECTED_PLAN_ADDS:-7}" \
 	 "$(CURDIR)/scripts/maintenance/post-t24-terraform-apply.sh"
 
 schedule-post-t24-terraform-apply: ## Schedule gated Terraform apply after pressure watch (default: T+24 timer + 5 min)
