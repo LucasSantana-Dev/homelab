@@ -13,7 +13,7 @@ usage() {
 Usage: capture-pressure-snapshot.sh <LABEL> <WATCH_DIR> [--burnin-since '<value>']
 
 Examples:
-  capture-pressure-snapshot.sh SAMPLE2 /tmp/homelab-pressure-watch-20260314_115740
+  capture-pressure-snapshot.sh TPLUS6H /tmp/homelab-pressure-watch-20260314_115740
   capture-pressure-snapshot.sh TNOW /tmp/homelab-pressure-watch --burnin-since '24 hours ago'
 EOF
 }

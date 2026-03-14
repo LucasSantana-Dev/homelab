@@ -10,7 +10,7 @@ SWAP_THRESHOLD_GIB="${SWAP_THRESHOLD_GIB:-2.0}"
 
 usage() {
   cat <<'EOF'
-Usage: pressure-checkpoint-gate.sh --label <SAMPLE2|TPLUS6H|TPLUS24H|...> [options]
+Usage: pressure-checkpoint-gate.sh --label <TPLUS6H|TPLUS24H|...> [options]
 
 Options:
   --watch-dir DIR           Checkpoint directory (default: /tmp/homelab-pressure-watch-20260314_115740)
@@ -65,7 +65,6 @@ fi
 derive_prev_label() {
   local current="$1"
   case "${current}" in
-    SAMPLE2) echo "TNOW" ;;
     TPLUS6H) echo "T0" ;;
     TPLUS24H) echo "TPLUS6H" ;;
     TNOW) echo "T0" ;;
@@ -88,7 +87,6 @@ fi
 
 TIMER_UNIT=""
 case "${LABEL}" in
-  SAMPLE2) TIMER_UNIT="homelab-pressure-gate-sample2.timer" ;;
   TPLUS6H) TIMER_UNIT="homelab-pressure-watch-tplus6h.timer" ;;
   TPLUS24H) TIMER_UNIT="homelab-pressure-watch-tplus24h.timer" ;;
 esac
@@ -124,32 +122,6 @@ for f in "${required[@]}"; do
 done
 
 if (( ${#missing[@]} > 0 )); then
-  if [[ "${LABEL}" == "SAMPLE2" ]]; then
-    live_swap_used_human="$(swapon --show --noheadings 2>/dev/null | awk 'NR==1 {print $4}')"
-    live_swap_used_bytes=0
-    if [[ -n "${live_swap_used_human}" ]]; then
-      live_swap_used_bytes="$(human_to_bytes "${live_swap_used_human}")"
-    fi
-    if (( live_swap_used_bytes >= threshold_bytes )); then
-      print_kv "TIMESTAMP" "${timestamp}"
-      print_kv "WATCH_DIR" "${WATCH_DIR}"
-      print_kv "LABEL" "${LABEL}"
-      print_kv "PREV_LABEL" "${PREV_LABEL:-none}"
-      print_kv "ARTIFACT_STATUS" "pre_sample_live_check"
-      print_kv "TIMER_UNIT" "${TIMER_UNIT:-none}"
-      print_kv "TIMER_NEXT" "${TIMER_NEXT:-unknown}"
-      print_kv "SWAP_THRESHOLD_GIB" "${SWAP_THRESHOLD_GIB}"
-      print_kv "SWAP_USED_HUMAN" "${live_swap_used_human}"
-      print_kv "SWAP_USED_BYTES" "${live_swap_used_bytes}"
-      print_kv "TREND" "UNKNOWN"
-      print_kv "GATE_TOKEN" "BLOCKED"
-      print_kv "REASON" "swap_above_threshold_pre_sample2"
-      print_kv "MISSING_COUNT" "${#missing[@]}"
-      printf 'MISSING_FILES=%s\n' "$(printf '%s;' "${missing[@]}")"
-      exit 2
-    fi
-  fi
-
   print_kv "TIMESTAMP" "${timestamp}"
   print_kv "WATCH_DIR" "${WATCH_DIR}"
   print_kv "LABEL" "${LABEL}"
@@ -204,10 +176,7 @@ fi
 gate_token="GREENLIGHT"
 reason="stable"
 
-if [[ "${LABEL}" == "SAMPLE2" ]] && (( swap_used_bytes >= threshold_bytes )); then
-  gate_token="BLOCKED"
-  reason="swap_above_threshold_pre_sample2"
-elif [[ "${burnin_status}" != "PASS" ]]; then
+if [[ "${burnin_status}" != "PASS" ]]; then
   gate_token="BLOCKED"
   reason="burnin_not_pass"
 elif [[ "${health_status}" != "HEALTHY" ]]; then
