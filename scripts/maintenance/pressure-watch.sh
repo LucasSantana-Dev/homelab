@@ -85,7 +85,7 @@ log() {
 }
 
 swap_used_bytes() {
-  swapon --show --bytes --noheadings --output=USED 2>/dev/null | awk '{sum += $1} END {print sum + 0}'
+  swapon --show --bytes --noheadings 2>/dev/null | awk '{sum += $4} END {print sum + 0}'
 }
 
 swap_used_human() {
