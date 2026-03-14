@@ -63,8 +63,8 @@ threshold_bytes="$(awk -v g="${SWAP_THRESHOLD_GIB}" 'BEGIN {printf "%.0f", g * 1
 log "T+24 swap usage: ${swap_used_human} (bytes=${swap_used_bytes})"
 log "Threshold: ${SWAP_THRESHOLD_GIB} GiB (bytes=${threshold_bytes})"
 
-if [[ "${swap_used_bytes}" -ge "${threshold_bytes}" ]]; then
-  log "Swap threshold reached/exceeded at T+24. Blocking apply."
+if (( swap_used_bytes > threshold_bytes )); then
+  log "Swap is above threshold at T+24. Blocking apply."
   log "Escalation: phase-2 maintenance window (server-mode-apply + reboot + post-reboot validate)."
   exit 22
 fi
