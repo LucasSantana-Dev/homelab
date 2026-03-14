@@ -6,7 +6,8 @@
         image-lock-status image-lock-refresh image-lock-refresh-dry-run \
         watchdog-install watchdog-status watchdog-run-now watchdog-disable automation-reconcile \
         host-stabilize-prep host-swap-recover server-mode-plan server-mode-apply post-reboot-validate \
-        concurrency-guard pressure-watch pressure-checkpoint-gate pressure-gates-status schedule-pressure-gate-checkpoints \
+        concurrency-guard pressure-watch pressure-capture-checkpoint pressure-checkpoint-gate pressure-gates-status \
+        pressure-sample2-status schedule-sample2-checkpoint schedule-pressure-gate-checkpoints \
         baseline-bundle \
         post-t24-terraform-apply schedule-post-t24-terraform-apply \
         ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
@@ -443,9 +444,18 @@ pressure-watch: ## Run pressure watch (defaults: 6 samples, 4h interval, 2.0 GiB
 	if [ -n "$${BURNIN_SINCE:-}" ]; then args="$$args --burnin-since \"$${BURNIN_SINCE}\""; fi; \
 	eval ./scripts/maintenance/pressure-watch.sh $$args
 
-pressure-checkpoint-gate: ## Evaluate one timed checkpoint (LABEL=TPLUS6H|TPLUS24H WATCH_DIR=/tmp/... [PREV_LABEL=T0] [SWAP_THRESHOLD_GIB=2.0])
+pressure-capture-checkpoint: ## Capture a labeled pressure snapshot (LABEL=SAMPLE2 WATCH_DIR=/tmp/... [BURNIN_SINCE='30 minutes ago'])
 	@if [ -z "$(LABEL)" ]; then \
-		echo "❌ Usage: make pressure-checkpoint-gate LABEL=<TPLUS6H|TPLUS24H|...> [WATCH_DIR=/tmp/... PREV_LABEL=<label> SWAP_THRESHOLD_GIB=2.0]"; \
+		echo "❌ Usage: make pressure-capture-checkpoint LABEL=<SAMPLE2|TNOW|...> [WATCH_DIR=/tmp/... BURNIN_SINCE='30 minutes ago']"; \
+		exit 1; \
+	fi
+	@watch_dir="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}"; \
+	 burnin_since="$${BURNIN_SINCE:-30 minutes ago}"; \
+	 "$(CURDIR)/scripts/maintenance/capture-pressure-snapshot.sh" "$(LABEL)" "$$watch_dir" --burnin-since "$$burnin_since"
+
+pressure-checkpoint-gate: ## Evaluate one timed checkpoint (LABEL=SAMPLE2|TPLUS6H|TPLUS24H WATCH_DIR=/tmp/... [PREV_LABEL=TNOW] [SWAP_THRESHOLD_GIB=2.0])
+	@if [ -z "$(LABEL)" ]; then \
+		echo "❌ Usage: make pressure-checkpoint-gate LABEL=<SAMPLE2|TPLUS6H|TPLUS24H|...> [WATCH_DIR=/tmp/... PREV_LABEL=<label> SWAP_THRESHOLD_GIB=2.0]"; \
 		exit 1; \
 	fi
 	@WATCH_DIR="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}" \
@@ -469,6 +479,33 @@ pressure-gates-status: ## Evaluate both timed checkpoints from watch artifacts (
 	   exit 2; \
 	 fi; \
 	 echo "✅ Checkpoint evaluation completed (WAITING/GREENLIGHT only)"
+
+pressure-sample2-status: ## Evaluate SAMPLE2 early-risk checkpoint (live BLOCKED if swap >= threshold before artifacts)
+	@WATCH_DIR="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}" \
+	 PREV_LABEL="$${PREV_LABEL:-TNOW}" \
+	 SWAP_THRESHOLD_GIB="$${SWAP_THRESHOLD_GIB:-2.0}" \
+	 LABEL=SAMPLE2 \
+	 "$(CURDIR)/scripts/maintenance/pressure-checkpoint-gate.sh"
+
+schedule-sample2-checkpoint: ## Schedule SAMPLE2 capture + gate file generation (SAMPLE2_ON_CALENDAR / SAMPLE2_PREV_LABEL)
+	@set -e; \
+	 watch_dir="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}"; \
+	 swap_threshold="$${SWAP_THRESHOLD_GIB:-2.0}"; \
+	 sample2_calendar="$${SAMPLE2_ON_CALENDAR:-2026-03-14 16:10:00}"; \
+	 sample2_prev_label="$${SAMPLE2_PREV_LABEL:-TNOW}"; \
+	 sample2_unit="$${SAMPLE2_UNIT:-homelab-pressure-gate-sample2}"; \
+	 systemctl --user stop homelab-pressure-watch-sample2.timer homelab-pressure-watch-sample2.service >/dev/null 2>&1 || true; \
+	 systemctl --user stop homelab-pressure-watch-sample2-token.timer homelab-pressure-watch-sample2-token.service >/dev/null 2>&1 || true; \
+	 systemctl --user reset-failed homelab-pressure-watch-sample2.timer homelab-pressure-watch-sample2.service >/dev/null 2>&1 || true; \
+	 systemctl --user reset-failed homelab-pressure-watch-sample2-token.timer homelab-pressure-watch-sample2-token.service >/dev/null 2>&1 || true; \
+	 systemctl --user stop "$$sample2_unit.timer" "$$sample2_unit.service" >/dev/null 2>&1 || true; \
+	 systemctl --user reset-failed "$$sample2_unit.timer" "$$sample2_unit.service" >/dev/null 2>&1 || true; \
+	 echo "⏱️ Scheduling SAMPLE2 capture+gate on: $$sample2_calendar"; \
+	 systemd-run --user --on-calendar="$$sample2_calendar" --unit="$$sample2_unit" \
+	   /usr/bin/bash -lc "'$(CURDIR)/scripts/maintenance/capture-pressure-snapshot.sh' SAMPLE2 '$$watch_dir' && WATCH_DIR='$$watch_dir' LABEL=SAMPLE2 PREV_LABEL='$$sample2_prev_label' SWAP_THRESHOLD_GIB='$$swap_threshold' '$(CURDIR)/scripts/maintenance/pressure-checkpoint-gate.sh' | tee '$$watch_dir/SAMPLE2-gate.txt'" \
+	   >/dev/null; \
+	 systemctl --user list-timers --all --no-legend "$$sample2_unit.timer" || true; \
+	 echo "✅ SAMPLE2 timer scheduled (unit=$$sample2_unit timer=$$sample2_calendar)"
 
 schedule-pressure-gate-checkpoints: ## Schedule timed gate-token snapshots (TPLUS6_GATE_ON_CALENDAR / TPLUS24_GATE_ON_CALENDAR)
 	@set -e; \
