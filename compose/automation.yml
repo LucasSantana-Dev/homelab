@@ -4,7 +4,7 @@
 services:
   # Home Assistant - Tailscale Only
   homeassistant:
-    image: "ghcr.io/home-assistant/home-assistant:stable"
+    image: ${IMG_HOMEASSISTANT:-ghcr.io/home-assistant/home-assistant:stable}
     container_name: homeassistant
     restart: unless-stopped
     user: "root"  # Running as root to allow package installation for integrations like Meross Cloud

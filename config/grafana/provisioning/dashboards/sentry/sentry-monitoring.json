@@ -78,7 +78,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "up{job=\"homelab-services\"}",
+          "expr": "probe_success{job=\"blackbox\"}",
           "interval": "",
           "legendFormat": "Services Up",
           "refId": "A"
@@ -374,7 +374,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "up{job=\"homelab-services\"}",
+          "expr": "probe_success{job=\"blackbox\"}",
           "interval": "",
           "legendFormat": "Services",
           "refId": "A"

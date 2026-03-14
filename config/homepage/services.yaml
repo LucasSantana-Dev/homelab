@@ -61,6 +61,12 @@
         description: Workflow Automation
         container: n8n
 
+    - Forge MCP Gateway:
+        icon: https://raw.githubusercontent.com/Forge-Space/mcp-gateway/main/public/favicon.svg
+        href: http://{{HOMEPAGE_VAR_TAILSCALE_IP}}:4444/admin
+        description: Forge Space MCP gateway admin
+        container: forge-mcp-gateway
+
 - Monitoring & Observability:
     - Grafana:
         icon: grafana

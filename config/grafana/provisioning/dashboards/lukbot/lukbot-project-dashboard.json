@@ -27,7 +27,7 @@
       "keepTime": false,
       "tags": [],
       "targetBlank": true,
-      "title": "LukBot GitHub Repository",
+      "title": "Lucky GitHub Repository",
       "tooltip": "",
       "type": "link",
       "url": "https://github.com/lucas-santana-gm/luk-bot"
@@ -111,7 +111,7 @@
           "refId": "A"
         }
       ],
-      "title": "LukBot Error Events",
+      "title": "Lucky Error Events",
       "type": "stat"
     },
     {
@@ -395,7 +395,7 @@
           "refId": "A"
         }
       ],
-      "title": "LukBot Error Events Over Time",
+      "title": "Lucky Error Events Over Time",
       "type": "timeseries"
     },
     {
@@ -780,7 +780,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "LukBot Project Dashboard",
+  "title": "Lucky Project Dashboard",
   "uid": "lukbot-project-dashboard",
   "version": 1,
   "weekStart": ""

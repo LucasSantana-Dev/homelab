@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOMELAB_DIR="$(dirname "$SCRIPT_DIR")"
+HOMELAB_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 BACKUP_DIR="$HOMELAB_DIR/backups"
 LOG_FILE="$HOMELAB_DIR/logs/backup.log"
 VENV_DIR="$HOMELAB_DIR/venv"
@@ -41,6 +41,8 @@ mkdir -p "$BACKUP_DIR"
 
 # Check if homelab manager is available
 check_homelab_manager() {
+    cd "$HOMELAB_DIR"
+
     if [ -f "$VENV_DIR/bin/activate" ]; then
         log "Using virtual environment for homelab manager"
         source "$VENV_DIR/bin/activate"
@@ -101,6 +103,10 @@ manual_backup() {
         return 0
     else
         error "Manual backup failed"
+        if [ -f "$backup_path" ]; then
+            rm -f "$backup_path" || true
+            warning "Removed incomplete backup artifact: $backup_name"
+        fi
         return 1
     fi
 }
@@ -193,8 +199,13 @@ main() {
             # Find the latest backup file
             latest_backup=$(find "$BACKUP_DIR" -name "homelab_backup_*.tar.gz" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
         else
-            backup_status="error"
-            backup_message="Backup failed using homelab manager"
+            warning "Backup with homelab manager failed. Falling back to manual backup."
+            if manual_backup; then
+                latest_backup=$(find "$BACKUP_DIR" -name "homelab_backup_*.tar.gz" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
+            else
+                backup_status="error"
+                backup_message="Backup failed using homelab manager and manual fallback"
+            fi
         fi
     else
         # Fall back to manual backup

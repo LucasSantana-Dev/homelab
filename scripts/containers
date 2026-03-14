@@ -3,10 +3,14 @@
 # Modern Python-based container management
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 case "$1" in
     "status")
-        python3 "$SCRIPT_DIR/monitoring/container-status.py"
+        (
+            cd "$PROJECT_ROOT"
+            python3 -m homelab_manager status
+        )
         ;;
     "update")
         if [ -z "$2" ]; then

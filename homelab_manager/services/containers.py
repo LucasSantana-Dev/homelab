@@ -290,6 +290,9 @@ class ContainerManager:
             "container_name": service.container_name,
             "port": service.port,
             "health_url": service.health_url,
+            "health_mode": service.health_mode,
+            "health_host": service.health_host,
+            "expected_statuses": service.expected_statuses,
             "sensitive": service.sensitive,
             "description": service.description,
         }

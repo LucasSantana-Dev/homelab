@@ -46,26 +46,6 @@ scrape_configs:
     scrape_interval: 15s
     metrics_path: /metrics
 
-  # Homelab services health check
-  - job_name: 'homelab-services'
-    static_configs:
-      - targets:
-          - 'homepage:3000'
-          - 'homeassistant:8123'
-          - 'portainer:9000'
-          - 'pihole:8054'
-          - 'grafana:3000'
-          - 'uptime-kuma:3001'
-          - 'whats-up-docker:3003'
-          # Services without Prometheus metrics endpoints:
-          # - 'filebrowser:80'
-          # - 'vaultwarden:80' (minimal metrics)
-          # - 'jellyfin:8096'
-          # - 'n8n:5678'
-    scrape_interval: 30s
-    metrics_path: /metrics
-    scheme: http
-
   # Blackbox Exporter - HTTP endpoint monitoring
   - job_name: 'blackbox'
     metrics_path: /probe

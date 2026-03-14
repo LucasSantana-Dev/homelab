@@ -7,6 +7,7 @@ Monitor health and status of homelab services
 import time
 from typing import Dict, List, Optional
 
+import docker
 import requests
 from rich.console import Console
 
@@ -22,9 +23,19 @@ class HealthMonitor:
     def __init__(self, registry: Optional[ServiceRegistry] = None):
         self.registry = registry or ServiceRegistry()
         self.timeout = 5
+        try:
+            self.docker_client = docker.from_env()
+        except Exception:
+            self.docker_client = None
 
-    def check_service(self, service_name: str, url: str) -> Dict:
-        """Check health of a single service"""
+    def check_service(
+        self,
+        service_name: str,
+        url: str,
+        expected_statuses: Optional[List[int]] = None,
+    ) -> Dict:
+        """Check health of a single service over HTTP"""
+        expected = expected_statuses or [200]
         start_time = time.time()
 
         try:
@@ -32,11 +43,12 @@ class HealthMonitor:
             response_time = (time.time() - start_time) * 1000
 
             return {
-                "healthy": response.status_code == 200,
+                "healthy": response.status_code in expected,
                 "status_code": response.status_code,
                 "response_time": response_time,
                 "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "error": None,
+                "source": "http",
             }
 
         except requests.exceptions.RequestException as e:
@@ -46,15 +58,115 @@ class HealthMonitor:
                 "response_time": None,
                 "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "error": str(e),
+                "source": "http",
             }
+
+    def _check_container_health(self, container_name: str) -> Dict:
+        """Check service health using Docker container status and healthcheck state."""
+        if self.docker_client is None:
+            return {
+                "healthy": False,
+                "status_code": None,
+                "response_time": None,
+                "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "error": "Docker client is not available",
+                "source": "docker",
+            }
+
+        try:
+            container = self.docker_client.containers.get(container_name)
+            state = container.attrs.get("State", {})
+            container_status = state.get("Status", "unknown")
+            health_data = state.get("Health")
+
+            if health_data:
+                health_status = health_data.get("Status", "unknown")
+                last_log = ""
+                health_log = health_data.get("Log", [])
+                if health_log:
+                    last_output = health_log[-1].get("Output", "")
+                    last_log = last_output.strip()[:200]
+
+                return {
+                    "healthy": health_status == "healthy",
+                    "status_code": None,
+                    "response_time": None,
+                    "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "error": (
+                        None
+                        if health_status == "healthy"
+                        else last_log or health_status
+                    ),
+                    "source": "docker",
+                }
+
+            # No healthcheck configured: use running state as service health.
+            return {
+                "healthy": container_status == "running",
+                "status_code": None,
+                "response_time": None,
+                "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "error": None if container_status == "running" else container_status,
+                "source": "docker",
+            }
+        except Exception as e:
+            return {
+                "healthy": False,
+                "status_code": None,
+                "response_time": None,
+                "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "error": str(e),
+                "source": "docker",
+            }
+
+    def _check_service_by_policy(self, service) -> Dict:
+        """Check service health according to service registry health policy."""
+        mode = (service.health_mode or "docker").lower()
+
+        if mode == "none":
+            return {
+                "healthy": True,
+                "status_code": None,
+                "response_time": None,
+                "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "error": None,
+                "source": "skipped",
+            }
+
+        if mode == "http":
+            if not service.health_url:
+                return {
+                    "healthy": False,
+                    "status_code": None,
+                    "response_time": None,
+                    "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "error": "HTTP health mode configured without health_url",
+                    "source": "http",
+                }
+            return self.check_service(
+                service.id,
+                service.health_url,
+                expected_statuses=service.expected_statuses,
+            )
+
+        # docker mode and auto both prefer Docker-first checks
+        docker_result = self._check_container_health(service.container_name)
+        if mode == "auto" and docker_result.get("error") and service.health_url:
+            return self.check_service(
+                service.id,
+                service.health_url,
+                expected_statuses=service.expected_statuses,
+            )
+        return docker_result
 
     def check_all_services(self) -> Dict[str, Dict]:
         """Check health of all services from the registry"""
         results = {}
 
         for service in self.registry.get_services_with_ports():
-            if service.health_url:
-                results[service.id] = self.check_service(service.id, service.health_url)
+            if (service.health_mode or "docker").lower() == "none":
+                continue
+            results[service.id] = self._check_service_by_policy(service)
 
         return results
 
@@ -90,6 +202,6 @@ class HealthMonitor:
     def check_service_by_id(self, service_id: str) -> Optional[Dict]:
         """Check health of a specific service by its ID"""
         service = self.registry.get_service(service_id)
-        if not service or not service.health_url:
+        if not service:
             return None
-        return self.check_service(service_id, service.health_url)
+        return self._check_service_by_policy(service)

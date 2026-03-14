@@ -32,6 +32,9 @@ class Service:
     port: Optional[int] = None
     internal_port: Optional[int] = None
     health_endpoint: Optional[str] = None
+    health_mode: str = "docker"
+    health_host: Optional[str] = None
+    expected_statuses: List[int] = field(default_factory=lambda: [200])
     sensitive: bool = False
     localhost_only: bool = False
     has_port: bool = True
@@ -40,10 +43,10 @@ class Service:
     @property
     def health_url(self) -> Optional[str]:
         """Generate health check URL"""
-        if not self.has_port or not self.port:
+        if not self.has_port or not self.port or not self.health_endpoint:
             return None
-        host = "127.0.0.1" if self.localhost_only else "localhost"
-        endpoint = self.health_endpoint or "/"
+        host = self.health_host or ("127.0.0.1" if self.localhost_only else "localhost")
+        endpoint = self.health_endpoint
         return f"http://{host}:{self.port}{endpoint}"
 
     def get_public_url(self, domain: str) -> Optional[str]:
@@ -100,6 +103,9 @@ class ServiceRegistry:
                 port=svc_data.get("port"),
                 internal_port=svc_data.get("internal_port"),
                 health_endpoint=svc_data.get("health_endpoint"),
+                health_mode=svc_data.get("health_mode", "docker"),
+                health_host=svc_data.get("health_host"),
+                expected_statuses=svc_data.get("expected_statuses", [200]),
                 sensitive=svc_data.get("sensitive", False),
                 localhost_only=svc_data.get("localhost_only", False),
                 has_port=svc_data.get("has_port", True),

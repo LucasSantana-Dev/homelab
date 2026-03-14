@@ -1,0 +1,33 @@
+image:
+  repository: filebrowser/filebrowser
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: traefik
+  host: files.k3s.local
+  tlsSecretName: ""
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  enabled: true
+  storageClassName: local-path
+  size: 10Gi
+
+config:
+  rootPath: /srv
+  databasePath: /database/filebrowser.db
+
+envFromSecret: ""

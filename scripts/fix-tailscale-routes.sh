@@ -45,7 +45,7 @@ fi
 
 echo ""
 echo "⚠️  IMPORTANT: You must approve these routes in the Tailscale admin console:"
-echo "   1. Go to https://login.tailscale.com/admin/machines/homelab-node"
+echo "   1. Go to https://login.tailscale.com/admin/machines/homelab-node-01"
 echo "   2. Click 'Edit route settings...'"
 echo "   3. Approve the route for $LOCAL_NETWORK"
 echo ""

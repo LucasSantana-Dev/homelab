@@ -1,0 +1,58 @@
+# Copy to terraform.tfvars and update values locally.
+
+account_id = "00000000000000000000000000000000"
+zone_id    = "00000000000000000000000000000000"
+tunnel_id  = "00000000-0000-0000-0000-000000000000"
+
+# Optional if CLOUDFLARE_API_TOKEN is already exported.
+cloudflare_api_token = ""
+
+dns_records = {
+  homepage = {
+    name    = "home"
+    type    = "CNAME"
+    content = "example.tunnel.cloudflare.com"
+    proxied = true
+  }
+  blackbox = {
+    name    = "blackbox"
+    type    = "CNAME"
+    content = "example.tunnel.cloudflare.com"
+    proxied = true
+  }
+  files = {
+    name    = "files"
+    type    = "CNAME"
+    content = "example.tunnel.cloudflare.com"
+    proxied = true
+  }
+}
+
+tunnel_routes = {
+  homepage = {
+    hostname = "home.example.com"
+    service  = "http://nginx-proxy:80"
+    path     = "/"
+  }
+  blackbox = {
+    hostname = "blackbox.example.com"
+    service  = "http://nginx-proxy:80"
+    path     = "/"
+  }
+  files = {
+    hostname = "files.example.com"
+    service  = "http://nginx-proxy:80"
+    path     = "/"
+  }
+}
+
+host_network_rules = {
+  k3s_api_local = {
+    description = "Allow local access to k3s API only"
+    source      = "127.0.0.1/32"
+    destination = "6443"
+    protocol    = "tcp"
+    ports       = [6443]
+    action      = "allow"
+  }
+}

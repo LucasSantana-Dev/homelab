@@ -50,10 +50,10 @@ if [ -f docker-compose.yml ]; then
     docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null | tail -n +2 | sed 's/^/    /' || echo "    ⚠ Unable to check containers"
 fi
 
-# Check LukBot containers
-cd /home/luk-server/LukBot 2>/dev/null || exit 1
+# Check Lucky containers
+cd /home/luk-server/Lucky 2>/dev/null || exit 1
 if [ -f docker-compose.yml ]; then
-    echo "  LukBot stack:"
+    echo "  Lucky stack:"
     docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null | tail -n +2 | sed 's/^/    /' || echo "    ⚠ Unable to check containers"
 fi
 

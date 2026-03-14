@@ -21,9 +21,9 @@ providers:
         options:
           path: /etc/grafana/provisioning/dashboards/sentry
 
-      - name: 'LukBot Project Dashboards'
+      - name: 'Lucky Project Dashboards'
         orgId: 1
-        folder: 'LukBot'
+        folder: 'Lucky'
         type: file
         disableDeletion: false
         updateIntervalSeconds: 10

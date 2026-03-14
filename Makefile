@@ -2,7 +2,15 @@
 # Provides convenient targets for homelab operations
 
 .PHONY: help install deploy status logs health backup restore security-scan monitor clean test \
-        update update-safe update-timer-install update-timer-status update-timer-enable update-timer-disable
+        update update-safe update-timer-install update-timer-status update-timer-enable update-timer-disable \
+        image-lock-status image-lock-refresh image-lock-refresh-dry-run \
+        watchdog-install watchdog-status watchdog-run-now watchdog-disable automation-reconcile \
+        host-stabilize-prep host-swap-recover server-mode-plan server-mode-apply post-reboot-validate \
+        ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
+        serena-mcp-setup migration-toolchain migration-preflight k3s-bootstrap migration-budget \
+        wave-a-deploy wave-a-gate wave-b-deploy wave-rollback \
+        secret-gate secret-gate-history public-safety-gate public-release-checkpoint rewrite-history \
+        forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup
 
 # Default target
 help: ## Show this help message
@@ -22,6 +30,25 @@ deploy: ## Deploy all homelab services
 	@echo "🚀 Deploying homelab services..."
 	docker compose up -d
 	@echo "✅ Deployment complete"
+
+forge-space-up: ## Deploy Forge Space MCP Gateway profile
+	@echo "🧠 Starting Forge Space MCP Gateway..."
+	@docker compose --profile forge-space up -d forge-mcp-gateway
+	@echo "✅ Forge MCP Gateway started"
+
+forge-space-down: ## Stop Forge Space MCP Gateway profile
+	@echo "🛑 Stopping Forge Space MCP Gateway..."
+	@docker compose --profile forge-space stop forge-mcp-gateway
+	@echo "✅ Forge MCP Gateway stopped"
+
+forge-space-logs: ## Tail Forge Space MCP Gateway logs
+	@docker compose --profile forge-space logs -f --tail=100 forge-mcp-gateway
+
+forge-space-status: ## Show Forge Space MCP Gateway status
+	@docker compose --profile forge-space ps forge-mcp-gateway
+
+forge-space-mcp-setup: ## Register Forge Space MCP client in Codex (requires FORGE_MCP_SERVER_URL and FORGE_MCP_JWT)
+	@./scripts/deployment/setup-forge-space-mcp.sh
 
 status: ## Show status of all services
 	@echo "📊 Homelab Status"
@@ -121,6 +148,25 @@ security-scan: ## Run security scan on containers and images
 		exit 1; \
 	fi
 
+secret-gate: ## Run gitleaks secret scan against tracked snapshot
+	@./scripts/security/secret-gate.sh
+
+secret-gate-history: ## Run gitleaks scan including full git history
+	@./scripts/security/secret-gate.sh --history
+
+public-safety-gate: ## Fail if known private identifiers are present in tracked public files
+	@./scripts/security/public-safety-gate.sh
+
+public-release-checkpoint: ## Create branch/tag/mirror backup and credential inventory before history rewrite
+	@./scripts/security/pre-release-checkpoint.sh
+
+rewrite-history: ## Rewrite history with configured scrub/remove policies (use PUSH=true to force-push)
+	@if [ "$(PUSH)" = "true" ]; then \
+		./scripts/security/rewrite-history.sh --push --remote origin; \
+	else \
+		./scripts/security/rewrite-history.sh; \
+	fi
+
 # Development and testing
 test: ## Run tests
 	@echo "🧪 Running tests..."
@@ -195,6 +241,21 @@ update-dry-run: ## Preview what would be updated without making changes
 		exit 1; \
 	fi
 
+image-lock-status: ## Show image lock status and runtime digest alignment
+	@echo "🔒 Image Lock Status"
+	@echo "===================="
+	@./scripts/maintenance/image-locks.sh status
+
+image-lock-refresh-dry-run: ## Preview digest refresh for locked images
+	@echo "🔍 Image Lock Refresh (Dry Run)"
+	@echo "==============================="
+	@./scripts/maintenance/image-locks.sh refresh --dry-run
+
+image-lock-refresh: ## Refresh locked image digests in .env (no tag bump)
+	@echo "🔄 Image Lock Refresh"
+	@echo "====================="
+	@./scripts/maintenance/image-locks.sh refresh --apply
+
 update-timer-install: ## Install and enable the container update timer
 	@echo "📦 Installing update timer..."
 	@sudo cp ./scripts/systemd/homelab-update.service /etc/systemd/system/
@@ -239,6 +300,169 @@ update-logs: ## Show recent container update logs
 	@echo ""
 	@echo "📋 Systemd Journal Logs:"
 	@journalctl -u homelab-update.service --no-pager -n 50 2>/dev/null || echo "No journal logs found"
+
+watchdog-install: ## Install and enable the homelab watchdog timer
+	@echo "🛡️  Installing watchdog timer..."
+	@sudo cp ./scripts/systemd/homelab-watchdog.service /etc/systemd/system/
+	@sudo cp ./scripts/systemd/homelab-watchdog.timer /etc/systemd/system/
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable homelab-watchdog.timer
+	@sudo systemctl start homelab-watchdog.timer
+	@echo "✅ Watchdog timer installed and enabled"
+	@echo "Next run: $$(systemctl list-timers homelab-watchdog.timer --no-pager | grep homelab-watchdog || echo 'Check with: systemctl list-timers')"
+
+watchdog-status: ## Show status of the homelab watchdog service and timer
+	@echo "📊 Watchdog Status"
+	@echo "=================="
+	@if systemctl list-unit-files homelab-watchdog.timer --no-legend 2>/dev/null | grep -q '^homelab-watchdog.timer'; then \
+		systemctl status homelab-watchdog.timer --no-pager || true; \
+	else \
+		echo "Timer not installed"; \
+	fi
+	@echo ""
+	@if systemctl list-unit-files homelab-watchdog.service --no-legend 2>/dev/null | grep -q '^homelab-watchdog.service'; then \
+		systemctl status homelab-watchdog.service --no-pager || true; \
+	else \
+		echo "Service not installed"; \
+	fi
+	@echo ""
+	@echo "📅 Timer Schedule:"
+	@systemctl list-timers homelab-watchdog.timer --no-pager 2>/dev/null || echo "Timer not found"
+
+power-restore-check: ## Validate host readiness for AC-loss auto-boot recovery
+	@echo "🔌 Power-Restore Readiness"
+	@echo "========================="
+	@./scripts/maintenance/power-restore-check.sh
+
+sso-status: ## Show Cloudflare/Auth SSO runtime status and required config checks
+	@echo "🔐 SSO Edge Status"
+	@echo "=================="
+	@./scripts/maintenance/sso-status.sh
+
+sso-smoke-test: ## Run end-to-end unauthenticated redirect checks for protected domains
+	@echo "🧪 SSO Smoke Test"
+	@echo "================="
+	@./scripts/maintenance/sso-smoke-test.sh
+
+sso-register-apps: ## Rebuild Authentik app/provider registration for phase-1 SSO
+	@echo "🧩 Authentik Registration Rebuild"
+	@echo "================================="
+	@./scripts/maintenance/authentik-register-apps.sh
+
+sso-register-dry-run: ## Preview Authentik registration changes without applying them
+	@echo "🔎 Authentik Registration Dry Run"
+	@echo "================================="
+	@./scripts/maintenance/authentik-register-apps.sh --dry-run
+
+sso-register-status: ## Show Authentik registration state and phase-1 coverage
+	@echo "📚 Authentik Registration Status"
+	@echo "================================"
+	@./scripts/maintenance/authentik-register-apps.sh --status
+
+ssl-renew: ## Issue/renew wildcard TLS cert via Cloudflare DNS-01 and restart nginx
+	@echo "🔐 Renewing Wildcard Certificate"
+	@echo "================================"
+	@./scripts/maintenance/renew-wildcard-cert.sh
+
+ssl-status: ## Show currently served TLS cert details for auth domain
+	@echo "🔎 TLS Certificate Status"
+	@echo "========================="
+	@domain="$$(grep -m1 '^DOMAIN=' .env | cut -d'=' -f2- | tr -d '\r')"; \
+	if [ -z "$$domain" ]; then \
+		echo "❌ DOMAIN is missing in .env"; \
+		exit 1; \
+	fi; \
+	openssl s_client -connect auth.$$domain:443 -servername auth.$$domain </dev/null 2>/dev/null | \
+		openssl x509 -noout -subject -issuer -dates -ext subjectAltName
+
+burnin-status: ## Show 24h burn-in status summary (use SINCE='2026-03-10 12:00:00')
+	@echo "🧪 Burn-in Status"
+	@echo "================="
+	@SINCE="$(SINCE)"; \
+	if [ -z "$$SINCE" ]; then SINCE="24 hours ago"; fi; \
+	./scripts/maintenance/burnin-status.sh --since "$$SINCE"
+
+watchdog-run-now: ## Run watchdog once immediately
+	@echo "🚀 Triggering watchdog now..."
+	@sudo systemctl start homelab-watchdog.service
+	@echo "✅ Watchdog triggered. Check logs with: journalctl -u homelab-watchdog.service -n 50"
+
+watchdog-disable: ## Disable the homelab watchdog timer
+	@sudo systemctl stop homelab-watchdog.timer
+	@sudo systemctl disable homelab-watchdog.timer
+	@echo "✅ Watchdog timer disabled"
+
+automation-reconcile: ## Sync systemd units and remove stale user cron entries
+	@echo "🧰 Reconciling homelab automation..."
+	@if [ -f "./scripts/maintenance/reconcile-automation.sh" ]; then \
+		./scripts/maintenance/reconcile-automation.sh; \
+	else \
+		echo "❌ reconcile-automation.sh not found"; \
+		exit 1; \
+	fi
+
+host-stabilize-prep: ## Create recovery point and baseline diagnostics before host cleanup
+	@echo "🧷 Preparing host stabilization recovery point"
+	@./scripts/maintenance/stabilize-host-prep.sh
+
+host-swap-recover: ## Reset swap and capture pre/post pressure diagnostics
+	@echo "♻️  Recovering swap usage"
+	@./scripts/maintenance/swap-recover.sh
+
+server-mode-plan: ## Preview Desktop -> Server-mode package/service changes
+	@echo "🧾 Previewing server-mode conversion"
+	@./scripts/maintenance/convert-to-server-mode.sh
+
+server-mode-apply: ## Apply Desktop -> Server-mode conversion (requires sudo, reboot after)
+	@echo "🛠️  Applying server-mode conversion"
+	@./scripts/maintenance/convert-to-server-mode.sh --apply
+
+post-reboot-validate: ## Validate host + homelab state after server-mode reboot
+	@echo "✅ Running post-reboot validation"
+	@./scripts/maintenance/post-reboot-validate.sh
+
+# Migration helpers (K3s + Terraform)
+serena-mcp-setup: ## Build and register Serena MCP image with node+terraform dependencies
+	@echo "🧠 Setting up Serena MCP..."
+	@./scripts/deployment/setup-serena-mcp.sh
+
+migration-toolchain: ## Install kubectl/helm/sops/age into ~/.local/bin
+	@echo "🧰 Installing migration tooling"
+	@./scripts/migration/install-tooling.sh
+
+migration-preflight: ## Run migration preflight checks (tools, edge services, lint/validate)
+	@echo "🛫 Migration preflight"
+	@./scripts/migration/preflight.sh
+
+k3s-bootstrap: ## Install k3s (if needed) and apply baseline namespaces/policies
+	@echo "☸️  Bootstrapping k3s baseline"
+	@./scripts/migration/bootstrap-k3s.sh
+
+migration-budget: ## Show k3s namespace quotas and current resource pressure
+	@echo "📉 Migration resource budget"
+	@./scripts/migration/check-resource-budget.sh
+
+wave-a-deploy: ## Deploy wave A services (homepage + blackbox-exporter)
+	@echo "🌊 Deploying wave A"
+	@helm upgrade --install homepage ./k8s/helm/homepage -n apps --create-namespace
+	@helm upgrade --install blackbox-exporter ./k8s/helm/blackbox-exporter -n observability --create-namespace
+
+wave-a-gate: ## Deploy Wave A and enforce a burn-in stability gate (BURNIN_MINUTES=30)
+	@echo "🧪 Running Wave A stability gate"
+	@./scripts/migration/wave-a-gate.sh --burnin-minutes "$${BURNIN_MINUTES:-30}" --interval-seconds "$${CHECK_INTERVAL_SECONDS:-60}"
+
+wave-b-deploy: ## Deploy wave B pilot service (filebrowser)
+	@echo "🌊 Deploying wave B"
+	@helm upgrade --install filebrowser ./k8s/helm/filebrowser -n apps --create-namespace
+
+wave-rollback: ## Show rollback checks for a release (usage: make wave-rollback NS=apps RELEASE=homepage REV=1)
+	@if [ -z "$(NS)" ] || [ -z "$(RELEASE)" ]; then \
+		echo "❌ Usage: make wave-rollback NS=<namespace> RELEASE=<release> [REV=<revision>]"; \
+		exit 1; \
+	fi
+	@rev="$(REV)"; \
+	if [ -z "$$rev" ]; then rev=1; fi; \
+	./scripts/migration/rollback-checks.sh "$(NS)" "$(RELEASE)" "$$rev"
 
 restart: ## Restart all services
 	@echo "🔄 Restarting all services..."

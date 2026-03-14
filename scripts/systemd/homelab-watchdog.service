@@ -1,0 +1,27 @@
+[Unit]
+Description=Homelab Resilience Watchdog
+Documentation=https://github.com/luk-homeserver/homelab
+After=network-online.target docker.service tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/luk-server/homelab
+ExecStart=/home/luk-server/homelab/scripts/maintenance/homelab-watchdog.sh
+User=root
+Group=root
+
+# Environment
+Environment=HOME=/root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Keep the check bounded
+TimeoutStartSec=55
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homelab-watchdog
+
+[Install]
+WantedBy=multi-user.target

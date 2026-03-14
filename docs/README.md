@@ -7,9 +7,24 @@ This directory contains detailed documentation for specific components and featu
 ### Core Setup & Configuration
 
 - **[Tailscale Setup](tailscale-setup.md)** - Complete Tailscale configuration and security setup
-- **[Python Migration Guide](python-migration.md)** - Migration from shell scripts to Python tools
 - **[Interactive CLI](interactive-cli.md)** - Comprehensive interactive console application
 - **[Project Structure](project-structure.md)** - Improved project organization and structure
+
+### Hybrid Migration (K3s + Terraform)
+
+- **[90-Day Migration Roadmap](k8s-terraform-migration-roadmap.md)** - Staged hybrid migration execution plan
+- **[Phase-2 Readiness Gate](k8s-phase2-readiness-gate.md)** - Entry criteria before migrating critical stateful workloads
+- **[ADR 0001](adr/0001-compose-vs-k3s-boundary.md)** - Compose/K3s boundary decision
+- **[ADR 0002](adr/0002-storage-boundary-local-path.md)** - Storage strategy decision
+- **[ADR 0003](adr/0003-ingress-boundary-compose-edge.md)** - Ingress boundary decision
+
+### MCP / AI Tooling
+
+- **[Forge Space Tools](forge-space-tools.md)** - Deploy and operate Forge Space-compatible MCP gateway on homelab
+
+### Public Release & Security Hygiene
+
+- **[Public Release Hardening](public-release-hardening.md)** - Credential rotation, public-safe sanitization, and history rewrite workflow
 
 ### Testing & Results
 

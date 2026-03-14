@@ -69,7 +69,9 @@ def create_app(
 
         for container in containers:
             status_icon = "✅" if container["status"] == "running" else "❌"
-            health_icon = "🟢" if container.get("health") == "healthy" else "🔴"
+            health_icon = (
+                "🟢" if container.get("health") in {"healthy", "running"} else "🔴"
+            )
 
             table.add_row(
                 container["name"],

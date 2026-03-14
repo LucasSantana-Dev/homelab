@@ -4,7 +4,7 @@
 services:
   # n8n Workflow Automation - Tailscale Only
   n8n:
-    image: n8nio/n8n:latest
+    image: ${IMG_N8N:-n8nio/n8n:latest}
     container_name: n8n
     restart: unless-stopped
     user: "root"  # Run as root to avoid permission issues with volume
@@ -43,7 +43,7 @@ services:
 
   # Nextcloud Database - MariaDB
   nextcloud-db:
-    image: mariadb:latest
+    image: ${IMG_MARIADB:-mariadb:latest}
     container_name: nextcloud-db
     restart: unless-stopped
     volumes:
@@ -78,7 +78,7 @@ services:
 
   # Nextcloud Redis Cache
   nextcloud-redis:
-    image: redis:alpine
+    image: ${IMG_REDIS_ALPINE:-redis:alpine}
     container_name: nextcloud-redis
     restart: unless-stopped
     volumes:
@@ -107,7 +107,7 @@ services:
 
   # Nextcloud Cloud Storage - Tailscale Only
   nextcloud:
-    image: nextcloud:latest
+    image: ${IMG_NEXTCLOUD:-nextcloud:latest}
     container_name: nextcloud
     restart: unless-stopped
     volumes:
@@ -155,7 +155,7 @@ services:
 
   # Paperless PostgreSQL Database
   paperless-db:
-    image: postgres:15-alpine
+    image: ${IMG_POSTGRES_15_ALPINE:-postgres:15-alpine}
     container_name: paperless-db
     restart: unless-stopped
     volumes:
@@ -189,7 +189,7 @@ services:
 
   # Paperless Redis Broker
   paperless-redis:
-    image: redis:alpine
+    image: ${IMG_REDIS_ALPINE:-redis:alpine}
     container_name: paperless-redis
     restart: unless-stopped
     volumes:
@@ -221,6 +221,8 @@ services:
     build:
       context: ../dockerfiles/paperless-ngx
       dockerfile: Dockerfile
+      args:
+        PAPERLESS_BASE_IMAGE: ${IMG_PAPERLESS_BASE:-ghcr.io/paperless-ngx/paperless-ngx:latest}
     image: paperless-ngx:custom
     container_name: paperless-ngx
     restart: unless-stopped

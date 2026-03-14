@@ -1,0 +1,14 @@
+[Unit]
+Description=Homelab Resilience Watchdog Timer
+Documentation=https://github.com/luk-homeserver/homelab
+Requires=homelab-watchdog.service
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=1m
+Persistent=true
+AccuracySec=15s
+Unit=homelab-watchdog.service
+
+[Install]
+WantedBy=timers.target

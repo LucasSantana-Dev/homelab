@@ -2,6 +2,8 @@
 .env.backup
 .cursor/
 .cursorignore
+.serena/
+.serena.root-owned.*/
 
 # Home Assistant sensitive files
 appdata/homeassistant/config/secrets.yaml
@@ -227,7 +229,29 @@ config/*/
 !config/alertmanager/
 !config/blackbox/
 !config/homepage/
+config/alertmanager/discord_webhook_url
 
 # But still ignore these nginx subdirectories
 config/nginx/ssl/
 config/nginx/logs/
+
+# Terraform local state and cache
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.*
+infra/terraform/terraform.tfvars
+infra/terraform/*.tfplan
+
+# Kubernetes secret workflow artifacts
+k8s/secrets/*.dec.yaml
+k8s/secrets/*.decrypted.yaml
+**/.age-key.txt
+
+# Keep encrypted Kubernetes secrets versioned for SOPS workflow
+!k8s/secrets/
+!k8s/secrets/*.enc.yaml
+!k8s/secrets/*.yaml.template
+
+# Python packaging metadata (generated)
+*.egg-info/

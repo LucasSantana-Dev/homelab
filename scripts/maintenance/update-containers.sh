@@ -11,6 +11,12 @@ HOMELAB_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 LOG_FILE="$HOMELAB_DIR/logs/update.log"
 BACKUP_DIR="$HOMELAB_DIR/backups"
 LOCK_FILE="/tmp/homelab-update.lock"
+FORGE_ENV_PLACEHOLDERS_ACTIVE=0
+
+# Compose interpolation guard vars (for forge profile)
+FORGE_MCP_JWT_SECRET_KEY="${FORGE_MCP_JWT_SECRET_KEY:-}"
+FORGE_MCP_BASIC_AUTH_PASSWORD="${FORGE_MCP_BASIC_AUTH_PASSWORD:-}"
+FORGE_MCP_ADMIN_PASSWORD="${FORGE_MCP_ADMIN_PASSWORD:-}"
 
 # Load environment variables (handle special characters)
 if [[ -f "$HOMELAB_DIR/.env" ]]; then
@@ -18,7 +24,37 @@ if [[ -f "$HOMELAB_DIR/.env" ]]; then
     UPDATE_DISCORD_WEBHOOK_URL=$(grep -E "^UPDATE_DISCORD_WEBHOOK_URL=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
     WUD_DISCORD_WEBHOOK_URL=$(grep -E "^WUD_DISCORD_WEBHOOK_URL=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
     TAILSCALE_IP=$(grep -E "^TAILSCALE_IP=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+
+    if [[ -z "$FORGE_MCP_JWT_SECRET_KEY" ]]; then
+        FORGE_MCP_JWT_SECRET_KEY=$(grep -E "^FORGE_MCP_JWT_SECRET_KEY=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    fi
+    if [[ -z "$FORGE_MCP_BASIC_AUTH_PASSWORD" ]]; then
+        FORGE_MCP_BASIC_AUTH_PASSWORD=$(grep -E "^FORGE_MCP_BASIC_AUTH_PASSWORD=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    fi
+    if [[ -z "$FORGE_MCP_ADMIN_PASSWORD" ]]; then
+        FORGE_MCP_ADMIN_PASSWORD=$(grep -E "^FORGE_MCP_ADMIN_PASSWORD=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    fi
 fi
+
+# Required Forge vars are only needed when forge-space profile runs, but docker compose
+# still validates interpolation for included files. Provide safe placeholders so routine
+# updates do not fail when Forge is intentionally disabled.
+if [[ -z "$FORGE_MCP_JWT_SECRET_KEY" ]]; then
+    FORGE_MCP_JWT_SECRET_KEY="forge-disabled-jwt-placeholder"
+    FORGE_ENV_PLACEHOLDERS_ACTIVE=1
+fi
+if [[ -z "$FORGE_MCP_BASIC_AUTH_PASSWORD" ]]; then
+    FORGE_MCP_BASIC_AUTH_PASSWORD="forge-disabled-basic-auth-placeholder"
+    FORGE_ENV_PLACEHOLDERS_ACTIVE=1
+fi
+if [[ -z "$FORGE_MCP_ADMIN_PASSWORD" ]]; then
+    FORGE_MCP_ADMIN_PASSWORD="forge-disabled-admin-placeholder"
+    FORGE_ENV_PLACEHOLDERS_ACTIVE=1
+fi
+
+export FORGE_MCP_JWT_SECRET_KEY
+export FORGE_MCP_BASIC_AUTH_PASSWORD
+export FORGE_MCP_ADMIN_PASSWORD
 
 # Discord webhook URL (prefer dedicated update webhook, fallback to legacy WUD webhook)
 DISCORD_WEBHOOK_URL="${UPDATE_DISCORD_WEBHOOK_URL:-${WUD_DISCORD_WEBHOOK_URL:-}}"
@@ -33,6 +69,7 @@ NC='\033[0m'
 
 # Container groups for safe rolling updates (order matters)
 declare -a GROUP_DATABASES=("nextcloud-db" "authentik-db" "paperless-db" "nextcloud-redis" "authentik-redis" "paperless-redis")
+declare -a GROUP_SECURITY=("authentik-server" "authentik-worker")
 declare -a GROUP_CORE=("nginx-proxy" "homepage" "homeassistant" "vaultwarden")
 declare -a GROUP_APPS=("jellyfin" "stremio-server" "n8n" "nextcloud" "paperless-ngx" "filebrowser")
 declare -a GROUP_MONITORING=("prometheus" "grafana" "loki" "promtail" "alertmanager" "netdata" "blackbox-exporter" "node-exporter" "cadvisor")
@@ -41,6 +78,7 @@ declare -a GROUP_UTILITIES=("portainer" "uptime-kuma" "whats-up-docker" "pihole"
 # Health check wait times per group (seconds)
 declare -A GROUP_WAIT_TIMES=(
     ["databases"]=30
+    ["security"]=25
     ["core"]=20
     ["apps"]=20
     ["monitoring"]=15
@@ -55,6 +93,7 @@ UNCHANGED_CONTAINERS=0
 declare -a UPDATED_LIST=()
 declare -a FAILED_LIST=()
 declare -a UNCHANGED_LIST=()
+RELOAD_NGINX_AFTER_AUTHENTIK=0
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -129,6 +168,65 @@ EOF
 container_exists() {
     local container_name="$1"
     docker ps -a --format '{{.Names}}' | grep -q "^${container_name}$"
+}
+
+requires_nginx_reload_for_container() {
+    local container_name="$1"
+    case "$container_name" in
+        authentik-server|authentik-worker)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+queue_nginx_reload_after_authentik_update() {
+    local container_name="$1"
+
+    if requires_nginx_reload_for_container "$container_name"; then
+        RELOAD_NGINX_AFTER_AUTHENTIK=1
+        log_info "Queued nginx-proxy reload after $container_name recreate to refresh Authentik upstream resolution"
+    fi
+}
+
+reload_nginx_proxy_after_authentik_updates() {
+    if [[ "$RELOAD_NGINX_AFTER_AUTHENTIK" -eq 0 ]]; then
+        return 0
+    fi
+
+    log "Refreshing nginx-proxy after Authentik updates..."
+
+    if ! container_exists "nginx-proxy"; then
+        log_warning "nginx-proxy container not found; skipping Authentik post-update reload"
+        return 0
+    fi
+
+    local nginx_status
+    nginx_status=$(docker inspect --format='{{.State.Status}}' nginx-proxy 2>/dev/null || echo "not_found")
+    if [[ "$nginx_status" != "running" ]]; then
+        log_warning "nginx-proxy is not running (status: $nginx_status); skipping Authentik post-update reload"
+        return 0
+    fi
+
+    if docker exec nginx-proxy nginx -s reload 2>&1 | tee -a "$LOG_FILE"; then
+        log_success "nginx-proxy reloaded after Authentik updates"
+        RELOAD_NGINX_AFTER_AUTHENTIK=0
+        return 0
+    fi
+
+    log_warning "nginx-proxy reload failed after Authentik updates; attempting recreate fallback"
+    if docker compose -f "$HOMELAB_DIR/docker-compose.yml" up -d --no-deps --force-recreate nginx 2>&1 | tee -a "$LOG_FILE"; then
+        log_success "nginx-proxy recreated after Authentik updates"
+        RELOAD_NGINX_AFTER_AUTHENTIK=0
+        return 0
+    fi
+
+    log_error "Failed to refresh nginx-proxy after Authentik updates"
+    FAILED_LIST+=("nginx-proxy(refresh-after-authentik)")
+    FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
+    return 1
 }
 
 # Check container health
@@ -293,6 +391,8 @@ update_container() {
         return 1
     fi
 
+    queue_nginx_reload_after_authentik_update "$container_name"
+
     local new_digest
     new_digest=$(get_image_digest "$container_name")
 
@@ -357,6 +457,10 @@ preflight_checks() {
         return 1
     fi
     log_success "docker-compose.yml found"
+
+    if [[ "$FORGE_ENV_PLACEHOLDERS_ACTIVE" -eq 1 ]]; then
+        log_info "Forge required env vars not set; using safe placeholders for compose interpolation"
+    fi
 
     # Check disk space (require at least 5GB free)
     local free_space
@@ -583,6 +687,8 @@ main() {
 
     # Update groups in safe order
     update_group "databases" "${GROUP_WAIT_TIMES[databases]}" "${GROUP_DATABASES[@]}"
+    update_group "security" "${GROUP_WAIT_TIMES[security]}" "${GROUP_SECURITY[@]}"
+    reload_nginx_proxy_after_authentik_updates
     update_group "core" "${GROUP_WAIT_TIMES[core]}" "${GROUP_CORE[@]}"
     update_group "apps" "${GROUP_WAIT_TIMES[apps]}" "${GROUP_APPS[@]}"
     update_group "monitoring" "${GROUP_WAIT_TIMES[monitoring]}" "${GROUP_MONITORING[@]}"
@@ -637,6 +743,7 @@ case "${1:-}" in
         preflight_checks
         log "Would update the following groups:"
         log "  Databases: ${GROUP_DATABASES[*]}"
+        log "  Security: ${GROUP_SECURITY[*]}"
         log "  Core: ${GROUP_CORE[*]}"
         log "  Apps: ${GROUP_APPS[*]}"
         log "  Monitoring: ${GROUP_MONITORING[*]}"

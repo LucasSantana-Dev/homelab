@@ -4,7 +4,7 @@
 services:
   # Nginx Reverse Proxy
   nginx:
-    image: nginx:alpine
+    image: ${IMG_NGINX:-nginx:alpine}
     container_name: nginx-proxy
     restart: unless-stopped
     volumes:
@@ -45,6 +45,35 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Cloudflare Tunnel - Selected public hostnames only
+  cloudflared:
+    image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:latest}
+    container_name: cloudflared
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --metrics
+      - 0.0.0.0:2000
+      - --config
+      - /etc/cloudflared/config.yml
+      - run
+      - --token
+      - ${CF_TUNNEL_TOKEN}
+    volumes:
+      - ../config/cloudflared:/etc/cloudflared:ro
+    ports:
+      - "127.0.0.1:2000:2000"
+    networks:
+      - frontend
+    depends_on:
+      - nginx
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Homepage Dashboard - Tailscale Only
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
@@ -58,7 +87,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TIMEZONE}
-      - HOMEPAGE_ALLOWED_HOSTS=homelab.example.com,www.homelab.example.com,localhost,127.0.0.1
+      - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
       - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
       - DOMAIN=${DOMAIN}
     ports:
@@ -112,7 +141,7 @@ services:
 
   # Portainer - TAILSCALE ONLY (Sensitive Service)
   portainer:
-    image: portainer/portainer-ce:latest
+    image: ${IMG_PORTAINER:-portainer/portainer-ce:latest}
     container_name: portainer
     restart: unless-stopped
     volumes:

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: homepage
+version: 0.1.0
+appVersion: "latest"
+description: Homepage dashboard for wave A migration.
+type: application

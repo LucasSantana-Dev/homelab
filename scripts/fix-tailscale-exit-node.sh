@@ -35,4 +35,4 @@ tailscale status --json 2>&1 | jq -r '.Self | {ExitNodeOption, ExitNode, Active,
 
 echo ""
 echo "💡 If the error persists, check the Tailscale admin console:"
-echo "   https://login.tailscale.com/admin/machines/homelab-node"
+echo "   https://login.tailscale.com/admin/machines/homelab-node-01"

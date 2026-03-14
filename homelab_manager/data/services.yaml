@@ -34,6 +34,20 @@ services:
     description: "Reverse proxy for all services"
     sensitive: false
 
+  cloudflared:
+    name: "Cloudflared"
+    category: core
+    container_name: cloudflared
+    port: 2000
+    internal_port: 2000
+    health_endpoint: "/metrics"
+    health_mode: "http"
+    health_host: "127.0.0.1"
+    expected_statuses: [200]
+    description: "Cloudflare Tunnel connector (phase-1 public edge)"
+    sensitive: true
+    localhost_only: true
+
   homepage:
     name: "Homepage"
     category: core
@@ -87,6 +101,20 @@ services:
     description: "Web-based file manager"
     sensitive: true
     url_path: "files"
+
+  forge-mcp-gateway:
+    name: "Forge MCP Gateway"
+    category: core
+    container_name: forge-mcp-gateway
+    port: 4444
+    internal_port: 4444
+    health_endpoint: "/health"
+    health_mode: "none"
+    health_host: "127.0.0.1"
+    expected_statuses: [200, 404]
+    description: "Forge Space-compatible MCP gateway (IBM Context Forge runtime)"
+    sensitive: true
+    localhost_only: true
 
   # Monitoring Stack
   grafana:
@@ -146,6 +174,9 @@ services:
     port: 9100
     internal_port: 9100
     health_endpoint: "/metrics"
+    health_mode: "http"
+    health_host: "127.0.0.1"
+    expected_statuses: [200]
     description: "System metrics exporter"
     sensitive: true
     localhost_only: true
@@ -168,6 +199,9 @@ services:
     port: 9115
     internal_port: 9115
     health_endpoint: "/-/healthy"
+    health_mode: "http"
+    health_host: "127.0.0.1"
+    expected_statuses: [200]
     description: "Endpoint monitoring"
     sensitive: true
     localhost_only: true
