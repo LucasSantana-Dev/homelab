@@ -6,6 +6,7 @@
         image-lock-status image-lock-refresh image-lock-refresh-dry-run \
         watchdog-install watchdog-status watchdog-run-now watchdog-disable automation-reconcile \
         host-stabilize-prep host-swap-recover server-mode-plan server-mode-apply post-reboot-validate \
+        concurrency-guard pressure-watch baseline-bundle \
         ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
         serena-mcp-setup migration-toolchain migration-preflight k3s-bootstrap migration-budget \
         wave-a-deploy wave-a-gate wave-b-deploy wave-rollback \
@@ -420,6 +421,29 @@ server-mode-apply: ## Apply Desktop -> Server-mode conversion (requires sudo, re
 post-reboot-validate: ## Validate host + homelab state after server-mode reboot
 	@echo "✅ Running post-reboot validation"
 	@./scripts/maintenance/post-reboot-validate.sh
+
+concurrency-guard: ## Snapshot/verify multi-agent git guardrails (MODE=snapshot|verify LABEL=name ALLOW_PREFIXES='path1 path2')
+	@if [ -z "$(MODE)" ] || [ -z "$(LABEL)" ]; then \
+		echo "❌ Usage: make concurrency-guard MODE=<snapshot|verify> LABEL=<chunk> [ALLOW_PREFIXES='path1 path2']"; \
+		exit 1; \
+	fi
+	@args=""; \
+	for prefix in $(ALLOW_PREFIXES); do \
+		args="$$args --allow-prefix $$prefix"; \
+	done; \
+	./scripts/maintenance/concurrency-guard.sh "$(MODE)" --label "$(LABEL)" $$args
+
+pressure-watch: ## Run pressure watch (defaults: 6 samples, 4h interval, 2.0 GiB threshold)
+	@echo "📈 Running pressure watch..."
+	@args="--samples $${SAMPLES:-6} --interval-seconds $${INTERVAL_SECONDS:-14400} --swap-threshold-gib $${SWAP_THRESHOLD_GIB:-2.0}"; \
+	if [ "$${ESCALATE:-false}" = "true" ]; then args="$$args --escalate"; fi; \
+	if [ "$${NO_SLEEP:-false}" = "true" ]; then args="$$args --no-sleep"; fi; \
+	if [ -n "$${BURNIN_SINCE:-}" ]; then args="$$args --burnin-since \"$${BURNIN_SINCE}\""; fi; \
+	eval ./scripts/maintenance/pressure-watch.sh $$args
+
+baseline-bundle: ## Capture baseline evidence bundle (health, burn-in, budget, preflight)
+	@echo "📦 Capturing baseline bundle..."
+	@./scripts/maintenance/capture-baseline-bundle.sh
 
 # Migration helpers (K3s + Terraform)
 serena-mcp-setup: ## Build and register Serena MCP image with node+terraform dependencies
