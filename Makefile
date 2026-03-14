@@ -449,16 +449,19 @@ post-t24-terraform-apply: ## Run gated Terraform apply using pressure-watch T+24
 	@echo "🧭 Running post-T+24 gated Terraform apply"
 	@WATCH_DIR="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}" \
 	 SWAP_THRESHOLD_GIB="$${SWAP_THRESHOLD_GIB:-2.0}" \
-	 ./scripts/maintenance/post-t24-terraform-apply.sh
+	 "$(CURDIR)/scripts/maintenance/post-t24-terraform-apply.sh"
 
 schedule-post-t24-terraform-apply: ## Schedule gated Terraform apply after pressure watch (APPLY_ON_CALENDAR='2026-03-15 12:05:00')
-	@on_calendar="$${APPLY_ON_CALENDAR:-2026-03-15 12:05:00}"; \
+	@set -e; \
+	 on_calendar="$${APPLY_ON_CALENDAR:-2026-03-15 12:05:00}"; \
 	 watch_dir="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}"; \
 	 swap_threshold="$${SWAP_THRESHOLD_GIB:-2.0}"; \
+	 systemctl --user stop homelab-post-t24-terraform-apply.timer homelab-post-t24-terraform-apply.service >/dev/null 2>&1 || true; \
+	 systemctl --user reset-failed homelab-post-t24-terraform-apply.timer homelab-post-t24-terraform-apply.service >/dev/null 2>&1 || true; \
 	 echo "⏱️ Scheduling post-T+24 apply on: $$on_calendar"; \
 	 systemd-run --user --on-calendar="$$on_calendar" --unit=homelab-post-t24-terraform-apply \
 	   env WATCH_DIR="$$watch_dir" SWAP_THRESHOLD_GIB="$$swap_threshold" \
-	   ./scripts/maintenance/post-t24-terraform-apply.sh \
+	   "$(CURDIR)/scripts/maintenance/post-t24-terraform-apply.sh" \
 	   >/dev/null; \
 	 echo "✅ Timer scheduled: homelab-post-t24-terraform-apply.timer (watch_dir=$$watch_dir threshold=$$swap_threshold)"
 
