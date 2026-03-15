@@ -7,7 +7,7 @@ set -uo pipefail
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
 export PATH="${HOME}/.local/bin:${PATH}"
 
-RELEASES=("apps:homepage" "observability:blackbox-exporter" "apps:filebrowser")
+RELEASES=("apps:homepage" "observability:blackbox-exporter" "apps:filebrowser" "apps:uptime-kuma" "apps:vaultwarden")
 STATUS=0
 
 for entry in "${RELEASES[@]}"; do
