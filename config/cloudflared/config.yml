@@ -1,0 +1,72 @@
+# Cloudflare Tunnel ingress policy for phase-1 public homelab services.
+# Only explicitly listed hostnames are published.
+
+ingress:
+  - hostname: luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: luk-homeserver.com.br
+  - hostname: www.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: www.luk-homeserver.com.br
+  - hostname: homeassistant.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: homeassistant.luk-homeserver.com.br
+  - hostname: grafana.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: grafana.luk-homeserver.com.br
+  - hostname: portainer.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: portainer.luk-homeserver.com.br
+  - hostname: n8n.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: n8n.luk-homeserver.com.br
+  - hostname: cloud.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: cloud.luk-homeserver.com.br
+  - hostname: docs.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: docs.luk-homeserver.com.br
+  - hostname: vault.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: vault.luk-homeserver.com.br
+  - hostname: auth.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: auth.luk-homeserver.com.br
+  - hostname: home.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: home.luk-homeserver.com.br
+  - hostname: blackbox.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: blackbox.luk-homeserver.com.br
+  - hostname: files.luk-homeserver.com.br
+    service: https://nginx-proxy:443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: files.luk-homeserver.com.br
+
+  # Block all other hostnames on this tunnel by default.
+  - service: http_status:404

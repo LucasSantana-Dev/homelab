@@ -148,8 +148,8 @@ appdata/homeassistant/config/coverage.xml
 appdata/homeassistant/config/*.cover
 appdata/homeassistant/config/.hypothesis/
 
-# Temporary files and binaries
-cloudflared
+# Temporary files and binaries (cloudflared binary, not config dir)
+/cloudflared
 *.deb
 *.log
 
@@ -220,7 +220,8 @@ config/whats-up-docker/wud-config.json
 # All service appdata
 config/*/
 
-# Keep monitoring and proxy configurations
+# Keep monitoring, proxy, and tunnel configurations
+!config/cloudflared/
 !config/nginx/
 !config/prometheus/
 !config/grafana/
