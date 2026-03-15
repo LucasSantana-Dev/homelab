@@ -7,7 +7,10 @@ resource "cloudflare_dns_record" "dns_records" {
   content = each.value.content
   proxied = try(each.value.proxied, true)
   ttl     = try(each.value.ttl, 1)
-  comment = try(each.value.comment, "")
+
+  lifecycle {
+    ignore_changes = [comment]
+  }
 }
 
 # Phase-1 intentionally tracks tunnel routing declarations in Terraform state
