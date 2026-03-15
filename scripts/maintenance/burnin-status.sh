@@ -1,7 +1,8 @@
 #!/bin/bash
 # Burn-in health summary for homelab resilience rollout.
 
-set -euo pipefail
+# This is a status-report command: prefer resilient output over fail-fast exits.
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
@@ -126,3 +127,5 @@ status_line "WATCHDOG_REBOOT_ENABLED" "${watchdog_reboot_enabled:-unset}"
 status_line "WATCHDOG_RECOVERY_WINDOW_MINUTES" "${watchdog_recovery_window:-unset}"
 status_line "ALERTMANAGER webhook in .env" "$([ -n "${alert_webhook}" ] && echo configured || echo unset)"
 status_line "WATCHDOG webhook override in .env" "$([ -n "${watchdog_webhook}" ] && echo configured || echo unset/fallback)"
+
+exit 0

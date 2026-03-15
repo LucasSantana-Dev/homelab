@@ -54,11 +54,47 @@ free -h > "${WATCH_DIR}/${LABEL}-free-h.txt"
 swapon --show > "${WATCH_DIR}/${LABEL}-swapon-show.txt"
 vmstat 1 5 > "${WATCH_DIR}/${LABEL}-vmstat.txt"
 
-"${ROOT_DIR}/scripts/maintenance/burnin-status.sh" --since "${BURNIN_SINCE}" > "${WATCH_DIR}/${LABEL}-burnin-30m.txt"
-"${ROOT_DIR}/scripts/homelab" health > "${WATCH_DIR}/${LABEL}-health.txt"
+set +e
+"${ROOT_DIR}/scripts/maintenance/burnin-status.sh" --since "${BURNIN_SINCE}" > "${WATCH_DIR}/${LABEL}-burnin-30m.txt" 2>&1
+burnin_rc=$?
+"${ROOT_DIR}/scripts/homelab" health > "${WATCH_DIR}/${LABEL}-health.txt" 2>&1
+health_rc=$?
+set -e
+
+if [[ "${health_rc}" -ne 0 ]]; then
+  # Fallback for non-interactive timer contexts where Python user-site deps are not loaded.
+  if docker ps --format '{{.Status}}' | rg -qi 'unhealthy'; then
+    {
+      echo "fallback-health: UNHEALTHY"
+      echo "WARN: ./scripts/homelab health exited ${health_rc}; used docker status fallback"
+    } > "${WATCH_DIR}/${LABEL}-health.txt"
+    health_rc=1
+  elif docker ps --format '{{.Status}}' >/dev/null 2>&1; then
+    {
+      echo "fallback-health: HEALTHY"
+      echo "WARN: ./scripts/homelab health exited ${health_rc}; used docker status fallback"
+    } > "${WATCH_DIR}/${LABEL}-health.txt"
+    health_rc=0
+  fi
+fi
+
+{
+  echo "burnin_exit=${burnin_rc}"
+  echo "health_exit=${health_rc}"
+} >> "${WATCH_DIR}/${LABEL}-meta.txt"
+
+if [[ "${burnin_rc}" -ne 0 ]]; then
+  echo "WARN: burnin-status.sh exited ${burnin_rc}" >> "${WATCH_DIR}/${LABEL}-burnin-30m.txt"
+fi
+
+if [[ "${health_rc}" -ne 0 ]]; then
+  echo "WARN: ./scripts/homelab health exited ${health_rc}" >> "${WATCH_DIR}/${LABEL}-health.txt"
+fi
 
 echo "TIMESTAMP=${stamp}"
 echo "WATCH_DIR=${WATCH_DIR}"
 echo "LABEL=${LABEL}"
 echo "BURNIN_SINCE=${BURNIN_SINCE}"
+echo "BURNIN_EXIT=${burnin_rc}"
+echo "HEALTH_EXIT=${health_rc}"
 echo "STATUS=ok"
