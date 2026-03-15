@@ -23,8 +23,9 @@ cp "${STATE_FILE}" "${BACKUP_FILE}"
 echo "Backed up: ${BACKUP_FILE} ($(stat -c%s "${BACKUP_FILE}") bytes)"
 
 KEEP_COUNT=10
-BACKUPS=$(ls -1t "${BACKUP_DIR}"/terraform.tfstate.* 2>/dev/null | tail -n +$((KEEP_COUNT + 1)))
-if [[ -n "${BACKUPS}" ]]; then
-  echo "${BACKUPS}" | xargs rm -f
-  echo "Pruned old backups (keeping last ${KEEP_COUNT})"
+mapfile -t BACKUPS < <(find "${BACKUP_DIR}" -maxdepth 1 -name 'terraform.tfstate.*' -printf '%T@ %p\n' 2>/dev/null \
+  | sort -rn | tail -n +$((KEEP_COUNT + 1)) | cut -d' ' -f2-)
+if [[ ${#BACKUPS[@]} -gt 0 ]]; then
+  rm -f "${BACKUPS[@]}"
+  echo "Pruned ${#BACKUPS[@]} old backup(s) (keeping last ${KEEP_COUNT})"
 fi
