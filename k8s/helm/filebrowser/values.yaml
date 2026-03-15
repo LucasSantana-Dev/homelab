@@ -1,6 +1,6 @@
 image:
   repository: filebrowser/filebrowser
-  tag: latest
+  tag: v2.62.1
   pullPolicy: IfNotPresent
 
 service:
@@ -15,8 +15,8 @@ ingress:
 
 resources:
   requests:
-    cpu: 200m
-    memory: 256Mi
+    cpu: 100m
+    memory: 128Mi
   limits:
     cpu: 500m
     memory: 512Mi
@@ -24,10 +24,15 @@ resources:
 persistence:
   enabled: true
   storageClassName: local-path
-  size: 10Gi
+  dataSize: 10Gi
+  dbSize: 100Mi
 
 config:
   rootPath: /srv
   databasePath: /database/filebrowser.db
+
+hostPaths:
+  home: /home/luk-server
+  media: /home/luk-server/media
 
 envFromSecret: ""

@@ -24,6 +24,8 @@ unit_files=(
     "homelab-update.timer"
     "homelab-watchdog.service"
     "homelab-watchdog.timer"
+    "homelab-k3s-health.service"
+    "homelab-k3s-health.timer"
 )
 installed_units=()
 

@@ -1,0 +1,14 @@
+[Unit]
+Description=Homelab k3s Wave Health Check Timer
+Documentation=https://github.com/luk-homeserver/homelab
+Requires=homelab-k3s-health.service
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=5m
+Persistent=true
+AccuracySec=30s
+Unit=homelab-k3s-health.service
+
+[Install]
+WantedBy=timers.target

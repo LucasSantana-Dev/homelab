@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "filebrowser.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "filebrowser.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: 1
   selector:
@@ -28,15 +31,15 @@ spec:
 {{ toYaml .Values.resources | indent 12 }}
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
-            initialDelaySeconds: 10
+            initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
-            initialDelaySeconds: 20
+            initialDelaySeconds: 10
             periodSeconds: 20
 {{- if .Values.envFromSecret }}
           envFrom:
@@ -44,22 +47,27 @@ spec:
                 name: {{ .Values.envFromSecret }}
 {{- end }}
           volumeMounts:
-            - name: data
-              mountPath: /srv
             - name: database
               mountPath: /database
+            - name: srv-home
+              mountPath: /srv/home
+              readOnly: false
+            - name: srv-media
+              mountPath: /srv/media
+              readOnly: false
       volumes:
-        - name: data
-{{- if .Values.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "filebrowser.fullname" . }}
-{{- else }}
-          emptyDir: {}
-{{- end }}
         - name: database
 {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "filebrowser.fullname" . }}
+            claimName: {{ include "filebrowser.fullname" . }}-db
 {{- else }}
           emptyDir: {}
 {{- end }}
+        - name: srv-home
+          hostPath:
+            path: {{ .Values.hostPaths.home }}
+            type: Directory
+        - name: srv-media
+          hostPath:
+            path: {{ .Values.hostPaths.media }}
+            type: Directory

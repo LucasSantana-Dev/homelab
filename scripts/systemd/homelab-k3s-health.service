@@ -1,0 +1,21 @@
+[Unit]
+Description=Homelab k3s Wave Health Check
+Documentation=https://github.com/luk-homeserver/homelab
+After=k3s.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/luk-server/homelab
+ExecStart=/home/luk-server/homelab/scripts/migration/wave-a-status.sh
+User=luk-server
+Group=luk-server
+
+Environment=HOME=/home/luk-server
+Environment=KUBECONFIG=/home/luk-server/.kube/config
+Environment=PATH=/home/luk-server/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+TimeoutStartSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homelab-k3s-health
