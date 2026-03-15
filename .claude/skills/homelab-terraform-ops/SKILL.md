@@ -66,9 +66,30 @@ export CLOUDFLARE_API_TOKEN=$(grep '^CLOUDFLARE_API_TOKEN=' /home/luk-server/hom
 - DNS changes are reversible but affect production routing
 - The `lifecycle { ignore_changes = [comment] }` block prevents Cloudflare API null/empty drift
 
+## State Backup
+
+Always back up before apply:
+
+```bash
+bash scripts/maintenance/terraform-state-backup.sh
+```
+
+Backups are kept in `logs/terraform-state-backups/` (last 10 retained).
+
 ## Adding a New DNS Record
 
 1. Add entry to `terraform.tfvars` `dns_records` map
 2. Optionally add tunnel route to `tunnel_routes` map
-3. Run plan to verify expected changes
-4. Apply and verify no-op
+3. Add cloudflared ingress rule to `config/cloudflared/config.yml`
+4. Add nginx server block to `config/nginx/conf.d/tailscale-domains.conf`
+5. Add Pi-hole local DNS entry via API
+6. Run plan, back up state, apply, verify no-op
+7. Reload nginx: `docker exec nginx-proxy nginx -s reload`
+8. Restart cloudflared: `docker restart cloudflared`
+
+## Adding a New Tunnel Route (Cloudflare API)
+
+The tunnel uses token-based config from dashboard, not local config file. Routes must be added via:
+
+1. Local `config/cloudflared/config.yml` (for reference/documentation)
+2. Cloudflare API PUT to `/accounts/{account}/cfd_tunnel/{tunnel}/configurations`

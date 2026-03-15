@@ -137,6 +137,7 @@ POLICY_ADMIN_BYPASS_NAME = "homelab-admin-bypass-policy"
 PHASE1_HOSTS = [
     f"{DOMAIN}",
     f"www.{DOMAIN}",
+    f"home.{DOMAIN}",
     f"homeassistant.{DOMAIN}",
     f"grafana.{DOMAIN}",
     f"portainer.{DOMAIN}",
@@ -144,6 +145,8 @@ PHASE1_HOSTS = [
     f"cloud.{DOMAIN}",
     f"docs.{DOMAIN}",
     f"vault.{DOMAIN}",
+    f"blackbox.{DOMAIN}",
+    f"files.{DOMAIN}",
 ]
 
 NATIVE_OAUTH_TARGETS = [
