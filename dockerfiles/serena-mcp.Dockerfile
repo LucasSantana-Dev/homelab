@@ -1,4 +1,4 @@
-FROM ghcr.io/oraios/serena:latest
+FROM ghcr.io/oraios/serena:v0.1.4
 
 USER root
 
