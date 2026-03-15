@@ -107,6 +107,39 @@ registries when available:
 user. Work around by using a registry mirror or referencing an image already
 present on the node.
 
+### Docker Hub Rate Limits — Solutions
+
+Create an `imagePullSecret` in each namespace that needs Docker Hub access:
+
+```bash
+kubectl create secret docker-registry dockerhub-creds \
+  --docker-server=https://index.docker.io/v1/ \
+  --docker-username=<user> \
+  --docker-password="$(python3 -c "import json,base64; a=json.load(open('/home/luk-server/.docker/config.json')).get('auths',{}).get('https://index.docker.io/v1/',{}).get('auth',''); print(base64.b64decode(a).decode().split(':',1)[1]) if a else ''")" \
+  -n <namespace>
+```
+
+Wire it into the Helm chart:
+
+- `values.yaml`: add `image.pullSecret: dockerhub-creds`
+- Deployment template `spec`: add `imagePullSecrets: [{name: "{{ .Values.image.pullSecret }}"}]` behind `{{- if .Values.image.pullSecret }}`
+
+### Known Alternative Mirrors
+
+| Image | Mirror |
+|-------|--------|
+| blackbox-exporter | `quay.io/prometheus/blackbox-exporter:v0.25.0` |
+| homepage | `ghcr.io/gethomepage/homepage:v0.10.9` (already on ghcr.io) |
+| filebrowser | No quay/ghcr mirror — use `dockerhub-creds` secret |
+
+### DB Restore for Stateful Services
+
+```bash
+POD=$(kubectl get pod -n <ns> -l app.kubernetes.io/instance=<release> -o name | head -1 | cut -d/ -f2)
+kubectl cp <backup.db> "<ns>/$POD:/database/filebrowser.db"
+kubectl rollout restart deployment/<name> -n <ns>
+```
+
 ## Traefik Ingress
 
 Internal services are exposed via `IngressRoute` with hosts ending in `.k3s.local`.
