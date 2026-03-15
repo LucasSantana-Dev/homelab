@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Quick Wave A deployment health check.
+# Quick Wave A+B deployment health check.
 # Exit 0 = all healthy, exit 1 = degraded.
 
 set -uo pipefail
@@ -7,7 +7,7 @@ set -uo pipefail
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
 export PATH="${HOME}/.local/bin:${PATH}"
 
-RELEASES=("apps:homepage" "observability:blackbox-exporter")
+RELEASES=("apps:homepage" "observability:blackbox-exporter" "apps:filebrowser")
 STATUS=0
 
 for entry in "${RELEASES[@]}"; do

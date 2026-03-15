@@ -17,6 +17,10 @@ spec:
         app.kubernetes.io/name: {{ include "filebrowser.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+{{- if .Values.image.pullSecret }}
+      imagePullSecrets:
+        - name: {{ .Values.image.pullSecret }}
+{{- end }}
       containers:
         - name: filebrowser
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

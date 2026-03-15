@@ -2,6 +2,7 @@ image:
   repository: filebrowser/filebrowser
   tag: v2.62.1
   pullPolicy: IfNotPresent
+  pullSecret: dockerhub-creds
 
 service:
   type: ClusterIP
