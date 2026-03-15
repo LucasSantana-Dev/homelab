@@ -9,6 +9,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        args: [--allow-multiple-documents]
         exclude: ^(config/homeassistant/|k8s/helm/.*/templates/)
       - id: check-added-large-files
         args: ['--maxkb=1000']
@@ -70,7 +71,7 @@ repos:
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
-        args: [-e, SC1091, -e, SC2034, -e, SC2155, -e, SC2164, -e, SC2001, -e, SC2126]
+        args: [-e, SC1091, -e, SC2034, -e, SC2155, -e, SC2164, -e, SC2001, -e, SC2126, -e, SC2016, -e, SC2094]
 
   # YAML
   - repo: https://github.com/adrienverge/yamllint

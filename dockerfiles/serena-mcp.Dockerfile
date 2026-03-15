@@ -14,3 +14,5 @@ RUN set -eux; \
     unzip -o /tmp/terraform.zip -d /usr/local/bin; \
     chmod 0755 /usr/local/bin/terraform; \
     rm -rf /var/lib/apt/lists/* /tmp/terraform.zip
+
+USER 1000
