@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "blackbox-exporter.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "blackbox-exporter.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: 1
   selector:
