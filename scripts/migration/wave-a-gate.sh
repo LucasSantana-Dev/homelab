@@ -3,6 +3,9 @@
 
 set -euo pipefail
 
+export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
+export PATH="${HOME}/.local/bin:${PATH}"
+
 BURNIN_MINUTES="${BURNIN_MINUTES:-30}"
 CHECK_INTERVAL_SECONDS="${CHECK_INTERVAL_SECONDS:-60}"
 LOG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/logs/migration"

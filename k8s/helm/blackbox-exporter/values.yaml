@@ -1,6 +1,6 @@
 image:
-  repository: prom/blackbox-exporter
-  tag: latest
+  repository: quay.io/prometheus/blackbox-exporter
+  tag: v0.25.0
   pullPolicy: IfNotPresent
 
 service:
