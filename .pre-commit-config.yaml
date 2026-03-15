@@ -9,7 +9,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        exclude: ^config/homeassistant/
+        exclude: ^(config/homeassistant/|k8s/helm/.*/templates/)
       - id: check-added-large-files
         args: ['--maxkb=1000']
       - id: check-merge-conflict
@@ -78,6 +78,7 @@ repos:
     hooks:
       - id: yamllint
         args: [-d, relaxed]
+        exclude: ^k8s/helm/.*/templates/
 
   # Markdown
   - repo: https://github.com/igorshubovych/markdownlint-cli
