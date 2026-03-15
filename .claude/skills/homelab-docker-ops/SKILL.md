@@ -3,6 +3,7 @@
 Manage, restart, and troubleshoot Docker Compose services in the homelab.
 
 ## When to Use
+
 - Restarting or recreating individual services
 - Checking container health and status
 - Diagnosing OOM kills, restart loops, or unhealthy containers
@@ -43,11 +44,13 @@ Services that need internet exposure attach to `frontend`. Internal services use
 `docker compose` commands validate variable interpolation for **all included files**, including `compose/forge-space.yml`. If `FORGE_MCP_JWT_SECRET_KEY`, `FORGE_MCP_BASIC_AUTH_PASSWORD`, or `FORGE_MCP_ADMIN_PASSWORD` are not set in the environment, `docker compose up/restart` will fail with an interpolation error.
 
 **Safe pattern — use `docker restart` for single-container restarts:**
+
 ```bash
 docker restart <container-name>
 ```
 
 **Only use `docker compose` when the Forge vars are present or you export placeholders first:**
+
 ```bash
 export FORGE_MCP_JWT_SECRET_KEY="${FORGE_MCP_JWT_SECRET_KEY:-placeholder}"
 export FORGE_MCP_BASIC_AUTH_PASSWORD="${FORGE_MCP_BASIC_AUTH_PASSWORD:-placeholder}"
@@ -56,6 +59,7 @@ docker compose up -d --no-deps --force-recreate <service-name>
 ```
 
 Or source from `.env` first:
+
 ```bash
 set -a && source /home/luk-server/homelab/.env && set +a
 docker compose -f /home/luk-server/homelab/docker-compose.yml up -d --no-deps <service-name>
@@ -83,29 +87,34 @@ docker stats --no-stream
 ## Common Troubleshooting
 
 ### OOM Kill
+
 - **Symptom**: container exits with code 137, `dmesg` shows `oom-kill-action`
 - **Common offenders**: `cadvisor` (limit 768M), `loki` (limit 512M), `prometheus` (limit 1G)
 - **Fix**: `docker restart <name>` to bring it back; investigate memory growth in Grafana
 - **cadvisor** has `healthcheck: disable: true` by default — it OOMs most frequently
 
 ### Unhealthy container
+
 - **Symptom**: `docker ps` shows `(unhealthy)` in the status column
 - **Check**: `docker inspect --format '{{json .State.Health}}' <name> | jq .`
 - **Loki**: healthcheck is disabled (`healthcheck: disable: true`) — ignore Loki health in `docker ps`
 - **Fix**: check logs, then `docker restart <name>`
 
 ### Restart loop (restarting every few seconds)
+
 - **Check logs**: `docker logs --tail 100 <name>`
 - **Common causes**: missing env var, config parse error, port conflict
 - **Stop the loop**: `docker stop <name>` then fix the config before restarting
 
 ### Port conflict
+
 ```bash
 ss -tlnp | grep <port>
 docker ps --format '{{.Names}}\t{{.Ports}}' | grep <port>
 ```
 
 ### Container missing after host reboot
+
 - All containers have `restart: unless-stopped` — they should auto-start
 - If a container is missing: `docker ps -a` to check stopped state, then `docker start <name>`
 
@@ -144,6 +153,7 @@ Update notifications are sent to Discord via `UPDATE_DISCORD_WEBHOOK_URL` (falls
 | node-exporter | `node-exporter` |
 
 ## Scripts Reference
+
 - `scripts/maintenance/update-containers.sh` — managed rolling update
 - `scripts/maintenance/update-containers-cron.sh` — cron/systemd wrapper
 - `scripts/maintenance/post-reboot-validate.sh` — validates all containers after reboot
