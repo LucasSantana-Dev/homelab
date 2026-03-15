@@ -256,3 +256,10 @@ k8s/secrets/*.decrypted.yaml
 
 # Python packaging metadata (generated)
 *.egg-info/
+
+# Skills installed via npx skills add (symlinks)
+.agents/
+.windsurf/
+skills-lock.json
+.claude/skills/*
+!.claude/skills/homelab-*/
