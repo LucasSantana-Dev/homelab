@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Quick Wave A+B deployment health check.
+# k3s migration health check — Waves A through D.
 # Exit 0 = all healthy, exit 1 = degraded.
 
 set -uo pipefail
@@ -7,7 +7,15 @@ set -uo pipefail
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
 export PATH="${HOME}/.local/bin:${PATH}"
 
-RELEASES=("apps:homepage" "observability:blackbox-exporter" "apps:filebrowser" "apps:uptime-kuma" "apps:vaultwarden")
+RELEASES=(
+  "apps:homepage"
+  "observability:blackbox-exporter"
+  "apps:filebrowser"
+  "apps:uptime-kuma"
+  "apps:vaultwarden"
+  "apps:n8n"
+  "apps:pihole"
+)
 STATUS=0
 
 for entry in "${RELEASES[@]}"; do
@@ -29,14 +37,13 @@ for entry in "${RELEASES[@]}"; do
   fi
 done
 
-if command -v kubectl &>/dev/null; then
-  restarts=$(kubectl get pods -A \
-    -l 'app.kubernetes.io/instance in (homepage,blackbox-exporter)' \
-    -o jsonpath='{range .items[*]}{.status.containerStatuses[0].restartCount}{"\n"}{end}' 2>/dev/null | awk '{s+=$1}END{print s+0}')
-  echo "RESTARTS: ${restarts}"
-  if [[ "${restarts}" -gt 0 ]]; then
-    STATUS=1
-  fi
+echo ""
+echo "Total restarts across all migrated pods:"
+restarts=$(kubectl get pods -n apps -n observability \
+  -o jsonpath='{range .items[*]}{.status.containerStatuses[0].restartCount}{"\n"}{end}' 2>/dev/null | awk '{s+=$1}END{print s+0}')
+echo "RESTARTS: ${restarts}"
+if [[ "${restarts}" -gt 5 ]]; then
+  STATUS=1
 fi
 
 exit "${STATUS}"

@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "pihole.fullname" . }}
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: {{ include "pihole.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "pihole.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
