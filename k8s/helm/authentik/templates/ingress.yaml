@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "authentik.fullname" . }}
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ .Values.authentik.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "authentik.fullname" . }}
+                port:
+                  name: http
