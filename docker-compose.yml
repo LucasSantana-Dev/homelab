@@ -15,6 +15,7 @@
 #   - security.yml:   Authentik, Vaultwarden, Pi-hole
 #   - automation.yml: Home Assistant
 #   - forge-space.yml: Forge Space MCP Gateway (profile: forge-space)
+#   - dev-dashboard.yml: Development documentation site
 
 include:
   - path: compose/base.yml
@@ -25,3 +26,4 @@ include:
   - path: compose/security.yml
   - path: compose/automation.yml
   - path: compose/forge-space.yml
+  - path: compose/dev-dashboard.yml

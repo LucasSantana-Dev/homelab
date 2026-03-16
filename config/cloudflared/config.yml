@@ -69,4 +69,7 @@ ingress:
       httpHostHeader: files.luk-homeserver.com.br
 
   # Block all other hostnames on this tunnel by default.
+  - hostname: dev.luk-homeserver.com.br
+    service: http://dev-dashboard:8899
+
   - service: http_status:404

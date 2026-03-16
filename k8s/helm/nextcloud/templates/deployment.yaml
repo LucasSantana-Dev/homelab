@@ -1,0 +1,211 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nextcloud.mariadb.fullname" . }}
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: nextcloud-mariadb
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud-mariadb
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud-mariadb
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: mariadb
+          image: "{{ .Values.mariadb.image.repository }}:{{ .Values.mariadb.image.tag }}"
+          imagePullPolicy: {{ .Values.mariadb.image.pullPolicy }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.nextcloud.env.MYSQL_DATABASE | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.nextcloud.env.MYSQL_USER | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-secrets
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-secrets
+                  key: MYSQL_ROOT_PASSWORD
+          resources:
+{{ toYaml .Values.mariadb.resources | indent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mariadb-data
+          persistentVolumeClaim:
+            claimName: {{ include "nextcloud.mariadb.fullname" . }}-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nextcloud.redis.fullname" . }}
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: nextcloud-redis
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud-redis
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud-redis
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: redis
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+{{ toYaml .Values.redis.resources | indent 12 }}
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nextcloud.fullname" . }}
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: nextcloud
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      initContainers:
+        - name: wait-for-mariadb
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "nextcloud.mariadb.fullname" . }} 3306; do
+                echo "Waiting for MariaDB..."; sleep 2
+              done
+        - name: wait-for-redis
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "nextcloud.redis.fullname" . }} 6379; do
+                echo "Waiting for Redis..."; sleep 2
+              done
+      containers:
+        - name: nextcloud
+          image: "{{ .Values.nextcloud.image.repository }}:{{ .Values.nextcloud.image.tag }}"
+          imagePullPolicy: {{ .Values.nextcloud.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: MYSQL_HOST
+              value: {{ include "nextcloud.mariadb.fullname" . | quote }}
+            - name: REDIS_HOST
+              value: {{ include "nextcloud.redis.fullname" . | quote }}
+            - name: MYSQL_DATABASE
+              value: {{ .Values.nextcloud.env.MYSQL_DATABASE | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.nextcloud.env.MYSQL_USER | quote }}
+            - name: NEXTCLOUD_TRUSTED_DOMAINS
+              value: {{ .Values.nextcloud.env.NEXTCLOUD_TRUSTED_DOMAINS | quote }}
+            - name: OVERWRITEPROTOCOL
+              value: {{ .Values.nextcloud.env.OVERWRITEPROTOCOL | quote }}
+            - name: OVERWRITEHOST
+              value: {{ .Values.nextcloud.env.OVERWRITEHOST | quote }}
+            - name: TRUSTED_PROXIES
+              value: {{ .Values.nextcloud.env.TRUSTED_PROXIES | quote }}
+            - name: PHP_MEMORY_LIMIT
+              value: {{ .Values.nextcloud.env.PHP_MEMORY_LIMIT | quote }}
+            - name: TZ
+              value: {{ .Values.nextcloud.env.TZ | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-secrets
+                  key: MYSQL_PASSWORD
+          resources:
+{{ toYaml .Values.nextcloud.resources | indent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /status.php
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 15
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /status.php
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
+          volumeMounts:
+            - name: html
+              mountPath: /var/www/html
+            - name: data
+              mountPath: /var/www/html/data
+      volumes:
+        - name: html
+          persistentVolumeClaim:
+            claimName: {{ include "nextcloud.fullname" . }}-html
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "nextcloud.fullname" . }}-data
