@@ -1,15 +1,38 @@
 title = "homelab-secret-scan-policy"
 
+# Custom rules to catch k8s Secret stringData patterns not covered by default ruleset
+[[rules]]
+id = "k8s-stringdata-password"
+description = "Kubernetes Secret stringData containing a password/secret value"
+regex = '''stringData:\s*\n(?:\s+\S+:\s+\S+\n)*\s+\S*(?:password|secret|token|key|webhook|credential)\S*:\s+["']?[A-Za-z0-9+/=_\-]{16,}["']?'''
+tags = ["kubernetes", "secret"]
+
+[[rules]]
+id = "discord-webhook-url"
+description = "Discord webhook URL with real token (not test)"
+regex = '''https://discord\.com/api/webhooks/\d+/[A-Za-z0-9_\-]{50,}'''
+tags = ["discord", "webhook"]
+
+[[rules]]
+id = "k8s-stringdata-inline"
+description = "Kubernetes Secret stringData inline secret value"
+regex = '''^\s+\S*(?:password|secret|token|key|webhook)\S*:\s+["']?[A-Za-z0-9+/=_\-]{16,}["']?'''
+tags = ["kubernetes", "secret"]
+
 [allowlist]
 description = "Allow known non-production test fixtures and dummy CI values"
 paths = [
   '''^tests/conftest\.py$''',
   '''^tests/unit/test_config\.py$''',
   '''^\.github/workflows/ci\.yml$''',
+  '''^scripts/secrets/.*\.sh$''',
 ]
 regexes = [
   '''test_(?:token|secret|password)_[A-Za-z0-9_]+''',
   '''https://discord\.com/api/webhooks/123[0-9]*/test[_A-Za-z0-9-]*''',
   '''^AUTHENTIK_SECRET_KEY=test_secret_key_123$''',
   '''^PAPERLESS_SECRET_KEY=test_secret_key_123$''',
+  '''REDACTED''',
+  '''Required env var''',
+  '''dry-run=client''',
 ]
