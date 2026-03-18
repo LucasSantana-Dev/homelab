@@ -209,3 +209,21 @@ scripts/maintenance/recover-lucky-db.sh --full-recovery
 ```
 
 Backups are stored in `backups/lucky/` by default.
+
+### CraftVaria PR CI unblock checklist
+
+For PRs failing `audit` and `security` checks simultaneously:
+
+1. Refresh lockfiles with scoped updates (`npm audit fix`) in affected package roots.
+2. Ensure CI workflow has minimal permissions for gitleaks PR commit reads:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: read
+```
+
+3. If backend tests are flaky due stale SQLite artifacts, remove stale `test.db`
+   in global test setup before schema reset.
+4. Re-run CI (`gh run rerun <run-id>`) and confirm `audit`, `security`, and
+   quality gates are all green before merge.

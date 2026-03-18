@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Operations)
+
+- **Lucky DB recovery runbook** - Added `docs/lucky-db-recovery-runbook.md` with backup-only and full-recovery workflows for `ERR_DB_SCHEMA_MISSING`, including verification commands and backup location checks.
+- **k3s restart baseline note** - Added `docs/k3s-restart-baseline.md` to classify historical restart counts vs actionable incidents after migration waves.
+
+### Fixed (Database Reliability)
+
+- **Lucky Postgres persistence guardrail** - Documented and operationalized `PGDATA=/var/lib/postgresql/data` requirement for `postgres:18-alpine` to prevent schema/data drift outside mounted volume.
+
 ### Added (Automation and Registry)
 
 - **Nextcloud as Primary NAS Service** - Enhanced Nextcloud configuration and documentation for Network Attached Storage use case
