@@ -30,9 +30,27 @@ Execute phased migration of services from Docker Compose to k3s.
 - **uptime-kuma**: monitoring dashboard (SQLite DB)
 - **vaultwarden**: password manager (SQLite + RSA key)
 
-### Wave D (next — complex stateful)
+### Wave D (stateful services) — COMPLETE ✅
 - **n8n**: workflow automation (SQLite, requires careful data migration)
 - **pihole**: DNS sinkhole (custom config files)
+
+### Wave E (observability stack) — COMPLETE ✅
+- **prometheus**
+- **grafana**
+- **loki**
+- **alertmanager**
+- **promtail**
+
+### Wave F (apps/media) — COMPLETE ✅
+- **homeassistant**
+- **jellyfin**
+
+### Wave G (complex app stacks) — COMPLETE ✅
+- **nextcloud** (app + mariadb + redis)
+- **paperless-ngx** (app + postgres + redis)
+
+### Wave H (SSO stack) — COMPLETE ✅
+- **authentik** (server + worker + postgres + redis)
 
 ### Not Suitable for k3s (requires docker.sock)
 - **portainer**: container management
@@ -170,3 +188,24 @@ docker stop <container> && docker rm <container>
 - Keep Docker compose service definitions until burn-in confirmed
 - Stateful: always scale to 0, copy data, scale to 1
 - Run `wave-a-status.sh` after each migration
+
+## Post-Migration Operational Lessons
+
+### Lucky postgres:18 data-loss guardrail
+
+When Lucky uses `postgres:18-alpine`, the runtime default data directory can diverge from the mounted volume path. Always pin:
+
+```yaml
+environment:
+  PGDATA: /var/lib/postgresql/data
+```
+
+Use recovery automation when schema is missing:
+
+```bash
+scripts/maintenance/recover-lucky-db.sh --help
+scripts/maintenance/recover-lucky-db.sh --backup-only
+scripts/maintenance/recover-lucky-db.sh --full-recovery
+```
+
+Backups are stored in `backups/lucky/` by default.
