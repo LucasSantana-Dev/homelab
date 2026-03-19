@@ -1,0 +1,46 @@
+name: Workflow Ref Guard
+
+on:
+  workflow_dispatch:
+    inputs:
+      enforce_pinned:
+        description: "Require full SHA-pinned action refs"
+        required: false
+        default: "false"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "scripts/maintenance/workflow-ref-guard.sh"
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-ref-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
+      - name: Validate script syntax
+        run: bash -n scripts/maintenance/workflow-ref-guard.sh
+
+      - name: Run workflow reference guard
+        run: |
+          chmod +x scripts/maintenance/workflow-ref-guard.sh
+          args=()
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.enforce_pinned || 'false' }}" == "true" ]]; then
+            args+=(--enforce-pinned)
+          fi
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+            mapfile -t changed_workflows < <(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- ".github/workflows/*.yml" ".github/workflows/*.yaml")
+            if [[ ${#changed_workflows[@]} -eq 0 ]]; then
+              echo "No workflow files changed; skipping reference checks."
+              exit 0
+            fi
+            scripts/maintenance/workflow-ref-guard.sh "${args[@]}" "${changed_workflows[@]}"
+          else
+            scripts/maintenance/workflow-ref-guard.sh "${args[@]}"
+          fi
