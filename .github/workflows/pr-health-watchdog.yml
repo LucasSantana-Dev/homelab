@@ -1,0 +1,28 @@
+name: PR Health Watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+
+jobs:
+  pr-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run PR health watchdog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOS_CSV: "LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/Craftvaria"
+        run: |
+          chmod +x scripts/maintenance/pr-health-watchdog.sh
+          scripts/maintenance/pr-health-watchdog.sh
