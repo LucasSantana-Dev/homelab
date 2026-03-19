@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/github-api.sh"
 
-REPOS_CSV="${REPOS_CSV:-LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/Craftvaria}"
+REPOS_CSV="${REPOS_CSV:-LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/CraftVaria}"
 MAX_OPEN_PRS="${MAX_OPEN_PRS:-30}"
 FAIL_ON_RED="${FAIL_ON_RED:-true}"
 
