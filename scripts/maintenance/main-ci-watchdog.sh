@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/github-api.sh"
 
-REPOS_CSV="LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/CraftVaria"
+REPOS_CSV="LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/Craftvaria"
 FAIL_ON_FAILURE="true"
 
 usage() {
@@ -50,7 +50,11 @@ warn_count=0
 printf 'Main CI Watchdog at %s\n\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
 for repo in "${repos[@]}"; do
-  run_json="$(gh_retry gh run list --repo "$repo" --branch main --limit 1 --json workflowName,status,conclusion,url,headSha)"
+  if ! run_json="$(gh_retry gh run list --repo "$repo" --branch main --limit 1 --json workflowName,status,conclusion,url,headSha)"; then
+    echo "RED    $repo failed to fetch latest main workflow run"
+    fail_count=$((fail_count + 1))
+    continue
+  fi
   run_len="$(python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' <<<"$run_json")"
 
   if [[ "$run_len" == "0" ]]; then
