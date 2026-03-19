@@ -45,7 +45,7 @@ apply_schema() {
         sh -c 'node_modules/.bin/prisma db push --config prisma/prisma.config.ts' 2>&1
 
     echo "Baselining all existing migrations..."
-    for migration in $(ls "$LUCKY_DIR/prisma/migrations/" | sort); do
+    while IFS= read -r migration; do
         docker run --rm \
             --network lucky_lucky-network \
             -v "$LUCKY_DIR:/app" \
@@ -53,7 +53,7 @@ apply_schema() {
             -e DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@postgres:5432/$DB_NAME" \
             node:22-alpine \
             sh -c "node_modules/.bin/prisma migrate resolve --applied $migration --config prisma/prisma.config.ts" 2>&1 | grep -v "^$"
-    done
+    done < <(find "$LUCKY_DIR/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
 }
 
 echo "=== Lucky DB Recovery ==="
