@@ -214,6 +214,23 @@ scripts/maintenance/guard-pr-body.sh --body-file /tmp/pr-body.md
 cat /tmp/pr-body.md | scripts/maintenance/guard-pr-body.sh --stdin
 ```
 
+### **Workflow Ref Guardrail**
+
+- Use `scripts/maintenance/workflow-ref-guard.sh` to detect mutable `uses:` references.
+- Current default guard blocks:
+  - `docker://...:latest`
+  - symbolic refs like `@main`, `@master`, `@latest`
+  - major-only tags like `@v1`, `@v2`, etc.
+- CI workflow `Workflow Ref Guard` automatically scans changed workflow files on pull requests.
+
+```bash
+# Scan all workflow files with baseline mutable-ref rules
+scripts/maintenance/workflow-ref-guard.sh
+
+# Strict mode: require every action reference to be full 40-char SHA
+scripts/maintenance/workflow-ref-guard.sh --enforce-pinned
+```
+
 ### **Common Issues**
 
 **1. Permission Errors:**
