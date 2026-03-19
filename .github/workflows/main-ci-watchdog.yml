@@ -1,0 +1,27 @@
+name: Main CI Watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate script syntax
+        run: bash -n scripts/maintenance/main-ci-watchdog.sh
+
+      - name: Run main CI watchdog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/maintenance/main-ci-watchdog.sh
+          scripts/maintenance/main-ci-watchdog.sh --fail-on-failure true
