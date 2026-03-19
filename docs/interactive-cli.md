@@ -222,6 +222,7 @@ cat /tmp/pr-body.md | scripts/maintenance/guard-pr-body.sh --stdin
   - symbolic refs like `@main`, `@master`, `@latest`
   - major-only tags like `@v1`, `@v2`, etc.
 - CI workflow `Workflow Ref Guard` automatically scans changed workflow files on pull requests.
+- When violations are found in PRs, the workflow posts/updates a single bot comment with fix guidance and guard output.
 
 ```bash
 # Scan all workflow files with baseline mutable-ref rules
