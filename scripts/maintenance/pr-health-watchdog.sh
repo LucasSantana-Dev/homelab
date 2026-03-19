@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/github-api.sh"
 
-REPOS_CSV="${REPOS_CSV:-LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/CraftVaria}"
+REPOS_CSV="${REPOS_CSV:-LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/Craftvaria}"
 MAX_OPEN_PRS="${MAX_OPEN_PRS:-30}"
 FAIL_ON_RED="${FAIL_ON_RED:-true}"
 
@@ -70,7 +70,12 @@ for repo in "${repos[@]}"; do
 
   echo "## ${repo}"
 
-  pr_list="$(gh_retry gh pr list --repo "${repo}" --state open --limit "${MAX_OPEN_PRS}" --json number,title,url,statusCheckRollup)"
+  if ! pr_list="$(gh_retry gh pr list --repo "${repo}" --state open --limit "${MAX_OPEN_PRS}" --json number,title,url,statusCheckRollup)"; then
+    echo "- RED: failed to list PRs for ${repo}"
+    overall_failures=$((overall_failures + 1))
+    echo
+    continue
+  fi
   pr_count="$(python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' <<<"${pr_list}")"
   overall_open_prs=$((overall_open_prs + pr_count))
 
