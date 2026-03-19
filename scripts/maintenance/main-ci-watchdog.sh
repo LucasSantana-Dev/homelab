@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/github-api.sh"
+
 REPOS_CSV="LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/Craftvaria"
 FAIL_ON_FAILURE="true"
 
@@ -37,10 +40,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${GH_TOKEN:-}" ]]; then
-  echo "GH_TOKEN is required" >&2
-  exit 2
-fi
+require_gh_token
 
 IFS=',' read -r -a repos <<< "$REPOS_CSV"
 
@@ -50,7 +50,8 @@ warn_count=0
 printf 'Main CI Watchdog at %s\n\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
 for repo in "${repos[@]}"; do
-  run_len="$(gh run list --repo "$repo" --branch main --limit 1 --json workflowName --jq 'length')"
+  run_json="$(gh_retry gh run list --repo "$repo" --branch main --limit 1 --json workflowName,status,conclusion,url,headSha)"
+  run_len="$(python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' <<<"$run_json")"
 
   if [[ "$run_len" == "0" ]]; then
     echo "YELLOW $repo no main runs found"
@@ -58,11 +59,22 @@ for repo in "${repos[@]}"; do
     continue
   fi
 
-  workflow="$(gh run list --repo "$repo" --branch main --limit 1 --json workflowName --jq '.[0].workflowName')"
-  status="$(gh run list --repo "$repo" --branch main --limit 1 --json status --jq '.[0].status')"
-  conclusion="$(gh run list --repo "$repo" --branch main --limit 1 --json conclusion --jq '.[0].conclusion')"
-  url="$(gh run list --repo "$repo" --branch main --limit 1 --json url --jq '.[0].url')"
-  sha="$(gh run list --repo "$repo" --branch main --limit 1 --json headSha --jq '.[0].headSha')"
+  IFS=$'\t' read -r workflow status conclusion url sha < <(
+    python3 - <<'PY' "$run_json"
+import json
+import sys
+
+data = json.loads(sys.argv[1])[0]
+fields = [
+    data.get("workflowName", ""),
+    data.get("status", ""),
+    data.get("conclusion", ""),
+    data.get("url", ""),
+    data.get("headSha", ""),
+]
+print("\t".join(fields))
+PY
+  )
 
   if [[ "$status" != "completed" ]]; then
     echo "YELLOW $repo workflow='$workflow' status=$status sha=${sha:0:7} url=$url"

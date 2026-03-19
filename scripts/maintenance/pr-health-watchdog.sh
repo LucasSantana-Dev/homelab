@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/github-api.sh"
+
 REPOS_CSV="${REPOS_CSV:-LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/Craftvaria}"
 MAX_OPEN_PRS="${MAX_OPEN_PRS:-30}"
 FAIL_ON_RED="${FAIL_ON_RED:-true}"
@@ -47,10 +50,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${GH_TOKEN:-}" ]]; then
-  echo "GH_TOKEN is required" >&2
-  exit 1
-fi
+require_gh_token
 
 IFS=',' read -r -a repos <<<"${REPOS_CSV}"
 
@@ -70,7 +70,7 @@ for repo in "${repos[@]}"; do
 
   echo "## ${repo}"
 
-  pr_list="$(gh pr list --repo "${repo}" --state open --limit "${MAX_OPEN_PRS}" --json number,title,url)"
+  pr_list="$(gh_retry gh pr list --repo "${repo}" --state open --limit "${MAX_OPEN_PRS}" --json number,title,url,statusCheckRollup)"
   pr_count="$(python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' <<<"${pr_list}")"
   overall_open_prs=$((overall_open_prs + pr_count))
 
@@ -82,64 +82,49 @@ for repo in "${repos[@]}"; do
 
   echo "- Open PRs: ${pr_count}"
 
-  while IFS='|' read -r pr_number pr_title pr_url; do
+  while IFS='|' read -r verdict pr_number pr_title pr_url; do
     if [[ -z "${pr_number}" ]]; then
       continue
     fi
 
-    checks_json="$(gh pr view "${pr_number}" --repo "${repo}" --json statusCheckRollup)"
-
-    verdict="$(python3 - <<'PY' "${checks_json}"
-import json
-import sys
-
-data = json.loads(sys.argv[1])
-checks = data.get("statusCheckRollup", [])
-
-bad_states = {"FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED"}
-pending_states = {"PENDING", "QUEUED", "IN_PROGRESS", "EXPECTED"}
-
-bad = 0
-pending = 0
-for item in checks:
-    t = item.get("__typename")
-    if t == "CheckRun":
-        conclusion = (item.get("conclusion") or "").upper()
-        status = (item.get("status") or "").upper()
-        if conclusion in bad_states:
-            bad += 1
-        elif status in pending_states:
-            pending += 1
-    elif t == "StatusContext":
-        state = (item.get("state") or "").upper()
-        if state in bad_states:
-            bad += 1
-        elif state in pending_states:
-            pending += 1
-
-if bad > 0:
-    print("RED")
-elif pending > 0:
-    print("YELLOW")
-else:
-    print("GREEN")
-PY
-)"
-
     if [[ "${verdict}" == "RED" ]]; then
       overall_failures=$((overall_failures + 1))
-      echo "  - RED #${pr_number}: ${pr_title} (${pr_url})"
-    elif [[ "${verdict}" == "YELLOW" ]]; then
-      echo "  - YELLOW #${pr_number}: ${pr_title} (${pr_url})"
-    else
-      echo "  - GREEN #${pr_number}: ${pr_title} (${pr_url})"
     fi
+
+    echo "  - ${verdict} #${pr_number}: ${pr_title} (${pr_url})"
   done < <(python3 - <<'PY' "${pr_list}"
 import json
 import sys
 
+bad_states = {"FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED"}
+pending_states = {"PENDING", "QUEUED", "IN_PROGRESS", "EXPECTED"}
+
 for pr in json.loads(sys.argv[1]):
-    print(f"{pr['number']}|{pr['title']}|{pr['url']}")
+    bad = 0
+    pending = 0
+    for item in pr.get("statusCheckRollup", []):
+        t = item.get("__typename")
+        if t == "CheckRun":
+            conclusion = (item.get("conclusion") or "").upper()
+            status = (item.get("status") or "").upper()
+            if conclusion in bad_states:
+                bad += 1
+            elif status in pending_states:
+                pending += 1
+        elif t == "StatusContext":
+            state = (item.get("state") or "").upper()
+            if state in bad_states:
+                bad += 1
+            elif state in pending_states:
+                pending += 1
+
+    verdict = "GREEN"
+    if bad > 0:
+        verdict = "RED"
+    elif pending > 0:
+        verdict = "YELLOW"
+
+    print(f"{verdict}|{pr['number']}|{pr['title']}|{pr['url']}")
 PY
 )
 
