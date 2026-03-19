@@ -200,6 +200,20 @@ scripts/homelab_manager/
 
 ## 🔍 **Troubleshooting**
 
+### **PR Body Secret Guardrail**
+
+- Use `scripts/maintenance/guard-pr-body.sh` before `gh pr create` or `gh pr edit`.
+- Safe examples must redact credentials and tokens, e.g. `GH_TOKEN=<redacted>`.
+- The CI workflow `PR Body Secret Guard` also scans PR titles/bodies and PR comments.
+
+```bash
+# Validate a PR body file before publishing
+scripts/maintenance/guard-pr-body.sh --body-file /tmp/pr-body.md
+
+# Validate stdin content
+cat /tmp/pr-body.md | scripts/maintenance/guard-pr-body.sh --stdin
+```
+
 ### **Common Issues**
 
 **1. Permission Errors:**
