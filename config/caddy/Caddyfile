@@ -1,0 +1,41 @@
+{
+	auto_https off
+	default_bind 0.0.0.0
+}
+
+http://ai.home {
+	reverse_proxy 127.0.0.1:3000
+}
+
+http://craftvaria.home {
+	reverse_proxy 127.0.0.1:3333
+}
+
+http://lucky.home {
+	reverse_proxy 127.0.0.1:8090
+}
+
+http://registry.home {
+	reverse_proxy 127.0.0.1:5000
+}
+
+http://pihole.home {
+	redir / /admin/
+	reverse_proxy 127.0.0.1:8054
+}
+
+http://cockpit.home {
+	reverse_proxy https://127.0.0.1:9090 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}
+
+http://homelab.home, http://home {
+	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home" 200
+}
+
+:80 {
+	respond "unknown host — try http://homelab.home/" 404
+}

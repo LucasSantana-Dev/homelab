@@ -1,0 +1,27 @@
+# LAN-wide reverse proxy — Caddy, host network, *.home routing
+# Depends on Pi-hole resolving *.home → this host (192.168.0.11)
+
+services:
+  caddy-lan:
+    image: caddy:2-alpine
+    container_name: caddy-lan
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ../config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_lan_data:/data
+      - caddy_lan_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy_lan_data:
+  caddy_lan_config:

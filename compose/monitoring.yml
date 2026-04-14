@@ -32,7 +32,7 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_DISABLE_LOGIN_FORM:-true}
     ports:
       # Bind only to Tailscale IP for secure access
-      - "${TAILSCALE_IP}:${GRAFANA_PORT:-3002}:3000"
+      - "${BIND_IP:-0.0.0.0}:${GRAFANA_PORT:-3002}:3000"
     networks:
       - default
     deploy:
@@ -64,7 +64,7 @@ services:
       - '--storage.path=/alertmanager'
     ports:
       - "127.0.0.1:9093:9093"
-      - "${TAILSCALE_IP}:9093:9093"
+      - "${BIND_IP:-0.0.0.0}:9093:9093"
     networks:
       - default
     healthcheck:
@@ -140,7 +140,7 @@ services:
       # Localhost access
       - "127.0.0.1:${PROMETHEUS_PORT:-9091}:9090"
       # Tailscale access ONLY
-      - "${TAILSCALE_IP}:${PROMETHEUS_PORT:-9091}:9090"
+      - "${BIND_IP:-0.0.0.0}:${PROMETHEUS_PORT:-9091}:9090"
     networks:
       - default
     depends_on:
@@ -252,7 +252,7 @@ services:
     environment:
       - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
     ports:
-      - "${TAILSCALE_IP}:19999:19999"
+      - "${BIND_IP:-0.0.0.0}:19999:19999"
     networks:
       - default
     deploy:
@@ -280,7 +280,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "127.0.0.1:3100:3100"
-      - "${TAILSCALE_IP}:3100:3100"
+      - "${BIND_IP:-0.0.0.0}:3100:3100"
     networks:
       - default
     healthcheck:

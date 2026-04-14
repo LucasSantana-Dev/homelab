@@ -19,7 +19,7 @@ services:
       - PUID=1000
       - PGID=1000
     ports:
-      - "${TAILSCALE_IP}:5678:5678"
+      - "${BIND_IP:-0.0.0.0}:5678:5678"
     networks:
       - default
     healthcheck:
@@ -127,7 +127,7 @@ services:
       - OVERWRITEHOST=cloud.${DOMAIN}
       - TZ=${TIMEZONE}
     ports:
-      - "${TAILSCALE_IP}:8300:80"
+      - "${BIND_IP:-0.0.0.0}:8300:80"
     networks:
       - default
     depends_on:
@@ -250,7 +250,7 @@ services:
       - USERMAP_UID=${PUID}
       - USERMAP_GID=${PGID}
     ports:
-      - "${TAILSCALE_IP}:8400:8000"
+      - "${BIND_IP:-0.0.0.0}:8400:8000"
     networks:
       - frontend
       - database
