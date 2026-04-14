@@ -17,7 +17,7 @@ services:
       - PYTHONUSERBASE=/config/deps
     ports:
       # Bind only to Tailscale IP for secure access
-      - "${TAILSCALE_IP}:${HOMEASSISTANT_PORT:-8123}:8123"
+      - "${BIND_IP:-0.0.0.0}:${HOMEASSISTANT_PORT:-8123}:8123"
     networks:
       - default
     deploy:

@@ -9,20 +9,20 @@ services:
     restart: unless-stopped
     volumes:
       - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - ../config/pihole/etc:/etc/pihole
-      - ../config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
       - pihole_data:/etc/pihole
     environment:
       - TZ=${TIMEZONE}
       - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
       - PIHOLE_DNS_=8.8.8.8;1.1.1.1
+      - FTLCONF_dns_listeningMode=all
+      - FTLCONF_webserver_api_password=${PIHOLE_WEB_PASSWORD}
       - VIRTUAL_HOST=pihole.${DOMAIN}
       - VIRTUAL_PORT=80
     ports:
       # Bind only to Tailscale IP for secure access
-      - "${TAILSCALE_IP}:${PIHOLE_WEB_PORT:-8054}:80"
-      - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/tcp"
-      - "127.0.0.1:${PIHOLE_DNS_PORT:-53}:53/udp"
+      - "${BIND_IP:-0.0.0.0}:${PIHOLE_WEB_PORT:-8054}:80"
+      - "${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/tcp"
+      - "${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/udp"
     networks:
       - default
     deploy:
@@ -53,8 +53,8 @@ services:
       - WEBSOCKET_ENABLED=true
       - TZ=${TIMEZONE}
     ports:
-      - "${TAILSCALE_IP}:8200:80"
-      - "${TAILSCALE_IP}:3012:3012"  # WebSocket port
+      - "${BIND_IP:-0.0.0.0}:8200:80"
+      - "${BIND_IP:-0.0.0.0}:3012:3012"  # WebSocket port
     networks:
       - default
     healthcheck:
@@ -161,8 +161,8 @@ services:
       - AUTHENTIK_AVATARS=initials
       - TZ=${TIMEZONE}
     ports:
-      - "${TAILSCALE_IP}:9100:9000"
-      - "${TAILSCALE_IP}:9443:9443"
+      - "${BIND_IP:-0.0.0.0}:9100:9000"
+      - "${BIND_IP:-0.0.0.0}:9443:9443"
     networks:
       - frontend
       - database

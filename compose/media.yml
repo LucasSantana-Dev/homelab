@@ -19,7 +19,7 @@ services:
       - stremio_cache:/root/.stremio-server/stremio-cache
     ports:
       # Bind only to Tailscale IP for secure access
-      - "${TAILSCALE_IP}:11470:11470"
+      - "${BIND_IP:-0.0.0.0}:11470:11470"
     networks:
       - default
     deploy:
@@ -48,7 +48,7 @@ services:
     environment:
       - TZ=${TIMEZONE}
     ports:
-      - "${TAILSCALE_IP}:8096:8096"
+      - "${BIND_IP:-0.0.0.0}:8096:8096"
     networks:
       - default
     healthcheck:
