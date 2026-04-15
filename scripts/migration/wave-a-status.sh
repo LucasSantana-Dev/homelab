@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # k3s migration health check — Waves A through D.
 # Exit 0 = all healthy, exit 1 = degraded.
 

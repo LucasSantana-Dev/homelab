@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Environment Variable Validation Script
 # Validates that all required environment variables are set in .env file
 #

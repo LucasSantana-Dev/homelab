@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Burn-in health summary for homelab resilience rollout.
 
 # This is a status-report command: prefer resilient output over fail-fast exits.

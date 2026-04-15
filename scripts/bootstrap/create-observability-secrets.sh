@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # Create k8s secrets for observability namespace.
 # Run this ONCE on a fresh cluster or after credential rotation.
 # NEVER commit real values to git — set them as env vars before running.
