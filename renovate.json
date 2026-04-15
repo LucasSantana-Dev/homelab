@@ -1,0 +1,61 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":preserveSemverRanges",
+    ":semanticCommitType(chore)",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Europe/Lisbon",
+  "schedule": ["before 6am on monday"],
+  "labels": ["renovate", "dependencies"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 8,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "description": "Auto-merge patch updates for Docker images",
+      "matchManagers": ["docker-compose", "dockerfile"],
+      "matchUpdateTypes": ["patch", "digest"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Auto-merge patch updates for GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch", "digest", "pin"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Group Python dev dependencies",
+      "matchManagers": ["pep621", "pip_requirements"],
+      "matchDepTypes": ["dev"],
+      "groupName": "python-dev-deps",
+      "automerge": false
+    },
+    {
+      "description": "Group minor Helm chart bumps",
+      "matchManagers": ["helm-values", "helmv3"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "helm-chart-minor-patch"
+    },
+    {
+      "description": "Never auto-merge major bumps",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ],
+  "docker-compose": {
+    "enabled": true,
+    "fileMatch": ["compose/.*\\.ya?ml$"]
+  },
+  "github-actions": {
+    "pinDigests": true
+  }
+}
