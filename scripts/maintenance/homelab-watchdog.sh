@@ -80,15 +80,6 @@ print(json.dumps({"channelId": os.environ["LUCKY_CHAN"], "content": content[:190
         log "Lucky notify failed (HTTP ${http_code}) — check LUCKY_NOTIFY_* env + lucky-backend health"
     fi
 }
-print(json.dumps(data))
-PY
-)
-
-    if ! curl -fsS -m 10 -H "Content-Type: application/json" -d "${payload}" "${WATCHDOG_WEBHOOK_URL}" >/dev/null 2>&1; then
-        log "Warning: failed to send Discord notification"
-    fi
-}
-
 ensure_state_path() {
     local state_dir
     state_dir="$(dirname "${STATE_FILE}")"
