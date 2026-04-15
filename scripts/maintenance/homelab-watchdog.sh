@@ -57,32 +57,29 @@ to_bool() {
 }
 
 send_discord() {
-    local msg payload
+    local msg payload http_code
     msg="$1"
-    if [ -z "${WATCHDOG_WEBHOOK_URL}" ]; then
+
+    if [ -z "${LUCKY_NOTIFY_URL}" ] || [ -z "${LUCKY_NOTIFY_KEY}" ] || [ -z "${LUCKY_NOTIFY_CHANNEL_ID}" ]; then
         return 0
     fi
 
-    payload=$(python3 - "$msg" <<'PY'
-import json
-import socket
-import sys
-from datetime import datetime, timezone
+    payload=$(LUCKY_MSG="${msg}" LUCKY_CHAN="${LUCKY_NOTIFY_CHANNEL_ID}" python3 -c '
+import json, os, socket
+content = f"[{socket.gethostname()}] {os.environ[\"LUCKY_MSG\"]}"
+print(json.dumps({"channelId": os.environ["LUCKY_CHAN"], "content": content[:1900]}))
+')
 
-message = sys.argv[1]
-content = f"[{socket.gethostname()}] {message}"
-data = {
-    "content": content[:1900],
-}
-print(json.dumps(data))
-PY
-)
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" -m 10 \
+        -H "Content-Type: application/json" \
+        -H "X-Notify-Key: ${LUCKY_NOTIFY_KEY}" \
+        -d "${payload}" \
+        "${LUCKY_NOTIFY_URL}" || echo "000")
 
-    if ! curl -fsS -m 10 -H "Content-Type: application/json" -d "${payload}" "${WATCHDOG_WEBHOOK_URL}" >/dev/null 2>&1; then
-        log "Warning: failed to send Discord notification"
+    if [ "${http_code}" != "204" ] && [ "${http_code}" != "200" ]; then
+        log "Lucky notify failed (HTTP ${http_code}) — check LUCKY_NOTIFY_* env + lucky-backend health"
     fi
 }
-
 ensure_state_path() {
     local state_dir
     state_dir="$(dirname "${STATE_FILE}")"
@@ -344,7 +341,9 @@ main() {
     if ! [[ "${WATCHDOG_RECOVERY_WINDOW_MINUTES}" =~ ^[0-9]+$ ]]; then
         WATCHDOG_RECOVERY_WINDOW_MINUTES=10
     fi
-    WATCHDOG_WEBHOOK_URL="$(get_env_value WATCHDOG_DISCORD_WEBHOOK)"
+    LUCKY_NOTIFY_URL="$(get_env_value LUCKY_NOTIFY_URL)"
+    LUCKY_NOTIFY_KEY="$(get_env_value LUCKY_NOTIFY_KEY)"
+    LUCKY_NOTIFY_CHANNEL_ID="$(get_env_value LUCKY_NOTIFY_CHANNEL_ID)"
     if [ "${WATCHDOG_FORCE_DEGRADED}" != "true" ]; then
         WATCHDOG_FORCE_DEGRADED="$(to_bool "$(get_env_value WATCHDOG_FORCE_DEGRADED)")"
     fi
