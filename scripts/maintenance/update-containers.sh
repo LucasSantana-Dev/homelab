@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Safe Container Update Script for Homelab
 # Performs rolling updates with health checks between container restarts
 # Designed to run via systemd timer every 5 days

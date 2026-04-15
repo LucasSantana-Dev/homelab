@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Project Cleanup Script
 # Removes temporary files, caches, and stale backups
 #

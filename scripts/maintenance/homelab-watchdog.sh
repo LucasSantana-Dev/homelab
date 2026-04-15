@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Homelab resilience watchdog:
 # - Detects degraded host/service/container state
 # - Runs a bounded recovery ladder

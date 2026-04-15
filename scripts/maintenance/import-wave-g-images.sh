@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Import Wave G Docker images into k3s containerd
 # Run as: bash scripts/maintenance/import-wave-g-images.sh
 # Or: nohup bash scripts/maintenance/import-wave-g-images.sh > /tmp/import-wave-g.log 2>&1 &

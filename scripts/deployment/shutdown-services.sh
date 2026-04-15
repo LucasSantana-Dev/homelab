@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Gracefully shutdown all homelab services
 
 set -e

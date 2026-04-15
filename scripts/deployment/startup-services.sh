@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Start all homelab services manually
 
 set -e

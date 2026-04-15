@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Check status of all auto-start services
 
 echo "=== Homelab Auto-Start Services Status ==="

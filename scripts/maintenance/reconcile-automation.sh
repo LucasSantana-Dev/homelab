@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Reconcile homelab automation wiring:
 # - Remove stale user crontab entries with dead paths
 # - Sync managed systemd units from repository into /etc/systemd/system
