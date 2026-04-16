@@ -45,6 +45,7 @@ check_homelab_manager() {
 
     if [ -f "$VENV_DIR/bin/activate" ]; then
         log "Using virtual environment for homelab manager"
+        # shellcheck disable=SC1091  # runtime path — venv created during install
         source "$VENV_DIR/bin/activate"
     elif command -v python3 &> /dev/null; then
         log "Using system Python for homelab manager"
@@ -81,7 +82,8 @@ backup_with_manager() {
 manual_backup() {
     log "Creating manual backup..."
 
-    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
     local backup_name="homelab_backup_${timestamp}.tar.gz"
     local backup_path="$BACKUP_DIR/$backup_name"
 
@@ -97,7 +99,8 @@ manual_backup() {
         success "Manual backup created: $backup_name"
 
         # Get backup size
-        local backup_size=$(du -h "$backup_path" | cut -f1)
+        local backup_size
+        backup_size=$(du -h "$backup_path" | cut -f1)
         log "Backup size: $backup_size"
 
         return 0
@@ -224,7 +227,8 @@ main() {
             backup_status="error"
             backup_message="Backup created but integrity check failed"
         else
-            local backup_size=$(du -h "$latest_backup" | cut -f1)
+            local backup_size
+            backup_size=$(du -h "$latest_backup" | cut -f1)
             backup_message="Backup completed successfully (Size: $backup_size)"
         fi
     fi
