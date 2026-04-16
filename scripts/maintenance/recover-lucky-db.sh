@@ -4,10 +4,25 @@ set -euo pipefail
 
 LUCKY_DIR="${LUCKY_DIR:-/home/luk-server/Lucky}"
 BACKUP_DIR="${BACKUP_DIR:-/home/luk-server/homelab/backups/lucky}"
-DB_NAME="discordbot"
-DB_USER="discordbot"
-DB_PASSWORD="discordbot123"
-CONTAINER="lucky-postgres"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOMELAB_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+if [[ -f "$HOMELAB_DIR/.env" ]]; then
+    LUCKY_DB_NAME=$(grep -E "^LUCKY_DB_NAME=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    LUCKY_DB_USER=$(grep -E "^LUCKY_DB_USER=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    LUCKY_DB_PASSWORD=$(grep -E "^LUCKY_DB_PASSWORD=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+fi
+
+DB_NAME="${LUCKY_DB_NAME:-discordbot}"
+DB_USER="${LUCKY_DB_USER:-discordbot}"
+DB_PASSWORD="${LUCKY_DB_PASSWORD:-}"
+CONTAINER="${LUCKY_DB_CONTAINER:-lucky-postgres}"
+
+if [[ -z "$DB_PASSWORD" ]]; then
+    echo "ERROR: LUCKY_DB_PASSWORD is not set. Define it in $HOMELAB_DIR/.env or export it before running." >&2
+    exit 1
+fi
 
 mkdir -p "$BACKUP_DIR"
 
