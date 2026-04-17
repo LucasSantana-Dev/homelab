@@ -25,6 +25,7 @@ if [[ -f "$HOMELAB_DIR/.env" ]]; then
     UPDATE_DISCORD_WEBHOOK_URL=$(grep -E "^UPDATE_DISCORD_WEBHOOK_URL=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
     WUD_DISCORD_WEBHOOK_URL=$(grep -E "^WUD_DISCORD_WEBHOOK_URL=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
     TAILSCALE_IP=$(grep -E "^TAILSCALE_IP=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
+    export TAILSCALE_IP  # consumed by docker compose interpolation downstream
 
     if [[ -z "$FORGE_MCP_JWT_SECRET_KEY" ]]; then
         FORGE_MCP_JWT_SECRET_KEY=$(grep -E "^FORGE_MCP_JWT_SECRET_KEY=" "$HOMELAB_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' || echo "")
@@ -102,27 +103,32 @@ mkdir -p "$BACKUP_DIR"
 
 # Logging functions
 log() {
-    local message="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    local message
+    message="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
     echo -e "${BLUE}${message}${NC}" | tee -a "$LOG_FILE"
 }
 
 log_success() {
-    local message="[$(date '+%Y-%m-%d %H:%M:%S')] ✅ $1"
+    local message
+    message="[$(date '+%Y-%m-%d %H:%M:%S')] ✅ $1"
     echo -e "${GREEN}${message}${NC}" | tee -a "$LOG_FILE"
 }
 
 log_warning() {
-    local message="[$(date '+%Y-%m-%d %H:%M:%S')] ⚠️  $1"
+    local message
+    message="[$(date '+%Y-%m-%d %H:%M:%S')] ⚠️  $1"
     echo -e "${YELLOW}${message}${NC}" | tee -a "$LOG_FILE"
 }
 
 log_error() {
-    local message="[$(date '+%Y-%m-%d %H:%M:%S')] ❌ $1"
+    local message
+    message="[$(date '+%Y-%m-%d %H:%M:%S')] ❌ $1"
     echo -e "${RED}${message}${NC}" | tee -a "$LOG_FILE"
 }
 
 log_info() {
-    local message="[$(date '+%Y-%m-%d %H:%M:%S')] ℹ️  $1"
+    local message
+    message="[$(date '+%Y-%m-%d %H:%M:%S')] ℹ️  $1"
     echo -e "${CYAN}${message}${NC}" | tee -a "$LOG_FILE"
 }
 

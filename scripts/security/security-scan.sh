@@ -86,7 +86,7 @@ scan_container_images() {
             log "Scanning image: $image"
 
             # Create safe filename for report
-            safe_name=$(echo "$image" | sed 's/[^a-zA-Z0-9._-]/_/g')
+            safe_name="${image//[^a-zA-Z0-9._-]/_}"
             report_file="$TRIVY_REPORT_DIR/image-scan-${safe_name}-$(date +%Y%m%d-%H%M%S).json"
 
             if ! $TRIVY_CMD image --severity HIGH,CRITICAL "$image" \
@@ -146,7 +146,7 @@ check_security_practices() {
 
     # Check if containers are running as root
     log "Checking for containers running as root..."
-    root_containers=$(docker ps --format "table {{.Names}}\t{{.Command}}" | grep -v "USER" | grep -v "user" | wc -l)
+    root_containers=$(docker ps --format "table {{.Names}}\t{{.Command}}" | grep -v "USER" | grep -cv "user")
     if [ "$root_containers" -gt 0 ]; then
         warning "Some containers may be running as root"
         ((issues++))
@@ -154,7 +154,7 @@ check_security_practices() {
 
     # Check for privileged containers
     log "Checking for privileged containers..."
-    privileged_containers=$(docker ps --format "table {{.Names}}\t{{.Command}}" | grep "privileged" | wc -l)
+    privileged_containers=$(docker ps --format "table {{.Names}}\t{{.Command}}" | grep -c "privileged")
     if [ "$privileged_containers" -gt 0 ]; then
         warning "Some containers are running in privileged mode"
         ((issues++))
@@ -162,7 +162,7 @@ check_security_practices() {
 
     # Check for exposed ports
     log "Checking for exposed ports..."
-    exposed_ports=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | grep "0.0.0.0" | wc -l)
+    exposed_ports=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -c "0.0.0.0")
     if [ "$exposed_ports" -gt 0 ]; then
         warning "Some containers have ports exposed to all interfaces"
         ((issues++))
@@ -180,7 +180,8 @@ check_security_practices() {
 generate_report() {
     log "Generating security report..."
 
-    local report_file="$TRIVY_REPORT_DIR/security-report-$(date +%Y%m%d-%H%M%S).txt"
+    local report_file
+    report_file="$TRIVY_REPORT_DIR/security-report-$(date +%Y%m%d-%H%M%S).txt"
 
     {
         echo "=== Homelab Security Scan Report ==="

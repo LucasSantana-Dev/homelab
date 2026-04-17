@@ -1,4 +1,16 @@
+keys:
+  - &age_key_local 'age1pljvlg2j8k3nqp7w8xjt9kn2m3q4r5s6t7u8v9w0x1y2z3a4b5c6d7e8f'
+
 creation_rules:
-  - path_regex: ^k8s/secrets/.*\.enc\.ya?ml$
-    encrypted_regex: '^(data|stringData)$'
-    age: "age18qmemsqgr3gpcmmhjwjmhpp8tqd2ae5s0g5x0u4qwuu94nx3fuls8t5fc8"
+  - path_regex: ^\.env\.enc\.yaml$
+    key_groups:
+      - age:
+          - *age_key_local
+  - path_regex: ^config/.*/.*\.enc\.yaml$
+    key_groups:
+      - age:
+          - *age_key_local
+  - path_regex: ^docker-compose\..*\.enc\.yml$
+    key_groups:
+      - age:
+          - *age_key_local
