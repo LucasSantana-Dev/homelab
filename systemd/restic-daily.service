@@ -1,0 +1,22 @@
+[Unit]
+Description=Homelab Restic Daily Backup
+Documentation=man:restic(1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/opt/homelab/scripts/backup/restic-backup.sh
+StandardOutput=journal
+StandardError=journal
+
+# Environment loaded from /etc/homelab/.env or user profile
+EnvironmentFile=-/etc/homelab/.env
+EnvironmentFile=-/root/.restic-env
+Environment="RESTIC_PASSWORD_FILE=/root/.restic-password"
+Environment="RESTIC_REPOSITORY="
+
+[Install]
+WantedBy=multi-user.target
