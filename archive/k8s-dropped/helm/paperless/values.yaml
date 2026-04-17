@@ -1,0 +1,95 @@
+paperless:
+  image:
+    repository: ghcr.io/paperless-ngx/paperless-ngx
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  ingress:
+    enabled: true
+    className: traefik
+    host: paperless.k3s.local
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  persistence:
+    data:
+      storageClassName: local-path
+      size: 2Gi
+    media:
+      storageClassName: local-path
+      size: 5Gi
+    consume:
+      storageClassName: local-path
+      size: 1Gi
+    export:
+      storageClassName: local-path
+      size: 1Gi
+
+  env:
+    PAPERLESS_TIME_ZONE: "America/Sao_Paulo"
+    PAPERLESS_OCR_LANGUAGE: "eng"
+    PAPERLESS_OCR_LANGUAGES: "por"
+    PAPERLESS_DBHOST: "paperless-postgresql"
+    PAPERLESS_DBNAME: "paperless"
+    PAPERLESS_DBUSER: "paperless"
+    PAPERLESS_REDIS: "redis://paperless-redis:6379"
+    PAPERLESS_CORS_ALLOWED_HOSTS: "https://docs.luk-homeserver.com.br"
+    PAPERLESS_TRUSTED_PROXIES: "100.95.204.103"
+    PAPERLESS_URL: "https://docs.luk-homeserver.com.br"
+    PAPERLESS_ENABLE_HTTP_REMOTE_USER: "false"
+    PAPERLESS_ADMIN_USER: "admin"
+    PAPERLESS_ADMIN_MAIL: "admin@luk-homeserver.com.br"
+    USERMAP_UID: "1000"
+    USERMAP_GID: "1000"
+
+postgresql:
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 5432
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  persistence:
+    storageClassName: local-path
+    size: 5Gi
+
+  env:
+    POSTGRES_DB: "paperless"
+    POSTGRES_USER: "paperless"
+
+redis:
+  image:
+    repository: redis
+    tag: "alpine"
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 6379
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

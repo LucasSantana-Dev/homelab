@@ -1,0 +1,57 @@
+authentik:
+  image:
+    repository: ghcr.io/goauthentik/server
+    tag: "2025.2.4"
+    pullPolicy: IfNotPresent
+  env:
+    AUTHENTIK_POSTGRESQL__USER: authentik
+    AUTHENTIK_POSTGRESQL__NAME: authentik
+    AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
+    AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    AUTHENTIK_AVATARS: initials
+    TZ: America/Sao_Paulo
+  service:
+    port: 9000
+  ingress:
+    host: authentik.k3s.local
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+postgresql:
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  pvc:
+    size: 5Gi
+    storageClass: local-path
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+redis:
+  image:
+    repository: redis
+    tag: alpine
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+media:
+  pvc:
+    size: 1Gi
+    storageClass: local-path
