@@ -4,7 +4,7 @@
 services:
   # Grafana - TAILSCALE ONLY (Sensitive Service)
   grafana:
-    image: ${IMG_GRAFANA:-grafana/grafana-oss:latest}
+    image: ${IMG_GRAFANA:-grafana/grafana-oss:11.4}
     container_name: grafana
     restart: unless-stopped
     volumes:
@@ -51,7 +51,7 @@ services:
 
   # Alertmanager - Alert routing and notifications - TAILSCALE ONLY
   alertmanager:
-    image: ${IMG_ALERTMANAGER:-prom/alertmanager:latest}
+    image: ${IMG_ALERTMANAGER:-prom/alertmanager:v0.27}
     container_name: alertmanager
     restart: unless-stopped
     environment:
@@ -89,7 +89,7 @@ services:
 
   # Blackbox Exporter - HTTP/TCP endpoint monitoring - Localhost only
   blackbox-exporter:
-    image: prom/blackbox-exporter:latest
+    image: prom/blackbox-exporter:v0.25.0
     container_name: blackbox-exporter
     restart: unless-stopped
     volumes:
@@ -122,7 +122,7 @@ services:
 
   # Prometheus - TAILSCALE ONLY (Sensitive Service)
   prometheus:
-    image: ${IMG_PROMETHEUS:-prom/prometheus:latest}
+    image: ${IMG_PROMETHEUS:-prom/prometheus:v2.54}
     container_name: prometheus
     restart: unless-stopped
     volumes:
@@ -161,7 +161,7 @@ services:
 
   # Node Exporter - LOCALHOST ONLY (System Metrics)
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.8.2
     container_name: node-exporter
     restart: unless-stopped
     volumes:
@@ -195,7 +195,7 @@ services:
 
   # cAdvisor - Container Metrics
   cadvisor:
-    image: ${IMG_CADVISOR:-gcr.io/cadvisor/cadvisor:latest}
+    image: ${IMG_CADVISOR:-gcr.io/cadvisor/cadvisor:v0.48.1}
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
@@ -236,7 +236,7 @@ services:
 
   # Netdata - Real-time System Monitoring
   netdata:
-    image: netdata/netdata:latest
+    image: netdata/netdata:v1.48.0
     container_name: netdata
     restart: unless-stopped
     cap_add:
@@ -271,7 +271,7 @@ services:
 
   # Loki Log Aggregation - Localhost + Tailscale
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.12
     container_name: loki
     restart: unless-stopped
     volumes:
@@ -301,7 +301,7 @@ services:
 
   # Promtail Log Collection
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:2.9.12
     container_name: promtail
     restart: unless-stopped
     volumes:

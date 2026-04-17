@@ -4,7 +4,7 @@
 services:
   # Stremio - Public Access Required for app.strem.io
   stremio:
-    image: stremio/server:latest
+    image: stremio/server:v4.20.11
     container_name: stremio-server
     restart: unless-stopped
     environment:
@@ -38,7 +38,7 @@ services:
 
   # Jellyfin Media Server - Tailscale Only
   jellyfin:
-    image: jellyfin/jellyfin:latest
+    image: jellyfin/jellyfin:10.11
     container_name: jellyfin
     restart: unless-stopped
     volumes:
