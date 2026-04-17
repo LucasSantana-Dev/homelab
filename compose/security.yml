@@ -4,7 +4,7 @@
 services:
   # Pi-hole - LOCALHOST ONLY (Local Network Service)
   pihole:
-    image: ${IMG_PIHOLE:-pihole/pihole:latest}
+    image: ${IMG_PIHOLE:-pihole/pihole:2025.03.2}
     container_name: pihole
     restart: unless-stopped
     volumes:
@@ -41,7 +41,7 @@ services:
 
   # Vaultwarden Password Manager - Tailscale Only
   vaultwarden:
-    image: ${IMG_VAULTWARDEN:-vaultwarden/server:latest}
+    image: ${IMG_VAULTWARDEN:-vaultwarden/server:1.0.19}
     container_name: vaultwarden
     restart: unless-stopped
     volumes:
@@ -142,7 +142,7 @@ services:
 
   # Authentik Server - SSO Identity Provider
   authentik-server:
-    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:latest}
+    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:2024.12.1}
     container_name: authentik-server
     restart: unless-stopped
     command: server
@@ -191,7 +191,7 @@ services:
 
   # Authentik Worker - Background tasks
   authentik-worker:
-    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:latest}
+    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:2024.12.1}
     container_name: authentik-worker
     restart: unless-stopped
     command: worker
