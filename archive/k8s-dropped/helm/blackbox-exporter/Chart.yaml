@@ -1,0 +1,6 @@
+apiVersion: v2
+name: blackbox-exporter
+version: 0.1.0
+appVersion: "latest"
+description: Blackbox exporter for wave A migration.
+type: application

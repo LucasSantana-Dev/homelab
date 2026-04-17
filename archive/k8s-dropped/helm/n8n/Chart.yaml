@@ -1,0 +1,6 @@
+apiVersion: v2
+name: n8n
+version: 0.1.0
+appVersion: "latest"
+description: n8n workflow automation — Wave D migration.
+type: application

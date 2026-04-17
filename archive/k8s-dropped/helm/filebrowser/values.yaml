@@ -1,0 +1,39 @@
+image:
+  repository: filebrowser/filebrowser
+  tag: v2.62.1
+  pullPolicy: IfNotPresent
+  pullSecret: dockerhub-creds
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: traefik
+  host: files.k3s.local
+  tlsSecretName: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  enabled: true
+  storageClassName: local-path
+  dataSize: 10Gi
+  dbSize: 100Mi
+
+config:
+  rootPath: /srv
+  databasePath: /database/filebrowser.db
+
+hostPaths:
+  home: /home/luk-server
+  media: /home/luk-server/media
+
+envFromSecret: ""

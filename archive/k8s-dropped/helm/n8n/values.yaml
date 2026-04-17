@@ -1,0 +1,35 @@
+image:
+  repository: n8nio/n8n
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5678
+
+ingress:
+  enabled: true
+  className: traefik
+  host: n8n.k3s.local
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  enabled: true
+  storageClassName: local-path
+  size: 2Gi
+
+env:
+  TZ: "Europe/Lisbon"
+  WEBHOOK_URL: "https://n8n.luklabs.dev"
+  N8N_BASIC_AUTH_ACTIVE: "true"
+
+auth:
+  user: "admin"
+  # password stored in secret n8n-auth
