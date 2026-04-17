@@ -32,7 +32,7 @@ fi
 export RESTIC_REPOSITORY RESTIC_PASSWORD_FILE
 
 TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
 echo "[$(date)] Starting homelab backup..."
 
