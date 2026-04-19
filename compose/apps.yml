@@ -4,7 +4,7 @@
 services:
   # n8n Workflow Automation - Tailscale Only
   n8n:
-    image: ${IMG_N8N:-n8nio/n8n:1.80}
+    image: ${IMG_N8N:-n8nio/n8n:1.110.1}
     container_name: n8n
     restart: unless-stopped
     user: "root"  # Run as root to avoid permission issues with volume
@@ -43,7 +43,7 @@ services:
 
   # Nextcloud Database - MariaDB
   nextcloud-db:
-    image: ${IMG_MARIADB:-mariadb:11.4}
+    image: ${IMG_MARIADB:-mariadb:11.4.10}
     container_name: nextcloud-db
     restart: unless-stopped
     volumes:
