@@ -62,7 +62,7 @@ echo ""
 
 # 5. Test HTTPS access
 echo "5️⃣  Testing HTTPS access..."
-HTTPS_RESPONSE=$(curl -k -sI https://stremio.homelab.example.com 2>&1 | head -1)
+HTTPS_RESPONSE=$(curl -k -sI http://stremio.home 2>&1 | head -1)
 if echo "$HTTPS_RESPONSE" | grep -q "HTTP"; then
     echo -e "${GREEN}✅ HTTPS endpoint is accessible${NC}"
     echo "  Response: $HTTPS_RESPONSE"
@@ -122,25 +122,23 @@ docker logs nginx-proxy --tail 100 2>&1 | grep -i "stremio.*error\|error.*stremi
 echo ""
 
 # 9. Configuration summary
+STREMIO_PUBLIC_URL=$(grep '^STREMIO_PUBLIC_URL=' .env 2>/dev/null | cut -d'=' -f2 || echo "https://server-do-luk.tailab88e9.ts.net")
 echo "9️⃣  Configuration Summary:"
-echo "  Stremio Server URL: https://stremio.homelab.example.com"
-echo "  Direct IP: http://${TAILSCALE_IP}:11470"
-echo "  Container Port: 11470"
+echo "  LAN URL (Stremio Desktop):  http://stremio.home"
+echo "  Tailscale IP:               http://${TAILSCALE_IP}:11470"
+echo "  Public HTTPS (Stremio Web): ${STREMIO_PUBLIC_URL}"
+echo "  Container Port:             11470"
 echo ""
 
 # 10. Recommendations
 echo "🔟 Recommendations:"
 echo ""
-echo "To connect Stremio app:"
-echo "  1. Open Stremio app (web or desktop)"
-echo "  2. Go to Settings → Server"
-echo "  3. Enter: https://stremio.homelab.example.com"
-echo "  4. If you see SSL certificate warning, accept it"
+echo "Stremio Web (web.stremio.com / app.strem.io):"
+echo "  → Use the public HTTPS URL (browser blocks HTTP mixed content):"
+echo "    ${STREMIO_PUBLIC_URL}"
 echo ""
-echo "If connection fails, try:"
-echo "  - Direct IP: http://${TAILSCALE_IP}:11470"
-echo "  - Check if you're connected to Tailscale network"
-echo "  - Verify firewall allows port 11470"
+echo "Stremio Desktop / mobile app on LAN:"
+echo "  → http://stremio.home  (or http://${TAILSCALE_IP}:11470 over Tailscale)"
 echo ""
 echo "For Tailscale error:"
 echo "  - Check admin console: https://login.tailscale.com/admin/machines"
