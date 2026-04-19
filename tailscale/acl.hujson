@@ -1,0 +1,101 @@
+// Tailscale ACL policy for the homelab tailnet.
+//
+// Authoritative copy — apply via: https://login.tailscale.com/admin/acls
+// or with `tailscale-cli` (see tailscale/README.md).
+//
+// Threat model
+// ------------
+// 1. Owner (you) retains full access.
+// 2. "Friends" get access to a curated, read-only service set
+//    (media + game server) — never SSH, admin panels, metrics, or DNS.
+// 3. Friends are onboarded via node sharing (they keep their own tailnet)
+//    OR added as guest users on this tailnet. Either path maps to
+//    `group:friends` / `autogroup:shared` below.
+{
+	"groups": {
+		// Add friend Tailscale identities (email) here. Keep tight.
+		"group:friends": [
+			// "friend1@example.com",
+			// "friend2@example.com",
+		],
+		"group:admin": [
+			"autogroup:admin",
+		],
+	},
+
+	"tagOwners": {
+		// Tag applied to the homelab node to mark it as a friend-exposed host.
+		// Apply on the host: `sudo tailscale up --advertise-tags=tag:homelab-friends-exposed`
+		"tag:homelab-friends-exposed": ["group:admin"],
+		"tag:homelab-private":         ["group:admin"],
+	},
+
+	"acls": [
+		// Owner: full access to own tailnet.
+		{
+			"action": "accept",
+			"src":    ["group:admin"],
+			"dst":    ["*:*"],
+		},
+
+		// Friends (guest users on this tailnet): only the curated service
+		// ports on the friend-exposed host. No SSH, no admin UIs.
+		{
+			"action": "accept",
+			"src":    ["group:friends"],
+			"dst": [
+				"tag:homelab-friends-exposed:8096",   // Jellyfin (HTTP)
+				"tag:homelab-friends-exposed:8920",   // Jellyfin (HTTPS)
+				"tag:homelab-friends-exposed:11470",  // Stremio server
+				"tag:homelab-friends-exposed:12470",  // Stremio alt port
+				"tag:homelab-friends-exposed:25565",  // Craftvaria Minecraft
+			],
+		},
+
+		// Friends accessing a *shared* node (they stay on their own tailnet
+		// and accept a share invite) — autogroup:shared covers that path.
+		{
+			"action": "accept",
+			"src":    ["autogroup:shared"],
+			"dst": [
+				"tag:homelab-friends-exposed:8096",
+				"tag:homelab-friends-exposed:8920",
+				"tag:homelab-friends-exposed:11470",
+				"tag:homelab-friends-exposed:12470",
+				"tag:homelab-friends-exposed:25565",
+			],
+		},
+	],
+
+	// No SSH for friends — owner-only and key-based.
+	"ssh": [
+		{
+			"action": "accept",
+			"src":    ["autogroup:admin"],
+			"dst":    ["autogroup:self"],
+			"users":  ["autogroup:nonroot", "root"],
+		},
+	],
+
+	// Lock down node auto-approval. Friends must be invited explicitly.
+	"autoApprovers": {
+		"routes": {
+			"192.168.0.0/24": ["group:admin"],
+		},
+	},
+
+	// Deny-by-default is implicit; no further rules = no access for anyone
+	// not explicitly listed above.
+
+	"tests": [
+		{
+			"src":    "group:admin",
+			"accept": ["tag:homelab-friends-exposed:22", "tag:homelab-private:9090"],
+		},
+		{
+			"src":    "group:friends",
+			"accept": ["tag:homelab-friends-exposed:8096", "tag:homelab-friends-exposed:25565"],
+			"deny":   ["tag:homelab-friends-exposed:22", "tag:homelab-private:3000", "tag:homelab-friends-exposed:9091"],
+		},
+	],
+}

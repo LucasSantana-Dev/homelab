@@ -7,6 +7,7 @@ This directory contains detailed documentation for specific components and featu
 ### Core Setup & Configuration
 
 - **[Tailscale Setup](tailscale-setup.md)** - Complete Tailscale configuration and security setup
+- **[Tailscale Friends Sharing](tailscale-friends-sharing.md)** - Give friends scoped access to Jellyfin/Stremio/Craftvaria via node sharing + ACL
 - **[Interactive CLI](interactive-cli.md)** - Comprehensive interactive console application
 - **[Project Structure](project-structure.md)** - Improved project organization and structure
 
