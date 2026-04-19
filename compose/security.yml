@@ -42,7 +42,7 @@ services:
 
   # Vaultwarden Password Manager - Tailscale Only
   vaultwarden:
-    image: ${IMG_VAULTWARDEN:-vaultwarden/server:1.0.19}
+    image: ${IMG_VAULTWARDEN:-vaultwarden/server:1.33.2}
     container_name: vaultwarden
     restart: unless-stopped
     volumes:
@@ -143,7 +143,7 @@ services:
 
   # Authentik Server - SSO Identity Provider
   authentik-server:
-    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:2024.12.1}
+    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:2025.12.1}
     container_name: authentik-server
     restart: unless-stopped
     command: server
@@ -192,7 +192,7 @@ services:
 
   # Authentik Worker - Background tasks
   authentik-worker:
-    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:2024.12.1}
+    image: ${IMG_AUTHENTIK_SERVER:-ghcr.io/goauthentik/server:2025.12.1}
     container_name: authentik-worker
     restart: unless-stopped
     command: worker

@@ -3,7 +3,7 @@
 
 services:
   forge-mcp-gateway:
-    image: ghcr.io/ibm/mcp-context-forge:1.0.0-BETA-2
+    image: ${IMG_MCP_CONTEXT_FORGE:-ghcr.io/ibm/mcp-context-forge:v1.0.0-RC-3}
     container_name: forge-mcp-gateway
     restart: unless-stopped
     profiles: ["forge-space"]
