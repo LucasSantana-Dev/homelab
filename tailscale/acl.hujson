@@ -1,45 +1,44 @@
 // Tailscale ACL policy for the homelab tailnet.
 //
 // Authoritative copy — apply via: https://login.tailscale.com/admin/acls
-// or with `tailscale-cli` (see tailscale/README.md).
+// or with Tailscale ↔ GitHub sync (recommended; see tailscale/README.md).
 //
 // Threat model
 // ------------
-// 1. Owner (you) retains full access.
+// 1. Owner (you) retains full access to all own-tagged nodes.
 // 2. "Friends" get access to a curated, read-only service set
-//    (media + game server) — never SSH, admin panels, metrics, or DNS.
-// 3. Friends are onboarded via node sharing (they keep their own tailnet)
-//    OR added as guest users on this tailnet. Either path maps to
-//    `group:friends` / `autogroup:shared` below.
+//    (media + game server) on tag:homelab-friends-exposed only.
+//    Onboarded via node sharing (stay on own tailnet) or as guest users.
+// 3. All other traffic denied by default.
 {
 	"groups": {
 		// Add friend Tailscale identities (email) here. Keep tight.
 		"group:friends": [
 			// "friend1@example.com",
-			// "friend2@example.com",
 		],
 		"group:admin": [
 			"autogroup:admin",
 		],
 	},
 
+	// Role tags. Owner assigns via `tailscale up --advertise-tags=...`.
 	"tagOwners": {
-		// Tag applied to the homelab node to mark it as a friend-exposed host.
-		// Apply on the host: `sudo tailscale up --advertise-tags=tag:homelab-friends-exposed`
+		"tag:homelab":                 ["group:admin"],
 		"tag:homelab-friends-exposed": ["group:admin"],
-		"tag:homelab-private":         ["group:admin"],
+		"tag:laptop":                  ["group:admin"],
+		"tag:mobile":                  ["group:admin"],
+		"tag:ci":                      ["group:admin"],
 	},
 
 	"acls": [
-		// Owner: full access to own tailnet.
+		// Owner: full mesh access across own tailnet.
 		{
 			"action": "accept",
-			"src":    ["group:admin"],
+			"src":    ["group:admin", "tag:laptop", "tag:mobile"],
 			"dst":    ["*:*"],
 		},
 
-		// Friends (guest users on this tailnet): only the curated service
-		// ports on the friend-exposed host. No SSH, no admin UIs.
+		// Friends (guest users on this tailnet): only curated service ports.
 		{
 			"action": "accept",
 			"src":    ["group:friends"],
@@ -47,13 +46,13 @@
 				"tag:homelab-friends-exposed:8096",   // Jellyfin (HTTP)
 				"tag:homelab-friends-exposed:8920",   // Jellyfin (HTTPS)
 				"tag:homelab-friends-exposed:11470",  // Stremio server
-				"tag:homelab-friends-exposed:12470",  // Stremio alt port
+				"tag:homelab-friends-exposed:12470",  // Stremio alt
 				"tag:homelab-friends-exposed:25565",  // Craftvaria Minecraft
 			],
 		},
 
-		// Friends accessing a *shared* node (they stay on their own tailnet
-		// and accept a share invite) — autogroup:shared covers that path.
+		// Friends accessing a *shared* node (node-sharing path — they stay
+		// on their own tailnet and accept the share invite).
 		{
 			"action": "accept",
 			"src":    ["autogroup:shared"],
@@ -65,9 +64,18 @@
 				"tag:homelab-friends-exposed:25565",
 			],
 		},
+
+		// CI runners (GitHub Actions via tailscale/github-action) reach
+		// homelab on deploy ports only. Uncomment when a workflow needs it.
+		// {
+		// 	"action": "accept",
+		// 	"src":    ["tag:ci"],
+		// 	"dst":    ["tag:homelab:22"],
+		// },
 	],
 
-	// No SSH for friends — owner-only and key-based.
+	// Tailscale SSH — replace authorized_keys management with tailnet
+	// identity. Owner-only; only reaches nodes they own.
 	"ssh": [
 		{
 			"action": "accept",
@@ -77,25 +85,34 @@
 		},
 	],
 
-	// Lock down node auto-approval. Friends must be invited explicitly.
+	// Auto-approve subnet-router advertisements and exit-node
+	// advertisement from homelab so the owner doesn't have to click
+	// "approve" in the admin console each time.
 	"autoApprovers": {
 		"routes": {
-			"192.168.0.0/24": ["group:admin"],
+			"192.168.0.0/24": ["tag:homelab"],
 		},
+		"exitNode": ["tag:homelab"],
 	},
 
-	// Deny-by-default is implicit; no further rules = no access for anyone
-	// not explicitly listed above.
+	// Key lifetime is configured in the admin console, not here.
+	// Recommended: Settings → Keys → Device key expiry = 90 days with
+	// auto-renewal so active devices don't get kicked off.
 
+	// Test cases — Tailscale runs these on every apply.
 	"tests": [
 		{
 			"src":    "group:admin",
-			"accept": ["tag:homelab-friends-exposed:22", "tag:homelab-private:9090"],
+			"accept": ["tag:homelab-friends-exposed:22", "tag:homelab:9090"],
 		},
 		{
 			"src":    "group:friends",
 			"accept": ["tag:homelab-friends-exposed:8096", "tag:homelab-friends-exposed:25565"],
-			"deny":   ["tag:homelab-friends-exposed:22", "tag:homelab-private:3000", "tag:homelab-friends-exposed:9091"],
+			"deny":   ["tag:homelab-friends-exposed:22", "tag:homelab:3000", "tag:homelab-friends-exposed:9091"],
+		},
+		{
+			"src":    "tag:laptop",
+			"accept": ["tag:homelab:22", "tag:homelab:3000"],
 		},
 	],
 }
