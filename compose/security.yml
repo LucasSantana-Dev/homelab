@@ -4,12 +4,13 @@
 services:
   # Pi-hole - LOCALHOST ONLY (Local Network Service)
   pihole:
-    image: ${IMG_PIHOLE:-pihole/pihole:2025.03.2}
+    image: ${IMG_PIHOLE:-pihole/pihole:2026.04.0}
     container_name: pihole
     restart: unless-stopped
     volumes:
       - ../config/nginx/www/certbot:/var/www/certbot:ro
       - pihole_data:/etc/pihole
+      - ../config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
     environment:
       - TZ=${TIMEZONE}
       - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}

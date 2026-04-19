@@ -12,7 +12,7 @@ services:
       - INTERNAL_IP=0.0.0.0
       - STREMIO_SERVER_PORT=11470
       - STREMIO_SERVER_HOST=0.0.0.0
-      - STREMIO_SERVER_URL=https://stremio.homelab.example.com
+      - STREMIO_SERVER_URL=${STREMIO_PUBLIC_URL:-https://server-do-luk.tailab88e9.ts.net}
     volumes:
       - ../config/nginx/www/certbot:/var/www/certbot:ro
       - ../config/stremio:/root/.stremio-server

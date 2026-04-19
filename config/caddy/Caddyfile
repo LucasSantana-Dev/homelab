@@ -32,8 +32,12 @@ http://cockpit.home {
 	}
 }
 
+http://stremio.home {
+	reverse_proxy 127.0.0.1:11470
+}
+
 http://homelab.home, http://home {
-	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home" 200
+	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home stremio.home" 200
 }
 
 :80 {

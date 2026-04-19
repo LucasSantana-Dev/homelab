@@ -196,6 +196,8 @@ appdata/
 config/homeassistant/config/home-assistant_v2.db-shm
 config/homeassistant/config/home-assistant_v2.db-wal
 config/pihole/
+!config/pihole/etc-dnsmasq.d/
+!config/pihole/etc-dnsmasq.d/*.conf
 
 # Additional sensitive files found
 config/homeassistant/config/home-assistant.log*
