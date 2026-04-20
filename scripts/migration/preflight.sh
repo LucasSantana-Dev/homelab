@@ -26,8 +26,8 @@ free -h
 
 echo
 echo "Compose edge services"
-docker ps --format '{{.Names}} {{.Status}}' | grep -E '^(nginx-proxy|cloudflared) ' || {
-  echo "Expected compose edge services are not both running"
+docker ps --format '{{.Names}} {{.Status}}' | grep -E '^(caddy-lan|cloudflared) ' || {
+  echo "Expected compose edge services (caddy-lan, cloudflared) are not both running"
   exit 1
 }
 

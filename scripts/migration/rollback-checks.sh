@@ -21,7 +21,7 @@ echo "helm rollback -n ${NAMESPACE} ${RELEASE} ${REVISION}"
 
 echo
 echo "Compose edge fallback check"
-docker ps --format '{{.Names}} {{.Status}}' | grep -E '^(nginx-proxy|cloudflared) ' || {
-  echo "Compose edge services are not both running"
+docker ps --format '{{.Names}} {{.Status}}' | grep -E '^(caddy-lan|cloudflared) ' || {
+  echo "Compose edge services (caddy-lan, cloudflared) are not both running"
   exit 1
 }

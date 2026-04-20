@@ -72,7 +72,7 @@ NC='\033[0m'
 # Container groups for safe rolling updates (order matters)
 declare -a GROUP_DATABASES=("nextcloud-db" "authentik-db" "paperless-db" "nextcloud-redis" "authentik-redis" "paperless-redis")
 declare -a GROUP_SECURITY=("authentik-server" "authentik-worker")
-declare -a GROUP_CORE=("nginx-proxy" "homepage" "homeassistant" "vaultwarden")
+declare -a GROUP_CORE=("caddy-lan" "homepage" "homeassistant" "vaultwarden")
 declare -a GROUP_APPS=("jellyfin" "stremio-server" "n8n" "nextcloud" "paperless-ngx" "filebrowser")
 declare -a GROUP_MONITORING=("prometheus" "grafana" "loki" "promtail" "alertmanager" "netdata" "blackbox-exporter" "node-exporter" "cadvisor")
 declare -a GROUP_UTILITIES=("portainer" "uptime-kuma" "whats-up-docker" "pihole")
@@ -194,7 +194,7 @@ queue_nginx_reload_after_authentik_update() {
 
     if requires_nginx_reload_for_container "$container_name"; then
         RELOAD_NGINX_AFTER_AUTHENTIK=1
-        log_info "Queued nginx-proxy reload after $container_name recreate to refresh Authentik upstream resolution"
+        log_info "Queued caddy-lan reload after $container_name recreate to refresh Authentik upstream resolution"
     fi
 }
 
@@ -203,35 +203,35 @@ reload_nginx_proxy_after_authentik_updates() {
         return 0
     fi
 
-    log "Refreshing nginx-proxy after Authentik updates..."
+    log "Refreshing caddy-lan after Authentik updates..."
 
-    if ! container_exists "nginx-proxy"; then
-        log_warning "nginx-proxy container not found; skipping Authentik post-update reload"
+    if ! container_exists "caddy-lan"; then
+        log_warning "caddy-lan container not found; skipping Authentik post-update reload"
         return 0
     fi
 
-    local nginx_status
-    nginx_status=$(docker inspect --format='{{.State.Status}}' nginx-proxy 2>/dev/null || echo "not_found")
-    if [[ "$nginx_status" != "running" ]]; then
-        log_warning "nginx-proxy is not running (status: $nginx_status); skipping Authentik post-update reload"
+    local caddy_status
+    caddy_status=$(docker inspect --format='{{.State.Status}}' caddy-lan 2>/dev/null || echo "not_found")
+    if [[ "$caddy_status" != "running" ]]; then
+        log_warning "caddy-lan is not running (status: $caddy_status); skipping Authentik post-update reload"
         return 0
     fi
 
-    if docker exec nginx-proxy nginx -s reload 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "nginx-proxy reloaded after Authentik updates"
+    if docker exec caddy-lan caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tee -a "$LOG_FILE"; then
+        log_success "caddy-lan reloaded after Authentik updates"
         RELOAD_NGINX_AFTER_AUTHENTIK=0
         return 0
     fi
 
-    log_warning "nginx-proxy reload failed after Authentik updates; attempting recreate fallback"
-    if docker compose -f "$HOMELAB_DIR/docker-compose.yml" up -d --no-deps --force-recreate nginx 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "nginx-proxy recreated after Authentik updates"
+    log_warning "caddy-lan reload failed after Authentik updates; attempting recreate fallback"
+    if docker compose -f "$HOMELAB_DIR/docker-compose.yml" up -d --no-deps --force-recreate caddy-lan 2>&1 | tee -a "$LOG_FILE"; then
+        log_success "caddy-lan recreated after Authentik updates"
         RELOAD_NGINX_AFTER_AUTHENTIK=0
         return 0
     fi
 
-    log_error "Failed to refresh nginx-proxy after Authentik updates"
-    FAILED_LIST+=("nginx-proxy(refresh-after-authentik)")
+    log_error "Failed to refresh caddy-lan after Authentik updates"
+    FAILED_LIST+=("caddy-lan(refresh-after-authentik)")
     FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
     return 1
 }
