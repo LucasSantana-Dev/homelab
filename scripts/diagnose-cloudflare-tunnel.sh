@@ -53,7 +53,7 @@ else
 fi
 
 section CONFIG
-cat "${HOMELAB_DIR:-$HOME/homelab}/config/cloudflared/config.yml" 2>/dev/null | head -40 || echo '(config.yml not found)'
+head -40 "${HOMELAB_DIR:-$HOME/homelab}/config/cloudflared/config.yml" 2>/dev/null || echo '(config.yml not found)'
 
 section LOGS_LAST_50
 docker logs --tail 50 cloudflared 2>&1 || echo '(no logs)'
