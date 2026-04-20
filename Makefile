@@ -547,6 +547,27 @@ serena-mcp-setup: ## Build and register Serena MCP image with node+terraform dep
 	@echo "🧠 Setting up Serena MCP..."
 	@./scripts/deployment/setup-serena-mcp.sh
 
+k3s-registry-mirror: ## Configure local-registry as a Docker Hub pull-through cache + install registries.yaml (see docs/k3s-registry-mirror.md)
+	@echo "🪞 Configuring k3s registry mirror..."
+	@if [ ! -f /etc/rancher/k3s/registries.yaml ]; then \
+	  echo "Installing /etc/rancher/k3s/registries.yaml from template"; \
+	  sudo mkdir -p /etc/rancher/k3s; \
+	  sudo cp config/k3s/registries.yaml.example /etc/rancher/k3s/registries.yaml; \
+	else \
+	  echo "/etc/rancher/k3s/registries.yaml already exists — skipping (edit manually if needed)"; \
+	fi
+	@docker stop local-registry 2>/dev/null || true
+	@docker rm local-registry 2>/dev/null || true
+	@docker run -d --restart=unless-stopped \
+	  --name local-registry \
+	  -p 127.0.0.1:5000:5000 \
+	  -v local-registry-data:/var/lib/registry \
+	  -e REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io \
+	  registry:2
+	@echo "Restarting k3s to pick up new registries.yaml"
+	@sudo systemctl restart k3s
+	@echo "✅ Registry mirror configured — verify: sudo k3s crictl pull redis:alpine"
+
 migration-toolchain: ## Install kubectl/helm/sops/age into ~/.local/bin
 	@echo "🧰 Installing migration tooling"
 	@./scripts/migration/install-tooling.sh
