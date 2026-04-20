@@ -35,6 +35,11 @@ Legend: `[ ]` not done · `[x]` done · `[~]` partial / verify.
 - [ ] **DNS A records** for `homelab.example.com` +
       `*.homelab.example.com` → `100.64.0.10`. Already documented in
       `docs/tailscale-dns-records-setup.md` — apply if not yet done.
+- **⚠ DNS guardrail** — never publish Tailscale A records for
+  `*.luk-homeserver.com.br`. That domain is Cloudflare-tunneled;
+  overlapping records would bypass Cloudflare Access. See
+  [`access-layers.md`](access-layers.md) for the canonical
+  service × layer matrix.
 
 ## 3. HTTPS certificates
 
