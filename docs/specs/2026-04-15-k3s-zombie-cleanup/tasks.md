@@ -15,4 +15,4 @@
 - [x] Mark this spec `status: shipped`, add PR URL.
 - [x] Move spec entry in `docs/roadmap.md` from "Next (proposed)" to "Recently shipped".
 - [x] Add CHANGELOG `[Unreleased] ### Removed` entry citing ADR 0004.
-- [ ] Merge PR #38.
+- [ ] Merge PR #39.

@@ -143,7 +143,7 @@ python -m homelab_manager --help
 - `make server-mode-apply` - Apply Desktop -> Server-mode conversion (`ubuntu-server-minimal`, target + package cleanup)
 - `make post-reboot-validate` - Validate host, timers, and homelab health after reboot
 
-> **Note:** k3s/Hybrid Migration tooling was removed in PR #38 per [ADR 0004](docs/adr/0004-drop-k3s.md). Kubernetes artifacts are preserved in `archive/k8s-dropped/` for audit purposes.
+> **Note:** k3s/Hybrid Migration tooling was removed in PR #39 per [ADR 0004](docs/adr/0004-drop-k3s.md). Kubernetes artifacts are preserved in `archive/k8s-dropped/` for audit purposes.
 
 ### Forge Space MCP Gateway (Makefile)
 

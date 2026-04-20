@@ -3,7 +3,7 @@ status: shipped
 created: 2026-04-15
 shipped: 2026-04-20
 owner: lucassantana
-pr: https://github.com/LucasSantana-Dev/homelab/pull/38
+pr: https://github.com/LucasSantana-Dev/homelab/pull/39
 tags: k3s,cleanup,audit-p0
 ---
 
