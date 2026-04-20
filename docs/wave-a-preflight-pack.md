@@ -98,4 +98,4 @@ helm rollback -n observability blackbox-exporter 1
   - Terraform apply path completes with post-plan no-op
   - Post-apply health, burn-in, migration-budget, and migration-preflight are green
 - If swap trend worsens above ~2.0 Gi with upward trend or burn-in degrades, pause Wave A and schedule phase-2 host maintenance.
-- Keep compose edge (`nginx-proxy`, `cloudflared`) running for rollback safety.
+- Keep compose edge (`caddy-lan`, `cloudflared`) running for rollback safety. nginx-proxy was retired in PR #34; caddy-lan now owns :80 and routes to k3s Traefik.
