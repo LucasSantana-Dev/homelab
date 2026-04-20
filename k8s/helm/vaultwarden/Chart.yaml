@@ -1,6 +1,0 @@
-apiVersion: v2
-name: vaultwarden
-version: 0.1.0
-appVersion: "latest"
-description: Vaultwarden password manager — Wave C migration.
-type: application

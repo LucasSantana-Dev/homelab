@@ -134,26 +134,16 @@ python -m homelab_manager --help
 - `make ssl-renew` - Issue/renew wildcard TLS cert via Cloudflare DNS-01 and restart nginx
 - `make ssl-status` - Show the currently served certificate details for `auth.$DOMAIN`
 
-### Hybrid Migration (Makefile)
+### Host Maintenance (Makefile)
 
 - `make serena-mcp-setup` - Build and register Serena MCP runtime with node/terraform dependencies
-- `make migration-toolchain` - Install `kubectl`, `helm`, `sops`, and `age` into `~/.local/bin`
-- `make migration-preflight` - Validate migration toolchain, edge services, and lint checks
-- `make k3s-bootstrap` - Install/start k3s, sync user kubeconfig (backup + replace), wait for API readiness, and apply baseline namespaces/policies
 - `make host-stabilize-prep` - Create recovery point (backup + host snapshots) before host package cleanup; prompts for sudo to capture root-owned container volumes
 - `make host-swap-recover` - Reset swap and capture pre/post pressure diagnostics
 - `make server-mode-plan` - Preview in-place Desktop -> Server-mode conversion
 - `make server-mode-apply` - Apply Desktop -> Server-mode conversion (`ubuntu-server-minimal`, target + package cleanup)
-- `make post-reboot-validate` - Validate host, timers, k3s context, and homelab health after reboot
-- `make wave-a-deploy` - Deploy wave A charts (`homepage`, `blackbox-exporter`)
-- `make wave-a-gate` - Deploy Wave A and run burn-in stability gate before traffic shift
-- `make wave-b-deploy` - Deploy wave B chart (`filebrowser`)
-- `make migration-budget` - Check namespace quotas and node pressure snapshots
-- `make wave-rollback NS=<ns> RELEASE=<name> [REV=<n>]` - Run rollback safety checks
+- `make post-reboot-validate` - Validate host, timers, and homelab health after reboot
 
-Troubleshooting:
-
-- If `kubectl` shows `current-context is not set` or API errors (`the server could not find the requested resource`), re-run `make k3s-bootstrap` to rebuild local kubeconfig from k3s admin config.
+> **Note:** k3s/Hybrid Migration tooling was removed in PR #38 per [ADR 0004](docs/adr/0004-drop-k3s.md). Kubernetes artifacts are preserved in `archive/k8s-dropped/` for audit purposes.
 
 ### Forge Space MCP Gateway (Makefile)
 
@@ -224,7 +214,7 @@ homelab/
 │   └── systemd/                 # Systemd service files
 ├── config/                       # Service configurations
 ├── infra/terraform/              # Phase-1 DNS/tunnel/network IaC declarations
-├── k8s/                          # K3s manifests and Helm charts for migration waves
+├── archive/k8s-dropped/          # Historical K3s manifests (retired per ADR 0004)
 ├── appdata/                      # Service data (volumes)
 ├── docker-compose.yml            # Main orchestrator (includes modules)
 ├── pyproject.toml                # Python project config (single source)

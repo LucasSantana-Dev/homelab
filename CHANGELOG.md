@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **k3s / Hybrid Migration tooling** - Executed [ADR 0004](docs/adr/0004-drop-k3s.md): all workloads consolidated on Docker Compose. Deleted live `k8s/` tree, `scripts/migration/`, bootstrap k3s-secret scripts, `homelab-k3s-health.{service,timer}`, `.claude/skills/homelab-{k3s-ops,wave-migration}/`, plus migration docs (`wave-a-preflight-pack.md`, `k3s-restart-baseline.md`, `k8s-terraform-migration-roadmap.md`, `k8s-phase2-readiness-gate.md`). Pruned k3s/kubectl/helm references from `Makefile`, `README.md`, `scripts/README.md`, deployment/maintenance scripts, and `.pre-commit-config.yaml`. Historical snapshot preserved under `archive/k8s-dropped/`.
+
 ### Added (Operations)
 
 - **Lucky DB recovery runbook** - Added `docs/lucky-db-recovery-runbook.md` with backup-only and full-recovery workflows for `ERR_DB_SCHEMA_MISSING`, including verification commands and backup location checks.

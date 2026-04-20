@@ -91,7 +91,6 @@ else
 fi
 
 check_active docker.service
-check_active k3s.service
 check_active ssh.service
 check_active tailscaled.service
 
@@ -105,25 +104,6 @@ if systemctl is-active --quiet homelab-watchdog.timer; then
   ok "homelab-watchdog.timer is active"
 else
   fail "homelab-watchdog.timer is not active"
-fi
-
-CURRENT_CONTEXT="$(kubectl config current-context 2>/dev/null || true)"
-if [[ -n "${CURRENT_CONTEXT}" ]]; then
-  ok "kubectl context: ${CURRENT_CONTEXT}"
-else
-  fail "kubectl context is empty"
-fi
-
-if kubectl get nodes >/dev/null 2>&1; then
-  ok "kubectl get nodes succeeded"
-else
-  fail "kubectl get nodes failed"
-fi
-
-if kubectl get ns platform observability apps >/dev/null 2>&1; then
-  ok "required namespaces are present"
-else
-  fail "required namespaces missing"
 fi
 
 if "${PROJECT_ROOT}/scripts/homelab" health >/dev/null 2>&1; then

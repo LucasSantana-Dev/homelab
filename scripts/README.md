@@ -23,16 +23,6 @@ scripts/
 │   ├── post-reboot-validate.sh
 │   ├── update-containers.sh
 │   └── update-containers.py
-├── migration/           # K3s/Terraform migration workflow scripts
-│   ├── preflight.sh
-│   ├── install-tooling.sh
-│   ├── bootstrap-k3s.sh
-│   ├── wave-a-gate.sh
-│   ├── cutover-checks.sh
-│   ├── rollback-checks.sh
-│   ├── check-resource-budget.sh
-│   ├── sops-age-init.sh
-│   └── encrypt-k8s-secret.sh
 ├── monitoring/          # Status and health monitoring
 │   ├── container-status.py
 │   └── status-services.sh
@@ -143,33 +133,7 @@ Converts desktop host to server mode in place. Default is preview; use `--apply`
 
 ### `maintenance/post-reboot-validate.sh`
 
-Validates server-mode reboot outcome, core services, timers, k3s context, and homelab health.
-
-## Migration Scripts
-
-### `migration/preflight.sh`
-
-Runs migration readiness checks for tools, compose edge state, Terraform, and Helm charts.
-
-### `migration/install-tooling.sh`
-
-Installs migration prerequisites (`kubectl`, `helm`, `sops`, `age`) into `~/.local/bin` without sudo.
-
-### `migration/bootstrap-k3s.sh`
-
-Installs k3s (if needed) and applies baseline namespaces plus resource policies.
-
-### `migration/cutover-checks.sh`
-
-Validates Helm release health and endpoint availability after wave cutover.
-
-### `migration/rollback-checks.sh`
-
-Prints rollback status/history checks and validates compose edge fallback path.
-
-### `migration/wave-a-gate.sh`
-
-Deploys Wave A releases and enforces a configurable burn-in stability gate before traffic shift.
+Validates server-mode reboot outcome, core services, timers, and homelab health.
 
 ## Security Scripts
 
