@@ -1,0 +1,12 @@
+[Unit]
+Description=Homelab Docker storage reclamation (weekly)
+Requires=docker-prune.service
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=30m
+AccuracySec=15m
+
+[Install]
+WantedBy=timers.target
