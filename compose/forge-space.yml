@@ -14,12 +14,18 @@ services:
       DATABASE_URL: sqlite:////data/mcp.db
       MCPGATEWAY_UI_ENABLED: ${FORGE_MCP_UI_ENABLED:-true}
       MCPGATEWAY_ADMIN_API_ENABLED: ${FORGE_MCP_ADMIN_API_ENABLED:-true}
-      JWT_SECRET_KEY: ${FORGE_MCP_JWT_SECRET_KEY:?FORGE_MCP_JWT_SECRET_KEY is required}
-      AUTH_ENCRYPTION_SECRET: ${FORGE_MCP_JWT_SECRET_KEY:?FORGE_MCP_JWT_SECRET_KEY is required}
+      # Secrets are validated by the forge-mcp-gateway container itself at
+      # startup (empty value → refuse to boot). We deliberately avoid `:?`
+      # here because compose validates env interpolation for *all* services
+      # in the merged project, even profile-gated ones — a missing secret
+      # would block the entire stack (including cloudflared / caddy-lan)
+      # from coming up.
+      JWT_SECRET_KEY: ${FORGE_MCP_JWT_SECRET_KEY:-}
+      AUTH_ENCRYPTION_SECRET: ${FORGE_MCP_JWT_SECRET_KEY:-}
       BASIC_AUTH_USER: ${FORGE_MCP_BASIC_AUTH_USER:-admin}
-      BASIC_AUTH_PASSWORD: ${FORGE_MCP_BASIC_AUTH_PASSWORD:?FORGE_MCP_BASIC_AUTH_PASSWORD is required}
+      BASIC_AUTH_PASSWORD: ${FORGE_MCP_BASIC_AUTH_PASSWORD:-}
       PLATFORM_ADMIN_EMAIL: ${FORGE_MCP_ADMIN_EMAIL:-admin@example.com}
-      PLATFORM_ADMIN_PASSWORD: ${FORGE_MCP_ADMIN_PASSWORD:?FORGE_MCP_ADMIN_PASSWORD is required}
+      PLATFORM_ADMIN_PASSWORD: ${FORGE_MCP_ADMIN_PASSWORD:-}
       PLATFORM_ADMIN_FULL_NAME: ${FORGE_MCP_ADMIN_FULL_NAME:-Forge Platform Admin}
       AUTH_REQUIRED: ${FORGE_MCP_AUTH_REQUIRED:-true}
       SECURE_COOKIES: ${FORGE_MCP_SECURE_COOKIES:-false}
