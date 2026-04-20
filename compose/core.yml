@@ -66,8 +66,11 @@ services:
       - "127.0.0.1:2000:2000"
     networks:
       - frontend
-    depends_on:
-      - nginx
+    extra_hosts:
+      # Required so cloudflared can dial the host-networked caddy-lan
+      # instance at `host.docker.internal:80` (see config.yml). Docker
+      # maps `host-gateway` to the host bridge IP automatically.
+      - "host.docker.internal:host-gateway"
     logging:
       driver: "json-file"
       options:

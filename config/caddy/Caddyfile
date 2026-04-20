@@ -3,6 +3,18 @@
 	default_bind 0.0.0.0
 }
 
+# ---------- Snippets ----------
+#
+# Rewrite Host header and forward to the k3s Traefik ClusterIP so
+# internal *.k3s.local ingresses match from an external hostname.
+(to_k3s_traefik) {
+	reverse_proxy http://10.43.242.180:80 {
+		header_up Host {args[0]}
+	}
+}
+
+# ---------- LAN (*.home) ----------
+
 http://ai.home {
 	reverse_proxy 127.0.0.1:3000
 }
@@ -40,6 +52,64 @@ http://homelab.home, http://home {
 	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home stremio.home" 200
 }
 
+# ---------- Public HTTPS via Cloudflare Tunnel (*.luk-homeserver.com.br) ----------
+#
+# Cloudflare terminates TLS at the edge; cloudflared forwards plain HTTP
+# to this caddy instance, which routes each hostname to the correct
+# backend. k3s apps get their traffic via the Traefik ClusterIP with
+# a Host rewrite; docker-native services get direct 127.0.0.1 proxying.
+
+http://luk-homeserver.com.br, http://www.luk-homeserver.com.br, http://home.luk-homeserver.com.br {
+	import to_k3s_traefik home.k3s.local
+}
+
+http://homeassistant.luk-homeserver.com.br {
+	import to_k3s_traefik homeassistant.k3s.local
+}
+
+http://grafana.luk-homeserver.com.br {
+	import to_k3s_traefik grafana.k3s.local
+}
+
+http://prometheus.luk-homeserver.com.br {
+	import to_k3s_traefik prometheus.k3s.local
+}
+
+http://n8n.luk-homeserver.com.br {
+	import to_k3s_traefik n8n.k3s.local
+}
+
+http://cloud.luk-homeserver.com.br {
+	import to_k3s_traefik nextcloud.k3s.local
+}
+
+http://docs.luk-homeserver.com.br {
+	import to_k3s_traefik paperless.k3s.local
+}
+
+http://vault.luk-homeserver.com.br {
+	import to_k3s_traefik vault.k3s.local
+}
+
+http://auth.luk-homeserver.com.br {
+	import to_k3s_traefik authentik.k3s.local
+}
+
+http://blackbox.luk-homeserver.com.br {
+	import to_k3s_traefik blackbox.k3s.local
+}
+
+http://jellyfin.luk-homeserver.com.br {
+	import to_k3s_traefik jellyfin.k3s.local
+}
+
+# Docker-native services on host ports (no k3s dependency)
+http://stremio.luk-homeserver.com.br {
+	reverse_proxy 127.0.0.1:11470
+}
+
+# ---------- Catch-all ----------
+
 :80 {
-	respond "unknown host — try http://homelab.home/" 404
+	respond "unknown host — try http://homelab.home/ or luk-homeserver.com.br" 404
 }
