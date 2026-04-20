@@ -1,9 +1,9 @@
 # LAN-wide reverse proxy — Caddy, host network, *.home routing
-# Depends on Pi-hole resolving *.home → this host (192.168.0.11)
+# Depends on Pi-hole resolving *.home → this host (192.168.0.6)
 
 services:
   caddy-lan:
-    image: caddy:2-alpine
+    image: ${IMG_CADDY:-caddy:2.10.2-alpine}
     container_name: caddy-lan
     restart: unless-stopped
     network_mode: host

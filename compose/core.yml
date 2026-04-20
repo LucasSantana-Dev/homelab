@@ -47,7 +47,7 @@ services:
 
   # Cloudflare Tunnel - Selected public hostnames only
   cloudflared:
-    image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:2024.12.0}
+    image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:2025.4.0}
     container_name: cloudflared
     restart: unless-stopped
     command:
@@ -76,7 +76,7 @@ services:
 
   # Homepage Dashboard - Tailscale Only
   homepage:
-    image: ghcr.io/gethomepage/homepage:v0.9.5
+    image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v0.10.9}
     container_name: homepage
     restart: unless-stopped
     volumes:
@@ -111,7 +111,7 @@ services:
 
   # Uptime Kuma - Tailscale Only
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    image: ${IMG_UPTIME_KUMA:-louislam/uptime-kuma:1.23.16}
     container_name: uptime-kuma
     restart: unless-stopped
     volumes:
@@ -141,7 +141,7 @@ services:
 
   # Portainer - TAILSCALE ONLY (Sensitive Service)
   portainer:
-    image: ${IMG_PORTAINER:-portainer/portainer-ce:2.21}
+    image: ${IMG_PORTAINER:-portainer/portainer-ce:2.21.4}
     container_name: portainer
     restart: unless-stopped
     volumes:
@@ -169,7 +169,7 @@ services:
 
   # What's Up Docker - TAILSCALE ONLY (Sensitive Service)
   whats-up-docker:
-    image: fmartinou/whats-up-docker:6.5.0
+    image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
@@ -205,7 +205,7 @@ services:
 
   # FileBrowser - NAS-like File Manager
   filebrowser:
-    image: filebrowser/filebrowser:v2.28.0
+    image: ${IMG_FILEBROWSER:-filebrowser/filebrowser:v2.63.2}
     container_name: filebrowser
     restart: unless-stopped
     volumes:
