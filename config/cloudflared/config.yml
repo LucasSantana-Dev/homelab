@@ -1,75 +1,68 @@
-# Cloudflare Tunnel ingress policy for phase-1 public homelab services.
-# Only explicitly listed hostnames are published.
+# Cloudflare Tunnel ingress policy.
+#
+# All traffic is forwarded to the host-networked caddy-lan instance,
+# which performs per-hostname routing into docker containers or the
+# k3s Traefik ClusterIP. `host.docker.internal` resolves to the
+# docker host because the cloudflared service in compose declares
+# `extra_hosts: ["host.docker.internal:host-gateway"]`.
 
 ingress:
   - hostname: luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: luk-homeserver.com.br
   - hostname: www.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: www.luk-homeserver.com.br
-  - hostname: homeassistant.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+  - hostname: home.luk-homeserver.com.br
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
+      httpHostHeader: home.luk-homeserver.com.br
+  - hostname: homeassistant.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
       httpHostHeader: homeassistant.luk-homeserver.com.br
   - hostname: grafana.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: grafana.luk-homeserver.com.br
-  - hostname: portainer.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+  - hostname: prometheus.luk-homeserver.com.br
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
-      httpHostHeader: portainer.luk-homeserver.com.br
+      httpHostHeader: prometheus.luk-homeserver.com.br
   - hostname: n8n.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: n8n.luk-homeserver.com.br
   - hostname: cloud.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: cloud.luk-homeserver.com.br
   - hostname: docs.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: docs.luk-homeserver.com.br
   - hostname: vault.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: vault.luk-homeserver.com.br
   - hostname: auth.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: auth.luk-homeserver.com.br
-  - hostname: home.luk-homeserver.com.br
-    service: https://nginx-proxy:443
-    originRequest:
-      noTLSVerify: true
-      httpHostHeader: home.luk-homeserver.com.br
   - hostname: blackbox.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
       httpHostHeader: blackbox.luk-homeserver.com.br
-  - hostname: files.luk-homeserver.com.br
-    service: https://nginx-proxy:443
+  - hostname: jellyfin.luk-homeserver.com.br
+    service: http://host.docker.internal:80
     originRequest:
-      noTLSVerify: true
-      httpHostHeader: files.luk-homeserver.com.br
+      httpHostHeader: jellyfin.luk-homeserver.com.br
+  - hostname: stremio.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: stremio.luk-homeserver.com.br
 
-  # Block all other hostnames on this tunnel by default.
-  - hostname: dev.luk-homeserver.com.br
-    service: http://dev-dashboard:8899
-
+  # Final catch-all — cloudflared returns 404 for any hostname not listed above.
   - service: http_status:404
