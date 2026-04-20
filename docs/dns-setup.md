@@ -136,9 +136,12 @@ curl -I https://auth.homelab.example.com
 
 ### Connection refused after DNS works
 
-1. Verify nginx is running: `docker ps | grep nginx`
-2. Check nginx can reach authentik: `docker exec nginx-proxy ping authentik-server`
-3. Review nginx logs: `docker logs nginx-proxy`
+> **Note (PR #34):** nginx-proxy was retired. The active reverse proxy is `caddy-lan` (host network). Troubleshooting commands below target it.
+
+1. Verify caddy is running: `docker ps --filter name=caddy-lan`
+2. Validate the Caddyfile: `docker exec caddy-lan caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`
+3. Review caddy logs: `docker logs caddy-lan --tail 50`
+4. Confirm k3s Traefik is reachable from the host: `curl -H "Host: authentik.k3s.local" http://10.43.242.180/`
 
 ### SSL certificate errors
 
@@ -152,17 +155,7 @@ If you see `NET::ERR_CERT_AUTHORITY_INVALID`:
    make ssl-status
    ```
 
-2. Verify cert files exist in nginx container:
-
-   ```bash
-   docker exec nginx-proxy ls -la /etc/nginx/ssl/live/homelab.example.com/
-   ```
-
-3. Check cert expiration:
-
-   ```bash
-   docker exec nginx-proxy openssl x509 -in /etc/nginx/ssl/live/homelab.example.com/fullchain.pem -noout -dates
-   ```
+2. *(Legacy, nginx-proxy retired)* Cert files were managed by nginx-proxy via `/etc/nginx/ssl/live/`. With caddy-lan + cloudflared, public-facing TLS is terminated at Cloudflare edge; no local cert to inspect. For tailnet HTTPS, use `tailscale cert` (see `docs/tailscale-features-checklist.md`).
 
 4. Re-issue/renew wildcard cert with DNS-01 (Cloudflare token required):
 

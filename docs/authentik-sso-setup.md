@@ -465,9 +465,9 @@ For automation:
 
 **Solution**:
 
-1. Check Authentik containers are running: `docker ps | grep authentik`
-2. Verify database connectivity: `docker logs authentik-server`
-3. Check Nginx reverse proxy config: `docker exec nginx-proxy nginx -t`
+1. Check Authentik pods are running (k3s): `sudo k3s kubectl -n apps get pods -l app.kubernetes.io/name=authentik`
+2. Verify database connectivity: `sudo k3s kubectl -n apps logs deploy/authentik-authentik-server`
+3. *(PR #34)* Caddy → k3s Traefik routing replaces the old nginx proxy. Validate caddy: `docker exec caddy-lan caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`
 
 ---
 
