@@ -61,6 +61,13 @@ The `.sops.yaml` file defines which files encrypt with which age key:
 - All `.enc.yaml` files use the local age key from `~/.config/sops/age/keys.txt`.
 - Paths matching regex patterns in `creation_rules` auto-encrypt.
 
+**Initial setup.** The `.sops.yaml` key field ships with an obvious
+placeholder (`age1PLACEHOLDER…`). Running `sops -e` against it will
+fail — that is intentional. Replace it with the *public* half of the
+key printed by `age-keygen` above before encrypting any secrets in
+this repo. No `.enc.yaml` files currently exist, so no re-encryption
+is required on first setup.
+
 ## Rotation/Migration
 
 If rotating the age key in the future:
