@@ -162,7 +162,7 @@ make security
 
 The project includes a comprehensive CI/CD pipeline:
 
-- **Multi-Python Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12
+- **Multi-Python Testing**: Python 3.10, 3.11, 3.12
 - **Code Quality**: Linting, formatting, type checking
 - **Security Scanning**: Bandit, Safety, Trivy
 - **Docker Validation**: Compose syntax checking

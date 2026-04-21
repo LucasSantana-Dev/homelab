@@ -196,11 +196,12 @@ class TestHomelabUpdateManager:
             mock_container.name = "test-service"
             mock_client.containers.list.return_value = [mock_container]
 
-            with patch("homelab_manager.updates.subprocess.run") as mock_run, patch(
-                "homelab_manager.updates.time.sleep"
-            ), patch("homelab_manager.updates.os.chdir"), patch(
-                "homelab_manager.updates.console.print"
-            ) as mock_print:
+            with (
+                patch("homelab_manager.updates.subprocess.run") as mock_run,
+                patch("homelab_manager.updates.time.sleep"),
+                patch("homelab_manager.updates.os.chdir"),
+                patch("homelab_manager.updates.console.print") as mock_print,
+            ):
                 mock_run.return_value = Mock(returncode=0)
 
                 manager = HomelabUpdateManager()
@@ -219,11 +220,12 @@ class TestHomelabUpdateManager:
 
             mock_client.containers.list.return_value = []
 
-            with patch("homelab_manager.updates.subprocess.run") as mock_run, patch(
-                "homelab_manager.updates.time.sleep"
-            ), patch("homelab_manager.updates.os.chdir"), patch(
-                "homelab_manager.updates.console.print"
-            ) as mock_print:
+            with (
+                patch("homelab_manager.updates.subprocess.run") as mock_run,
+                patch("homelab_manager.updates.time.sleep"),
+                patch("homelab_manager.updates.os.chdir"),
+                patch("homelab_manager.updates.console.print") as mock_print,
+            ):
                 mock_run.return_value = Mock(returncode=0)
 
                 manager = HomelabUpdateManager()
@@ -238,12 +240,14 @@ class TestHomelabUpdateManager:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
-            with patch(
-                "homelab_manager.updates.subprocess.run",
-                side_effect=subprocess.CalledProcessError(1, "docker-compose"),
-            ), patch("homelab_manager.updates.os.chdir"), patch(
-                "homelab_manager.updates.console.print"
-            ) as mock_print:
+            with (
+                patch(
+                    "homelab_manager.updates.subprocess.run",
+                    side_effect=subprocess.CalledProcessError(1, "docker-compose"),
+                ),
+                patch("homelab_manager.updates.os.chdir"),
+                patch("homelab_manager.updates.console.print") as mock_print,
+            ):
                 manager = HomelabUpdateManager()
                 result = manager.update_service("test-service")
 
@@ -259,13 +263,17 @@ class TestHomelabUpdateManager:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
-            with patch("homelab_manager.updates.subprocess.run") as mock_run, patch(
-                "homelab_manager.updates.os.chdir"
-            ), patch("homelab_manager.updates.console.print") as mock_print, patch(
-                "homelab_manager.updates.HomelabAutomation"
-            ) as mock_automation_class, patch(
-                "homelab_manager.updates.HomelabHealthMonitor"
-            ) as mock_health_class:
+            with (
+                patch("homelab_manager.updates.subprocess.run") as mock_run,
+                patch("homelab_manager.updates.os.chdir"),
+                patch("homelab_manager.updates.console.print") as mock_print,
+                patch(
+                    "homelab_manager.updates.HomelabAutomation"
+                ) as mock_automation_class,
+                patch(
+                    "homelab_manager.updates.HomelabHealthMonitor"
+                ) as mock_health_class,
+            ):
                 # Mock backup
                 mock_automation = Mock()
                 mock_automation.backup.return_value = "/backup/path"
@@ -289,9 +297,12 @@ class TestHomelabUpdateManager:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
-            with patch("homelab_manager.updates.console.print") as mock_print, patch(
-                "homelab_manager.updates.HomelabAutomation"
-            ) as mock_automation_class:
+            with (
+                patch("homelab_manager.updates.console.print") as mock_print,
+                patch(
+                    "homelab_manager.updates.HomelabAutomation"
+                ) as mock_automation_class,
+            ):
                 # Mock backup failure
                 mock_automation = Mock()
                 mock_automation.backup.return_value = None
@@ -311,14 +322,17 @@ class TestHomelabUpdateManager:
             mock_client = Mock()
             mock_docker.return_value = mock_client
 
-            with patch(
-                "homelab_manager.updates.subprocess.run",
-                side_effect=subprocess.CalledProcessError(1, "docker-compose"),
-            ), patch("homelab_manager.updates.os.chdir"), patch(
-                "homelab_manager.updates.console.print"
-            ) as mock_print, patch(
-                "homelab_manager.updates.HomelabAutomation"
-            ) as mock_automation_class:
+            with (
+                patch(
+                    "homelab_manager.updates.subprocess.run",
+                    side_effect=subprocess.CalledProcessError(1, "docker-compose"),
+                ),
+                patch("homelab_manager.updates.os.chdir"),
+                patch("homelab_manager.updates.console.print") as mock_print,
+                patch(
+                    "homelab_manager.updates.HomelabAutomation"
+                ) as mock_automation_class,
+            ):
                 # Mock backup
                 mock_automation = Mock()
                 mock_automation.backup.return_value = "/backup/path"
@@ -390,9 +404,10 @@ class TestHomelabUpdateManager:
             mock_client.images.get.return_value = mock_current_image
             mock_client.images.pull.return_value = mock_latest_image
 
-            with patch("homelab_manager.updates.console.print") as mock_print, patch(
-                "builtins.open", mock_open()
-            ) as mock_file:
+            with (
+                patch("homelab_manager.updates.console.print") as mock_print,
+                patch("builtins.open", mock_open()) as mock_file,
+            ):
                 manager = HomelabUpdateManager()
                 manager.auto_check()
 
@@ -489,13 +504,11 @@ class TestHomelabUpdateManager:
             mock_manager = Mock()
             mock_manager_class.return_value = mock_manager
 
-            with patch(
-                "homelab_manager.updates.argparse.ArgumentParser"
-            ) as mock_parser, patch(
-                "homelab_manager.updates.console.print"
-            ) as mock_print, patch(
-                "homelab_manager.updates.sys.exit"
-            ) as mock_exit:
+            with (
+                patch("homelab_manager.updates.argparse.ArgumentParser") as mock_parser,
+                patch("homelab_manager.updates.console.print") as mock_print,
+                patch("homelab_manager.updates.sys.exit") as mock_exit,
+            ):
                 mock_args = Mock()
                 mock_args.action = "update-service"
                 mock_args.service = None
