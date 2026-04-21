@@ -1,0 +1,36 @@
+# k3s containerd registry config — pull-through cache + optional Docker Hub auth.
+#
+# Install: copy to `/etc/rancher/k3s/registries.yaml`, then
+#   sudo systemctl restart k3s
+#
+# Why: prevents `pull QPS exceeded` (Docker Hub anonymous rate limit —
+# 100 pulls / 6h per IP) when k3s restarts pods or the image cache is
+# evicted after disk pressure.
+#
+# Two mitigations, pick one or both:
+#
+# 1. MIRROR — route docker.io pulls through the existing `local-registry`
+#    container (listening on 127.0.0.1:5000). Requires reconfiguring
+#    that container with REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io
+#    (see `make k3s-registry-mirror` below).
+#
+# 2. AUTH — give containerd a Docker Hub account so the limit doubles
+#    to 200 pulls / 6h. Fill in `username` and `password` (or a PAT).
+#    Leave the `auth` block commented out if you only want mirroring.
+
+mirrors:
+  "docker.io":
+    endpoint:
+      - "http://127.0.0.1:5000"       # local-registry acting as pull-through cache
+      - "https://registry-1.docker.io" # fallback if cache misses or is down
+
+configs:
+  "127.0.0.1:5000":
+    tls:
+      insecure_skip_verify: true
+
+  # Uncomment and fill in to authenticate to Docker Hub (doubles rate limit):
+  # "registry-1.docker.io":
+  #   auth:
+  #     username: "YOUR_DOCKERHUB_USERNAME"
+  #     password: "YOUR_DOCKERHUB_PAT"
