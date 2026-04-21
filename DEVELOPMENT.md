@@ -6,7 +6,7 @@ This document provides comprehensive guidance for developing and maintaining the
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10 or higher
 - Docker and Docker Compose
 - Git
 
