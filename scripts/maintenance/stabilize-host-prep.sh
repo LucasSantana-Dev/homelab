@@ -150,16 +150,6 @@ capture_cmd active_timers systemctl list-timers --no-pager
 capture_cmd docker_ps docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 capture_cmd package_list bash -lc 'dpkg-query -W -f="${Package}\t${Version}\n" | sort'
 
-if command -v kubectl >/dev/null 2>&1; then
-  capture_cmd kubectl_context bash -lc 'kubectl config current-context 2>/dev/null || true'
-  capture_cmd kubectl_nodes bash -lc 'kubectl get nodes -o wide 2>/dev/null || true'
-fi
-
-if [[ -f "${HOME}/.kube/config" ]]; then
-  cp "${HOME}/.kube/config" "${RUN_DIR}/kubeconfig.snapshot"
-  log "Saved kubeconfig snapshot"
-fi
-
 run_privileged_snapshot || true
 
 log "Host stabilization prep complete"

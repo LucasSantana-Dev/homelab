@@ -10,7 +10,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
         args: [--allow-multiple-documents]
-        exclude: ^(config/homeassistant/|k8s/helm/.*/templates/|archive/k8s-dropped/)
+        exclude: ^(config/homeassistant/|archive/k8s-dropped/)
       - id: check-added-large-files
         args: ['--maxkb=1000']
       - id: check-merge-conflict
@@ -79,7 +79,7 @@ repos:
     hooks:
       - id: yamllint
         args: [-d, relaxed]
-        exclude: ^(k8s/helm/.*/templates/|archive/k8s-dropped/)
+        exclude: ^archive/k8s-dropped/
 
   # Markdown
   - repo: https://github.com/igorshubovych/markdownlint-cli

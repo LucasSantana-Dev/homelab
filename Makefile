@@ -11,8 +11,7 @@
         baseline-bundle \
         post-t24-terraform-apply schedule-post-t24-terraform-apply \
         ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
-        serena-mcp-setup migration-toolchain migration-preflight k3s-bootstrap migration-budget \
-        wave-a-deploy wave-a-gate wave-b-deploy wave-rollback \
+        serena-mcp-setup k3s-registry-mirror \
         secret-gate secret-gate-history public-safety-gate public-release-checkpoint rewrite-history \
         forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup
 
@@ -542,7 +541,7 @@ schedule-post-t24-terraform-apply: ## Schedule gated Terraform apply after press
 	   >/dev/null; \
 	 echo "✅ Timer scheduled: homelab-post-t24-terraform-apply.timer (watch_dir=$$watch_dir threshold=$$swap_threshold)"
 
-# Migration helpers (K3s + Terraform)
+# MCP helpers
 serena-mcp-setup: ## Build and register Serena MCP image with node+terraform dependencies
 	@echo "🧠 Setting up Serena MCP..."
 	@./scripts/deployment/setup-serena-mcp.sh
@@ -567,44 +566,6 @@ k3s-registry-mirror: ## Configure local-registry as a Docker Hub pull-through ca
 	@echo "Restarting k3s to pick up new registries.yaml"
 	@sudo systemctl restart k3s
 	@echo "✅ Registry mirror configured — verify: sudo k3s crictl pull redis:alpine"
-
-migration-toolchain: ## Install kubectl/helm/sops/age into ~/.local/bin
-	@echo "🧰 Installing migration tooling"
-	@./scripts/migration/install-tooling.sh
-
-migration-preflight: ## Run migration preflight checks (tools, edge services, lint/validate)
-	@echo "🛫 Migration preflight"
-	@./scripts/migration/preflight.sh
-
-k3s-bootstrap: ## Install k3s (if needed) and apply baseline namespaces/policies
-	@echo "☸️  Bootstrapping k3s baseline"
-	@./scripts/migration/bootstrap-k3s.sh
-
-migration-budget: ## Show k3s namespace quotas and current resource pressure
-	@echo "📉 Migration resource budget"
-	@./scripts/migration/check-resource-budget.sh
-
-wave-a-deploy: ## Deploy wave A services (homepage + blackbox-exporter)
-	@echo "🌊 Deploying wave A"
-	@helm upgrade --install homepage ./k8s/helm/homepage -n apps --create-namespace
-	@helm upgrade --install blackbox-exporter ./k8s/helm/blackbox-exporter -n observability --create-namespace
-
-wave-a-gate: ## Deploy Wave A and enforce a burn-in stability gate (BURNIN_MINUTES=30)
-	@echo "🧪 Running Wave A stability gate"
-	@./scripts/migration/wave-a-gate.sh --burnin-minutes "$${BURNIN_MINUTES:-30}" --interval-seconds "$${CHECK_INTERVAL_SECONDS:-60}"
-
-wave-b-deploy: ## Deploy wave B pilot service (filebrowser)
-	@echo "🌊 Deploying wave B"
-	@helm upgrade --install filebrowser ./k8s/helm/filebrowser -n apps --create-namespace
-
-wave-rollback: ## Show rollback checks for a release (usage: make wave-rollback NS=apps RELEASE=homepage REV=1)
-	@if [ -z "$(NS)" ] || [ -z "$(RELEASE)" ]; then \
-		echo "❌ Usage: make wave-rollback NS=<namespace> RELEASE=<release> [REV=<revision>]"; \
-		exit 1; \
-	fi
-	@rev="$(REV)"; \
-	if [ -z "$$rev" ]; then rev=1; fi; \
-	./scripts/migration/rollback-checks.sh "$(NS)" "$(RELEASE)" "$$rev"
 
 restart: ## Restart all services
 	@echo "🔄 Restarting all services..."

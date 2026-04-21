@@ -1,6 +1,0 @@
-apiVersion: v2
-name: paperless
-description: Paperless-NGX document management with PostgreSQL and Redis
-type: application
-version: 0.1.0
-appVersion: "latest"
