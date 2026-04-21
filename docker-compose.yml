@@ -15,7 +15,6 @@
 #   - apps.yml:       n8n, Paperless-ngx, Nextcloud
 #   - security.yml:   Authentik, Vaultwarden, Pi-hole
 #   - automation.yml: Home Assistant
-#   - forge-space.yml: Forge Space MCP Gateway (profile: forge-space)
 #   - dev-dashboard.yml: Development documentation site
 
 include:
@@ -27,5 +26,4 @@ include:
   - path: compose/apps.yml
   - path: compose/security.yml
   - path: compose/automation.yml
-  - path: compose/forge-space.yml
   - path: compose/dev-dashboard.yml

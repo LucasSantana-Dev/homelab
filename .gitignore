@@ -233,6 +233,7 @@ config/*/
 !config/blackbox/
 !config/homepage/
 !config/k3s/
+!config/netplan/
 config/alertmanager/discord_webhook_url
 
 # But still ignore these nginx subdirectories
