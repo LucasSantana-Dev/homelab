@@ -18,20 +18,22 @@ class TestHomelabCLI:
 
     def test_init(self):
         """Test HomelabCLI initialization"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             cli = HomelabCLI()
             assert cli is not None
 
     def test_deploy(self):
         """Test deploy command"""
-        with patch("homelab_manager.cli.HomelabAutomation") as mock_automation, patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_automation.return_value.deploy.return_value = True
 
@@ -42,10 +44,11 @@ class TestHomelabCLI:
 
     def test_update(self):
         """Test update command"""
-        with patch("homelab_manager.cli.HomelabAutomation") as mock_automation, patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_automation.return_value.update.return_value = True
 
@@ -56,10 +59,11 @@ class TestHomelabCLI:
 
     def test_backup(self):
         """Test backup command"""
-        with patch("homelab_manager.cli.HomelabAutomation") as mock_automation, patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_automation.return_value.backup.return_value = "/path/to/backup"
 
@@ -70,10 +74,11 @@ class TestHomelabCLI:
 
     def test_restore(self):
         """Test restore command"""
-        with patch("homelab_manager.cli.HomelabAutomation") as mock_automation, patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_automation.return_value.restore.return_value = True
 
@@ -84,10 +89,11 @@ class TestHomelabCLI:
 
     def test_health_check(self):
         """Test health check command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ) as mock_health, patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor") as mock_health,
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_health.return_value.run_health_check.return_value = None
 
@@ -99,10 +105,11 @@ class TestHomelabCLI:
 
     def test_status(self):
         """Test status command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ) as mock_health, patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor") as mock_health,
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_health.return_value.quick_status.return_value = None
 
@@ -114,10 +121,11 @@ class TestHomelabCLI:
 
     def test_monitor(self):
         """Test monitor command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ) as mock_health, patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor") as mock_health,
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_health.return_value.monitor_continuous.return_value = None
 
@@ -129,10 +137,11 @@ class TestHomelabCLI:
 
     def test_check_updates(self):
         """Test check updates command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_updates.return_value.check_all_updates.return_value = []
 
@@ -144,10 +153,11 @@ class TestHomelabCLI:
 
     def test_update_all(self):
         """Test update all command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_updates.return_value.update_all_services.return_value = True
 
@@ -158,10 +168,11 @@ class TestHomelabCLI:
 
     def test_update_service(self):
         """Test update service command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_updates.return_value.update_service.return_value = True
 
@@ -172,10 +183,11 @@ class TestHomelabCLI:
 
     def test_versions(self):
         """Test versions command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates, patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_updates.return_value.show_versions.return_value = None
 
@@ -187,10 +199,11 @@ class TestHomelabCLI:
 
     def test_cleanup(self):
         """Test cleanup command"""
-        with patch("homelab_manager.cli.HomelabAutomation") as mock_automation, patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             mock_automation.return_value.cleanup.return_value = None
 
@@ -202,11 +215,12 @@ class TestHomelabCLI:
 
     def test_validate_config(self):
         """Test validate config command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
-        ) as mock_config:
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig") as mock_config,
+        ):
             mock_config.return_value.validate_environment.return_value = (True, [])
 
             cli = HomelabCLI()
@@ -217,11 +231,12 @@ class TestHomelabCLI:
 
     def test_config_summary(self):
         """Test config summary command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
-        ) as mock_config:
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig") as mock_config,
+        ):
             mock_config.return_value.show_config_summary.return_value = None
 
             cli = HomelabCLI()
@@ -232,10 +247,11 @@ class TestHomelabCLI:
 
     def test_setup_cron(self):
         """Test setup cron command"""
-        with patch("homelab_manager.cli.HomelabAutomation"), patch(
-            "homelab_manager.cli.HomelabHealthMonitor"
-        ), patch("homelab_manager.cli.HomelabUpdateManager"), patch(
-            "homelab_manager.cli.HomelabConfig"
+        with (
+            patch("homelab_manager.cli.HomelabAutomation"),
+            patch("homelab_manager.cli.HomelabHealthMonitor"),
+            patch("homelab_manager.cli.HomelabUpdateManager"),
+            patch("homelab_manager.cli.HomelabConfig"),
         ):
             cli = HomelabCLI()
             result = cli.setup_cron()
@@ -252,9 +268,10 @@ class TestHomelabCLI:
         from homelab_manager.cli import main
 
         # Mock the argument parsing to avoid sys.argv conflicts
-        with patch("sys.argv", ["cli.py", "deploy"]), patch(
-            "subprocess.run"
-        ) as mock_run:
+        with (
+            patch("sys.argv", ["cli.py", "deploy"]),
+            patch("subprocess.run") as mock_run,
+        ):
             # Mock subprocess success
             mock_result = Mock()
             mock_result.returncode = 0

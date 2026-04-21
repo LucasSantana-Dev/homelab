@@ -159,13 +159,11 @@ class TestHomelabHealthMonitor:
 
             monitor = HomelabHealthMonitor()
 
-            with patch(
-                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
-            ), patch(
-                "homelab_manager.health.psutil.virtual_memory"
-            ) as mock_memory, patch(
-                "homelab_manager.health.psutil.disk_usage"
-            ) as mock_disk:
+            with (
+                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
+                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
+                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
+            ):
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 
@@ -254,19 +252,16 @@ class TestHomelabHealthMonitor:
 
             mock_client.containers.list.return_value = [mock_container]
 
-            with patch(
-                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
-            ), patch(
-                "homelab_manager.health.psutil.virtual_memory"
-            ) as mock_memory, patch(
-                "homelab_manager.health.psutil.disk_usage"
-            ) as mock_disk, patch(
-                "homelab_manager.health.requests.get"
-            ) as mock_get, patch(
-                "homelab_manager.health.console.print"
-            ) as mock_print, patch(
-                "homelab_manager.health.time.strftime",
-                return_value="2023-01-01 12:00:00",
+            with (
+                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
+                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
+                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
+                patch("homelab_manager.health.requests.get") as mock_get,
+                patch("homelab_manager.health.console.print") as mock_print,
+                patch(
+                    "homelab_manager.health.time.strftime",
+                    return_value="2023-01-01 12:00:00",
+                ),
             ):
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
@@ -301,17 +296,13 @@ class TestHomelabHealthMonitor:
                 mock_container2,
             ]
 
-            with patch(
-                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
-            ), patch(
-                "homelab_manager.health.psutil.virtual_memory"
-            ) as mock_memory, patch(
-                "homelab_manager.health.psutil.disk_usage"
-            ) as mock_disk, patch(
-                "homelab_manager.health.requests.get"
-            ) as mock_get, patch(
-                "homelab_manager.health.console.print"
-            ) as mock_print:
+            with (
+                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
+                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
+                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
+                patch("homelab_manager.health.requests.get") as mock_get,
+                patch("homelab_manager.health.console.print") as mock_print,
+            ):
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 
@@ -333,17 +324,13 @@ class TestHomelabHealthMonitor:
 
             mock_client.containers.list.side_effect = Exception("Container error")
 
-            with patch(
-                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
-            ), patch(
-                "homelab_manager.health.psutil.virtual_memory"
-            ) as mock_memory, patch(
-                "homelab_manager.health.psutil.disk_usage"
-            ) as mock_disk, patch(
-                "homelab_manager.health.requests.get"
-            ) as mock_get, patch(
-                "homelab_manager.health.console.print"
-            ) as mock_print:
+            with (
+                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
+                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
+                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
+                patch("homelab_manager.health.requests.get") as mock_get,
+                patch("homelab_manager.health.console.print") as mock_print,
+            ):
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0
 
@@ -365,23 +352,18 @@ class TestHomelabHealthMonitor:
 
             mock_client.containers.list.return_value = []
 
-            with patch(
-                "homelab_manager.health.psutil.cpu_percent", return_value=50.0
-            ), patch(
-                "homelab_manager.health.psutil.virtual_memory"
-            ) as mock_memory, patch(
-                "homelab_manager.health.psutil.disk_usage"
-            ) as mock_disk, patch(
-                "homelab_manager.health.requests.get"
-            ) as mock_get, patch(
-                "homelab_manager.health.console.print"
-            ) as mock_print, patch(
-                "homelab_manager.health.subprocess.run"
-            ) as mock_subprocess, patch(
-                "homelab_manager.health.time.sleep"
-            ) as mock_sleep, patch(
-                "homelab_manager.health.time.strftime",
-                return_value="2023-01-01 12:00:00",
+            with (
+                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
+                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
+                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
+                patch("homelab_manager.health.requests.get") as mock_get,
+                patch("homelab_manager.health.console.print") as mock_print,
+                patch("homelab_manager.health.subprocess.run") as mock_subprocess,
+                patch("homelab_manager.health.time.sleep") as mock_sleep,
+                patch(
+                    "homelab_manager.health.time.strftime",
+                    return_value="2023-01-01 12:00:00",
+                ),
             ):
                 mock_memory.return_value.percent = 60.0
                 mock_disk.return_value.percent = 70.0

@@ -36,7 +36,7 @@ jobs:
     needs: repo-hygiene
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -76,6 +76,11 @@ jobs:
         pre-commit run --all-files
 
     - name: Test with pytest
+      # continue-on-error retained temporarily: pre-existing tests in
+      # tests/unit/test_cli.py, test_container_manager.py, test_health.py,
+      # test_updates.py reference the removed HomelabAutomation / HomelabCLI
+      # API and need rewriting against the current typer-based CLI. Drop
+      # once those tests are fixed.
       continue-on-error: true
       run: |
         pytest tests/ --cov=homelab_manager --cov-report=xml --cov-report=html --tb=short -v

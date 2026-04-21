@@ -104,9 +104,11 @@ def mock_subprocess():
 @pytest.fixture
 def mock_psutil():
     """Mock psutil for system resource testing"""
-    with patch("psutil.cpu_percent", return_value=25.0), patch(
-        "psutil.virtual_memory"
-    ) as mock_memory, patch("psutil.disk_usage") as mock_disk:
+    with (
+        patch("psutil.cpu_percent", return_value=25.0),
+        patch("psutil.virtual_memory") as mock_memory,
+        patch("psutil.disk_usage") as mock_disk,
+    ):
         mock_memory.return_value.percent = 50.0
         mock_disk.return_value.percent = 30.0
 
