@@ -27,7 +27,7 @@ jobs:
       - name: Run PR health watchdog
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPOS_CSV: "LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky,LucasSantana-Dev/Craftvaria"
+          REPOS_CSV: "LucasSantana-Dev/homelab,LucasSantana-Dev/Lucky"
         run: |
           chmod +x scripts/maintenance/pr-health-watchdog.sh
           scripts/maintenance/pr-health-watchdog.sh

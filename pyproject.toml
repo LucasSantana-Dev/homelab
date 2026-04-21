@@ -9,12 +9,11 @@ description = "Modern homelab management CLI"
 authors = [{name = "Luk Homelab", email = "luk@homelab.com"}]
 license = { text = "MIT" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: System Administrators",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -74,7 +73,7 @@ exclude = ["tests*", "docs*", "config*", "appdata*", "backups*", "logs*", "compo
 
 [tool.black]
 line-length = 88
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+target-version = ['py310', 'py311', 'py312']
 extend-exclude = '''
 /(
     \.git
