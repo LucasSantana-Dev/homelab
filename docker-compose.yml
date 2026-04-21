@@ -9,21 +9,21 @@
 # Modules:
 #   - base.yml:       Networks and volumes (always required)
 #   - core.yml:       Nginx, Homepage, Portainer, Uptime-Kuma, What's Up Docker, FileBrowser
+#   - lan-proxy.yml:  Caddy reverse proxy (*.home routing)
 #   - monitoring.yml: Prometheus, Grafana, Loki, Alertmanager, Netdata, Promtail, etc.
 #   - media.yml:      Jellyfin, Stremio
 #   - apps.yml:       n8n, Paperless-ngx, Nextcloud
 #   - security.yml:   Authentik, Vaultwarden, Pi-hole
 #   - automation.yml: Home Assistant
-#   - forge-space.yml: Forge Space MCP Gateway (profile: forge-space)
 #   - dev-dashboard.yml: Development documentation site
 
 include:
   - path: compose/base.yml
   - path: compose/core.yml
+  - path: compose/lan-proxy.yml
   - path: compose/monitoring.yml
   - path: compose/media.yml
   - path: compose/apps.yml
   - path: compose/security.yml
   - path: compose/automation.yml
-  - path: compose/forge-space.yml
   - path: compose/dev-dashboard.yml
