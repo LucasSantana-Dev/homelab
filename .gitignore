@@ -232,6 +232,8 @@ config/*/
 !config/alertmanager/
 !config/blackbox/
 !config/homepage/
+!config/gatus/
+!config/caddy/
 !config/k3s/
 !config/netplan/
 config/alertmanager/discord_webhook_url

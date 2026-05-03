@@ -42,11 +42,17 @@
         description: DNS sinkhole & ad blocking
         container: pihole
 
-    - Uptime Kuma:
-        icon: uptime-kuma
-        href: http://uptime.home
-        description: Service monitoring
-        container: uptime-kuma
+    - Gatus:
+        icon: si-statuspage
+        href: http://homelab.home:8095
+        description: Service status & uptime
+        container: gatus
+
+    - Portainer:
+        icon: portainer
+        href: http://homelab.home:9000
+        description: Container management
+        container: portainer
 
     - Netdata:
         icon: netdata
