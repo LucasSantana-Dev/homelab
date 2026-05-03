@@ -143,8 +143,14 @@ http://status.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:8095
 }
 
+http://portainer.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:9000
+}
+
 # ---------- Catch-all ----------
 
 :80 {
 	respond "unknown host — try http://homelab.home/ or luk-homeserver.com.br" 404
 }
+
