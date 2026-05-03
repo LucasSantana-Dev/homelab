@@ -48,8 +48,25 @@ http://stremio.home {
 	reverse_proxy 127.0.0.1:11470
 }
 
+
+http://n8n.home {
+	reverse_proxy 127.0.0.1:5678
+}
+
+http://linkding.home {
+	reverse_proxy 127.0.0.1:9095
+}
+
+http://miniflux.home {
+	reverse_proxy 127.0.0.1:9094
+}
+
+http://forgejo.home {
+	reverse_proxy 127.0.0.1:9096
+}
+
 http://homelab.home, http://home {
-	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home stremio.home" 200
+	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home stremio.home n8n.home linkding.home miniflux.home forgejo.home" 200
 }
 
 # ---------- Public HTTPS via Cloudflare Tunnel (*.luk-homeserver.com.br) ----------
@@ -81,6 +98,10 @@ http://stremio.luk-homeserver.com.br {
 }
 http://miniflux.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:9094
+}
+
+http://forgejo.luk-homeserver.com.br {
+	reverse_proxy 127.0.0.1:9096
 }
 
 http://linkding.luk-homeserver.com.br {

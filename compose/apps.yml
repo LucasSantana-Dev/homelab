@@ -380,3 +380,47 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Forgejo - self-hosted git (Phase 3, SQLite)
+  forgejo:
+    image: ${IMG_FORGEJO:-codeberg.org/forgejo/forgejo:12}
+    container_name: forgejo
+    restart: unless-stopped
+    volumes:
+      - ../appdata/forgejo:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - FORGEJO__server__DOMAIN=forgejo.luk-homeserver.com.br
+      - FORGEJO__server__ROOT_URL=https://forgejo.luk-homeserver.com.br/
+      - FORGEJO__server__SSH_DOMAIN=forgejo.luk-homeserver.com.br
+      - FORGEJO__server__SSH_PORT=2222
+      - FORGEJO__service__DISABLE_REGISTRATION=true
+      - FORGEJO__service__REQUIRE_SIGNIN_VIEW=true
+      - TZ=${TIMEZONE}
+    ports:
+      - "${BIND_IP:-0.0.0.0}:${FORGEJO_HTTP_PORT:-9096}:3000"
+      - "${BIND_IP:-0.0.0.0}:${FORGEJO_SSH_PORT:-2222}:22"
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
