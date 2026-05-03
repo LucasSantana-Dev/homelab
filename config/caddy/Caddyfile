@@ -9,6 +9,7 @@
 	forward_auth 127.0.0.1:3030 {
 		uri /api/auth/caddy
 		copy_headers Remote-User Remote-Email Remote-Name
+		header_up X-Forwarded-Proto https
 	}
 }
 
