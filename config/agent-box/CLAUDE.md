@@ -67,3 +67,43 @@ Use MCPs as source of truth: GitHub for PRs/issues/CI, filesystem for repo reads
 ## Output style
 Be concise and operational. Report: what you checked / what you found / what you changed / what is blocked / next best action.
 Use exact file paths, PR numbers, commands, and error messages. No vague summaries.
+
+## Container operations runbook
+
+### Normal restart (settings/skills/secrets change)
+```bash
+docker restart agent-box
+```
+
+### Full rebuild (Dockerfile change)
+```bash
+cd ~/homelab
+docker compose -f compose/agent-box.yml build
+docker compose -f compose/agent-box.yml up -d
+```
+
+### Claude OAuth re-auth (after --force-recreate or fresh build)
+```bash
+ssh -t -L 1455:localhost:1455 agent-box "claude"
+# Follow the OAuth flow in the browser popup on your Mac
+```
+
+### Codex OAuth re-auth (after --force-recreate)
+```bash
+ssh -t -L 1455:localhost:1455 agent-box "codex login"
+```
+
+### Refresh skills/settings only (no rebuild)
+```bash
+ssh agent-box "cd /home/agent/.claude-env && git pull --ff-only"
+docker restart agent-box
+```
+
+### Check agent-box logs
+```bash
+docker logs agent-box --tail 100 -f
+```
+
+### Secrets update
+1. Edit secrets/agent-box.secrets.yaml.age with SOPS
+2. docker restart agent-box (entrypoint re-decrypts on start)
