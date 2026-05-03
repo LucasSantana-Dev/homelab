@@ -63,5 +63,10 @@ ingress:
     originRequest:
       httpHostHeader: miniflux.luk-homeserver.com.br
 
+  - hostname: forgejo.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: forgejo.luk-homeserver.com.br
+
   # Final catch-all — cloudflared returns 404 for any hostname not listed above.
   - service: http_status:404

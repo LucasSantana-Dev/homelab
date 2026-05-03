@@ -19,19 +19,25 @@
 - Apps:
     - Miniflux:
         icon: miniflux
-        href: https://miniflux.luk-homeserver.com.br
+        href: http://miniflux.home
         description: RSS reader
         container: miniflux
 
+    - Forgejo:
+        icon: forgejo
+        href: http://forgejo.home
+        description: Self-hosted git
+        container: forgejo
+
     - Linkding:
         icon: linkding
-        href: https://linkding.luk-homeserver.com.br
+        href: http://linkding.home
         description: Bookmarks
         container: linkding
 
     - n8n:
         icon: n8n
-        href: https://n8n.luk-homeserver.com.br
+        href: http://n8n.home
         description: Workflow automation
         container: n8n
 
