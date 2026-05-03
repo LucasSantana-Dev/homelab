@@ -37,8 +37,8 @@ ASSESSMENT=$(echo "$RESULT" | grep -E 'HEALTH_(GOOD|WARN|CRITICAL)' | head -1 ||
 BODY="$(printf '%s\n%s\n%s\n%s\n\n%s' "$CI_LINE" "$PRS_MERGED" "$PRS_OPEN" "$BUGS" "$ASSESSMENT")"
 
 URGENCY="info"
-echo "$ASSESSMENT" | grep -q 'HEALTH_WARN' && URGENCY="warn" || true
-echo "$ASSESSMENT" | grep -q 'HEALTH_CRITICAL' && URGENCY="alert" || true
+if echo "$ASSESSMENT" | grep -q 'HEALTH_WARN'; then URGENCY="warn"; fi
+if echo "$ASSESSMENT" | grep -q 'HEALTH_CRITICAL'; then URGENCY="alert"; fi
 
 $NOTIFY --title "📊 Lucky Weekly Health" --body "$BODY" --urgency "$URGENCY" || true
 echo "[$(date)] Weekly health score complete."

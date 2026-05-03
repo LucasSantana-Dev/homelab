@@ -5,7 +5,7 @@ ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
 # Base packages + locales + SSH
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl wget git openssh-server sudo jq \
     ca-certificates gnupg lsb-release \
     locales age python3 python3-pip rsync && \
@@ -14,8 +14,9 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 
 # Node.js 22
+SHELL [/bin/bash, -o, pipefail, -c]
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI
@@ -24,7 +25,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
     https://cli.github.com/packages stable main" \
     | tee /etc/apt/sources.list.d/github-cli.list && \
-    apt-get update && apt-get install -y gh && \
+    apt-get update && apt-get install -y --no-install-recommends gh && \
     rm -rf /var/lib/apt/lists/*
 
 # Docker CLI only (no daemon)
@@ -33,7 +34,7 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
     https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
     | tee /etc/apt/sources.list.d/docker.list && \
-    apt-get update && apt-get install -y docker-ce-cli && \
+    apt-get update && apt-get install -y --no-install-recommends docker-ce-cli && \
     rm -rf /var/lib/apt/lists/*
 
 # SOPS
@@ -41,10 +42,11 @@ RUN curl -fsSL https://github.com/getsops/sops/releases/download/v3.9.4/sops-v3.
     -o /usr/local/bin/sops && chmod +x /usr/local/bin/sops
 
 # uv (for uvx / mcp-server-fetch and other MCP tools)
-RUN pip3 install uv --break-system-packages && \
+RUN pip3 install --no-cache-dir uv --break-system-packages && \
     ln -sf /usr/local/bin/uv /usr/local/bin/uvx 2>/dev/null || true
 
 # Claude CLI + OpenCode
+# hadolint ignore=DL3016
 # PINNED: @openai/codex@0.125.0 — newer versions (>=0.126) reject gpt-5.4 with ChatGPT Pro OAuth.
 # Upgrade only when OpenAI adds Pro OAuth support for a newer model in codex release notes.
 RUN npm install -g @anthropic-ai/claude-code opencode-ai @openai/codex@0.125.0
