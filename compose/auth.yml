@@ -12,7 +12,7 @@
 
 services:
   tinyauth:
-    image: ${IMG_TINYAUTH:-ghcr.io/tinyauthapp/tinyauth:v5}
+    image: ${IMG_TINYAUTH:-ghcr.io/steveiliop56/tinyauth:v5}
     container_name: tinyauth
     restart: unless-stopped
     volumes:
