@@ -40,44 +40,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Vaultwarden Password Manager - Tailscale Only
-  vaultwarden:
-    image: ${IMG_VAULTWARDEN:-vaultwarden/server:1.33.2}
-    container_name: vaultwarden
-    restart: unless-stopped
-    volumes:
-      - ../appdata/vaultwarden:/data
-    environment:
-      - DOMAIN=https://vault.${DOMAIN}
-      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
-      - SIGNUPS_ALLOWED=false
-      - WEBSOCKET_ENABLED=true
-      - TZ=${TIMEZONE}
-    ports:
-      - "${BIND_IP:-0.0.0.0}:8200:80"
-      - "${BIND_IP:-0.0.0.0}:3012:3012"  # WebSocket port
-    networks:
-      - default
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-        reservations:
-          memory: 128M
-          cpus: '0.1'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   # Authentik PostgreSQL Database
   authentik-db:
     image: ${IMG_POSTGRES_15_ALPINE:-postgres:15-alpine}

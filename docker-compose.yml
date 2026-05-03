@@ -11,11 +11,10 @@
 #   - core.yml:       Nginx, Homepage, Portainer, Uptime-Kuma, What's Up Docker, FileBrowser
 #   - lan-proxy.yml:  Caddy reverse proxy (*.home routing)
 #   - monitoring.yml: Prometheus, Grafana, Loki, Alertmanager, Netdata, Promtail, etc.
-#   - media.yml:      Jellyfin, Stremio
+#   - media.yml:      Stremio
 #   - apps.yml:       n8n, Paperless-ngx, Nextcloud
-#   - security.yml:   Authentik, Vaultwarden, Pi-hole
+#   - security.yml:   Authentik, Pi-hole
 #   - automation.yml: Home Assistant
-#   - dev-dashboard.yml: Development documentation site
 
 include:
   - path: compose/base.yml
@@ -26,4 +25,3 @@ include:
   - path: compose/apps.yml
   - path: compose/security.yml
   - path: compose/automation.yml
-  - path: compose/dev-dashboard.yml

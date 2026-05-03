@@ -206,40 +206,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # FileBrowser - NAS-like File Manager
-  filebrowser:
-    image: ${IMG_FILEBROWSER:-filebrowser/filebrowser:v2.63.2}
-    container_name: filebrowser
-    restart: unless-stopped
-    volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - filebrowser_data:/database
-      - /home/luk-server:/srv/home
-      - /home/luk-server/media:/srv/media
-      - /home/luk-server/homelab:/srv/homelab
-    environment:
-      - TZ=${TIMEZONE}
-      - FB_DATABASE=/database/filebrowser.db
-      - FB_ROOT=/srv
-    ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${FILEBROWSER_PORT:-8080}:80"
-    networks:
-      - default
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-        reservations:
-          memory: 128M
-          cpus: '0.1'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
 volumes:
   portainer_data:
   uptime_kuma_data:

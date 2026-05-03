@@ -87,20 +87,12 @@ http://docs.luk-homeserver.com.br {
 	import to_k3s_traefik paperless.k3s.local
 }
 
-http://vault.luk-homeserver.com.br {
-	import to_k3s_traefik vault.k3s.local
-}
-
 http://auth.luk-homeserver.com.br {
 	import to_k3s_traefik authentik.k3s.local
 }
 
 http://blackbox.luk-homeserver.com.br {
 	import to_k3s_traefik blackbox.k3s.local
-}
-
-http://jellyfin.luk-homeserver.com.br {
-	import to_k3s_traefik jellyfin.k3s.local
 }
 
 # Docker-native services on host ports (no k3s dependency)

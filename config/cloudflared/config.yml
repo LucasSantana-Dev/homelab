@@ -43,10 +43,6 @@ ingress:
     service: http://host.docker.internal:80
     originRequest:
       httpHostHeader: docs.luk-homeserver.com.br
-  - hostname: vault.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: vault.luk-homeserver.com.br
   - hostname: auth.luk-homeserver.com.br
     service: http://host.docker.internal:80
     originRequest:
@@ -55,10 +51,6 @@ ingress:
     service: http://host.docker.internal:80
     originRequest:
       httpHostHeader: blackbox.luk-homeserver.com.br
-  - hostname: jellyfin.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: jellyfin.luk-homeserver.com.br
   - hostname: stremio.luk-homeserver.com.br
     service: http://host.docker.internal:80
     originRequest:
