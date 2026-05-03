@@ -79,6 +79,10 @@ http://cloud.luk-homeserver.com.br {
 http://stremio.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:11470
 }
+http://linkding.luk-homeserver.com.br {
+	reverse_proxy 127.0.0.1:9095
+}
+
 http://n8n.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:5678
 }
