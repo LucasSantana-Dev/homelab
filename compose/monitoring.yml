@@ -328,9 +328,41 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Gatus - declarative uptime monitoring (replaces Uptime Kuma)
+  gatus:
+    image: ${IMG_GATUS:-twinproduction/gatus:v5.16.0}
+    container_name: gatus
+    restart: unless-stopped
+    volumes:
+      - ../config/gatus/config.yaml:/config/config.yaml:ro
+      - gatus_data:/data
+    environment:
+      - TZ=${TIMEZONE}
+      - GATUS_CONFIG_PATH=/config
+    ports:
+      - "${BIND_IP:-0.0.0.0}:${GATUS_PORT:-8095}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   grafana_data:
   prometheus_data:
   netdataconfig:
   netdatalib:
   netdatacache:
+  gatus_data:

@@ -1,0 +1,95 @@
+metrics: true
+storage:
+  type: sqlite
+  path: /data/data.db
+
+ui:
+  title: Luk's Homelab Status
+  header: Luk's Homelab
+  description: Live health of self-hosted services
+
+alerting:
+  custom: {}
+
+endpoints:
+  - name: Homepage
+    group: dashboard
+    url: https://luk-homeserver.com.br
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 1500"
+
+  - name: Nextcloud
+    group: storage
+    url: https://cloud.luk-homeserver.com.br/status.php
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].installed == true"
+
+  - name: Stremio
+    group: media
+    url: http://host.docker.internal:11470/
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Open WebUI
+    group: apps
+    url: http://host.docker.internal:3000/
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 307)"
+
+  - name: Lucky Web
+    group: apps
+    url: http://host.docker.internal:8090/
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 301, 302)"
+
+  - name: Craftvaria Admin
+    group: apps
+    url: http://host.docker.internal:3333/
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 301, 302)"
+
+  - name: Pi-hole DNS
+    group: infrastructure
+    dns:
+      query-name: pi.hole
+      query-type: A
+    url: 192.168.0.11:53
+    interval: 60s
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+
+  - name: Pi-hole Web
+    group: infrastructure
+    url: http://host.docker.internal:8054/admin/
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 301, 302, 403)"
+
+  - name: Netdata
+    group: infrastructure
+    url: http://host.docker.internal:19999/api/v1/info
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Portainer
+    group: infrastructure
+    url: http://host.docker.internal:9000/api/system/status
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Internet (Cloudflare 1.1.1.1)
+    group: external
+    url: icmp://1.1.1.1
+    interval: 30s
+    conditions:
+      - "[CONNECTED] == true"

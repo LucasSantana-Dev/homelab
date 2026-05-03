@@ -25,7 +25,6 @@ services:
       - frontend
     depends_on:
       - homepage
-      - uptime-kuma
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
       interval: 30s
@@ -112,36 +111,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Uptime Kuma - Tailscale Only
-  uptime-kuma:
-    image: ${IMG_UPTIME_KUMA:-louislam/uptime-kuma:1.23.16}
-    container_name: uptime-kuma
-    restart: unless-stopped
-    volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - uptime_kuma_data:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - TZ=${TIMEZONE}
-    ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${UPTIME_KUMA_PORT:-3001}:3001"
-    networks:
-      - default
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-        reservations:
-          memory: 128M
-          cpus: '0.1'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   # Portainer - TAILSCALE ONLY (Sensitive Service)
   portainer:
     image: ${IMG_PORTAINER:-portainer/portainer-ce:2.21.4}
@@ -208,6 +177,4 @@ services:
 
 volumes:
   portainer_data:
-  uptime_kuma_data:
   whats_up_docker_data:
-  filebrowser_data:
