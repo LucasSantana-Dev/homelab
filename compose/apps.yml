@@ -312,3 +312,69 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+  # Miniflux PostgreSQL (Phase 3)
+  miniflux-db:
+    image: ${IMG_POSTGRES_15_ALPINE:-postgres:15-alpine}
+    container_name: miniflux-db
+    restart: unless-stopped
+    volumes:
+      - ../appdata/miniflux/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=miniflux
+      - POSTGRES_PASSWORD=${MINIFLUX_DB_PASSWORD}
+      - POSTGRES_DB=miniflux
+      - TZ=${TIMEZONE}
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "miniflux"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Miniflux - RSS reader (Phase 3)
+  miniflux:
+    image: ${IMG_MINIFLUX:-miniflux/miniflux:2.2.10}
+    container_name: miniflux
+    restart: unless-stopped
+    depends_on:
+      miniflux-db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://miniflux:${MINIFLUX_DB_PASSWORD}@miniflux-db/miniflux?sslmode=disable
+      - RUN_MIGRATIONS=1
+      - CREATE_ADMIN=1
+      - ADMIN_USERNAME=${MINIFLUX_USER:-admin}
+      - ADMIN_PASSWORD=${MINIFLUX_PASSWORD}
+      - BASE_URL=https://miniflux.luk-homeserver.com.br
+      - TZ=${TIMEZONE}
+    ports:
+      - "${BIND_IP:-0.0.0.0}:${MINIFLUX_PORT:-9094}:8080"
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

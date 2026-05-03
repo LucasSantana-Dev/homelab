@@ -17,6 +17,12 @@
         container: nextcloud
 
 - Apps:
+    - Miniflux:
+        icon: miniflux
+        href: https://miniflux.luk-homeserver.com.br
+        description: RSS reader
+        container: miniflux
+
     - Linkding:
         icon: linkding
         href: https://linkding.luk-homeserver.com.br

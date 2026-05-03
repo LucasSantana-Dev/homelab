@@ -79,6 +79,10 @@ http://cloud.luk-homeserver.com.br {
 http://stremio.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:11470
 }
+http://miniflux.luk-homeserver.com.br {
+	reverse_proxy 127.0.0.1:9094
+}
+
 http://linkding.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:9095
 }
