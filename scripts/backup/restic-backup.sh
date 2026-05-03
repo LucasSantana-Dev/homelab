@@ -17,6 +17,13 @@ COMPOSE_DIR="${COMPOSE_DIR:-.}"
 CRAFTVARIA_WORLD_DIR="${CRAFTVARIA_WORLD_DIR:-appdata/craftvaria/world}"
 CADDY_CONFIG_DIR="${CADDY_CONFIG_DIR:-config/caddy}"
 PIHOLE_CONFIG_DIR="${PIHOLE_CONFIG_DIR:-appdata/pihole}"
+HOMEASSISTANT_CONFIG_DIR="${HOMEASSISTANT_CONFIG_DIR:-config/homeassistant/config}"
+GATUS_CONFIG_DIR="${GATUS_CONFIG_DIR:-config/gatus}"
+HOMEPAGE_CONFIG_DIR="${HOMEPAGE_CONFIG_DIR:-config/homepage}"
+ALERTMANAGER_DATA_DIR="${ALERTMANAGER_DATA_DIR:-appdata/alertmanager}"
+GATUS_VOLUME="${GATUS_VOLUME:-/var/lib/docker/volumes/homelab_gatus_data/_data}"
+PORTAINER_VOLUME="${PORTAINER_VOLUME:-/var/lib/docker/volumes/homelab_portainer_data/_data}"
+GRAFANA_VOLUME="${GRAFANA_VOLUME:-/var/lib/docker/volumes/compose_grafana_data/_data}"
 
 # Verify environment
 if [ -z "${RESTIC_REPOSITORY:-}" ]; then
@@ -69,6 +76,44 @@ if [ -d "$PIHOLE_CONFIG_DIR" ]; then
   cp -r "$PIHOLE_CONFIG_DIR" "$TEMP_DIR/pihole-config"
 else
   echo "Warning: Pi-hole config dir not found at $PIHOLE_CONFIG_DIR"
+fi
+
+
+# 6.5. Home Assistant config (post-k3s migration)
+if [ -d "$HOMEASSISTANT_CONFIG_DIR" ]; then
+  echo "[$(date)] Backing up Home Assistant config..."
+  cp -r "$HOMEASSISTANT_CONFIG_DIR" "$TEMP_DIR/homeassistant-config" 2>/dev/null || sudo cp -r "$HOMEASSISTANT_CONFIG_DIR" "$TEMP_DIR/homeassistant-config" || echo "Warning: HA config copy failed"
+fi
+
+# 6.6. Gatus config + data
+if [ -d "$GATUS_CONFIG_DIR" ]; then
+  cp -r "$GATUS_CONFIG_DIR" "$TEMP_DIR/gatus-config" 2>/dev/null || true
+fi
+if [ -d "$GATUS_VOLUME" ]; then
+  echo "[$(date)] Backing up Gatus data..."
+  sudo cp -r "$GATUS_VOLUME" "$TEMP_DIR/gatus-data" 2>/dev/null || echo "Warning: gatus volume copy failed"
+fi
+
+# 6.7. Homepage config
+if [ -d "$HOMEPAGE_CONFIG_DIR" ]; then
+  cp -r "$HOMEPAGE_CONFIG_DIR" "$TEMP_DIR/homepage-config" 2>/dev/null || true
+fi
+
+# 6.8. Portainer data (admin db, endpoints, stacks)
+if [ -d "$PORTAINER_VOLUME" ]; then
+  echo "[$(date)] Backing up Portainer data..."
+  sudo cp -r "$PORTAINER_VOLUME" "$TEMP_DIR/portainer-data" 2>/dev/null || echo "Warning: portainer volume copy failed"
+fi
+
+# 6.9. Grafana data (dashboards + sqlite db, post-k3s migration)
+if [ -d "$GRAFANA_VOLUME" ]; then
+  echo "[$(date)] Backing up Grafana data..."
+  sudo cp -r "$GRAFANA_VOLUME" "$TEMP_DIR/grafana-data" 2>/dev/null || echo "Warning: grafana volume copy failed"
+fi
+
+# 6.10. Alertmanager appdata (silence DB)
+if [ -d "$ALERTMANAGER_DATA_DIR" ]; then
+  sudo cp -r "$ALERTMANAGER_DATA_DIR" "$TEMP_DIR/alertmanager-data" 2>/dev/null || true
 fi
 
 # 6. Docker Compose files
