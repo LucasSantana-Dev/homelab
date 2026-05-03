@@ -64,7 +64,6 @@ services:
       - '--storage.path=/alertmanager'
       - '--cluster.listen-address='
     ports:
-      - "127.0.0.1:9093:9093"
       - "${BIND_IP:-0.0.0.0}:9093:9093"
     networks:
       - default
@@ -138,9 +137,6 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     ports:
-      # Localhost access
-      - "127.0.0.1:${PROMETHEUS_PORT:-9091}:9090"
-      # Tailscale access ONLY
       - "${BIND_IP:-0.0.0.0}:${PROMETHEUS_PORT:-9091}:9090"
     networks:
       - default
