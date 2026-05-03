@@ -3,12 +3,6 @@
 # https://gethomepage.dev/configs/services
 
 - Media:
-    - Jellyfin:
-        icon: jellyfin
-        href: https://jellyfin.luk-homeserver.com.br
-        description: Movies, shows, music
-        container: jellyfin
-
     - Stremio:
         icon: stremio
         href: https://stremio.luk-homeserver.com.br
