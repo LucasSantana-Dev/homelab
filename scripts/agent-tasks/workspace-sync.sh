@@ -8,6 +8,7 @@ REPOS="Lucky homelab Craftvaria"
 RESULTS=""
 
 for REPO in $REPOS; do
+    # shellcheck disable=SC2029
     OUTPUT=$(ssh agent-box "
         if [ -d /workspace/$REPO/.git ]; then
             cd /workspace/$REPO
