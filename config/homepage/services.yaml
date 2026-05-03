@@ -1,120 +1,73 @@
 ---
-- Core Services:
-    - Stremio:
-        icon: stremio
-        href: https://stremio.homelab.example.com
-        description: Streaming Service
-        container: stremio-server
+# Luk's Homelab — service catalog
+# https://gethomepage.dev/configs/services
 
+- Media:
     - Jellyfin:
         icon: jellyfin
-        href: https://jellyfin.homelab.example.com
-        description: Media Server
+        href: https://jellyfin.luk-homeserver.com.br
+        description: Movies, shows, music
         container: jellyfin
 
-    - Home Assistant:
-        icon: https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/New_Home_Assistant_logo.svg/1200px-New_Home_Assistant_logo.svg.png
-        href: https://homeassistant.homelab.example.com
-        description: Home Automation
-        container: homeassistant
-
-- Management Tools:
-    - Portainer:
-        icon: portainer
-        href: https://portainer.homelab.example.com
-        description: Docker Management
-        container: portainer
-
-    - Pi-hole:
-        icon: https://upload.wikimedia.org/wikipedia/commons/0/00/Pi-hole_Logo.png
-        href: https://pihole.homelab.example.com
-        description: DNS Sinkhole & Ad Blocking
-        container: pihole
-
-    - Uptime Kuma:
-        icon: https://raw.githubusercontent.com/louislam/uptime-kuma/master/public/icon.svg
-        href: https://uptime.homelab.example.com
-        description: Service Monitoring
-        container: uptime-kuma
-
-    - What's Up Docker:
-        icon: https://getwud.github.io/wud/assets/wud-logo.svg
-        href: https://docker.homelab.example.com
-        description: Docker Container Monitoring
-        container: whats-up-docker
-
-    - FileBrowser:
-        icon: filebrowser
-        href: https://files.homelab.example.com
-        description: NAS-like File Manager
-        container: filebrowser
-
-    - Vaultwarden:
-        icon: https://raw.githubusercontent.com/dani-garcia/vaultwarden/main/resources/vaultwarden-icon.svg
-        href: https://vault.homelab.example.com
-        description: Password Manager
-        container: vaultwarden
-
-    - n8n:
-        icon: n8n
-        href: https://n8n.homelab.example.com
-        description: Workflow Automation
-        container: n8n
-
-    - Forge MCP Gateway:
-        icon: https://raw.githubusercontent.com/Forge-Space/mcp-gateway/main/public/favicon.svg
-        href: http://{{HOMEPAGE_VAR_TAILSCALE_IP}}:4444/admin
-        description: Forge Space MCP gateway admin
-        container: forge-mcp-gateway
-
-- Monitoring & Observability:
-    - Grafana:
-        icon: grafana
-        href: https://grafana.homelab.example.com
-        description: Monitoring Dashboard
-        container: grafana
-
-    - Prometheus:
-        icon: prometheus
-        href: https://prometheus.homelab.example.com
-        description: Metrics Collection
-        container: prometheus
-
-    - Alertmanager:
-        icon: https://raw.githubusercontent.com/prometheus/docs/main/static/prometheus_logo_grey.svg
-        href: https://alertmanager.homelab.example.com
-        description: Alert Management & Routing
-        container: alertmanager
-
-    - Loki:
-        icon: https://grafana.com/static/img/logos/logo-loki.svg
-        href: https://grafana.homelab.example.com/explore
-        description: Log Aggregation
-        container: loki
-
-    - Netdata:
-        icon: netdata
-        href: http://{{HOMEPAGE_VAR_TAILSCALE_IP}}:19999
-        description: Real-time System Monitoring
-        container: netdata
-
-- Security & Identity:
-    - Authentik:
-        icon: authentik
-        href: https://auth.homelab.example.com
-        description: SSO & Identity Provider
-        container: authentik-server
-
-- Document Management:
-    - Paperless-ngx:
-        icon: paperless
-        href: https://docs.homelab.example.com
-        description: Document Management & OCR
-        container: paperless-ngx
+    - Stremio:
+        icon: stremio
+        href: https://stremio.luk-homeserver.com.br
+        description: Streaming
+        container: stremio-server
 
 - Storage:
     - Nextcloud:
         icon: nextcloud
-        href: https://cloud.homelab.example.com
-        description: NAS & Cloud Storage with Mobile Apps (iOS/Android) - File sync, sharing, and collaboration
+        href: https://cloud.luk-homeserver.com.br
+        description: Files, photos, sync
         container: nextcloud
+
+    - FileBrowser:
+        icon: filebrowser
+        href: http://files.home
+        description: NAS file manager
+        container: filebrowser
+
+- Apps:
+    - Lucky:
+        icon: discord
+        href: https://lucky.luk-homeserver.com.br
+        description: Discord bot dashboard
+        container: lucky-frontend
+
+    - Craftvaria:
+        icon: minecraft
+        href: https://craftvaria.luk-homeserver.com.br
+        description: Minecraft server admin
+        container: craftvaria-admin-frontend
+
+    - Open WebUI:
+        icon: open-webui
+        href: http://ai.home
+        description: Local LLM chat
+        container: open-webui
+
+    - Dev Dashboard:
+        icon: si-astro
+        href: http://homelab.home
+        description: Project status board
+        container: dev-dashboard
+
+- Infrastructure:
+    - Pi-hole:
+        icon: pi-hole
+        href: http://pihole.home/admin
+        description: DNS sinkhole & ad blocking
+        container: pihole
+
+    - Uptime Kuma:
+        icon: uptime-kuma
+        href: http://uptime.home
+        description: Service monitoring
+        container: uptime-kuma
+
+    - Netdata:
+        icon: netdata
+        href: http://homelab.home:19999
+        description: Real-time host metrics
+        container: netdata

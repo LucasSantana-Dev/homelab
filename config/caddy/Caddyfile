@@ -60,7 +60,7 @@ http://homelab.home, http://home {
 # a Host rewrite; docker-native services get direct 127.0.0.1 proxying.
 
 http://luk-homeserver.com.br, http://www.luk-homeserver.com.br, http://home.luk-homeserver.com.br {
-	import to_k3s_traefik home.k3s.local
+	reverse_proxy 127.0.0.1:3010
 }
 
 http://homeassistant.luk-homeserver.com.br {

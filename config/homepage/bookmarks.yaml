@@ -1,18 +1,30 @@
 ---
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/bookmarks
-
-- Developer:
-    - Github:
+- Repos:
+    - GitHub:
         - abbr: GH
-          href: https://github.com/
+          href: https://github.com/LucasSantana-Dev
+    - Lucky:
+        - abbr: LK
+          href: https://github.com/LucasSantana-Dev/Lucky
+    - Homelab:
+        - abbr: HL
+          href: https://github.com/LucasSantana-Dev/homelab
 
-- Social:
-    - Reddit:
-        - abbr: RE
-          href: https://reddit.com/
+- Cloud:
+    - Cloudflare:
+        - abbr: CF
+          href: https://dash.cloudflare.com
+    - Tailscale:
+        - abbr: TS
+          href: https://login.tailscale.com/admin/machines
 
-- Entertainment:
-    - YouTube:
-        - abbr: YT
-          href: https://youtube.com/
+- Workspace:
+    - Gmail:
+        - abbr: GM
+          href: https://mail.google.com
+    - Calendar:
+        - abbr: CA
+          href: https://calendar.google.com
+    - Drive:
+        - abbr: DR
+          href: https://drive.google.com
