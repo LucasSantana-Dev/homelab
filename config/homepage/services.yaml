@@ -17,6 +17,12 @@
         container: nextcloud
 
 - Apps:
+    - Linkding:
+        icon: linkding
+        href: https://linkding.luk-homeserver.com.br
+        description: Bookmarks
+        container: linkding
+
     - n8n:
         icon: n8n
         href: https://n8n.luk-homeserver.com.br
