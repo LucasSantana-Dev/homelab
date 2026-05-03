@@ -83,37 +83,51 @@ fi
 if [ -d "$HOMEASSISTANT_CONFIG_DIR" ]; then
   echo "[$(date)] Backing up Home Assistant config..."
   cp -r "$HOMEASSISTANT_CONFIG_DIR" "$TEMP_DIR/homeassistant-config" 2>/dev/null || sudo cp -r "$HOMEASSISTANT_CONFIG_DIR" "$TEMP_DIR/homeassistant-config" || echo "Warning: HA config copy failed"
+else
+  echo "Warning: Home Assistant config dir not found at $HOMEASSISTANT_CONFIG_DIR"
 fi
 
 # 6.6. Gatus config + data
 if [ -d "$GATUS_CONFIG_DIR" ]; then
-  cp -r "$GATUS_CONFIG_DIR" "$TEMP_DIR/gatus-config" 2>/dev/null || true
+  cp -r "$GATUS_CONFIG_DIR" "$TEMP_DIR/gatus-config" 2>/dev/null || echo "Warning: gatus config copy failed"
+else
+  echo "Warning: Gatus config dir not found at $GATUS_CONFIG_DIR"
 fi
 if [ -d "$GATUS_VOLUME" ]; then
   echo "[$(date)] Backing up Gatus data..."
   sudo cp -r "$GATUS_VOLUME" "$TEMP_DIR/gatus-data" 2>/dev/null || echo "Warning: gatus volume copy failed"
+else
+  echo "Warning: Gatus docker volume not found at $GATUS_VOLUME"
 fi
 
 # 6.7. Homepage config
 if [ -d "$HOMEPAGE_CONFIG_DIR" ]; then
-  cp -r "$HOMEPAGE_CONFIG_DIR" "$TEMP_DIR/homepage-config" 2>/dev/null || true
+  cp -r "$HOMEPAGE_CONFIG_DIR" "$TEMP_DIR/homepage-config" 2>/dev/null || echo "Warning: homepage config copy failed"
+else
+  echo "Warning: Homepage config dir not found at $HOMEPAGE_CONFIG_DIR"
 fi
 
 # 6.8. Portainer data (admin db, endpoints, stacks)
 if [ -d "$PORTAINER_VOLUME" ]; then
   echo "[$(date)] Backing up Portainer data..."
   sudo cp -r "$PORTAINER_VOLUME" "$TEMP_DIR/portainer-data" 2>/dev/null || echo "Warning: portainer volume copy failed"
+else
+  echo "Warning: Portainer docker volume not found at $PORTAINER_VOLUME"
 fi
 
 # 6.9. Grafana data (dashboards + sqlite db, post-k3s migration)
 if [ -d "$GRAFANA_VOLUME" ]; then
   echo "[$(date)] Backing up Grafana data..."
   sudo cp -r "$GRAFANA_VOLUME" "$TEMP_DIR/grafana-data" 2>/dev/null || echo "Warning: grafana volume copy failed"
+else
+  echo "Warning: Grafana docker volume not found at $GRAFANA_VOLUME"
 fi
 
 # 6.10. Alertmanager appdata (silence DB)
 if [ -d "$ALERTMANAGER_DATA_DIR" ]; then
-  sudo cp -r "$ALERTMANAGER_DATA_DIR" "$TEMP_DIR/alertmanager-data" 2>/dev/null || true
+  sudo cp -r "$ALERTMANAGER_DATA_DIR" "$TEMP_DIR/alertmanager-data" 2>/dev/null || echo "Warning: alertmanager appdata copy failed"
+else
+  echo "Warning: Alertmanager data dir not found at $ALERTMANAGER_DATA_DIR"
 fi
 
 # 6. Docker Compose files
