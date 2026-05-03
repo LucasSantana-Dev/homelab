@@ -48,5 +48,10 @@ ingress:
     originRequest:
       httpHostHeader: stremio.luk-homeserver.com.br
 
+  - hostname: n8n.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: n8n.luk-homeserver.com.br
+
   # Final catch-all — cloudflared returns 404 for any hostname not listed above.
   - service: http_status:404
