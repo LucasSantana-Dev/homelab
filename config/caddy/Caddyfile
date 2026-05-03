@@ -162,3 +162,4 @@ http://portainer.luk-homeserver.com.br {
 :80 {
 	respond "unknown host — try http://homelab.home/ or luk-homeserver.com.br" 404
 }
+
