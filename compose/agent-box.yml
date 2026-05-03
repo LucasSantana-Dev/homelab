@@ -1,0 +1,63 @@
+networks:
+  agent:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.33.0.0/24
+
+volumes:
+  agent_workspace:
+  agent_claude_state:
+  agent_opencode_state:
+  agent_codex_state:
+
+services:
+  agent-box:
+    build:
+      context: ..
+      dockerfile: Dockerfile.agent-box
+    image: agent-box:latest
+    container_name: agent-box
+    hostname: agent-box
+    restart: unless-stopped
+    networks:
+      - agent
+    ports:
+      - "127.0.0.1:2222:22"
+    volumes:
+      - agent_workspace:/workspace
+      - agent_claude_state:/home/agent/.claude
+      - agent_opencode_state:/home/agent/.config/opencode
+      - agent_codex_state:/home/agent/.codex
+      - ../config/agent-box/opencode.jsonc:/opt/agent-config/opencode.jsonc:ro
+      - ../config/agent-box/settings.json:/opt/agent-config/settings.json:ro
+      - ../config/agent-box/mcp.json:/opt/agent-config/mcp.json:ro
+      - ../config/agent-box/authorized_keys:/opt/agent-config/authorized_keys:ro
+      - ../config/agent-box/protect-homelab.sh:/opt/agent-config/hooks/protect-homelab.sh:ro
+      - ../config/agent-box/secret-write-guard.sh:/opt/agent-config/hooks/secret-write-guard.sh:ro
+      - ../config/agent-box/tag-deploy-guard.sh:/opt/agent-config/hooks/tag-deploy-guard.sh:ro
+      - ../config/agent-box/codex-config.toml:/opt/agent-config/codex-config.toml:ro
+      - ../config/agent-box/codex-mcp.json:/opt/agent-config/codex-mcp.json:ro
+      - ../config/agent-box/codex-agents.md:/opt/agent-config/codex-agents.md:ro
+      - ../config/agent-box/CLAUDE.md:/opt/agent-config/CLAUDE.md:ro
+      - ../secrets/agent-box.secrets.yaml.age:/run/secrets/agent-box.secrets.yaml:ro
+      - /home/luk-server/.config/sops/age/keys.txt:/run/secrets/age.key:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD", "pgrep", "sshd"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
