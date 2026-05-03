@@ -80,19 +80,19 @@ http://stremio.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:11470
 }
 
-# k3s observability stack (still active — drains in Wave 2B2)
 http://grafana.luk-homeserver.com.br {
-	import to_k3s_traefik grafana.k3s.local
+	reverse_proxy 127.0.0.1:3002
 }
 
 http://prometheus.luk-homeserver.com.br {
-	import to_k3s_traefik prometheus.k3s.local
+	reverse_proxy 127.0.0.1:9091
 }
 
 http://blackbox.luk-homeserver.com.br {
-	import to_k3s_traefik blackbox.k3s.local
+	reverse_proxy 127.0.0.1:9115
 }
 
+# Authentik (k3s) — kept until SSO decision in B7
 http://auth.luk-homeserver.com.br {
 	import to_k3s_traefik authentik.k3s.local
 }
