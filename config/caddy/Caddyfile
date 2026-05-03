@@ -3,16 +3,6 @@
 	default_bind 0.0.0.0
 }
 
-# ---------- Snippets ----------
-#
-# Rewrite Host header and forward to the k3s Traefik ClusterIP so
-# internal *.k3s.local ingresses match from an external hostname.
-(to_k3s_traefik) {
-	reverse_proxy http://10.43.242.180:80 {
-		header_up Host {args[0]}
-	}
-}
-
 # Forward-auth via Tinyauth — applied to all public services that need OAuth.
 # caddy-lan runs on host network; tinyauth binds 127.0.0.1:3030.
 (protected) {
@@ -145,6 +135,11 @@ http://blackbox.luk-homeserver.com.br {
 # Tinyauth — OAuth login portal (replaces Authentik k3s route)
 http://auth.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:3030
+}
+
+http://status.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:8095
 }
 
 # ---------- Catch-all ----------
