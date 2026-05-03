@@ -1,3 +1,6 @@
+tunnel: 5cefde7a-6cd0-4d56-a1e2-67f922433682
+credentials-file: /etc/cloudflared/creds.json
+
 # Cloudflare Tunnel ingress policy.
 #
 # All traffic is forwarded to the host-networked caddy-lan instance,
