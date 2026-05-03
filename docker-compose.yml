@@ -13,7 +13,7 @@
 #   - monitoring.yml: Prometheus, Grafana, Loki, Alertmanager, Netdata, Promtail, etc.
 #   - media.yml:      Stremio
 #   - apps.yml:       n8n, Paperless-ngx, Nextcloud
-#   - security.yml:   Authentik, Pi-hole
+#   - security.yml:   Pi-hole
 #   - automation.yml: Home Assistant
 #   - auth.yml:        Tinyauth OAuth middleware
 
