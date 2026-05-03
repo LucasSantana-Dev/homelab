@@ -49,9 +49,9 @@ RUN pip3 install --no-cache-dir uv --break-system-packages && \
     ln -sf /usr/local/bin/uv /usr/local/bin/uvx 2>/dev/null || true
 
 # Claude CLI + OpenCode
-# hadolint ignore=DL3016
 # PINNED: @openai/codex@0.125.0 — newer versions (>=0.126) reject gpt-5.4 with ChatGPT Pro OAuth.
 # Upgrade only when OpenAI adds Pro OAuth support for a newer model in codex release notes.
+# hadolint ignore=DL3016
 RUN npm install -g @anthropic-ai/claude-code opencode-ai @openai/codex@0.125.0
 
 # agent user
