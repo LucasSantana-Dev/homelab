@@ -15,6 +15,7 @@
 #   - apps.yml:       n8n, Paperless-ngx, Nextcloud
 #   - security.yml:   Authentik, Pi-hole
 #   - automation.yml: Home Assistant
+#   - auth.yml:        Tinyauth OAuth middleware
 
 include:
   - path: compose/base.yml
@@ -25,3 +26,4 @@ include:
   - path: compose/apps.yml
   - path: compose/security.yml
   - path: compose/automation.yml
+  - path: compose/auth.yml
