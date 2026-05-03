@@ -31,18 +31,10 @@ ingress:
     service: http://host.docker.internal:80
     originRequest:
       httpHostHeader: prometheus.luk-homeserver.com.br
-  - hostname: n8n.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: n8n.luk-homeserver.com.br
   - hostname: cloud.luk-homeserver.com.br
     service: http://host.docker.internal:80
     originRequest:
       httpHostHeader: cloud.luk-homeserver.com.br
-  - hostname: docs.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: docs.luk-homeserver.com.br
   - hostname: auth.luk-homeserver.com.br
     service: http://host.docker.internal:80
     originRequest:
