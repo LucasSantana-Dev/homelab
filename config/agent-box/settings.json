@@ -64,11 +64,21 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/agent/.claude/hooks/bash-secret-guard.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Bash(git push*)",
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "CONFIRM: Pushing to remote — was this explicitly requested by the user in this session?",
+            "prompt": "CONFIRM: Pushing to remote \u2014 was this explicitly requested by the user in this session?",
             "timeout": 10
           }
         ]
@@ -78,7 +88,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "CONFIRM: Creating a pull request — was this explicitly requested by the user in this session?",
+            "prompt": "CONFIRM: Creating a pull request \u2014 was this explicitly requested by the user in this session?",
             "timeout": 10
           }
         ]
