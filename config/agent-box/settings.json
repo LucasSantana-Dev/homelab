@@ -1,0 +1,109 @@
+{
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-5-20251001",
+    "CLAUDE_DIR": "/home/agent/.claude",
+    "LANG": "en_US.UTF-8",
+    "LC_ALL": "en_US.UTF-8"
+  },
+  "model": "claude-sonnet-4-6",
+  "autoUpdates": false,
+  "skipDangerousModePermissionPrompt": false,
+  "permissions": {
+    "defaultMode": "auto",
+    "allow": [],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push origin main*)",
+      "Bash(git push origin master*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh repo delete*)",
+      "Bash(docker rm*)",
+      "Bash(docker stop*)",
+      "Bash(docker kill*)",
+      "Bash(docker rmi*)",
+      "Bash(docker system prune*)",
+      "Bash(rm -rf*)",
+      "Bash(sudo*)",
+      "Bash(chmod 777*)",
+      "Bash(chown root*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/agent/.claude/hooks/protect-homelab.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/agent/.claude/hooks/tag-deploy-guard.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/agent/.claude/hooks/secret-write-guard.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/agent/.claude/hooks/bash-secret-guard.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(git push*)",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "CONFIRM: Pushing to remote \u2014 was this explicitly requested by the user in this session?",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(gh pr create*)",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "CONFIRM: Creating a pull request \u2014 was this explicitly requested by the user in this session?",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[agent-box] Session started $(date)\" >> /home/agent/.claude/session.log"
+          }
+        ]
+      }
+    ]
+  }
+}
