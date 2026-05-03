@@ -325,12 +325,13 @@ services:
       - POSTGRES_DB=miniflux
       - TZ=${TIMEZONE}
     networks:
-      - default
+      - database
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "miniflux"]
       interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -344,7 +345,7 @@ services:
 
   # Miniflux - RSS reader (Phase 3)
   miniflux:
-    image: ${IMG_MINIFLUX:-miniflux/miniflux:2.2.10}
+    image: ${IMG_MINIFLUX:-miniflux/miniflux:2.2.19}
     container_name: miniflux
     restart: unless-stopped
     depends_on:
@@ -356,12 +357,13 @@ services:
       - CREATE_ADMIN=1
       - ADMIN_USERNAME=${MINIFLUX_USER:-admin}
       - ADMIN_PASSWORD=${MINIFLUX_PASSWORD}
-      - BASE_URL=https://miniflux.luk-homeserver.com.br
+      - BASE_URL=https://miniflux.${DOMAIN}
       - TZ=${TIMEZONE}
     ports:
       - "${BIND_IP:-0.0.0.0}:${MINIFLUX_PORT:-9094}:8080"
     networks:
-      - default
+      - frontend
+      - database
     healthcheck:
       test: ["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]
       interval: 30s
