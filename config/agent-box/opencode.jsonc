@@ -1,0 +1,262 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-6",
+  "skills": {
+    "paths": [
+      "/home/agent/.claude/skills",
+      "/home/agent/.codex/skills"
+    ]
+  },
+  "provider": {},
+  "agent": {
+    "main": {
+      "description": "Primary architect and implementation agent",
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "fast": {
+      "description": "Fast edits and quick lookup agent",
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+    "reviewer": {
+      "description": "Code review and quality agent",
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+    "planner": {
+      "description": "Planning and task breakdown agent",
+      "model": "anthropic/claude-sonnet-4-6"
+    }
+  },
+  "command": {
+    "resume": {
+      "description": "Resume work by reading repo state and local instructions",
+      "template": "Check git status and recent log. Read README.md, AGENTS.md, and CLAUDE.md if present. Summarize current state and suggest the highest-value next action.",
+      "subtask": false
+    },
+    "verify": {
+      "description": "Run lint, type-check, test, and build",
+      "template": "Run the project's lint, type-check, test, and build commands in sequence. Report failures with exact command and error. Do not fix automatically.",
+      "subtask": false
+    },
+    "ship": {
+      "description": "Commit, push, and prepare a PR safely",
+      "template": "Ship the current branch: inspect git status, stage only scoped files, run focused validation, create a conventional commit, push the branch, and open or update a PR. Never push directly to main.",
+      "subtask": false
+    },
+    "commit": {
+      "description": "Create a scoped conventional commit",
+      "template": "Inspect git status and diff, stage only files related to the current task, run focused validation when practical, and create a conventional commit. Do not add yourself as author.",
+      "subtask": false
+    },
+    "test": {
+      "description": "Run the narrowest meaningful test command",
+      "template": "Identify the relevant package and run the narrowest useful test command for the current change. Report exact failures.",
+      "subtask": false
+    },
+    "pr-review": {
+      "description": "Review the current PR like a senior engineer",
+      "template": "Inspect the PR diff and tests. Lead with bugs, regressions, security risks, and missing tests, with file and line references.",
+      "subtask": false
+    },
+    "deps": {
+      "description": "Inspect dependency health",
+      "template": "Run dependency health checks such as npm outdated, npm audit, or package-manager equivalents. Summarize high and critical issues first.",
+      "subtask": false
+    },
+    "worktree": {
+      "description": "Create an isolated git worktree for a feature branch",
+      "template": "Create a git worktree for a new feature/fix/chore branch under /workspace/.worktrees/, then report the path and branch name.",
+      "subtask": false
+    },
+    "validate": {
+      "description": "Run a full repo health scorecard",
+      "template": "Run lint, type-check, tests, and security checks if available. Return a pass/fail scorecard.",
+      "subtask": false
+    },
+    "context": {
+      "description": "Show context usage and recommended compaction actions",
+      "template": "Report current context window usage and summarize what can be pruned or compacted if the window is getting full.",
+      "subtask": false
+    },
+    "handoff": {
+      "description": "Write a Claude/Codex handoff summary",
+      "template": "Summarize completed work, current state, next actions, and blockers. Write to /home/agent/.claude/handoffs/latest.md.",
+      "subtask": false
+    }
+  },
+  "mcp": {
+    "github": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "enabled": true,
+      "timeout": 30000,
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${AGENT_GITHUB_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/workspace",
+        "/home/agent"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "memory": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "fetch": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "mcp-server-fetch"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "git": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-git",
+        "--repository",
+        "/workspace"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp",
+        "--headless"
+      ],
+      "enabled": false,
+      "timeout": 30000
+    },
+    "docker": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "docker-mcp"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "sonarqube": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "sonarqube-mcp-server@latest"
+      ],
+      "enabled": false,
+      "timeout": 30000,
+      "environment": {
+        "SONARQUBE_URL": "https://sonarcloud.io",
+        "SONARQUBE_ORG": "vsantana-organization",
+        "SONARQUBE_TOKEN": "${SONARQUBE_TOKEN}"
+      }
+    },
+    "tavily": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "tavily-mcp"
+      ],
+      "enabled": false,
+      "timeout": 30000,
+      "environment": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      }
+    },
+    "firecrawl": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "enabled": false,
+      "timeout": 30000,
+      "environment": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      }
+    }
+  },
+  "plugin": [
+    "openrtk",
+    "opencode-mem",
+    "oh-my-opencode-slim"
+  ],
+  "watcher": {
+    "ignore": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/.turbo/**",
+      "**/coverage/**",
+      "**/__pycache__/**",
+      "**/.mypy_cache/**",
+      ".worktrees/**"
+    ]
+  },
+  "instructions": [
+    "/home/agent/.claude/CLAUDE.md",
+    "/home/agent/.claude-env/memory/AGENTS.md"
+  ],
+  "permission": {
+    "edit": "ask",
+    "webfetch": "allow",
+    "external_directory": "ask",
+    "doom_loop": "ask",
+    "bash": {
+      "git push*": "ask",
+      "gh pr merge*": "ask",
+      "gh pr create*": "ask",
+      "docker rm*": "ask",
+      "docker rmi*": "ask",
+      "rm -rf*": "ask",
+      "git reset --hard*": "deny",
+      "git clean -f*": "deny",
+      "chmod -R 777*": "deny",
+      "git push --force*": "deny",
+      "git push origin main*": "deny",
+      "git push origin master*": "deny"
+    }
+  }
+}
