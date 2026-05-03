@@ -22,12 +22,6 @@
         description: Files, photos, sync
         container: nextcloud
 
-    - FileBrowser:
-        icon: filebrowser
-        href: http://files.home
-        description: NAS file manager
-        container: filebrowser
-
 - Apps:
     - Lucky:
         icon: discord
@@ -46,12 +40,6 @@
         href: http://ai.home
         description: Local LLM chat
         container: open-webui
-
-    - Dev Dashboard:
-        icon: si-astro
-        href: http://homelab.home
-        description: Project status board
-        container: dev-dashboard
 
 - Infrastructure:
     - Pi-hole:
