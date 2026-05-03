@@ -62,6 +62,7 @@ services:
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
+      - '--cluster.listen-address='
     ports:
       - "127.0.0.1:9093:9093"
       - "${BIND_IP:-0.0.0.0}:9093:9093"
