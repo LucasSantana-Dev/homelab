@@ -14,12 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Node.js 22
-SHELL [/bin/bash, -o, pipefail, -c]
+# hadolint ignore=DL4006
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI
+# hadolint ignore=DL4006
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
@@ -29,6 +30,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     rm -rf /var/lib/apt/lists/*
 
 # Docker CLI only (no daemon)
+# hadolint ignore=DL4006
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
@@ -42,6 +44,7 @@ RUN curl -fsSL https://github.com/getsops/sops/releases/download/v3.9.4/sops-v3.
     -o /usr/local/bin/sops && chmod +x /usr/local/bin/sops
 
 # uv (for uvx / mcp-server-fetch and other MCP tools)
+# hadolint ignore=DL3013
 RUN pip3 install --no-cache-dir uv --break-system-packages && \
     ln -sf /usr/local/bin/uv /usr/local/bin/uvx 2>/dev/null || true
 
