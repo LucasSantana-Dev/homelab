@@ -223,6 +223,7 @@ config/whats-up-docker/wud-config.json
 config/*/
 
 # Keep monitoring, proxy, and tunnel configurations
+!config/agent-box/
 !config/cloudflared/
 !config/nginx/
 !config/prometheus/
@@ -274,3 +275,6 @@ skills-lock.json
 !config/caddy/
 config/caddy/data/
 config/caddy/config/
+
+# Worktree spec scratch space (not committed)
+.wt-specs/

@@ -1,0 +1,11 @@
+approval_policy = "on-request"
+ask_for_approval = "never"
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
+personality = "pragmatic"
+sandbox_mode = "workspace-write"
+
+[features]
+memories = true
+multi_agent = true
+prevent_idle_sleep = false
