@@ -268,8 +268,6 @@ k8s/secrets/*.decrypted.yaml
 .agents/
 .windsurf/
 skills-lock.json
-.claude/skills/*
-!.claude/skills/homelab-*/
 
 # LAN reverse proxy config (tracked; data/ is still ignored)
 !config/caddy/
@@ -278,3 +276,4 @@ config/caddy/config/
 
 # Worktree spec scratch space (not committed)
 .wt-specs/
+.claude/
