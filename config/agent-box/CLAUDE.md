@@ -107,3 +107,65 @@ docker logs agent-box --tail 100 -f
 ### Secrets update
 1. Edit secrets/agent-box.secrets.yaml.age with SOPS
 2. docker restart agent-box (entrypoint re-decrypts on start)
+
+## Adding a New Agent Task
+
+To create a new scheduled autonomous agent task, follow this runbook:
+
+### Script template
+Create at `scripts/agent-tasks/<name>.sh`:
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+LOG_FILE="/home/luk-server/agent-logs/<name>-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee "$LOG_FILE") 2>&1
+echo "[$(date)] Starting <description>..."
+source "$(dirname "$0")/common.sh"
+# ... task logic ...
+# To run gh commands on agent-box: OUTPUT=$(run_on_agent "gh pr list --repo Org/Repo ...")
+# To notify Discord: $NOTIFY --title "Title" --body "Body" --urgency info|warn|alert
+echo "[$(date)] <description> complete."
+```
+
+### Systemd service
+Install to `/etc/systemd/system/agent-<name>.service`:
+```ini
+[Unit]
+Description=Agent: <description>
+After=network-online.target
+[Service]
+Type=oneshot
+User=luk-server
+ExecStart=/home/luk-server/homelab/scripts/agent-tasks/<name>.sh
+StandardOutput=journal
+StandardError=journal
+```
+
+### Systemd timer
+Install to `/etc/systemd/system/agent-<name>.timer`:
+```ini
+[Unit]
+Description=Agent: <description> — <schedule>
+[Timer]
+OnCalendar=<systemd calendar expression>
+Persistent=true
+[Install]
+WantedBy=timers.target
+```
+
+### Install commands
+Passwordless sudo is available for systemctl:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now agent-<name>.timer
+systemctl list-timers 'agent-*' --no-pager
+```
+
+### Checklist
+- [ ] Script is executable (`chmod +x`)
+- [ ] Script sources `common.sh` for NOTIFY + run_on_agent
+- [ ] Script logs to `/home/luk-server/agent-logs/<name>-<timestamp>.log`
+- [ ] Script added to homelab git repo at `scripts/agent-tasks/<name>.sh`
+- [ ] Systemd units installed and enabled
+- [ ] Smoke-tested with `bash /home/luk-server/homelab/scripts/agent-tasks/<name>.sh`
+- [ ] Timer verified with `systemctl list-timers 'agent-<name>*'`
