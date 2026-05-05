@@ -103,7 +103,16 @@ http://miniflux.luk-homeserver.com.br {
 }
 
 http://forgejo.luk-homeserver.com.br {
-	import protected
+	# Bypass tinyauth for OAuth2 server-to-server endpoints
+	@oauth2_paths path /login/oauth/access_token /login/oauth/keys /login/oauth/userinfo /.well-known/openid-configuration
+	reverse_proxy @oauth2_paths 127.0.0.1:9096
+
+	@needs_auth not path /login/oauth/access_token /login/oauth/keys /login/oauth/userinfo /.well-known/openid-configuration
+	forward_auth @needs_auth 127.0.0.1:3030 {
+		uri /api/auth/caddy
+		copy_headers Remote-User Remote-Email Remote-Name
+		header_up X-Forwarded-Proto https
+	}
 	reverse_proxy 127.0.0.1:9096
 }
 

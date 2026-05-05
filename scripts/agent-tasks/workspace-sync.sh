@@ -5,27 +5,38 @@ exec > >(tee "$LOG_FILE") 2>&1
 echo "[$(date)] Starting workspace sync..."
 
 REPOS="Lucky homelab Craftvaria"
-RESULTS=""
+TMPDIR_SYNC=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_SYNC"' EXIT
 
+# shellcheck disable=SC2029
 for REPO in $REPOS; do
-    # shellcheck disable=SC2029
-    OUTPUT=$(ssh agent-box "
-        if [ -d /workspace/$REPO/.git ]; then
-            cd /workspace/$REPO
-            BEFORE=\$(git rev-parse HEAD 2>/dev/null)
-            git fetch --tags -q 2>/dev/null || true
-            git pull --ff-only -q 2>/dev/null || true
-            AFTER=\$(git rev-parse HEAD 2>/dev/null)
-            if [ \"\$BEFORE\" != \"\$AFTER\" ]; then
-                COUNT=\$(git log --oneline \"\$BEFORE..\$AFTER\" 2>/dev/null | wc -l | tr -d ' ')
-                echo \"UPDATED: $REPO +\${COUNT} commits\"
+    (
+        OUTPUT=$(ssh agent-box "
+            if [ -d /workspace/$REPO/.git ]; then
+                cd /workspace/$REPO
+                BEFORE=\$(git rev-parse HEAD 2>/dev/null)
+                git fetch --tags -q 2>/dev/null || true
+                git pull --ff-only -q 2>/dev/null || true
+                AFTER=\$(git rev-parse HEAD 2>/dev/null)
+                if [ \"\$BEFORE\" != \"\$AFTER\" ]; then
+                    COUNT=\$(git log --oneline \"\$BEFORE..\$AFTER\" 2>/dev/null | wc -l | tr -d ' ')
+                    echo \"UPDATED: $REPO +\${COUNT} commits\"
+                else
+                    echo \"CURRENT: $REPO\"
+                fi
             else
-                echo \"CURRENT: $REPO\"
+                echo \"MISSING: $REPO\"
             fi
-        else
-            echo \"MISSING: $REPO\"
-        fi
-    " 2>/dev/null) || OUTPUT="ERROR: $REPO"
+        " 2>/dev/null) || OUTPUT="ERROR: $REPO"
+        printf '%s' "$OUTPUT" > "$TMPDIR_SYNC/$REPO"
+    ) &
+done
+
+wait
+
+RESULTS=""
+for REPO in $REPOS; do
+    OUTPUT=$(cat "$TMPDIR_SYNC/$REPO" 2>/dev/null || echo "ERROR: $REPO")
     echo "$OUTPUT"
     RESULTS="$RESULTS
 $OUTPUT"
