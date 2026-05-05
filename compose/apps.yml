@@ -358,6 +358,12 @@ services:
       - ADMIN_USERNAME=${MINIFLUX_USER:-admin}
       - ADMIN_PASSWORD=${MINIFLUX_PASSWORD}
       - BASE_URL=https://miniflux.${DOMAIN}
+      - OAUTH2_PROVIDER=oidc
+      - OAUTH2_CLIENT_ID=${MINIFLUX_OIDC_CLIENT_ID}
+      - OAUTH2_CLIENT_SECRET=${MINIFLUX_OIDC_CLIENT_SECRET}
+      - OAUTH2_REDIRECT_URL=https://miniflux.${DOMAIN}/oauth2/oidc/callback
+      - OAUTH2_OIDC_DISCOVERY_ENDPOINT=https://forgejo.${DOMAIN}
+      - OAUTH2_USER_CREATION=1
       - TZ=${TIMEZONE}
     ports:
       - "${BIND_IP:-0.0.0.0}:${MINIFLUX_PORT:-9094}:8080"
