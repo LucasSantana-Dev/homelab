@@ -1,25 +1,20 @@
-# Automation Services
-# Home Assistant
-
 services:
-  # Home Assistant - Tailscale Only
   homeassistant:
     image: ${IMG_HOMEASSISTANT:-ghcr.io/home-assistant/home-assistant:stable}
     container_name: homeassistant
     restart: unless-stopped
-    user: "root"  # Running as root to allow package installation for integrations like Meross Cloud
+    user: root
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - ../config/homeassistant/config:/config
-      - /etc/localtime:/etc/localtime:ro
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - ../config/homeassistant/config:/config
+    - /etc/localtime:/etc/localtime:ro
     environment:
-      - TZ=${TIMEZONE}
-      - PYTHONUSERBASE=/config/deps
+    - TZ=${TIMEZONE}
+    - PYTHONUSERBASE=/config/deps
     ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${HOMEASSISTANT_PORT:-8123}:8123"
+    - ${BIND_IP:-0.0.0.0}:${HOMEASSISTANT_PORT:-8123}:8123
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -29,7 +24,17 @@ services:
           memory: 1G
           cpus: '0.5'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:8123/
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
