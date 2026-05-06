@@ -177,7 +177,7 @@ jobs:
         pip install -e ".[dev]"
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@6b89c0cdd629f514a3b8c8b36f3f408d65d22e89
       with:
         scan-type: 'fs'
         scan-ref: '.'
@@ -251,7 +251,7 @@ jobs:
       uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
     - name: Run Trivy on Docker Compose config
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@6b89c0cdd629f514a3b8c8b36f3f408d65d22e89
       with:
         scan-type: 'config'
         scan-ref: 'docker-compose.yml'
