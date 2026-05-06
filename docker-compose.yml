@@ -16,6 +16,7 @@
 #   - security.yml:   Pi-hole
 #   - automation.yml: Home Assistant
 #   - auth.yml:        Tinyauth OAuth middleware
+#   - agent-box.yml:  Claude Code agent-box
 
 include:
   - path: compose/base.yml
@@ -27,3 +28,4 @@ include:
   - path: compose/security.yml
   - path: compose/automation.yml
   - path: compose/auth.yml
+  - path: compose/agent-box.yml
