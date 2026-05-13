@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ADR 0005 — Media stack: Stremio + RealDebrid (conditional)** — documents the decision to keep Stremio+RealDebrid as the primary media surface, reject Plex permanently, and defer Jellyfin+*arr migration. Conditional on 4 pre-conditions (deadline 2026-05-27) and 7 operational revisit triggers. (`docs/adr/0005-media-stack-stremio-realdebrid.md`)
 - **Unit test coverage for previously untested modules** — closes audit-deep H5+H7. New files: `tests/unit/test_command_sequence.py` (13 tests), `tests/unit/test_backup_manager.py` (8 tests), `tests/unit/test_deployment.py` (10 tests), `tests/unit/test_status.py` (13 tests). Per-module coverage: command_sequence 50→100%, backup_manager 32→100%, deployment 48→100%, status 29→98%. Suite-wide: 71→80%.
 
+### Security
+
+- **Cleanup + supply-chain pin pass** — closes audit-deep v2 **C2 + H3 + H4 + H5**.
+  - **C2** Removed dangling `nginx` service block from `compose/core.yml` (PR #78 deleted `config/nginx/` but left the service referencing 5 non-existent bind mounts; fresh `docker compose up` now succeeds).
+  - **H4** Pinned 4 floating Docker tags: `home-assistant:stable`→`:2025.5`, `netdata:stable`→`:v1.48.0`, `paperless-ngx:latest`→`:2.13`, `redis:alpine`→`:7.4-alpine`. All overridable via existing `IMG_*` env vars.
+  - **H3** Fixed `.github/dependabot.yml`: replaced ineffective `docker` ecosystem at `/` with `docker-compose` ecosystem at `/compose` so image-tag updates actually get auto-PR'd.
+  - **H5** SHA-pinned `github/codeql-action/upload-sarif@v3` (2 instances in `.github/workflows/ci.yml`) to v3.35.4 commit `7fd177f` to close the action-tag-moving supply-chain vector.
+
 ### Changed (CI)
 
 - **Pytest gate enforced** — closes audit-deep H6. Removed `continue-on-error: true` from `.github/workflows/ci.yml`. Test failures now fail CI.
