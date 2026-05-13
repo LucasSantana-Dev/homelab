@@ -17,3 +17,10 @@ export AGENT_DISCORD_WEBHOOK
 if [[ -z "${AGENT_DISCORD_WEBHOOK:-}" ]]; then
     echo "[$(date)] WARNING: AGENT_DISCORD_WEBHOOK not set — notifications will be skipped" >&2
 fi
+
+# Run a command on agent-box via SSH, sourcing the container env first.
+# Usage: run_on_agent "gh pr list --repo Org/Repo --json number"
+run_on_agent() {
+    # shellcheck disable=SC2029
+    ssh agent-box "source /etc/profile.d/agent-env.sh && $1" 2>/dev/null
+}

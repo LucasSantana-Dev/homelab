@@ -12,33 +12,39 @@ ALL_FAILING=""
 
 for REPO in $REPOS; do
     SHORT="${REPO#*/}"
-    PROMPT="CI health check for ${REPO}.
-1. gh run list --repo ${REPO} --branch main --limit 3 --json status,conclusion,name,createdAt
-2. gh pr list --repo ${REPO} --json number,title,statusCheckRollup --limit 10
-3. For any failed run: gh run view <id> --repo ${REPO} --log-failed 2>/dev/null | head -20
-Output CI_HEALTHY if all green, or one line per failure: CI_FAILING: <branch/PR> — <check> — <error>"
 
-    RESULT=$(ssh agent-box bash -c "
-      source /etc/profile.d/agent-env.sh
-      unset ANTHROPIC_API_KEY CLAUDE_API_KEY
-      cd /workspace/${SHORT} 2>/dev/null || true
-      git fetch -q 2>/dev/null || true
-      claude -p '$PROMPT' --dangerously-skip-permissions --allowedTools 'Bash' 2>&1
-    " 2>/dev/null) || RESULT="ERROR: SSH failed"
+    # Last 3 runs on main
+    RUNS=$(run_on_agent "gh run list --repo $REPO --branch main --limit 3 --json status,conclusion,name,headBranch") || RUNS="[]"
+    FAILING_RUNS=$(echo "$RUNS" | jq -r '.[] | select(.conclusion == "failure") | "CI_FAILING: \(.name) on \(.headBranch)"' 2>/dev/null || true)
 
-    echo "[${SHORT}] $RESULT"
+    # Open PR check-rollup
+    PR_FAILURES=$(run_on_agent "gh pr list --repo $REPO --state open --json number,title,statusCheckRollup --limit 10") || PR_FAILURES="[]"
+    FAILING_PRS=$(echo "$PR_FAILURES" | jq -r '
+        .[] | . as $pr |
+        (.statusCheckRollup // []) |
+        map(select(.conclusion == "FAILURE" or .state == "FAILURE")) |
+        select(length > 0) |
+        "CI_FAILING: PR #\($pr.number) \($pr.title)"
+    ' 2>/dev/null || true)
 
-    if echo "$RESULT" | grep -q 'CI_FAILING:'; then
-        FAILING=$(echo "$RESULT" | grep 'CI_FAILING:' | head -5 | sed "s/CI_FAILING: /• [${SHORT}] /" | tr '\n' '|' | sed 's/|$//')
-        ALL_FAILING="${ALL_FAILING}${FAILING}|"
+    COMBINED=$(printf '%s\n%s' "$FAILING_RUNS" "$FAILING_PRS" | grep -v '^$' || true)
+
+    if [[ -z "$COMBINED" ]]; then
+        echo "[$SHORT] CI_HEALTHY"
+    else
+        echo "[$SHORT] $COMBINED"
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            ALL_FAILING="${ALL_FAILING}• [${SHORT}] ${line#CI_FAILING: }
+"
+        done <<< "$COMBINED"
     fi
 done
 
-ALL_FAILING="${ALL_FAILING%|}"
+ALL_FAILING="${ALL_FAILING%$'\n'}"
 
 if [[ -n "$ALL_FAILING" ]]; then
-    BODY="${ALL_FAILING//|/$'\n'}"
-    $NOTIFY --title "🔴 CI Failures" --body "$BODY" --urgency alert || true
+    $NOTIFY --title "🔴 CI Failures" --body "$ALL_FAILING" --urgency alert || true
     echo "[$(date)] Discord alerted on CI failures."
 else
     echo "[$(date)] CI healthy across all repos."
