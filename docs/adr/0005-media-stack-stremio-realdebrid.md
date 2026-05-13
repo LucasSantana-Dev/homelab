@@ -1,6 +1,6 @@
 # ADR 0005: Media stack — keep Stremio + RealDebrid, defer *arr migration
 
-- **Status:** Accepted (with reservations — see "Pre-conditions" before this is binding)
+- **Status:** Proposed (conditional) — promotes to Accepted once all pre-conditions are complete (deadline 2026-05-27)
 - **Date:** 2026-05-13
 - **Deciders:** Lucas (solo operator)
 - **Supersedes:** —
@@ -17,7 +17,7 @@ The decision is forcing because:
 
 - Phase 2 of the Homepage redesign will commit dashboard sections, widget API keys, and CSS layout to a particular topology.
 - Disk pressure is real: **163 GB free / 468 GB total** on the host. A media library would eat most of that within a year.
-- RealDebrid introduced filename-based filtering in May 2026 that removes ~50% of historically-available links — flagged in community sources as a possible end-of-era for the Stremio+RD model.
+- RealDebrid introduced filename-based filtering in May 2026 that removes ~50% of historically-available links[^3] — flagged in community sources as a possible end-of-era for the Stremio+RD model.
 - We've never explicitly written down *why* we run Stremio, so the choice keeps getting re-litigated by every "should we add Plex?" thought.
 
 ## Decision
@@ -42,9 +42,9 @@ If any pre-condition fails to complete in 2 weeks, this ADR auto-degrades to "Pr
 
 ### A. Plex + *arr stack — **rejected**
 
-- Plex Pass: USD 6.99/mo or USD 249.99 lifetime (April 2025 hike from $119.99; +108% one-time, signals further extraction).
-- Remote streaming now gated behind separate Remote Watch Pass.
-- All feature-parity wins (4K HW transcode, HDR, family management) are now matched by Jellyfin for $0.
+- Plex Pass: USD 6.99/mo or USD 249.99 lifetime (April 2025 hike from USD 119.99; +108% one-time)[^1].
+- Remote streaming now gated behind separate Remote Watch Pass (USD 1.99–2.99/mo)[^1].
+- All feature-parity wins (4K HW transcode, HDR, family management) are now matched by Jellyfin for $0[^2].
 - Conclusion: Plex's only remaining moat is family-share UX polish, which doesn't justify the lifetime premium for solo + occasional family.
 
 ### B. Jellyfin + *arr stack — **rejected for now, viable in 6+ months**
@@ -125,3 +125,7 @@ Each is small enough for a stand-alone PR. All seven combined are <1 working day
 ## Notes
 
 This ADR closes a question that had been re-litigated without a written answer for ~6 months. The Phase 2 critic verdict (`/research-and-decide` workflow, 2026-05-13) is recorded by reference: the decision is accepted *with* the amendments the critic surfaced, not without them.
+
+[^1]: Plex Pass 2025–26 pricing changes: https://bytesized-hosting.com/guides/plex-2025-slash-2026-changes-what-seedbox-users-need-to-know/ and https://support.plex.tv/articles/201751006-plex-pass-feature-overview/
+[^2]: Jellyfin feature parity with Plex (family sharing): https://www.xda-developers.com/jellyfin-comes-very-close-to-plex-in-family-friendly-features/ and https://www.homedock.cloud/blog/self-hosting/plex-vs-jellyfin-2026/
+[^3]: RealDebrid May 2026 filtering / enforcement update: https://store.elfhosted.com/blog/2026/05/12/real-debrid-filtering-may-2026/ and https://troypoint.com/new-report-details-rise-and-fall-of-real-debrid-may-2026-update/
