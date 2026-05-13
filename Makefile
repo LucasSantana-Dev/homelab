@@ -63,7 +63,7 @@ logs: ## Show logs for all services
 	@echo "==============="
 	docker compose logs --tail=50
 
-logs-service: ## Show logs for specific service (usage: make logs-service SERVICE=nginx)
+logs-service: ## Show logs for specific service (usage: make logs-service SERVICE=caddy)
 	@if [ -z "$(SERVICE)" ]; then \
 		echo "❌ Please specify SERVICE=service_name"; \
 		echo "Available services:"; \
@@ -347,22 +347,7 @@ sso-smoke-test: ## Run end-to-end unauthenticated redirect checks for protected 
 	@echo "================="
 	@./scripts/maintenance/sso-smoke-test.sh
 
-sso-register-apps: ## Rebuild Authentik app/provider registration for phase-1 SSO
-	@echo "🧩 Authentik Registration Rebuild"
-	@echo "================================="
-	@./scripts/maintenance/authentik-register-apps.sh
-
-sso-register-dry-run: ## Preview Authentik registration changes without applying them
-	@echo "🔎 Authentik Registration Dry Run"
-	@echo "================================="
-	@./scripts/maintenance/authentik-register-apps.sh --dry-run
-
-sso-register-status: ## Show Authentik registration state and phase-1 coverage
-	@echo "📚 Authentik Registration Status"
-	@echo "================================"
-	@./scripts/maintenance/authentik-register-apps.sh --status
-
-ssl-renew: ## Issue/renew wildcard TLS cert via Cloudflare DNS-01 and restart nginx
+ssl-renew: ## Issue/renew wildcard TLS cert via Cloudflare DNS-01 and reload Caddy
 	@echo "🔐 Renewing Wildcard Certificate"
 	@echo "================================"
 	@./scripts/maintenance/renew-wildcard-cert.sh
