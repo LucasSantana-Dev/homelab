@@ -37,8 +37,8 @@ def register_management_commands(
                 console.print(f"❌ Deployment failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Deployment error: {str(e)}")
-            raise typer.Exit(1)
+            console.print(f"❌ Deployment error: {e!s}")
+            raise typer.Exit(1) from e
 
     @app.command()
     def update():
@@ -53,8 +53,8 @@ def register_management_commands(
                 console.print(f"❌ Update failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Update error: {str(e)}")
-            raise typer.Exit(1)
+            console.print(f"❌ Update error: {e!s}")
+            raise typer.Exit(1) from e
 
     @app.command()
     def backup():
@@ -64,13 +64,13 @@ def register_management_commands(
         try:
             result = container_manager.create_backup()
             if result["success"]:
-                console.print(f"✅ Backup created: {result['backup_path']}")
+                console.print(f"✅ Backup created: {result.get('backup_path', 'unknown location')}")
             else:
                 console.print(f"❌ Backup failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Backup error: {str(e)}")
-            raise typer.Exit(1)
+            console.print(f"❌ Backup error: {e!s}")
+            raise typer.Exit(1) from e
 
     @app.command()
     def restore(backup_path: str = typer.Argument(..., help="Path to backup file")):
@@ -85,8 +85,8 @@ def register_management_commands(
                 console.print(f"❌ Restore failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Restore error: {str(e)}")
-            raise typer.Exit(1)
+            console.print(f"❌ Restore error: {e!s}")
+            raise typer.Exit(1) from e
 
     @app.command()
     def restart(
@@ -114,8 +114,8 @@ def register_management_commands(
                     raise typer.Exit(1)
 
         except Exception as e:
-            console.print(f"❌ Restart error: {str(e)}")
-            raise typer.Exit(1)
+            console.print(f"❌ Restart error: {e!s}")
+            raise typer.Exit(1) from e
 
     @app.command()
     def services():
