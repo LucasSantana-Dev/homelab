@@ -132,6 +132,28 @@ class HomelabConfig:
 
         return summary
 
+    def validate_value(self, key: str, value: str) -> bool:
+        """Validate a single config value against its known pattern"""
+        pattern = self.required_vars.get(key) or self.optional_vars.get(key)
+        if pattern is None:
+            return True
+        return bool(re.match(pattern, value))
+
+    def get_validation_errors(self, config: Dict[str, str]) -> List[str]:
+        """Return a list of human-readable validation errors for the given config dict"""
+        errors = []
+        for key, value in config.items():
+            if not self.validate_value(key, value):
+                errors.append(f"Invalid value for {key}: {value}")
+        return errors
+
+    @staticmethod
+    def is_configured(value: str) -> bool:
+        """Return False when value is empty or a placeholder"""
+        return (
+            bool(value) and not value.startswith("your_") and value != "your-domain.com"
+        )
+
     def get_missing_config(self) -> List[str]:
         """Get list of missing or invalid configuration"""
         validation_results = self.validate_config()

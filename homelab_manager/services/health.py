@@ -61,7 +61,7 @@ class HealthMonitor:
                 "source": "http",
             }
 
-    def _check_container_health(self, container_name: str) -> Dict:
+    def check_container_health(self, container_name: str) -> Dict:
         """Check service health using Docker container status and healthcheck state."""
         if self.docker_client is None:
             return {
@@ -150,7 +150,7 @@ class HealthMonitor:
             )
 
         # docker mode and auto both prefer Docker-first checks
-        docker_result = self._check_container_health(service.container_name)
+        docker_result = self.check_container_health(service.container_name)
         if mode == "auto" and docker_result.get("error") and service.health_url:
             return self.check_service(
                 service.id,

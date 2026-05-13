@@ -15,11 +15,11 @@ from .status import StatusManager
 class ContainerManager:
     """Aggregate manager that delegates to specialized managers"""
 
-    def __init__(self):
+    def __init__(self, registry: Optional[ServiceRegistry] = None):
+        self.registry = registry or ServiceRegistry()
         self.deployment = DeploymentManager()
         self.backup = BackupManager()
-        self.status = StatusManager()
-        self.registry = ServiceRegistry()
+        self.status = StatusManager(registry=self.registry)
 
     # Delegation to DeploymentManager
     def deploy(self) -> Dict:

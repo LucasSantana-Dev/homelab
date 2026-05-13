@@ -44,7 +44,7 @@ def create_app(
     # Initialize managers with dependency injection
     _registry = registry or ServiceRegistry()
     _config_manager = config_manager or HomelabConfig()
-    _container_manager = container_manager or ContainerManager()
+    _container_manager = container_manager or ContainerManager(registry=_registry)
     _health_monitor = health_monitor or HealthMonitor(registry=_registry)
     _update_manager = update_manager or UpdateManager(registry=_registry)
 

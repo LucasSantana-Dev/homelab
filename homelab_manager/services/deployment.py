@@ -4,12 +4,13 @@ Deployment Service
 Handles Docker Compose deployment and service restart operations
 """
 
-import os
 import subprocess
 from pathlib import Path
 from typing import Dict
 
 from rich.console import Console
+
+from ..utils.command_sequence import CommandSequence, Step
 
 console = Console()
 
@@ -22,59 +23,27 @@ class DeploymentManager:
 
     def deploy(self) -> Dict:
         """Deploy homelab services"""
-        try:
-            console.print("🚀 Deploying homelab services...")
-
-            # Change to project directory
-            os.chdir(self.project_root)
-
-            # Run docker compose up
-            result = subprocess.run(
-                ["docker", "compose", "up", "-d"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-
-            return {
-                "success": True,
-                "message": "Homelab deployed successfully",
-                "output": result.stdout,
-            }
-
-        except subprocess.CalledProcessError as e:
-            return {
-                "success": False,
-                "error": f"Deployment failed: {e.stderr}",
-                "output": e.stdout,
-            }
-        except Exception as e:
-            return {"success": False, "error": f"Deployment error: {str(e)}"}
+        console.print("🚀 Deploying homelab services...")
+        result = CommandSequence(
+            [Step(["docker", "compose", "up", "-d"], "docker compose up")],
+            cwd=self.project_root,
+        ).run()
+        if result["success"]:
+            result["message"] = "Homelab deployed successfully"
+        return result
 
     def restart_service(self, service_name: str) -> Dict:
         """Restart a specific service"""
-        try:
-            console.print(f"🔄 Restarting {service_name}...")
-
-            subprocess.run(
-                ["docker", "compose", "restart", service_name],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-
-            return {
-                "success": True,
-                "message": f"{service_name} restarted successfully",
-            }
-
-        except subprocess.CalledProcessError as e:
-            return {
-                "success": False,
-                "error": f"Restart failed for {service_name}: {e.stderr}",
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Restart error for {service_name}: {str(e)}",
-            }
+        console.print(f"🔄 Restarting {service_name}...")
+        result = CommandSequence(
+            [
+                Step(
+                    ["docker", "compose", "restart", service_name],
+                    f"restart {service_name}",
+                )
+            ],
+            cwd=self.project_root,
+        ).run()
+        if result["success"]:
+            result["message"] = f"{service_name} restarted successfully"
+        return result

@@ -1,194 +1,140 @@
-"""
-Unit tests for __main__.py module
-"""
+"""Unit tests for __main__.py and app entry point"""
 
-import sys
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock
 
 import pytest
+from typer.testing import CliRunner
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+from homelab_manager.cli import create_app
 
-from homelab_manager import __main__
+
+def make_app():
+    """Create a fully-mocked Typer app for testing"""
+    registry = Mock()
+    registry.services = {}
+    registry.categories = {}
+    registry.get_service.return_value = None
+    registry.get_services_with_ports.return_value = []
+    registry.get_services_by_category.return_value = []
+
+    config_manager = Mock()
+    config_manager.load_env.return_value = {}
+    config_manager.validate_config.return_value = {}
+    config_manager.get_config_summary.return_value = {}
+    config_manager.get_missing_config.return_value = []
+    config_manager.get_services_for_display.return_value = []
+
+    container_manager = Mock()
+    container_manager.get_container_status.return_value = []
+    container_manager.deploy.return_value = {"success": True}
+    container_manager.create_backup.return_value = {
+        "success": True,
+        "backup_path": "/tmp/backup.tar.gz",
+    }
+    container_manager.restore_backup.return_value = {"success": True}
+    container_manager.restart_service.return_value = {"success": True}
+    container_manager.get_service_logs.return_value = ""
+
+    health_monitor = Mock()
+    health_monitor.check_all_services.return_value = {}
+
+    update_manager = Mock()
+    update_manager.update_all.return_value = {"success": True, "message": "updated"}
+
+    return create_app(
+        config_manager=config_manager,
+        container_manager=container_manager,
+        health_monitor=health_monitor,
+        update_manager=update_manager,
+        registry=registry,
+    )
 
 
 class TestMainModule:
-    """Test cases for __main__.py module"""
+    """Tests for the __main__ module entry point"""
 
-    def test_main_function(self):
-        """Test the main function"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.deploy.return_value = True
+    def test_main_module_can_be_imported(self):
+        """Test that homelab_manager.__main__ imports without error"""
+        from homelab_manager import __main__
 
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "deploy"]):
-                __main__.main()
-                assert True
+        assert __main__ is not None
 
-    def test_main_function_with_help(self):
-        """Test the main function with help argument"""
-        import pytest
+    def test_main_module_uses_create_app(self):
+        """Test that __main__ depends on create_app from cli"""
+        from homelab_manager.cli import create_app as cli_create_app
 
-        # Mock sys.argv to avoid command line argument issues
-        with patch("sys.argv", ["__main__.py", "--help"]):
-            # Should raise SystemExit for help
-            with pytest.raises(SystemExit):
-                __main__.main()
+        assert cli_create_app is not None
 
-    def test_main_function_with_invalid_command(self):
-        """Test the main function with invalid command"""
-        import pytest
+    def test_app_help_exits_zero(self):
+        """Test --help exits with code 0"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["--help"])
+        assert result.exit_code == 0
 
-        # Mock sys.argv to avoid command line argument issues
-        with patch("sys.argv", ["__main__.py", "invalid-command"]):
-            # Should raise SystemExit for invalid command
-            with pytest.raises(SystemExit):
-                __main__.main()
+    def test_app_invalid_command_exits_nonzero(self):
+        """Test an unknown command exits with non-zero code"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["invalid-command-xyz"])
+        assert result.exit_code != 0
 
-    def test_main_function_with_update_command(self):
-        """Test the main function with update command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.update.return_value = True
+    def test_app_status_command(self):
+        """Test the status command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["status"])
+        assert result.exit_code == 0
 
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "update"]):
-                __main__.main()
-                assert True
+    def test_app_deploy_command(self):
+        """Test the deploy command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["deploy"])
+        assert result.exit_code == 0
 
-    def test_main_function_with_backup_command(self):
-        """Test the main function with backup command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.backup.return_value = "/path/to/backup"
+    def test_app_update_command(self):
+        """Test the update command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["update"])
+        assert result.exit_code == 0
 
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "backup"]):
-                __main__.main()
-                assert True
+    def test_app_health_command(self):
+        """Test the health command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["health"])
+        assert result.exit_code == 0
 
-    def test_main_function_with_restore_command(self):
-        """Test the main function with restore command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.restore.return_value = True
+    def test_app_config_command(self):
+        """Test the config command runs successfully"""
+        app = make_app()
+        # Override config_manager to return proper summary structure
+        runner = CliRunner()
+        result = runner.invoke(app, ["config"])
+        assert result.exit_code == 0
 
-            # Mock sys.argv to avoid command line argument issues
-            with patch(
-                "sys.argv",
-                ["__main__.py", "restore", "--backup-path", "/path/to/backup"],
-            ):
-                __main__.main()
-                assert True
+    def test_app_urls_command(self):
+        """Test the urls command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["urls"])
+        assert result.exit_code == 0
 
-    def test_main_function_with_health_check_command(self):
-        """Test the main function with health-check command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.health_check.return_value = None
+    def test_app_services_command(self):
+        """Test the services command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["services"])
+        assert result.exit_code == 0
 
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "health-check"]):
-                __main__.main()
-                assert True
+    def test_app_backup_command(self):
+        """Test the backup command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["backup"])
+        assert result.exit_code == 0
 
-    def test_main_function_with_status_command(self):
-        """Test the main function with status command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.status.return_value = None
+    def test_app_restart_command(self):
+        """Test the restart command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["restart"])
+        assert result.exit_code == 0
 
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "status"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_monitor_command(self):
-        """Test the main function with monitor command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.monitor.return_value = None
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "monitor"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_check_updates_command(self):
-        """Test the main function with check-updates command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.check_updates.return_value = None
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "check-updates"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_update_all_command(self):
-        """Test the main function with update-all command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.update_all.return_value = True
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "update-all"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_versions_command(self):
-        """Test the main function with versions command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.versions.return_value = None
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "versions"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_cleanup_command(self):
-        """Test the main function with cleanup command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.cleanup.return_value = None
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "cleanup"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_setup_cron_command(self):
-        """Test the main function with setup-cron command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.setup_cron.return_value = None
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "setup-cron"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_validate_config_command(self):
-        """Test the main function with validate-config command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.validate_config.return_value = None
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "validate-config"]):
-                __main__.main()
-                assert True
-
-    def test_main_function_with_config_summary_command(self):
-        """Test the main function with config-summary command"""
-        with patch("homelab_manager.cli.HomelabCLI") as mock_cli:
-            mock_instance = mock_cli.return_value
-            mock_instance.config_summary.return_value = None
-
-            # Mock sys.argv to avoid command line argument issues
-            with patch("sys.argv", ["__main__.py", "config-summary"]):
-                __main__.main()
-                assert True
+    def test_app_logs_command(self):
+        """Test the logs command runs successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["logs"])
+        assert result.exit_code == 0

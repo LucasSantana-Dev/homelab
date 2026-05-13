@@ -19,10 +19,10 @@ console = Console()
 class StatusManager:
     """Manages container status, health checks, and logs"""
 
-    def __init__(self):
+    def __init__(self, registry: Optional[ServiceRegistry] = None):
         self.docker_client = docker.from_env()
         self.project_root = Path(__file__).parent.parent.parent
-        self.registry = ServiceRegistry()
+        self.registry = registry or ServiceRegistry()
 
     def get_container_status(self) -> List[Dict]:
         """Get status of all homelab containers"""
@@ -75,35 +75,8 @@ class StatusManager:
         return containers
 
     def _is_homelab_container(self, container_name: str) -> bool:
-        """Check if a container belongs to the homelab stack"""
-        # Known container name patterns
-        homelab_patterns = [
-            "nginx",
-            "homepage",
-            "portainer",
-            "grafana",
-            "prometheus",
-            "pihole",
-            "homeassistant",
-            "jellyfin",
-            "stremio",
-            "uptime",
-            "whats-up",
-            "netdata",
-            "loki",
-            "promtail",
-            "alertmanager",
-            "cadvisor",
-            "node-exporter",
-            "vaultwarden",
-            "authentik",
-            "paperless",
-            "nextcloud",
-            "n8n",
-            "filebrowser",
-            "blackbox",
-        ]
-        return any(pattern in container_name.lower() for pattern in homelab_patterns)
+        """Check if a container belongs to the homelab stack via the service registry"""
+        return self.registry.get_service_by_container(container_name) is not None
 
     def _check_container_health(self, container_name: str) -> str:
         """Check if a container is healthy"""
