@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **nginx-proxy service + `config/nginx/` tree + stale Authentik nginx include configs** — Caddy and Cloudflared own all ingress now. The nginx-proxy service had been dead code with broken mount paths since the Authentik removal in PR #63; `/audit-deep` flagged this as 2 CRITICAL findings (missing mount dirs that broke fresh deploys + stale Authentik outpost configs hardcoding `192.168.1.121`). Archives: `docs/authentik-sso-setup.md` → `archive/docs-dropped/`, `config/k3s/registries.yaml.example` → `archive/k8s-dropped/k3s/`.
+
 - **k3s / Hybrid Migration tooling** - Executed [ADR 0004](docs/adr/0004-drop-k3s.md): all workloads consolidated on Docker Compose. Deleted live `k8s/` tree, `scripts/migration/`, bootstrap k3s-secret scripts, `homelab-k3s-health.{service,timer}`, `.claude/skills/homelab-{k3s-ops,wave-migration}/`, plus migration docs (`wave-a-preflight-pack.md`, `k3s-restart-baseline.md`, `k8s-terraform-migration-roadmap.md`, `k8s-phase2-readiness-gate.md`). Pruned k3s/kubectl/helm references from `Makefile`, `README.md`, `scripts/README.md`, deployment/maintenance scripts, and `.pre-commit-config.yaml`. Historical snapshot preserved under `archive/k8s-dropped/`.
 
 ### Added (Operations)
