@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependabot configuration** — `.github/dependabot.yml` enables weekly Monday audits for pip, docker, and github-actions ecosystems. Bot PRs target the `release` branch (matching the release-branch model) so `/dep-sweep` can batch them. Closes audit-deep HIGH H4.
 - **ADR 0005 — Media stack: Stremio + RealDebrid (conditional)** — documents the decision to keep Stremio+RealDebrid as the primary media surface, reject Plex permanently, and defer Jellyfin+*arr migration. Conditional on 4 pre-conditions (deadline 2026-05-27) and 7 operational revisit triggers. (`docs/adr/0005-media-stack-stremio-realdebrid.md`)
 
+### Security
+
+- **Docker container hardening** — closes audit-deep HIGH H1+H2+H3 and MEDIUM M2+M3.
+  - agent-box: `/var/run/docker.sock` now mounted `:ro` (read-only).
+  - n8n: dropped `user: "root"`, runs as UID 1000 (image's default `node` user). Server prerequisite: `chown -R 1000:1000 ../appdata/n8n`.
+  - Home Assistant: `user: root` retained (USB device passthrough requirement) with inline justification comment; also dropped stale nginx certbot mount missed in PR #78.
+  - cadvisor: replaced `privileged: true` with explicit `cap_add: [DAC_READ_SEARCH, SYS_PTRACE]` + `cap_drop: ALL` + `no-new-privileges`.
+  - netdata: explicit `cap_drop: ALL` + scoped caps; `apparmor:unconfined` retained per upstream requirement with inline rationale; added `no-new-privileges`.
+  - Loki: removed `${BIND_IP:-0.0.0.0}:3100` binding (Grafana reaches Loki over internal docker network); only `127.0.0.1:3100` retained for host debugging.
+
 ### Changed
 
 - **Docs sweep — strip stale Authentik/nginx/Vaultwarden references** — README, `docs/access-layers.md`, `docs/public-release-hardening.md`, and `Makefile` updated to reflect the current Tinyauth + Caddy + Cloudflared stack. Three dead Makefile targets (`sso-register-apps`, `sso-register-dry-run`, `sso-register-status`) and `scripts/maintenance/authentik-register-apps.sh` archived under `archive/scripts-dropped/`. Closes audit-deep HIGH H8.

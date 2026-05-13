@@ -57,7 +57,9 @@ services:
     image: ${IMG_N8N:-n8nio/n8n:1.110.1}
     container_name: n8n
     restart: unless-stopped
-    user: "root"  # Run as root to avoid permission issues with volume
+    # H2 hardening: dropped explicit user:root. Image's default 'node' user is UID 1000.
+    # Server prerequisite: `sudo chown -R 1000:1000 ../appdata/n8n` before next deploy.
+    user: "1000:1000"
     volumes:
       - ../appdata/n8n:/home/node/.n8n
     environment:

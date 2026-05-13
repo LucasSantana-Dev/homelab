@@ -3,9 +3,10 @@ services:
     image: ${IMG_HOMEASSISTANT:-ghcr.io/home-assistant/home-assistant:stable}
     container_name: homeassistant
     restart: unless-stopped
+    # Home Assistant requires root for USB device access (Zigbee/Z-Wave dongles via /dev/tty*)
+    # and the supervisor's /config/deps install step. Bridge-networked, not host-networked.
     user: root
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - ../config/homeassistant/config:/config
     - /etc/localtime:/etc/localtime:ro
     environment:
