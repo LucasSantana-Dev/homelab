@@ -129,9 +129,9 @@ python -m homelab_manager --help
 ### Resilience & SSO Checks (Makefile)
 
 - `make power-restore-check` - Validate post-boot readiness for AC-loss recovery
-- `make sso-status` - Validate SSO edge runtime state (cloudflared/authentik/outpost/config)
-- `make sso-smoke-test` - Validate unauthenticated redirects to Authentik on protected domains
-- `make ssl-renew` - Issue/renew wildcard TLS cert via Cloudflare DNS-01 and restart nginx
+- `make sso-status` - Validate SSO edge runtime state (cloudflared/Tinyauth)
+- `make sso-smoke-test` - Validate unauthenticated redirects to Tinyauth on protected domains
+- `make ssl-renew` - Issue/renew wildcard TLS cert via Cloudflare DNS-01
 - `make ssl-status` - Show the currently served certificate details for `auth.$DOMAIN`
 
 ### Host Maintenance (Makefile)
@@ -189,11 +189,11 @@ python -m homelab_manager urls
 homelab/
 ├── compose/                      # Modular Docker Compose files
 │   ├── base.yml                 # Networks and volumes
-│   ├── core.yml                 # Nginx, Homepage, Portainer, etc.
-│   ├── monitoring.yml           # Prometheus, Grafana, Loki, etc.
-│   ├── media.yml                # Jellyfin, Stremio
-│   ├── apps.yml                 # n8n, Paperless, Nextcloud
-│   ├── security.yml             # Authentik, Vaultwarden, Pi-hole
+│   ├── core.yml                 # Caddy (LAN), Cloudflared, Homepage, Portainer
+│   ├── monitoring.yml           # Prometheus, Grafana, Loki, Alertmanager, Netdata
+│   ├── media.yml                # Stremio
+│   ├── apps.yml                 # n8n, Miniflux, Linkding, Nextcloud, Forgejo
+│   ├── security.yml             # Tinyauth, Pi-hole
 │   └── automation.yml           # Home Assistant
 ├── homelab_manager/              # Python CLI package
 │   ├── cli/                     # CLI commands
@@ -226,16 +226,16 @@ homelab/
 #### Core Infrastructure
 
 - **Homepage** - Dashboard (port 3000)
+- **Caddy (LAN)** - LAN reverse proxy for `*.home`
 - **Cloudflared** - Cloudflare Tunnel connector (localhost metrics on port 2000)
 - **Portainer** - Container management (port 9000)
-- **Uptime Kuma** - Uptime monitoring (port 3001)
+- **Gatus** - Service health monitoring (port 8095)
 - **What's Up Docker** - Container monitoring (port 3003)
 - **Forge MCP Gateway** - Forge Space-compatible MCP hub (port 4444, profile: `forge-space`)
 
 #### Media & Entertainment
 
-- **Stremio** - Media streaming (port 8080)
-- **Jellyfin** - Media server (port 8096) - <https://jellyfin.homelab.example.com>
+- **Stremio** - Media streaming gateway (see [ADR 0005](docs/adr/0005-media-stack-stremio-realdebrid.md))
 
 #### Home Automation
 
@@ -244,11 +244,7 @@ homelab/
 #### Networking & Security
 
 - **Pi-hole** - DNS filtering (port 8054)
-- **Vaultwarden** - Password manager (port 8200) - <https://vault.homelab.example.com>
-
-#### Security & Identity
-
-- **Authentik** - SSO & Identity Provider (ports 9100, 9443) - <https://auth.homelab.example.com>
+- **Tinyauth** - Forward-auth OAuth gateway (Google + GitHub providers)
 
 #### Monitoring & Observability
 
@@ -434,23 +430,14 @@ CF_TUNNEL_TOKEN=your_cloudflare_tunnel_token_here
 PIHOLE_WEB_PASSWORD=your_pihole_password_here
 GRAFANA_PASSWORD=your_grafana_password_here
 HOMEASSISTANT_KEY=your_homeassistant_key_here
-VAULTWARDEN_ADMIN_TOKEN=your_vaultwarden_admin_token_here
 N8N_USER=admin
 N8N_PASSWORD=your_n8n_password_here
 
-# Authentik SSO Configuration
-AUTHENTIK_SECRET_KEY=<openssl rand -base64 50>
-AUTHENTIK_DB_PASSWORD=<secure password>
-AUTHENTIK_ALLOWED_EMAIL=you@example.com
-AUTHENTIK_ALLOWED_GITHUB_USERNAME=your-github-user
-AUTHENTIK_SESSION_DAYS=7
-AUTHENTIK_REQUIRE_MFA=true
-AUTHENTIK_GRAFANA_CLIENT_ID=<grafana_client_id>
-AUTHENTIK_GRAFANA_CLIENT_SECRET=<grafana_client_secret>
-
-# Grafana SSO Controls
-GRAFANA_OAUTH_ENABLED=true
-GRAFANA_DISABLE_LOGIN_FORM=true
+# Tinyauth SSO Configuration
+TINYAUTH_SECRET=<openssl rand -base64 32>
+TINYAUTH_USERS=admin:<bcrypt-hash>
+TINYAUTH_OAUTH_GITHUB_CLIENT_ID=<github_oauth_client_id>
+TINYAUTH_OAUTH_GITHUB_CLIENT_SECRET=<github_oauth_client_secret>
 
 # Paperless-ngx Document Management
 PAPERLESS_SECRET_KEY=<openssl rand -base64 50>
@@ -501,7 +488,7 @@ For complete DNS setup including all services, see `docs/dns-setup.md`.
 
 1. **Localhost**: `http://localhost:PORT`
 2. **Tailscale**: `http://TAILSCALE_IP:PORT` or `https://service.DOMAIN` (with DNS configured)
-3. **Public (Selected only)**: `https://service.DOMAIN` via Cloudflare Tunnel + Authentik SSO
+3. **Public (Selected only)**: `https://service.DOMAIN` via Cloudflare Tunnel + Tinyauth SSO
 
 ## 🛠️ Development
 
@@ -528,7 +515,7 @@ mypy homelab_manager/
 
 1. Add service to the appropriate `compose/*.yml` module
 2. Add service definition to `homelab_manager/data/services.yaml`
-3. Update nginx configuration if needed
+3. Update Caddy configuration (`config/caddy/`) if the service is exposed
 4. Restart services: `docker compose up -d`
 
 ## 📊 Monitoring
@@ -564,11 +551,11 @@ The homelab includes an automated container update system that runs every 5 days
 **Container Update Groups:**
 | Group | Wait Time | Containers |
 |-------|-----------|------------|
-| Databases | 30s | nextcloud-db, authentik-db, paperless-db, *-redis |
-| Core | 20s | nginx, homepage, homeassistant, vaultwarden |
-| Applications | 20s | jellyfin, stremio, n8n, nextcloud, paperless-ngx |
-| Monitoring | 15s | prometheus, grafana, loki, alertmanager, netdata |
-| Utilities | 10s | portainer, uptime-kuma, whats-up-docker, pihole |
+| Databases | 30s | nextcloud-db, paperless-db, *-redis |
+| Core | 20s | caddy, cloudflared, homepage, homeassistant, tinyauth |
+| Applications | 20s | stremio, n8n, nextcloud, paperless-ngx |
+| Monitoring | 15s | prometheus, grafana, loki, alertmanager, netdata, gatus |
+| Utilities | 10s | portainer, whats-up-docker, pihole |
 
 **Setup Automated Updates:**
 
@@ -600,9 +587,9 @@ Recommended webhook model:
 
 - **Network Isolation**: Services bound to localhost and Tailscale
 - **Public Exposure Model**: Selected domains only via Cloudflare Tunnel
-- **SSO Gate**: Authentik forward-auth in nginx for phase-1 admin/public set
-- **Identity Controls**: Exact email + GitHub allowlist, MFA required, 7-day session policy
-- **Fallback Strategy**: One local break-glass Authentik admin account retained
+- **SSO Gate**: Tinyauth forward-auth in Caddy for phase-1 admin/public set
+- **Identity Controls**: GitHub OAuth allowlist + local user fallback
+- **Fallback Strategy**: One local break-glass Tinyauth admin account retained
 
 ## 📚 Documentation
 
@@ -611,7 +598,7 @@ Recommended webhook model:
 - **Configuration**: Check `.env.example` for all options
 - **Auto-Start Setup**: See `docs/bios-power-on-setup.md` for BIOS configuration
 - **Cloudflare Phase 1 Exposure**: See `docs/cloudflare-tunnel-phase1.md`
-- **Authentik SSO Setup**: See `docs/authentik-sso-setup.md`
+- **Tinyauth SSO Setup**: See `docs/tinyauth-sso-setup.md` (Authentik docs archived under `archive/docs-dropped/`)
 - **Service Management**: Scripts in `scripts/deployment/`, `scripts/monitoring/`
 - **Scripts README**: See `scripts/README.md` for script documentation
 

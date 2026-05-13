@@ -31,7 +31,7 @@ Rotate and validate cutover for:
 - Discord webhooks (`ALERTMANAGER_DISCORD_WEBHOOK`, `WATCHDOG_DISCORD_WEBHOOK`, `WUD_DISCORD_WEBHOOK_URL`, `UPDATE_DISCORD_WEBHOOK_URL`)
 - Sentry auth token
 - GitHub and Docker Hub tokens
-- Authentik OAuth client secrets and app credentials
+- Tinyauth secret + GitHub OAuth client credentials
 - Any additional API keys used by custom services
 
 Only after validation, revoke old credentials.

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependabot configuration** — `.github/dependabot.yml` enables weekly Monday audits for pip, docker, and github-actions ecosystems. Bot PRs target the `release` branch (matching the release-branch model) so `/dep-sweep` can batch them. Closes audit-deep HIGH H4.
 - **ADR 0005 — Media stack: Stremio + RealDebrid (conditional)** — documents the decision to keep Stremio+RealDebrid as the primary media surface, reject Plex permanently, and defer Jellyfin+*arr migration. Conditional on 4 pre-conditions (deadline 2026-05-27) and 7 operational revisit triggers. (`docs/adr/0005-media-stack-stremio-realdebrid.md`)
 
+### Changed
+
+- **Docs sweep — strip stale Authentik/nginx/Vaultwarden references** — README, `docs/access-layers.md`, `docs/public-release-hardening.md`, and `Makefile` updated to reflect the current Tinyauth + Caddy + Cloudflared stack. Three dead Makefile targets (`sso-register-apps`, `sso-register-dry-run`, `sso-register-status`) and `scripts/maintenance/authentik-register-apps.sh` archived under `archive/scripts-dropped/`. Closes audit-deep HIGH H8.
+
 ### Removed
 
 - **nginx-proxy service + `config/nginx/` tree + stale Authentik nginx include configs** — Caddy and Cloudflared own all ingress now. The nginx-proxy service had been dead code with broken mount paths since the Authentik removal in PR #63; `/audit-deep` flagged this as 2 CRITICAL findings (missing mount dirs that broke fresh deploys + stale Authentik outpost configs hardcoding `192.168.1.121`). Archives: `docs/authentik-sso-setup.md` → `archive/docs-dropped/`, `config/k3s/registries.yaml.example` → `archive/k8s-dropped/k3s/`.
