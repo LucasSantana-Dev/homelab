@@ -1,40 +1,86 @@
-# Monitoring Stack
-# Prometheus, Grafana, Loki, Alertmanager, Netdata, Promtail, Node-exporter, cAdvisor, Blackbox-exporter
+# YAML Anchors for DRY configuration
+x-logging-defaults: &logging-defaults
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-healthcheck-minimal: &healthcheck-minimal
+  interval: 30s
+  timeout: 10s
+  retries: 3
+
+x-healthcheck-with-start: &healthcheck-with-start
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-minimal: &resources-minimal
+  limits:
+    memory: 128M
+    cpus: '0.25'
+  reservations:
+    memory: 64M
+    cpus: '0.125'
+
+x-resources-small: &resources-small
+  limits:
+    memory: 256M
+    cpus: '0.5'
+  reservations:
+    memory: 128M
+    cpus: '0.25'
+
+x-resources-medium: &resources-medium
+  limits:
+    memory: 512M
+    cpus: '1.0'
+  reservations:
+    memory: 256M
+    cpus: '0.5'
+
+x-resources-large: &resources-large
+  limits:
+    memory: 1G
+    cpus: '2.0'
+  reservations:
+    memory: 512M
+    cpus: '1.0'
 
 services:
-  # Grafana - TAILSCALE ONLY (Sensitive Service)
   grafana:
     image: ${IMG_GRAFANA:-grafana/grafana-oss:11.4.6}
     container_name: grafana
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - grafana_data:/var/lib/grafana
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_DOMAIN=grafana.${DOMAIN}
-      - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
-      - GF_AUTH_GENERIC_OAUTH_ENABLED=${GRAFANA_OAUTH_ENABLED:-true}
-      - GF_AUTH_GENERIC_OAUTH_NAME=Authentik
-      - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
-      - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${AUTHENTIK_GRAFANA_CLIENT_ID}
-      - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${AUTHENTIK_GRAFANA_CLIENT_SECRET}
-      - GF_AUTH_GENERIC_OAUTH_SCOPES=openid profile email
-      - GF_AUTH_GENERIC_OAUTH_AUTH_URL=https://auth.${DOMAIN}/application/o/authorize/
-      - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=https://auth.${DOMAIN}/application/o/token/
-      - GF_AUTH_GENERIC_OAUTH_API_URL=https://auth.${DOMAIN}/application/o/userinfo/
-      - GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH=email
-      - GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH=email
-      - GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH=name
-      - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'Grafana Admins') && 'Admin' || contains(groups[*], 'Grafana Editors') && 'Editor' || 'Viewer'
-      - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_DISABLE_LOGIN_FORM:-true}
+    - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    - GF_SECURITY_ADMIN_USER=admin
+    - GF_USERS_ALLOW_SIGN_UP=false
+    - GF_SERVER_DOMAIN=grafana.${DOMAIN}
+    - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
+    - GF_AUTH_GENERIC_OAUTH_ENABLED=${GRAFANA_OAUTH_ENABLED:-true}
+    - GF_AUTH_GENERIC_OAUTH_NAME=Authentik
+    - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
+    - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${AUTHENTIK_GRAFANA_CLIENT_ID}
+    - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${AUTHENTIK_GRAFANA_CLIENT_SECRET}
+    - GF_AUTH_GENERIC_OAUTH_SCOPES=openid profile email
+    - GF_AUTH_GENERIC_OAUTH_AUTH_URL=https://auth.${DOMAIN}/application/o/authorize/
+    - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=https://auth.${DOMAIN}/application/o/token/
+    - GF_AUTH_GENERIC_OAUTH_API_URL=https://auth.${DOMAIN}/application/o/userinfo/
+    - GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH=email
+    - GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH=email
+    - GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH=name
+    - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'Grafana Admins')
+      && 'Admin' || contains(groups[*], 'Grafana Editors') && 'Editor' || 'Viewer'
+    - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_DISABLE_LOGIN_FORM:-true}
     ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${GRAFANA_PORT:-3002}:3000"
+    - ${BIND_IP:-0.0.0.0}:${GRAFANA_PORT:-3002}:3000
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -44,31 +90,45 @@ services:
           memory: 512M
           cpus: '0.25'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Alertmanager - Alert routing and notifications - TAILSCALE ONLY
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:3000/api/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
   alertmanager:
     image: ${IMG_ALERTMANAGER:-prom/alertmanager:v0.28.1}
     container_name: alertmanager
     restart: unless-stopped
     environment:
-      - ALERTMANAGER_DISCORD_WEBHOOK=${ALERTMANAGER_DISCORD_WEBHOOK}
+    - ALERTMANAGER_DISCORD_WEBHOOK=${ALERTMANAGER_DISCORD_WEBHOOK}
     volumes:
-      - ../config/alertmanager:/etc/alertmanager
-      - ../appdata/alertmanager:/alertmanager
+    - ../config/alertmanager:/etc/alertmanager
+    - ../appdata/alertmanager:/alertmanager
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--cluster.listen-address='
+    - --config.file=/etc/alertmanager/alertmanager.yml
+    - --storage.path=/alertmanager
+    - --cluster.listen-address=
     ports:
-      - "${BIND_IP:-0.0.0.0}:9093:9093"
+    - ${BIND_IP:-0.0.0.0}:9093:9093
     networks:
-      - default
+    - default
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost:9093/-/healthy
       interval: 30s
       timeout: 10s
       retries: 3
@@ -82,26 +142,30 @@ services:
           memory: 64M
           cpus: '0.1'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Blackbox Exporter - HTTP/TCP endpoint monitoring - Localhost only
+        max-size: 10m
+        max-file: '3'
   blackbox-exporter:
     image: ${IMG_BLACKBOX:-prom/blackbox-exporter:v0.28.0}
     container_name: blackbox-exporter
     restart: unless-stopped
     volumes:
-      - ../config/blackbox:/etc/blackbox_exporter
+    - ../config/blackbox:/etc/blackbox_exporter
     command:
-      - '--config.file=/etc/blackbox_exporter/blackbox.yml'
+    - --config.file=/etc/blackbox_exporter/blackbox.yml
     ports:
-      - "127.0.0.1:9115:9115"
+    - 127.0.0.1:9115:9115
     networks:
-      - default
+    - default
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9115/-/healthy"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost:9115/-/healthy
       interval: 30s
       timeout: 10s
       retries: 3
@@ -115,33 +179,31 @@ services:
           memory: 32M
           cpus: '0.05'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Prometheus - TAILSCALE ONLY (Sensitive Service)
+        max-size: 10m
+        max-file: '3'
   prometheus:
     image: ${IMG_PROMETHEUS:-prom/prometheus:v2.54.1}
     container_name: prometheus
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - ../config/prometheus:/etc/prometheus
-      - prometheus_data:/prometheus
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - ../config/prometheus:/etc/prometheus
+    - prometheus_data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --web.console.libraries=/etc/prometheus/console_libraries
+    - --web.console.templates=/etc/prometheus/consoles
+    - --storage.tsdb.retention.time=200h
+    - --web.enable-lifecycle
     ports:
-      - "${BIND_IP:-0.0.0.0}:${PROMETHEUS_PORT:-9091}:9090"
+    - ${BIND_IP:-0.0.0.0}:${PROMETHEUS_PORT:-9091}:9090
     networks:
-      - default
+    - default
     depends_on:
-      - alertmanager
+    - alertmanager
     deploy:
       resources:
         limits:
@@ -151,31 +213,37 @@ services:
           memory: 512M
           cpus: '0.25'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Node Exporter - LOCALHOST ONLY (System Metrics)
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:9090/-/healthy
+      interval: 30s
+      timeout: 10s
+      retries: 3
   node-exporter:
     image: ${IMG_NODE_EXPORTER:-prom/node-exporter:v1.9.1}
     container_name: node-exporter
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /:/rootfs:ro
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    - --path.procfs=/host/proc
+    - --path.rootfs=/rootfs
+    - --path.sysfs=/host/sys
+    - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
     ports:
-      # Localhost access ONLY
-      - "127.0.0.1:${NODE_EXPORTER_PORT:-9100}:9100"
+    - 127.0.0.1:${NODE_EXPORTER_PORT:-9100}:9100
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -185,34 +253,41 @@ services:
           memory: 128M
           cpus: '0.1'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # cAdvisor - Container Metrics
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:9100/metrics
+      interval: 30s
+      timeout: 10s
+      retries: 3
   cadvisor:
     image: ${IMG_CADVISOR:-gcr.io/cadvisor/cadvisor:v0.49.1}
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
     command:
-      - '--docker_only'
-      - '--housekeeping_interval=30s'
-      - '--max_housekeeping_interval=1m'
-      - '--event_storage_age_limit=default=1h'
-      - '--event_storage_event_limit=default=1000'
-      - '--store_container_labels=false'
+    - --docker_only
+    - --housekeeping_interval=30s
+    - --max_housekeeping_interval=1m
+    - --event_storage_age_limit=default=1h
+    - --event_storage_event_limit=default=1000
+    - --store_container_labels=false
     volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
+    - /:/rootfs:ro
+    - /var/run:/var/run:ro
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    - /dev/disk/:/dev/disk:ro
     ports:
-      - "127.0.0.1:8082:8080"
+    - 127.0.0.1:8082:8080
     networks:
-      - default
+    - default
     healthcheck:
       disable: true
     mem_limit: 768M
@@ -226,32 +301,30 @@ services:
           memory: 256M
           cpus: '0.1'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Netdata - Real-time System Monitoring
+        max-size: 10m
+        max-file: '3'
   netdata:
     image: ${IMG_NETDATA:-netdata/netdata:stable}
     container_name: netdata
     restart: unless-stopped
     cap_add:
-      - SYS_PTRACE
+    - SYS_PTRACE
     security_opt:
-      - apparmor:unconfined
+    - apparmor:unconfined
     volumes:
-      - netdataconfig:/etc/netdata
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
+    - netdataconfig:/etc/netdata
+    - netdatalib:/var/lib/netdata
+    - netdatacache:/var/cache/netdata
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
     environment:
-      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
+    - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
     ports:
-      - "${BIND_IP:-0.0.0.0}:19999:19999"
+    - ${BIND_IP:-0.0.0.0}:19999:19999
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -261,25 +334,32 @@ services:
           memory: 256M
           cpus: '0.25'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Loki Log Aggregation - Localhost + Tailscale
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:19999/
+      interval: 30s
+      timeout: 10s
+      retries: 3
   loki:
     image: ${IMG_LOKI:-grafana/loki:2.9.13}
     container_name: loki
     restart: unless-stopped
     volumes:
-      - ../appdata/loki:/loki
-      - ../config/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+    - ../appdata/loki:/loki
+    - ../config/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
     command: -config.file=/etc/loki/local-config.yaml
     ports:
-      - "127.0.0.1:3100:3100"
-      - "${BIND_IP:-0.0.0.0}:3100:3100"
+    - 127.0.0.1:3100:3100
+    - ${BIND_IP:-0.0.0.0}:3100:3100
     networks:
-      - default
+    - default
     healthcheck:
       disable: true
     deploy:
@@ -291,26 +371,23 @@ services:
           memory: 256M
           cpus: '0.2'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Promtail Log Collection
+        max-size: 10m
+        max-file: '3'
   promtail:
     image: ${IMG_PROMTAIL:-grafana/promtail:2.9.13}
     container_name: promtail
     restart: unless-stopped
     volumes:
-      - ../config/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
-      - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - ../config/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
+    - /var/log:/var/log:ro
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/config.yml
     networks:
-      - default
+    - default
     depends_on:
-      - loki
-    # Promtail doesn't expose a health endpoint, monitoring via logs only
+    - loki
     deploy:
       resources:
         limits:
@@ -320,28 +397,35 @@ services:
           memory: 128M
           cpus: '0.1'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Gatus - declarative uptime monitoring (replaces Uptime Kuma)
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:9080/ready
+      interval: 30s
+      timeout: 10s
+      retries: 3
   gatus:
     image: ${IMG_GATUS:-twinproduction/gatus:v5.16.0}
     container_name: gatus
     restart: unless-stopped
     volumes:
-      - ../config/gatus/config.yaml:/config/config.yaml:ro
-      - gatus_data:/data
+    - ../config/gatus/config.yaml:/config/config.yaml:ro
+    - gatus_data:/data
     environment:
-      - TZ=${TIMEZONE}
-      - GATUS_CONFIG_PATH=/config
+    - TZ=${TIMEZONE}
+    - GATUS_CONFIG_PATH=/config
     ports:
-      - "${BIND_IP:-0.0.0.0}:${GATUS_PORT:-8095}:8080"
+    - ${BIND_IP:-0.0.0.0}:${GATUS_PORT:-8095}:8080
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -351,15 +435,23 @@ services:
           memory: 64M
           cpus: '0.05'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:8080/api/v1/config
+      interval: 30s
+      timeout: 10s
+      retries: 3
 volumes:
-  grafana_data:
-  prometheus_data:
-  netdataconfig:
-  netdatalib:
-  netdatacache:
-  gatus_data:
+  grafana_data: null
+  prometheus_data: null
+  netdataconfig: null
+  netdatalib: null
+  netdatacache: null
+  gatus_data: null

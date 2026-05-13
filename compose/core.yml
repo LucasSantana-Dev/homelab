@@ -1,32 +1,82 @@
-# Core Infrastructure Services
-# Nginx, Homepage, Portainer, Uptime-Kuma, What's Up Docker
+# YAML Anchors for DRY configuration
+x-logging-defaults: &logging-defaults
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-healthcheck-minimal: &healthcheck-minimal
+  interval: 30s
+  timeout: 10s
+  retries: 3
+
+x-healthcheck-with-start: &healthcheck-with-start
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-minimal: &resources-minimal
+  limits:
+    memory: 128M
+    cpus: '0.25'
+  reservations:
+    memory: 64M
+    cpus: '0.125'
+
+x-resources-small: &resources-small
+  limits:
+    memory: 256M
+    cpus: '0.5'
+  reservations:
+    memory: 128M
+    cpus: '0.25'
+
+x-resources-medium: &resources-medium
+  limits:
+    memory: 512M
+    cpus: '1.0'
+  reservations:
+    memory: 256M
+    cpus: '0.5'
+
+x-resources-large: &resources-large
+  limits:
+    memory: 1G
+    cpus: '2.0'
+  reservations:
+    memory: 512M
+    cpus: '1.0'
 
 services:
-  # Nginx Reverse Proxy
   nginx:
     image: ${IMG_NGINX:-nginx:alpine}
     container_name: nginx-proxy
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - ../config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ../config/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ../config/nginx/ssl:/etc/nginx/ssl:ro
-      - ../config/nginx/auth:/etc/nginx/auth:ro
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - ../config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ../config/nginx/conf.d:/etc/nginx/conf.d:ro
+    - ../config/nginx/ssl:/etc/nginx/ssl:ro
+    - ../config/nginx/auth:/etc/nginx/auth:ro
     ports:
-      # Bind only to Tailscale IP for secure access (domain accessible via Tailscale only)
-      - "${BIND_IP:-0.0.0.0}:80:80"
-      - "${BIND_IP:-0.0.0.0}:443:443"
-      # Localhost for health checks
-      - "127.0.0.1:8080:80"
-      - "127.0.0.1:8443:443"
+    - ${BIND_IP:-0.0.0.0}:80:80
+    - ${BIND_IP:-0.0.0.0}:443:443
+    - 127.0.0.1:8080:80
+    - 127.0.0.1:8443:443
     networks:
-      - default
-      - frontend
+    - default
+    - frontend
     depends_on:
-      - homepage
+    - homepage
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://127.0.0.1:80/health
       interval: 30s
       timeout: 10s
       retries: 3
@@ -39,62 +89,63 @@ services:
           memory: 256M
           cpus: '0.25'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Cloudflare Tunnel - Selected public hostnames only
+        max-size: 10m
+        max-file: '3'
   cloudflared:
     image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:2025.4.0}
     container_name: cloudflared
     restart: unless-stopped
     command:
-      - tunnel
-      - --no-autoupdate
-      - --metrics
-      - 0.0.0.0:2000
-      - --config
-      - /etc/cloudflared/config.yml
-      - run
+    - tunnel
+    - --no-autoupdate
+    - --metrics
+    - 0.0.0.0:2000
+    - --config
+    - /etc/cloudflared/config.yml
+    - run
     volumes:
-      - ../config/cloudflared:/etc/cloudflared:ro
+    - ../config/cloudflared:/etc/cloudflared:ro
     ports:
-      - "127.0.0.1:2000:2000"
+    - 127.0.0.1:2000:2000
     networks:
-      - frontend
+    - frontend
     extra_hosts:
-      # Required so cloudflared can dial the host-networked caddy-lan
-      # instance at `host.docker.internal:80` (see config.yml). Docker
-      # maps `host-gateway` to the host bridge IP automatically.
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Homepage Dashboard - Tailscale Only
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://127.0.0.1:2000/metrics
+      interval: 30s
+      timeout: 10s
+      retries: 3
   homepage:
     image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.0.3}
     container_name: homepage
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - ../config/homepage:/app/config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - ../config/homepage:/app/config
+    - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TIMEZONE}
-      - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
-      - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
-      - DOMAIN=${DOMAIN}
+    - PUID=${PUID}
+    - PGID=${PGID}
+    - TZ=${TIMEZONE}
+    - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
+    - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
+    - DOMAIN=${DOMAIN}
     ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000"
+    - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -104,25 +155,31 @@ services:
           memory: 256M
           cpus: '0.25'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Portainer - TAILSCALE ONLY (Sensitive Service)
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:3000/
+      interval: 30s
+      timeout: 10s
+      retries: 3
   portainer:
     image: ${IMG_PORTAINER:-portainer/portainer-ce:2.21.4}
     container_name: portainer
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - portainer_data:/data
     ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${PORTAINER_PORT:-9000}:9000"
+    - ${BIND_IP:-0.0.0.0}:${PORTAINER_PORT:-9000}:9000
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -132,33 +189,40 @@ services:
           memory: 256M
           cpus: '0.1'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # What's Up Docker - TAILSCALE ONLY (Sensitive Service)
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - https://localhost:9443/api/system/status
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
   whats-up-docker:
     image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - whats_up_docker_data:/app/data
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - whats_up_docker_data:/app/data
     environment:
-      - WUD_UPDATER_DOCKER_HUB_TOKEN=${DOCKER_HUB_TOKEN:-}
-      - WUD_UPDATER_GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - WUD_DISCORD_WEBHOOK_URL=${WUD_DISCORD_WEBHOOK_URL}
-      - WUD_SMTP_HOST=${WUD_SMTP_HOST}
-      - WUD_SMTP_PORT=${WUD_SMTP_PORT}
-      - WUD_SMTP_USER=${WUD_SMTP_USER}
-      - WUD_SMTP_PASS=${WUD_SMTP_PASS}
+    - WUD_UPDATER_DOCKER_HUB_TOKEN=${DOCKER_HUB_TOKEN:-}
+    - WUD_UPDATER_GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    - WUD_DISCORD_WEBHOOK_URL=${WUD_DISCORD_WEBHOOK_URL}
+    - WUD_SMTP_HOST=${WUD_SMTP_HOST}
+    - WUD_SMTP_PORT=${WUD_SMTP_PORT}
+    - WUD_SMTP_USER=${WUD_SMTP_USER}
+    - WUD_SMTP_PASS=${WUD_SMTP_PASS}
     ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${WUD_PORT:-3003}:3000"
+    - ${BIND_IP:-0.0.0.0}:${WUD_PORT:-3003}:3000
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -168,11 +232,20 @@ services:
           memory: 128M
           cpus: '0.1'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost:3000/
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 volumes:
-  portainer_data:
-  whats_up_docker_data:
+  portainer_data: null
+  whats_up_docker_data: null

@@ -1,312 +1,328 @@
-"""
-Unit tests for CLI management
-"""
+"""Unit tests for CLI commands via create_app()"""
 
-import sys
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+import typer
+from typer.testing import CliRunner
 
 from homelab_manager.cli.commands import create_app
 
 
-class TestHomelabCLI:
-    """Test cases for HomelabCLI class"""
+def make_mocks():
+    """Create injected mock managers for CLI testing"""
+    registry = Mock()
+    registry.services = {}
+    registry.categories = {}
+    registry.get_service.return_value = None
+    registry.get_services_with_ports.return_value = []
+    registry.get_services_by_category.return_value = []
 
-    def test_init(self):
-        """Test HomelabCLI initialization"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            cli = HomelabCLI()
-            assert cli is not None
+    config_manager = Mock()
+    config_manager.load_env.return_value = {}
+    config_manager.validate_config.return_value = {}
+    config_manager.get_config_summary.return_value = {}
+    config_manager.get_missing_config.return_value = []
+    config_manager.get_services_for_display.return_value = []
 
-    def test_deploy(self):
-        """Test deploy command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_automation.return_value.deploy.return_value = True
+    container_manager = Mock()
+    container_manager.get_container_status.return_value = []
+    container_manager.deploy.return_value = {"success": True}
+    container_manager.create_backup.return_value = {
+        "success": True,
+        "backup_path": "/tmp/backup.tar.gz",
+    }
+    container_manager.restore_backup.return_value = {"success": True}
+    container_manager.restart_service.return_value = {"success": True}
+    container_manager.get_service_logs.return_value = "log output"
 
-            cli = HomelabCLI()
-            result = cli.deploy()
+    health_monitor = Mock()
+    health_monitor.check_all_services.return_value = {}
 
-            assert result is True
+    update_manager = Mock()
+    update_manager.check_updates.return_value = {"success": True, "message": "ok"}
+    update_manager.update_all.return_value = {"success": True, "message": "updated"}
+    update_manager.update_service.return_value = {"success": True, "message": "updated"}
+    update_manager.get_update_status.return_value = {
+        "success": True,
+        "services": [],
+        "total_services": 0,
+    }
 
-    def test_update(self):
-        """Test update command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_automation.return_value.update.return_value = True
+    return registry, config_manager, container_manager, health_monitor, update_manager
 
-            cli = HomelabCLI()
-            result = cli.update()
 
-            assert result is True
+def make_app():
+    """Create a fully-mocked app for testing"""
+    registry, config_manager, container_manager, health_monitor, update_manager = (
+        make_mocks()
+    )
+    return create_app(
+        config_manager=config_manager,
+        container_manager=container_manager,
+        health_monitor=health_monitor,
+        update_manager=update_manager,
+        registry=registry,
+    )
 
-    def test_backup(self):
-        """Test backup command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_automation.return_value.backup.return_value = "/path/to/backup"
 
-            cli = HomelabCLI()
-            result = cli.backup()
+class TestCreateApp:
+    """Tests for create_app() factory"""
 
-            assert result == "/path/to/backup"
+    def test_create_app_returns_typer_instance(self):
+        """Verify create_app() returns a Typer app"""
+        app = make_app()
+        assert isinstance(app, typer.Typer)
 
-    def test_restore(self):
-        """Test restore command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_automation.return_value.restore.return_value = True
+    def test_create_app_help_exits_zero(self):
+        """Verify --help exits successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["--help"])
+        assert result.exit_code == 0
 
-            cli = HomelabCLI()
-            result = cli.restore("/path/to/backup")
+    def test_invalid_command_exits_nonzero(self):
+        """Verify an unknown command exits with non-zero"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["invalid-command-xyz"])
+        assert result.exit_code != 0
 
-            assert result is True
 
-    def test_health_check(self):
-        """Test health check command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor") as mock_health,
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_health.return_value.run_health_check.return_value = None
+class TestStatusCommand:
+    """Tests for the status command"""
 
-            cli = HomelabCLI()
-            result = cli.health_check()
+    def test_status_exits_zero(self):
+        """Verify status command exits successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["status"])
+        assert result.exit_code == 0
 
-            # Should not raise any exceptions
-            assert result is None
+    def test_status_with_containers(self):
+        """Verify status displays containers"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        container_manager.get_container_status.return_value = [
+            {"name": "grafana", "status": "running", "port": 3000, "health": "healthy"}
+        ]
 
-    def test_status(self):
-        """Test status command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor") as mock_health,
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_health.return_value.quick_status.return_value = None
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
 
-            cli = HomelabCLI()
-            result = cli.status()
+        runner = CliRunner()
+        result = runner.invoke(app, ["status"])
+        assert result.exit_code == 0
+        assert "grafana" in result.output
 
-            # Should not raise any exceptions
-            assert result is None
 
-    def test_monitor(self):
-        """Test monitor command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor") as mock_health,
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_health.return_value.monitor_continuous.return_value = None
+class TestHealthCommand:
+    """Tests for the health command"""
 
-            cli = HomelabCLI()
-            result = cli.monitor(interval=30)
+    def test_health_exits_zero(self):
+        """Verify health command exits successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["health"])
+        assert result.exit_code == 0
 
-            # Should not raise any exceptions
-            assert result is None
+    def test_health_shows_service_status(self):
+        """Verify health command displays service status"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        health_monitor.check_all_services.return_value = {
+            "grafana": {
+                "healthy": True,
+                "response_time": 12.5,
+                "last_check": "2026-05-07",
+            }
+        }
 
-    def test_check_updates(self):
-        """Test check updates command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_updates.return_value.check_all_updates.return_value = []
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
 
-            cli = HomelabCLI()
-            result = cli.check_updates()
+        runner = CliRunner()
+        result = runner.invoke(app, ["health"])
+        assert result.exit_code == 0
+        assert "grafana" in result.output
 
-            # Should not raise any exceptions
-            assert result is None
 
-    def test_update_all(self):
-        """Test update all command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_updates.return_value.update_all_services.return_value = True
+class TestDeployCommand:
+    """Tests for the deploy command"""
 
-            cli = HomelabCLI()
-            result = cli.update_all()
+    def test_deploy_success_exits_zero(self):
+        """Verify deploy exits zero on success"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["deploy"])
+        assert result.exit_code == 0
 
-            assert result is True
+    def test_deploy_failure_exits_nonzero(self):
+        """Verify deploy exits non-zero on failure"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        container_manager.deploy.return_value = {
+            "success": False,
+            "error": "deploy failed",
+        }
 
-    def test_update_service(self):
-        """Test update service command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_updates.return_value.update_service.return_value = True
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
 
-            cli = HomelabCLI()
-            result = cli.update_service("test-service")
+        runner = CliRunner()
+        result = runner.invoke(app, ["deploy"])
+        assert result.exit_code != 0
 
-            assert result is True
 
-    def test_versions(self):
-        """Test versions command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager") as mock_updates,
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_updates.return_value.show_versions.return_value = None
+class TestUpdateCommand:
+    """Tests for the update command"""
 
-            cli = HomelabCLI()
-            result = cli.versions()
+    def test_update_success_exits_zero(self):
+        """Verify update exits zero on success"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["update"])
+        assert result.exit_code == 0
 
-            # Should not raise any exceptions
-            assert result is None
+    def test_update_failure_exits_nonzero(self):
+        """Verify update exits non-zero on failure"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        update_manager.update_all.return_value = {
+            "success": False,
+            "error": "update failed",
+        }
 
-    def test_cleanup(self):
-        """Test cleanup command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation") as mock_automation,
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            mock_automation.return_value.cleanup.return_value = None
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
 
-            cli = HomelabCLI()
-            result = cli.cleanup()
+        runner = CliRunner()
+        result = runner.invoke(app, ["update"])
+        assert result.exit_code != 0
 
-            # Should not raise any exceptions
-            assert result is None
 
-    def test_validate_config(self):
-        """Test validate config command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig") as mock_config,
-        ):
-            mock_config.return_value.validate_environment.return_value = (True, [])
+class TestConfigCommand:
+    """Tests for the config command"""
 
-            cli = HomelabCLI()
-            result = cli.validate_config()
+    def test_config_exits_zero(self):
+        """Verify config command exits successfully"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        config_manager.get_config_summary.return_value = {
+            "DOMAIN": {"value": "example.com", "valid": True, "required": True}
+        }
 
-            # Should return the validation result
-            assert result == (True, [])
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
 
-    def test_config_summary(self):
-        """Test config summary command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig") as mock_config,
-        ):
-            mock_config.return_value.show_config_summary.return_value = None
+        runner = CliRunner()
+        result = runner.invoke(app, ["config"])
+        assert result.exit_code == 0
 
-            cli = HomelabCLI()
-            result = cli.config_summary()
 
-            # Should not raise any exceptions
-            assert result is None
+class TestUrlsCommand:
+    """Tests for the urls command"""
 
-    def test_setup_cron(self):
-        """Test setup cron command"""
-        with (
-            patch("homelab_manager.cli.HomelabAutomation"),
-            patch("homelab_manager.cli.HomelabHealthMonitor"),
-            patch("homelab_manager.cli.HomelabUpdateManager"),
-            patch("homelab_manager.cli.HomelabConfig"),
-        ):
-            cli = HomelabCLI()
-            result = cli.setup_cron()
+    def test_urls_exits_zero(self):
+        """Verify urls command exits successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["urls"])
+        assert result.exit_code == 0
 
-            # Should not raise any exceptions
-            assert result is None
 
-    def test_main_function(self):
-        """Test the main function"""
-        from unittest.mock import patch
+class TestServicesCommand:
+    """Tests for the services command"""
 
-        import pytest
+    def test_services_exits_zero(self):
+        """Verify services command exits successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["services"])
+        assert result.exit_code == 0
 
-        from homelab_manager.cli import main
 
-        # Mock the argument parsing to avoid sys.argv conflicts
-        with (
-            patch("sys.argv", ["cli.py", "deploy"]),
-            patch("subprocess.run") as mock_run,
-        ):
-            # Mock subprocess success
-            mock_result = Mock()
-            mock_result.returncode = 0
-            mock_result.stdout = "Success"
-            mock_result.stderr = ""
-            mock_run.return_value = mock_result
+class TestLogsCommand:
+    """Tests for the logs command"""
 
-            # Should not raise any exceptions
-            main()
-            assert True
+    def test_logs_no_service_exits_zero(self):
+        """Verify logs with no argument exits successfully"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["logs"])
+        assert result.exit_code == 0
 
-    def test_main_function_with_help(self):
-        """Test the main function with help argument"""
-        from unittest.mock import patch
+    def test_logs_with_service_name(self):
+        """Verify logs with a service name fetches logs"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["logs", "grafana"])
+        assert result.exit_code == 0
 
-        import pytest
 
-        from homelab_manager.cli import main
+class TestBackupCommand:
+    """Tests for the backup command"""
 
-        # Mock the argument parsing to avoid sys.argv conflicts
-        with patch("sys.argv", ["cli.py", "--help"]):
-            # Should raise SystemExit for help
-            with pytest.raises(SystemExit):
-                main()
+    def test_backup_success_exits_zero(self):
+        """Verify backup exits zero on success"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["backup"])
+        assert result.exit_code == 0
 
-    def test_main_function_with_invalid_command(self):
-        """Test the main function with invalid command"""
-        from unittest.mock import patch
+    def test_backup_failure_exits_nonzero(self):
+        """Verify backup exits non-zero on failure"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        container_manager.create_backup.return_value = {
+            "success": False,
+            "error": "backup failed",
+        }
 
-        import pytest
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
 
-        from homelab_manager.cli import main
+        runner = CliRunner()
+        result = runner.invoke(app, ["backup"])
+        assert result.exit_code != 0
 
-        # Mock the argument parsing to avoid sys.argv conflicts
-        with patch("sys.argv", ["cli.py", "invalid-command"]):
-            # Should raise SystemExit for invalid command
-            with pytest.raises(SystemExit):
-                main()
+
+class TestRestartCommand:
+    """Tests for the restart command"""
+
+    def test_restart_all_exits_zero(self):
+        """Verify restart without args exits zero"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["restart"])
+        assert result.exit_code == 0
+
+    def test_restart_specific_service_exits_zero(self):
+        """Verify restart with service name exits zero"""
+        runner = CliRunner()
+        result = runner.invoke(make_app(), ["restart", "grafana"])
+        assert result.exit_code == 0

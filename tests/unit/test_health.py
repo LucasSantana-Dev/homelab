@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
-"""
-Tests for homelab_manager.health module
-"""
+"""Tests for homelab_manager.services.health module"""
 
-import os
-import subprocess
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 import requests
@@ -16,421 +9,380 @@ import requests
 from homelab_manager.services.health import HealthMonitor
 
 
-class TestHomelabHealthMonitor:
-    """Test cases for HomelabHealthMonitor class"""
+def make_monitor(registry=None):
+    """Create a HealthMonitor with Docker client mocked out"""
+    with patch("homelab_manager.services.health.docker") as mock_docker:
+        mock_docker.from_env.return_value = Mock()
+        monitor = HealthMonitor(registry=registry)
+    return monitor
 
-    def test_init_with_default_path(self):
-        """Test initialization with default path"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
 
-            monitor = HomelabHealthMonitor()
+def make_registry(services=None):
+    """Create a mock ServiceRegistry"""
+    registry = Mock()
+    registry.get_services_with_ports.return_value = services or []
+    registry.get_service.return_value = None
+    return registry
 
-            assert monitor.homelab_dir == Path(__file__).parent.parent.parent
-            assert monitor.log_dir == monitor.homelab_dir / "logs"
-            assert monitor.docker_client is not None
 
-    def test_init_with_custom_path(self):
-        """Test initialization with custom path"""
-        custom_path = "/custom/homelab"
+class TestHealthMonitorInit:
+    """Tests for HealthMonitor initialization"""
 
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
+    def test_init_with_injected_registry(self):
+        """Verify HealthMonitor uses the provided registry"""
+        registry = make_registry()
+        with patch("homelab_manager.services.health.docker"):
+            monitor = HealthMonitor(registry=registry)
+        assert monitor.registry is registry
 
-            monitor = HomelabHealthMonitor(custom_path)
-
-            assert monitor.homelab_dir == Path(custom_path)
-            assert monitor.log_dir == Path(custom_path) / "logs"
-
-    def test_init_docker_not_available(self):
-        """Test initialization when Docker is not available"""
-        with patch(
-            "homelab_manager.health.docker.from_env",
-            side_effect=Exception("Docker not available"),
+    def test_init_creates_default_registry(self):
+        """Verify HealthMonitor creates ServiceRegistry when none provided"""
+        with (
+            patch("homelab_manager.services.health.docker"),
+            patch("homelab_manager.services.health.ServiceRegistry") as mock_reg_cls,
         ):
-            with patch("rich.console.Console.print") as mock_print:
-                with patch("homelab_manager.health.sys.exit") as mock_exit:
-                    HomelabHealthMonitor()
+            HealthMonitor()
+            mock_reg_cls.assert_called_once()
 
-                    mock_print.assert_called_with(
-                        "❌ Docker is not running or not accessible", style="red"
-                    )
-                    mock_exit.assert_called_with(1)
+    def test_init_docker_client_set_on_success(self):
+        """Verify docker_client is set when Docker is available"""
+        mock_client = Mock()
+        with patch("homelab_manager.services.health.docker") as mock_docker:
+            mock_docker.from_env.return_value = mock_client
+            monitor = HealthMonitor(registry=make_registry())
+        assert monitor.docker_client is mock_client
 
-    def test_services_defined(self):
-        """Test that services are properly defined"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
+    def test_init_docker_client_none_on_failure(self):
+        """Verify docker_client is None when Docker is unavailable"""
+        with patch("homelab_manager.services.health.docker") as mock_docker:
+            mock_docker.from_env.side_effect = Exception("Docker not available")
+            monitor = HealthMonitor(registry=make_registry())
+        assert monitor.docker_client is None
 
-            monitor = HomelabHealthMonitor()
+    def test_init_timeout_default(self):
+        """Verify default timeout is 5 seconds"""
+        monitor = make_monitor(registry=make_registry())
+        assert monitor.timeout == 5
 
-            expected_services = [
-                ("Homepage", "http://localhost:3000"),
-                ("Home Assistant", "http://localhost:8123"),
-                ("Grafana", "http://localhost:3002"),
-                ("Portainer", "http://localhost:9000"),
-                ("Uptime Kuma", "http://localhost:3001"),
-                ("Prometheus", "http://localhost:9091"),
-                ("Node Exporter", "http://localhost:9100"),
-                ("What's Up Docker", "http://localhost:3003"),
-            ]
 
-            assert monitor.services == expected_services
+class TestCheckService:
+    """Tests for HealthMonitor.check_service()"""
 
-    def test_check_service_health_success(self):
-        """Test successful service health check"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
+    def test_check_service_returns_healthy_on_200(self):
+        """Verify check_service returns healthy=True for HTTP 200"""
+        monitor = make_monitor(registry=make_registry())
 
-            monitor = HomelabHealthMonitor()
+        mock_response = Mock()
+        mock_response.status_code = 200
 
-            with patch("requests.get") as mock_get:
-                mock_response = Mock()
-                mock_response.status_code = 200
-                mock_get.return_value = mock_response
+        with patch(
+            "homelab_manager.services.health.requests.get", return_value=mock_response
+        ):
+            result = monitor.check_service("grafana", "http://localhost:3000")
 
-                is_healthy, details = monitor.check_service_health(
-                    "Test Service", "http://localhost:3000"
-                )
+        assert result["healthy"] is True
+        assert result["status_code"] == 200
+        assert result["error"] is None
+        assert result["source"] == "http"
 
-                assert is_healthy is True
-                assert details == "Status 200"
-                mock_get.assert_called_once_with("http://localhost:3000", timeout=5)
+    def test_check_service_returns_unhealthy_on_500(self):
+        """Verify check_service returns healthy=False for HTTP 500"""
+        monitor = make_monitor(registry=make_registry())
 
-    def test_check_service_health_server_error(self):
-        """Test service health check with server error"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
+        mock_response = Mock()
+        mock_response.status_code = 500
 
-            monitor = HomelabHealthMonitor()
+        with patch(
+            "homelab_manager.services.health.requests.get", return_value=mock_response
+        ):
+            result = monitor.check_service("grafana", "http://localhost:3000")
 
-            with patch("requests.get") as mock_get:
-                mock_response = Mock()
-                mock_response.status_code = 500
-                mock_get.return_value = mock_response
+        assert result["healthy"] is False
+        assert result["status_code"] == 500
 
-                is_healthy, details = monitor.check_service_health(
-                    "Test Service", "http://localhost:3000"
-                )
+    def test_check_service_custom_expected_statuses(self):
+        """Verify check_service respects custom expected_statuses"""
+        monitor = make_monitor(registry=make_registry())
 
-                assert is_healthy is False
-                assert details == "Status 500"
+        mock_response = Mock()
+        mock_response.status_code = 302
 
-    def test_check_service_health_connection_error(self):
-        """Test service health check with connection error"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
+        with patch(
+            "homelab_manager.services.health.requests.get", return_value=mock_response
+        ):
+            result = monitor.check_service(
+                "app", "http://localhost:8080", expected_statuses=[200, 302]
+            )
 
-            monitor = HomelabHealthMonitor()
+        assert result["healthy"] is True
 
-            with patch(
-                "requests.get",
-                side_effect=requests.exceptions.ConnectionError("Connection failed"),
-            ):
-                is_healthy, details = monitor.check_service_health(
-                    "Test Service", "http://localhost:3000"
-                )
+    def test_check_service_connection_error(self):
+        """Verify check_service returns healthy=False on connection error"""
+        monitor = make_monitor(registry=make_registry())
 
-                assert is_healthy is False
-                assert "Connection failed" in details
+        with patch(
+            "homelab_manager.services.health.requests.get",
+            side_effect=requests.exceptions.ConnectionError("refused"),
+        ):
+            result = monitor.check_service("grafana", "http://localhost:3000")
 
-    def test_check_service_health_timeout(self):
-        """Test service health check with timeout"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
+        assert result["healthy"] is False
+        assert result["error"] is not None
+        assert result["source"] == "http"
 
-            monitor = HomelabHealthMonitor()
+    def test_check_service_timeout_error(self):
+        """Verify check_service returns healthy=False on timeout"""
+        monitor = make_monitor(registry=make_registry())
 
-            with patch(
-                "requests.get",
-                side_effect=requests.exceptions.Timeout("Request timeout"),
-            ):
-                is_healthy, details = monitor.check_service_health(
-                    "Test Service", "http://localhost:3000"
-                )
+        with patch(
+            "homelab_manager.services.health.requests.get",
+            side_effect=requests.exceptions.Timeout("timed out"),
+        ):
+            result = monitor.check_service("grafana", "http://localhost:3000")
 
-                assert is_healthy is False
-                assert "Request timeout" in details
+        assert result["healthy"] is False
+        assert result["error"] is not None
 
-    def test_check_system_resources(self):
-        """Test system resource checking"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_docker.return_value = Mock()
+    def test_check_service_result_has_required_keys(self):
+        """Verify check_service result contains all required keys"""
+        monitor = make_monitor(registry=make_registry())
 
-            monitor = HomelabHealthMonitor()
+        mock_response = Mock()
+        mock_response.status_code = 200
 
-            with (
-                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
-                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
-                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
-            ):
-                mock_memory.return_value.percent = 60.0
-                mock_disk.return_value.percent = 70.0
+        with patch(
+            "homelab_manager.services.health.requests.get", return_value=mock_response
+        ):
+            result = monitor.check_service("grafana", "http://localhost:3000")
 
-                resources = monitor.check_system_resources()
+        for key in (
+            "healthy",
+            "status_code",
+            "response_time",
+            "last_check",
+            "error",
+            "source",
+        ):
+            assert key in result
 
-                assert resources["cpu_percent"] == 50.0
-                assert resources["memory_percent"] == 60.0
-                assert resources["disk_percent"] == 70.0
+    def test_check_service_includes_response_time(self):
+        """Verify check_service records a response_time on success"""
+        monitor = make_monitor(registry=make_registry())
 
-    def test_check_docker_containers_success(self):
-        """Test successful Docker container checking"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
+        mock_response = Mock()
+        mock_response.status_code = 200
+
+        with patch(
+            "homelab_manager.services.health.requests.get", return_value=mock_response
+        ):
+            result = monitor.check_service("grafana", "http://localhost:3000")
+
+        assert result["response_time"] is not None
+        assert result["response_time"] >= 0
+
+
+class TestCheckAllServices:
+    """Tests for HealthMonitor.check_all_services()"""
+
+    def test_check_all_services_returns_dict(self):
+        """Verify check_all_services returns a dict"""
+        registry = make_registry()
+        monitor = make_monitor(registry=registry)
+
+        result = monitor.check_all_services()
+
+        assert isinstance(result, dict)
+
+    def test_check_all_services_empty_when_no_services(self):
+        """Verify check_all_services returns empty dict when registry has no services"""
+        registry = make_registry(services=[])
+        monitor = make_monitor(registry=registry)
+
+        result = monitor.check_all_services()
+
+        assert result == {}
+
+    def test_check_all_services_skips_none_health_mode(self):
+        """Verify check_all_services skips services with health_mode=none"""
+        mock_service = Mock()
+        mock_service.id = "internal"
+        mock_service.health_mode = "none"
+
+        registry = make_registry(services=[mock_service])
+        monitor = make_monitor(registry=registry)
+
+        result = monitor.check_all_services()
+
+        assert "internal" not in result
+
+    def test_check_all_services_includes_checked_services(self):
+        """Verify check_all_services includes results for checked services"""
+        mock_service = Mock()
+        mock_service.id = "grafana"
+        mock_service.container_name = "grafana"
+        mock_service.health_mode = "docker"
+        mock_service.health_url = None
+        mock_service.expected_statuses = [200]
+
+        registry = make_registry(services=[mock_service])
+
+        with patch("homelab_manager.services.health.docker") as mock_docker:
             mock_client = Mock()
-            mock_docker.return_value = mock_client
-
-            # Mock container
+            mock_docker.from_env.return_value = mock_client
             mock_container = Mock()
-            mock_container.name = "test-container"
-            mock_container.status = "running"
-            mock_container.image.tags = ["test:latest"]
-            mock_container.ports = {
-                "80/tcp": [{"HostPort": "3000", "PrivatePort": "80"}]
+            mock_container.attrs = {"State": {"Status": "running"}}
+            mock_client.containers.get.return_value = mock_container
+
+            monitor = HealthMonitor(registry=registry)
+            result = monitor.check_all_services()
+
+        assert "grafana" in result
+
+
+class TestGetHealthSummary:
+    """Tests for HealthMonitor.get_health_summary()"""
+
+    def test_get_health_summary_returns_dict(self):
+        """Verify get_health_summary returns a dict"""
+        registry = make_registry()
+        monitor = make_monitor(registry=registry)
+
+        result = monitor.get_health_summary()
+
+        assert isinstance(result, dict)
+
+    def test_get_health_summary_has_required_keys(self):
+        """Verify get_health_summary includes required keys"""
+        registry = make_registry()
+        monitor = make_monitor(registry=registry)
+
+        result = monitor.get_health_summary()
+
+        for key in (
+            "total_services",
+            "healthy_services",
+            "unhealthy_services",
+            "health_percentage",
+            "services",
+        ):
+            assert key in result
+
+    def test_get_health_summary_zero_services(self):
+        """Verify get_health_summary handles empty service list"""
+        registry = make_registry(services=[])
+        monitor = make_monitor(registry=registry)
+
+        result = monitor.get_health_summary()
+
+        assert result["total_services"] == 0
+        assert result["health_percentage"] == 0
+
+    def test_get_health_summary_counts_match(self):
+        """Verify healthy + unhealthy counts equal total"""
+        registry = make_registry(services=[])
+        monitor = make_monitor(registry=registry)
+
+        with patch.object(monitor, "check_all_services") as mock_check:
+            mock_check.return_value = {
+                "grafana": {"healthy": True},
+                "broken-svc": {"healthy": False},
             }
+            result = monitor.get_health_summary()
 
-            mock_client.containers.list.return_value = [mock_container]
+        assert result["total_services"] == 2
+        assert result["healthy_services"] == 1
+        assert result["unhealthy_services"] == 1
 
-            monitor = HomelabHealthMonitor()
-            containers = monitor.check_docker_containers()
 
-            assert len(containers) == 1
-            assert containers[0]["name"] == "test-container"
-            assert containers[0]["status"] == "running"
-            assert containers[0]["image"] == "test:latest"
-            assert "3000:80" in containers[0]["ports"]
+class TestGetUnhealthyServices:
+    """Tests for HealthMonitor.get_unhealthy_services()"""
 
-    def test_check_docker_containers_no_ports(self):
-        """Test Docker container checking with no ports"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
+    def test_get_unhealthy_services_returns_list(self):
+        """Verify get_unhealthy_services returns a list"""
+        registry = make_registry()
+        monitor = make_monitor(registry=registry)
+
+        result = monitor.get_unhealthy_services()
+
+        assert isinstance(result, list)
+
+    def test_get_unhealthy_services_empty_when_all_healthy(self):
+        """Verify get_unhealthy_services returns empty list when all services healthy"""
+        registry = make_registry()
+        monitor = make_monitor(registry=registry)
+
+        with patch.object(monitor, "check_all_services") as mock_check:
+            mock_check.return_value = {
+                "grafana": {"healthy": True},
+                "prometheus": {"healthy": True},
+            }
+            result = monitor.get_unhealthy_services()
+
+        assert result == []
+
+    def test_get_unhealthy_services_lists_failing_services(self):
+        """Verify get_unhealthy_services returns IDs of unhealthy services"""
+        registry = make_registry()
+        monitor = make_monitor(registry=registry)
+
+        with patch.object(monitor, "check_all_services") as mock_check:
+            mock_check.return_value = {
+                "grafana": {"healthy": True},
+                "broken-svc": {"healthy": False},
+                "also-broken": {"healthy": False},
+            }
+            result = monitor.get_unhealthy_services()
+
+        assert "broken-svc" in result
+        assert "also-broken" in result
+        assert "grafana" not in result
+        assert len(result) == 2
+
+
+class TestCheckServiceById:
+    """Tests for HealthMonitor.check_service_by_id()"""
+
+    def test_check_service_by_id_returns_none_for_unknown(self):
+        """Verify check_service_by_id returns None for unknown service"""
+        registry = make_registry()
+        registry.get_service.return_value = None
+
+        monitor = make_monitor(registry=registry)
+        result = monitor.check_service_by_id("nonexistent")
+
+        assert result is None
+
+    def test_check_service_by_id_returns_dict_for_known_service(self):
+        """Verify check_service_by_id returns result dict for known service"""
+        mock_service = Mock()
+        mock_service.id = "grafana"
+        mock_service.container_name = "grafana"
+        mock_service.health_mode = "docker"
+        mock_service.health_url = None
+        mock_service.expected_statuses = [200]
+
+        registry = make_registry()
+        registry.get_service.return_value = mock_service
+
+        with patch("homelab_manager.services.health.docker") as mock_docker:
             mock_client = Mock()
-            mock_docker.return_value = mock_client
-
-            # Mock container with no ports
+            mock_docker.from_env.return_value = mock_client
             mock_container = Mock()
-            mock_container.name = "test-container"
-            mock_container.status = "running"
-            mock_container.image.tags = ["test:latest"]
-            mock_container.ports = {}
+            mock_container.attrs = {"State": {"Status": "running"}}
+            mock_client.containers.get.return_value = mock_container
 
-            mock_client.containers.list.return_value = [mock_container]
+            monitor = HealthMonitor(registry=registry)
+            result = monitor.check_service_by_id("grafana")
 
-            monitor = HomelabHealthMonitor()
-            containers = monitor.check_docker_containers()
+        assert result is not None
+        assert "healthy" in result
 
-            assert len(containers) == 1
-            assert containers[0]["ports"] == []
+    def test_check_service_by_id_calls_registry_get_service(self):
+        """Verify check_service_by_id queries the registry"""
+        registry = make_registry()
+        registry.get_service.return_value = None
 
-    def test_check_docker_containers_exception(self):
-        """Test Docker container checking with exception"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_client = Mock()
-            mock_docker.return_value = mock_client
+        monitor = make_monitor(registry=registry)
+        monitor.check_service_by_id("grafana")
 
-            mock_client.containers.list.side_effect = Exception("Docker error")
-
-            with patch("rich.console.Console.print") as mock_print:
-                monitor = HomelabHealthMonitor()
-                containers = monitor.check_docker_containers()
-
-                assert containers == []
-                mock_print.assert_called_with(
-                    "⚠️ Error checking containers: Docker error", style="yellow"
-                )
-
-    def test_run_health_check(self):
-        """Test comprehensive health check"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_client = Mock()
-            mock_docker.return_value = mock_client
-
-            # Mock container
-            mock_container = Mock()
-            mock_container.name = "test-container"
-            mock_container.status = "running"
-            mock_container.image.tags = ["test:latest"]
-            mock_container.ports = {}
-
-            mock_client.containers.list.return_value = [mock_container]
-
-            with (
-                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
-                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
-                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
-                patch("homelab_manager.health.requests.get") as mock_get,
-                patch("homelab_manager.health.console.print") as mock_print,
-                patch(
-                    "homelab_manager.health.time.strftime",
-                    return_value="2023-01-01 12:00:00",
-                ),
-            ):
-                mock_memory.return_value.percent = 60.0
-                mock_disk.return_value.percent = 70.0
-
-                mock_response = Mock()
-                mock_response.status_code = 200
-                mock_get.return_value = mock_response
-
-                monitor = HomelabHealthMonitor()
-                monitor.run_health_check()
-
-                # Should print various status messages
-                assert mock_print.call_count > 0
-
-    def test_quick_status(self):
-        """Test quick status overview"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_client = Mock()
-            mock_docker.return_value = mock_client
-
-            # Mock containers
-            mock_container1 = Mock()
-            mock_container1.name = "container1"
-            mock_container1.status = "running"
-
-            mock_container2 = Mock()
-            mock_container2.name = "container2"
-            mock_container2.status = "stopped"
-
-            mock_client.containers.list.return_value = [
-                mock_container1,
-                mock_container2,
-            ]
-
-            with (
-                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
-                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
-                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
-                patch("homelab_manager.health.requests.get") as mock_get,
-                patch("homelab_manager.health.console.print") as mock_print,
-            ):
-                mock_memory.return_value.percent = 60.0
-                mock_disk.return_value.percent = 70.0
-
-                mock_response = Mock()
-                mock_response.status_code = 200
-                mock_get.return_value = mock_response
-
-                monitor = HomelabHealthMonitor()
-                monitor.quick_status()
-
-                # Should print status information
-                assert mock_print.call_count > 0
-
-    def test_quick_status_container_error(self):
-        """Test quick status with container error"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_client = Mock()
-            mock_docker.return_value = mock_client
-
-            mock_client.containers.list.side_effect = Exception("Container error")
-
-            with (
-                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
-                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
-                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
-                patch("homelab_manager.health.requests.get") as mock_get,
-                patch("homelab_manager.health.console.print") as mock_print,
-            ):
-                mock_memory.return_value.percent = 60.0
-                mock_disk.return_value.percent = 70.0
-
-                mock_response = Mock()
-                mock_response.status_code = 200
-                mock_get.return_value = mock_response
-
-                monitor = HomelabHealthMonitor()
-                monitor.quick_status()
-
-                # Should handle error gracefully
-                assert mock_print.call_count > 0
-
-    def test_monitor_continuous(self):
-        """Test continuous monitoring"""
-        with patch("homelab_manager.health.docker.from_env") as mock_docker:
-            mock_client = Mock()
-            mock_docker.return_value = mock_client
-
-            mock_client.containers.list.return_value = []
-
-            with (
-                patch("homelab_manager.health.psutil.cpu_percent", return_value=50.0),
-                patch("homelab_manager.health.psutil.virtual_memory") as mock_memory,
-                patch("homelab_manager.health.psutil.disk_usage") as mock_disk,
-                patch("homelab_manager.health.requests.get") as mock_get,
-                patch("homelab_manager.health.console.print") as mock_print,
-                patch("homelab_manager.health.subprocess.run") as mock_subprocess,
-                patch("homelab_manager.health.time.sleep") as mock_sleep,
-                patch(
-                    "homelab_manager.health.time.strftime",
-                    return_value="2023-01-01 12:00:00",
-                ),
-            ):
-                mock_memory.return_value.percent = 60.0
-                mock_disk.return_value.percent = 70.0
-
-                mock_response = Mock()
-                mock_response.status_code = 200
-                mock_get.return_value = mock_response
-
-                # Simulate KeyboardInterrupt after first iteration
-                mock_sleep.side_effect = KeyboardInterrupt()
-
-                monitor = HomelabHealthMonitor()
-                monitor.monitor_continuous(interval=1)
-
-                # Should handle KeyboardInterrupt gracefully
-                mock_print.assert_any_call("\n🛑 Monitoring stopped", style="yellow")
-
-    def test_main_function_check(self):
-        """Test main function with check action"""
-        with patch("homelab_manager.health.HomelabHealthMonitor") as mock_monitor_class:
-            mock_monitor = Mock()
-            mock_monitor_class.return_value = mock_monitor
-
-            with patch("argparse.ArgumentParser") as mock_parser:
-                mock_args = Mock()
-                mock_args.action = "check"
-                mock_args.interval = 60
-                mock_parser.return_value.parse_args.return_value = mock_args
-
-                from homelab_manager.health import main
-
-                main()
-
-                mock_monitor.run_health_check.assert_called_once()
-
-    def test_main_function_status(self):
-        """Test main function with status action"""
-        with patch("homelab_manager.health.HomelabHealthMonitor") as mock_monitor_class:
-            mock_monitor = Mock()
-            mock_monitor_class.return_value = mock_monitor
-
-            with patch("argparse.ArgumentParser") as mock_parser:
-                mock_args = Mock()
-                mock_args.action = "status"
-                mock_args.interval = 60
-                mock_parser.return_value.parse_args.return_value = mock_args
-
-                from homelab_manager.health import main
-
-                main()
-
-                mock_monitor.quick_status.assert_called_once()
-
-    def test_main_function_monitor(self):
-        """Test main function with monitor action"""
-        with patch("homelab_manager.health.HomelabHealthMonitor") as mock_monitor_class:
-            mock_monitor = Mock()
-            mock_monitor_class.return_value = mock_monitor
-
-            with patch("argparse.ArgumentParser") as mock_parser:
-                mock_args = Mock()
-                mock_args.action = "monitor"
-                mock_args.interval = 30
-                mock_parser.return_value.parse_args.return_value = mock_args
-
-                from homelab_manager.health import main
-
-                main()
-
-                mock_monitor.monitor_continuous.assert_called_once_with(30)
+        registry.get_service.assert_called_once_with("grafana")

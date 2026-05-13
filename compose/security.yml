@@ -1,31 +1,76 @@
-# Security Services
-# Pi-hole
+# YAML Anchors for DRY configuration
+x-logging-defaults: &logging-defaults
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-healthcheck-minimal: &healthcheck-minimal
+  interval: 30s
+  timeout: 10s
+  retries: 3
+
+x-healthcheck-with-start: &healthcheck-with-start
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-minimal: &resources-minimal
+  limits:
+    memory: 128M
+    cpus: '0.25'
+  reservations:
+    memory: 64M
+    cpus: '0.125'
+
+x-resources-small: &resources-small
+  limits:
+    memory: 256M
+    cpus: '0.5'
+  reservations:
+    memory: 128M
+    cpus: '0.25'
+
+x-resources-medium: &resources-medium
+  limits:
+    memory: 512M
+    cpus: '1.0'
+  reservations:
+    memory: 256M
+    cpus: '0.5'
+
+x-resources-large: &resources-large
+  limits:
+    memory: 1G
+    cpus: '2.0'
+  reservations:
+    memory: 512M
+    cpus: '1.0'
 
 services:
-  # Pi-hole - LOCALHOST ONLY (Local Network Service)
   pihole:
     image: ${IMG_PIHOLE:-pihole/pihole:2026.04.0}
     container_name: pihole
     restart: unless-stopped
     volumes:
-      - ../config/nginx/www/certbot:/var/www/certbot:ro
-      - pihole_data:/etc/pihole
-      - ../config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    - ../config/nginx/www/certbot:/var/www/certbot:ro
+    - pihole_data:/etc/pihole
+    - ../config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
     environment:
-      - TZ=${TIMEZONE}
-      - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
-      - PIHOLE_DNS_=8.8.8.8;1.1.1.1
-      - FTLCONF_dns_listeningMode=all
-      - FTLCONF_webserver_api_password=${PIHOLE_WEB_PASSWORD}
-      - VIRTUAL_HOST=pihole.${DOMAIN}
-      - VIRTUAL_PORT=80
+    - TZ=${TIMEZONE}
+    - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
+    - PIHOLE_DNS_=8.8.8.8;1.1.1.1
+    - FTLCONF_dns_listeningMode=all
+    - FTLCONF_webserver_api_password=${PIHOLE_WEB_PASSWORD}
+    - VIRTUAL_HOST=pihole.${DOMAIN}
+    - VIRTUAL_PORT=80
     ports:
-      # Bind only to Tailscale IP for secure access
-      - "${BIND_IP:-0.0.0.0}:${PIHOLE_WEB_PORT:-8054}:80"
-      - "${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/tcp"
-      - "${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/udp"
+    - ${BIND_IP:-0.0.0.0}:${PIHOLE_WEB_PORT:-8054}:80
+    - ${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/tcp
+    - ${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/udp
     networks:
-      - default
+    - default
     deploy:
       resources:
         limits:
@@ -35,10 +80,19 @@ services:
           memory: 256M
           cpus: '0.25'
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - http://localhost/admin/api.php
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 volumes:
-  pihole_data:
+  pihole_data: null
