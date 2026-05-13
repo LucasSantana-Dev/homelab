@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Dependabot configuration** — `.github/dependabot.yml` enables weekly Monday audits for pip, docker, and github-actions ecosystems. Bot PRs target the `release` branch (matching the release-branch model) so `/dep-sweep` can batch them. Closes audit-deep HIGH H4.
 - **ADR 0005 — Media stack: Stremio + RealDebrid (conditional)** — documents the decision to keep Stremio+RealDebrid as the primary media surface, reject Plex permanently, and defer Jellyfin+*arr migration. Conditional on 4 pre-conditions (deadline 2026-05-27) and 7 operational revisit triggers. (`docs/adr/0005-media-stack-stremio-realdebrid.md`)
+- **Unit test coverage for previously untested modules** — closes audit-deep H5+H7. New files: `tests/unit/test_command_sequence.py` (13 tests), `tests/unit/test_backup_manager.py` (8 tests), `tests/unit/test_deployment.py` (10 tests), `tests/unit/test_status.py` (13 tests). Per-module coverage: command_sequence 50→100%, backup_manager 32→100%, deployment 48→100%, status 29→98%. Suite-wide: 71→80%.
+
+### Changed (CI)
+
+- **Pytest gate enforced** — closes audit-deep H6. Removed `continue-on-error: true` from `.github/workflows/ci.yml`. Test failures now fail CI.
+- **`test_cpu_below_warning_threshold` reclassified as opt-in smoke check** — closes audit-deep M7. Test is brittle when pytest itself dominates CPU. Skips unless `HOMELAB_HEALTH_CHECK=1` is set; median-of-5 sampling retained when enabled.
 
 ### Security
 
