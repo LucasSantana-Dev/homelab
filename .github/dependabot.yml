@@ -1,0 +1,51 @@
+version: 2
+# Continuous dependency audits. /dep-sweep composite batches the safe bumps
+# onto the release branch; risky ones (always_hold list in
+# .claude/dep-sweep-config.json once that's tracked, or ~/.claude/ defaults
+# until then) surface for review.
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "release"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "LucasSantana-Dev"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "release"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "LucasSantana-Dev"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "release"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "LucasSantana-Dev"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps(ci)"
