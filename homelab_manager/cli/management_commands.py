@@ -64,7 +64,9 @@ def register_management_commands(
         try:
             result = container_manager.create_backup()
             if result["success"]:
-                console.print(f"✅ Backup created: {result.get('backup_path', 'unknown location')}")
+                console.print(
+                    f"✅ Backup created: {result.get('backup_path', 'unknown location')}"
+                )
             else:
                 console.print(f"❌ Backup failed: {result['error']}")
                 raise typer.Exit(1)
