@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ADR 0005 — Media stack: Stremio + RealDebrid (conditional)** — documents the decision to keep Stremio+RealDebrid as the primary media surface, reject Plex permanently, and defer Jellyfin+*arr migration. Conditional on 4 pre-conditions (deadline 2026-05-27) and 7 operational revisit triggers. (`docs/adr/0005-media-stack-stremio-realdebrid.md`)
+
 ### Removed
 
 - **k3s / Hybrid Migration tooling** - Executed [ADR 0004](docs/adr/0004-drop-k3s.md): all workloads consolidated on Docker Compose. Deleted live `k8s/` tree, `scripts/migration/`, bootstrap k3s-secret scripts, `homelab-k3s-health.{service,timer}`, `.claude/skills/homelab-{k3s-ops,wave-migration}/`, plus migration docs (`wave-a-preflight-pack.md`, `k3s-restart-baseline.md`, `k8s-terraform-migration-roadmap.md`, `k8s-phase2-readiness-gate.md`). Pruned k3s/kubectl/helm references from `Makefile`, `README.md`, `scripts/README.md`, deployment/maintenance scripts, and `.pre-commit-config.yaml`. Historical snapshot preserved under `archive/k8s-dropped/`.
