@@ -13,8 +13,8 @@ from ..models.service import ServiceRegistry
 from ..services.containers import ContainerManager
 from ..services.health import HealthMonitor
 from ..services.updates import UpdateManager
-from .status_commands import register_status_commands
 from .management_commands import register_management_commands
+from .status_commands import register_status_commands
 
 
 def create_app(
