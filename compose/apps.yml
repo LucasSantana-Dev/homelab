@@ -109,7 +109,7 @@ services:
 
   # Nextcloud Cloud Storage - Tailscale Only
   nextcloud:
-    image: ${IMG_NEXTCLOUD:-nextcloud:29-alpine}
+    image: ${IMG_NEXTCLOUD:-nextcloud:29-fpm-alpine}
     container_name: nextcloud
     restart: unless-stopped
     volumes:
@@ -157,7 +157,7 @@ services:
 
   # Paperless PostgreSQL Database
   paperless-db:
-    image: ${IMG_POSTGRES_15_ALPINE:-postgres:15-alpine}
+    image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
     container_name: paperless-db
     restart: unless-stopped
     volumes:
@@ -317,7 +317,7 @@ services:
         max-file: "3"
   # Miniflux PostgreSQL (Phase 3)
   miniflux-db:
-    image: ${IMG_POSTGRES_15_ALPINE:-postgres:15-alpine}
+    image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
     container_name: miniflux-db
     restart: unless-stopped
     volumes:
