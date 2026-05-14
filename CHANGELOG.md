@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(empty — see [2.3.0] below)
+### Changed
+
+- **`homelab_manager` package restructure (R1)** — new `clients/` subpackage owns Docker SDK + `docker compose` CLI invocations (`DockerClientFactory`, `ComposeCLI`). `services/status.py` and `services/health.py` consume the factory; `services/updates.py` consumes `ComposeCLI` for all 6 prior subprocess sites. The audit-deep H6 registry allowlist + M1 stderr-scrubbing are lifted into `ComposeCLI.logs()` and `core/errors.scrub_subprocess_error()` so every error path produces a safe-to-echo message. (`docs/adr/0007-homelab-manager-clients-package.md`)
+
+### Added
+
+- **Closed M4 coverage gap** — `core/config.py` 62% → 100% via 21 new tests covering `${VAR:-default}` substitution, placeholder fallbacks, `validate_value()` / `get_validation_errors()` / `is_configured()`, `get_service_urls()`, and `get_services_for_display()`. Whole-package coverage 81% → 86%; suite 233 → 284 passed.
+
+### Security
+
+- **Latent M1 violation closed in `services/updates.py`** — all 4 error handlers previously echoed raw `e.stderr` (could leak env values / paths). They now use `scrub_subprocess_error(exc, context=...)` for type-only messages with full detail at DEBUG. Mirrors the M1 work already applied to `services/status.py` in v2.3.0.
 
 ## [2.3.0] - 2026-05-14
 
