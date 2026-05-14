@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`status.py` hardened** — closes audit-deep v2 **H6 + M1**.
   - **H6** `get_service_logs` now allowlists `service_name` against `ServiceRegistry` before invoking `docker compose logs`. Closes the CLI argument-injection vector (an unvalidated name like `--no-log-prefix` would otherwise become a docker-compose flag). Also clamps `lines` to 1..10000 and rejects non-integer input.
   - **M1** Docker SDK exception details are no longer echoed to console — only the exception type name surfaces; full traceback is logged at DEBUG via stdlib `logging`. Prevents auth tokens / socket paths / env values from leaking into user-visible output. 9 new tests added (suite: 227→233, coverage 80→81%).
+- **ADR 0006 — Wake-on-LAN via shell endpoint** — Accepted (2026-05-14). Documents the WoL approach: shell endpoint + Homepage `customapi` widget, no GUI container.
+- **`update-containers.py` exec() removed + n8n chown documented** — closes audit-deep v2 **M2 + M3**.
+  - **M2** `scripts/maintenance/update-containers.py` no longer uses `exec(open(activate_script).read())` for venv activation. Now uses `os.execv` to re-exec into the venv's `python` binary if invoked outside it — same effect, no code-exec risk if the venv is tampered with.
+  - **M3** Created `docs/deployment-prerequisites.md` documenting the n8n `sudo chown -R 1000:1000 appdata/n8n` step required after PR #81's UID-1000 switch. Also captures the pending Cloudflare tunnel rotation (audit-deep v2 C1) and Homepage server-side v0.10.9→v1.0.3 bump.
 
 ### Changed (CI)
 
