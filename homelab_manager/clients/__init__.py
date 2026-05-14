@@ -5,6 +5,14 @@ one mock seam. See `.claude/plans/refactor-r1-homelab-manager-2026-05-14.md`.
 """
 
 from . import docker_client  # noqa: F401  (re-export so old patches still resolve)
+from .compose_cli import MAX_LOG_LINES, ComposeCLI, clamp_lines
 from .docker_client import DockerClientFactory, get_docker_client
 
-__all__ = ["DockerClientFactory", "get_docker_client", "docker_client"]
+__all__ = [
+    "ComposeCLI",
+    "DockerClientFactory",
+    "MAX_LOG_LINES",
+    "clamp_lines",
+    "docker_client",
+    "get_docker_client",
+]

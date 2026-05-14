@@ -5,12 +5,12 @@ Handles container status checks, health monitoring, and log retrieval
 """
 
 import logging
-import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from rich.console import Console
 
+from ..clients.compose_cli import ComposeCLI
 from ..clients.docker_client import docker, get_docker_client  # noqa: F401
 from ..models.service import ServiceRegistry
 
@@ -33,6 +33,9 @@ class StatusManager:
         self.docker_client = get_docker_client()
         self.project_root = Path(__file__).parent.parent.parent
         self.registry = registry or ServiceRegistry()
+        # R1 Phase D: compose CLI logic lives in clients.compose_cli; the
+        # allowlist (H6) and stderr scrub (M1) are baked into ComposeCLI.
+        self._compose = ComposeCLI(registry=self.registry)
 
     def get_container_status(self) -> List[Dict]:
         """Get status of all homelab containers"""
@@ -114,42 +117,7 @@ class StatusManager:
     def get_service_logs(self, service_name: str, lines: int = 50) -> str:
         """Get logs for a specific service.
 
-        H6 hardening: validate `service_name` against the ServiceRegistry
-        before invoking docker compose. Without this, a caller-controlled
-        string could become a docker-compose CLI flag (argument injection)
-        even though the list form of subprocess.run prevents shell injection.
-        Also caps `lines` to a sane positive int.
+        R1 Phase D: thin wrapper over ComposeCLI.logs(). H6 allowlist + M1
+        stderr scrub live in clients.compose_cli — see audit-deep notes there.
         """
-        # H6: registry-based allowlist
-        if (
-            self.registry.get_service_by_container(service_name) is None
-            and self.registry.get_service(service_name) is None
-        ):
-            return (
-                f"Error: unknown service '{service_name}'. "
-                "Use `homelab services` to list registered services."
-            )
-
-        # Reject negative/insane line counts; cap at 10k for sanity.
-        try:
-            lines_int = max(1, min(int(lines), 10_000))
-        except (TypeError, ValueError):
-            return "Error: 'lines' must be a positive integer."
-
-        try:
-            result = subprocess.run(
-                ["docker", "compose", "logs", "--tail", str(lines_int), service_name],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return result.stdout
-        except subprocess.CalledProcessError:
-            # M1 hardening: stderr from docker can leak env values / paths.
-            logger.debug("docker compose logs failed", exc_info=True)
-            return (
-                f"Error getting logs for '{service_name}'. Check docker-compose state."
-            )
-        except Exception as e:
-            logger.debug("get_service_logs unexpected error", exc_info=True)
-            return f"Logs error (type: {type(e).__name__})."
+        return self._compose.logs(service_name, lines=lines)
