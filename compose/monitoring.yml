@@ -479,7 +479,10 @@ services:
     environment:
       - SECRET_KEY=${HEALTHCHECKS_SECRET_KEY}
       - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN:-home}
-      - ALLOWED_HOSTS=*
+      # ALLOWED_HOSTS — Django host-header allowlist. Restrict to expected
+      # access paths: LAN loopback, Tailscale magicDNS, and the public
+      # subdomain. `*` would disable the protection entirely.
+      - ALLOWED_HOSTS=healthchecks.${DOMAIN:-home},${TAILSCALE_IP:-100.64.0.0},localhost,127.0.0.1
       - SITE_ROOT=https://healthchecks.${DOMAIN:-home}
       - SITE_NAME=Homelab Healthchecks
       - SUPERUSER_EMAIL=${HEALTHCHECKS_SUPERUSER_EMAIL}
