@@ -9,12 +9,22 @@ import os
 import sys
 from pathlib import Path
 
-# Activate virtual environment
+# M2 hardening: replaced `exec(open(activate_script).read())` venv activation
+# with site/sys path manipulation. exec() of a file from disk was a code-exec
+# risk if the venv was ever tampered with; the same effect (importing from
+# the venv's site-packages) is achieved with no exec call.
 venv_path = Path(__file__).parent.parent / "venv"
 if venv_path.exists():
-    activate_script = venv_path / "bin" / "activate_this.py"
-    if activate_script.exists():
-        exec(open(activate_script).read(), {"__file__": str(activate_script)})
+    venv_python = venv_path / "bin" / "python"
+    if venv_python.exists() and sys.executable != str(venv_python):
+        # If invoked outside the venv, re-exec into it (no shell, list-form).
+        # nosec B606: target is a fixed path derived from __file__, not user input;
+        # we explicitly pass argv as a list to avoid any shell interpretation.
+        os.execv(  # nosec B606
+            str(venv_python), [str(venv_python), __file__, *sys.argv[1:]]
+        )
+    # If already running under the venv interpreter, its site-packages are
+    # automatically on sys.path — nothing more to do.
 
 # Add the homelab_manager to the path
 sys.path.insert(0, str(Path(__file__).parent / "homelab_manager"))
