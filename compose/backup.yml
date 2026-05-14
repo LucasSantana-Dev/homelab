@@ -1,0 +1,68 @@
+services:
+  # Kopia — encrypted, deduplicated, snapshot-based backups with S3-compatible
+  # offsite target (Backblaze B2 by default). Mount /var/lib/docker/volumes
+  # read-only so Kopia can snapshot named volumes from sister stacks.
+  kopia:
+    image: ${IMG_KOPIA:-kopia/kopia:0.21.1}
+    container_name: kopia
+    restart: unless-stopped
+    hostname: homelab-kopia
+    user: root
+    environment:
+      - TZ=${TIMEZONE}
+      - KOPIA_PASSWORD=${KOPIA_REPO_PASSWORD}
+      # S3-compatible offsite (Backblaze B2 default; works for R2, Wasabi, etc.)
+      - KOPIA_S3_ENDPOINT=${KOPIA_S3_ENDPOINT:-s3.us-west-002.backblazeb2.com}
+      - KOPIA_S3_BUCKET=${KOPIA_S3_BUCKET}
+      - KOPIA_S3_ACCESS_KEY=${KOPIA_S3_ACCESS_KEY}
+      - KOPIA_S3_SECRET_KEY=${KOPIA_S3_SECRET_KEY}
+    command:
+      # --insecure: HTTP-only. Acceptable here because the port is bound to
+      # ${BIND_IP} (default 127.0.0.1 = loopback only) and the homelab is
+      # itself reachable only via Tailscale. To enable TLS later, generate
+      # a cert into kopia_config and drop --insecure.
+      - server
+      - start
+      - --insecure
+      - --address=0.0.0.0:51515
+      - --server-username=${KOPIA_SERVER_USERNAME:-admin}
+      - --server-password=${KOPIA_SERVER_PASSWORD}
+      - --without-password=false
+    volumes:
+      - kopia_config:/app/config
+      - kopia_cache:/app/cache
+      - kopia_logs:/app/logs
+      # Read-only mounts for backup sources. Add more lines per data root.
+      - /var/lib/docker/volumes:/source/docker-volumes:ro
+      - /home:/source/home:ro
+    ports:
+      - ${BIND_IP:-127.0.0.1}:${KOPIA_PORT:-51515}:51515
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      # Hits the unauthenticated /api/v1/repo/status endpoint. wget returns
+      # non-zero on connection failure (server down) and 4xx/5xx; that's
+      # the real "kopia is broken" signal. No `|| exit 0` mask.
+      test: ["CMD-SHELL", "wget -q -O- --tries=1 --timeout=5 http://localhost:51515/api/v1/repo/status >/dev/null"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  kopia_config: null
+  kopia_cache: null
+  kopia_logs: null
