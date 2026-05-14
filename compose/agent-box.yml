@@ -16,7 +16,10 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile.agent-box
-    image: ${IMG_AGENT_BOX:-agent-box:2026-05-14}
+    # agent-box is a LOCALLY-BUILT image (see build: above). The compose
+    # build process tags it :latest; this is an intentional exception to
+    # the repo-wide image-pinning convention. See memory #3415 (2026-05-07).
+    image: agent-box:latest
     container_name: agent-box
     hostname: agent-box
     restart: unless-stopped
