@@ -16,7 +16,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile.agent-box
-    image: agent-box:latest
+    image: ${IMG_AGENT_BOX:-agent-box:2026-05-14}
     container_name: agent-box
     hostname: agent-box
     restart: unless-stopped
