@@ -38,8 +38,7 @@ Access, and hit TLS-cert mismatch errors.
 | n8n | — | via `tailscale serve` | `n8n.luk-homeserver.com.br` | CF Access gated |
 | Nextcloud | — | `cloud.homelab.example.com` | `cloud.luk-homeserver.com.br` | Primary public access via CF |
 | Paperless-ngx | — | via `tailscale serve` | `docs.luk-homeserver.com.br` | CF Access gated |
-| Vaultwarden | — | — | `vault.luk-homeserver.com.br` | CF Access policy MUST be strict |
-| Authentik | — | — | `auth.luk-homeserver.com.br` | SSO broker — CF path only |
+| Tinyauth | — | — | `auth.luk-homeserver.com.br` | SSO broker — CF path only |
 | Pi-hole admin | `pihole.home` | `pihole.homelab.example.com` | — | Never public |
 | Prometheus | — | `prom.homelab.example.com` | — | Never public |
 | Netdata | — | `netdata.homelab.example.com` | — | Never public; candidate for removal (audit PR #28) |

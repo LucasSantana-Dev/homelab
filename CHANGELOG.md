@@ -7,7 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(empty — see [2.3.0] below)
+
+## [2.3.0] - 2026-05-14
+
+First release cut under the release-branch model. Batches 9 PRs (#77 → #85)
+focused on audit-deep remediation: security hardening, supply-chain pinning,
+test coverage, CI gate enforcement, and stale-config cleanup.
+
+### Added
+
+- **Dependabot configuration** — `.github/dependabot.yml` enables weekly Monday audits for pip, docker, and github-actions ecosystems. Bot PRs target the `release` branch (matching the release-branch model) so `/dep-sweep` can batch them. Closes audit-deep HIGH H4.
+- **ADR 0005 — Media stack: Stremio + RealDebrid (conditional)** — documents the decision to keep Stremio+RealDebrid as the primary media surface, reject Plex permanently, and defer Jellyfin+*arr migration. Conditional on 4 pre-conditions (deadline 2026-05-27) and 7 operational revisit triggers. (`docs/adr/0005-media-stack-stremio-realdebrid.md`)
+- **Unit test coverage for previously untested modules** — closes audit-deep H5+H7. New files: `tests/unit/test_command_sequence.py` (13 tests), `tests/unit/test_backup_manager.py` (8 tests), `tests/unit/test_deployment.py` (10 tests), `tests/unit/test_status.py` (13 tests). Per-module coverage: command_sequence 50→100%, backup_manager 32→100%, deployment 48→100%, status 29→98%. Suite-wide: 71→80%.
+
+### Security
+
+- **Cleanup + supply-chain pin pass** — closes audit-deep v2 **C2 + H3 + H4 + H5**.
+  - **C2** Removed dangling `nginx` service block from `compose/core.yml` (PR #78 deleted `config/nginx/` but left the service referencing 5 non-existent bind mounts; fresh `docker compose up` now succeeds).
+  - **H4** Pinned 4 floating Docker tags: `home-assistant:stable`→`:2025.5`, `netdata:stable`→`:v1.48.0`, `paperless-ngx:latest`→`:2.13`, `redis:alpine`→`:7.4-alpine`. All overridable via existing `IMG_*` env vars.
+  - **H3** Fixed `.github/dependabot.yml`: replaced ineffective `docker` ecosystem at `/` with `docker-compose` ecosystem at `/compose` so image-tag updates actually get auto-PR'd.
+  - **H5** SHA-pinned `github/codeql-action/upload-sarif@v3` (2 instances in `.github/workflows/ci.yml`) to v3.35.4 commit `7fd177f` to close the action-tag-moving supply-chain vector.
+- **`status.py` hardened** — closes audit-deep v2 **H6 + M1**.
+  - **H6** `get_service_logs` now allowlists `service_name` against `ServiceRegistry` before invoking `docker compose logs`. Closes the CLI argument-injection vector (an unvalidated name like `--no-log-prefix` would otherwise become a docker-compose flag). Also clamps `lines` to 1..10000 and rejects non-integer input.
+  - **M1** Docker SDK exception details are no longer echoed to console — only the exception type name surfaces; full traceback is logged at DEBUG via stdlib `logging`. Prevents auth tokens / socket paths / env values from leaking into user-visible output. 9 new tests added (suite: 227→233, coverage 80→81%).
+- **ADR 0006 — Wake-on-LAN via shell endpoint** — Accepted (2026-05-14). Documents the WoL approach: shell endpoint + Homepage `customapi` widget, no GUI container.
+- **`update-containers.py` exec() removed + n8n chown documented** — closes audit-deep v2 **M2 + M3**.
+  - **M2** `scripts/maintenance/update-containers.py` no longer uses `exec(open(activate_script).read())` for venv activation. Now uses `os.execv` to re-exec into the venv's `python` binary if invoked outside it — same effect, no code-exec risk if the venv is tampered with.
+  - **M3** Created `docs/deployment-prerequisites.md` documenting the n8n `sudo chown -R 1000:1000 appdata/n8n` step required after PR #81's UID-1000 switch. Also captures the pending Cloudflare tunnel rotation (audit-deep v2 C1) and Homepage server-side v0.10.9→v1.0.3 bump.
+
+### Changed (CI)
+
+- **Pytest gate enforced** — closes audit-deep H6. Removed `continue-on-error: true` from `.github/workflows/ci.yml`. Test failures now fail CI.
+- **`test_cpu_below_warning_threshold` reclassified as opt-in smoke check** — closes audit-deep M7. Test is brittle when pytest itself dominates CPU. Skips unless `HOMELAB_HEALTH_CHECK=1` is set; median-of-5 sampling retained when enabled.
+
+### Security
+
+- **Docker container hardening** — closes audit-deep HIGH H1+H2+H3 and MEDIUM M2+M3.
+  - agent-box: `/var/run/docker.sock` now mounted `:ro` (read-only).
+  - n8n: dropped `user: "root"`, runs as UID 1000 (image's default `node` user). Server prerequisite: `chown -R 1000:1000 ../appdata/n8n`.
+  - Home Assistant: `user: root` retained (USB device passthrough requirement) with inline justification comment; also dropped stale nginx certbot mount missed in PR #78.
+  - cadvisor: replaced `privileged: true` with explicit `cap_add: [DAC_READ_SEARCH, SYS_PTRACE]` + `cap_drop: ALL` + `no-new-privileges`.
+  - netdata: explicit `cap_drop: ALL` + scoped caps; `apparmor:unconfined` retained per upstream requirement with inline rationale; added `no-new-privileges`.
+  - Loki: removed `${BIND_IP:-0.0.0.0}:3100` binding (Grafana reaches Loki over internal docker network); only `127.0.0.1:3100` retained for host debugging.
+
+### Changed
+
+- **Docs sweep — strip stale Authentik/nginx/Vaultwarden references** — README, `docs/access-layers.md`, `docs/public-release-hardening.md`, and `Makefile` updated to reflect the current Tinyauth + Caddy + Cloudflared stack. Three dead Makefile targets (`sso-register-apps`, `sso-register-dry-run`, `sso-register-status`) and `scripts/maintenance/authentik-register-apps.sh` archived under `archive/scripts-dropped/`. Closes audit-deep HIGH H8.
+
 ### Removed
+
+- **nginx-proxy service + `config/nginx/` tree + stale Authentik nginx include configs** — Caddy and Cloudflared own all ingress now. The nginx-proxy service had been dead code with broken mount paths since the Authentik removal in PR #63; `/audit-deep` flagged this as 2 CRITICAL findings (missing mount dirs that broke fresh deploys + stale Authentik outpost configs hardcoding `192.168.1.121`). Archives: `docs/authentik-sso-setup.md` → `archive/docs-dropped/`, `config/k3s/registries.yaml.example` → `archive/k8s-dropped/k3s/`.
 
 - **k3s / Hybrid Migration tooling** - Executed [ADR 0004](docs/adr/0004-drop-k3s.md): all workloads consolidated on Docker Compose. Deleted live `k8s/` tree, `scripts/migration/`, bootstrap k3s-secret scripts, `homelab-k3s-health.{service,timer}`, `.claude/skills/homelab-{k3s-ops,wave-migration}/`, plus migration docs (`wave-a-preflight-pack.md`, `k3s-restart-baseline.md`, `k8s-terraform-migration-roadmap.md`, `k8s-phase2-readiness-gate.md`). Pruned k3s/kubectl/helm references from `Makefile`, `README.md`, `scripts/README.md`, deployment/maintenance scripts, and `.pre-commit-config.yaml`. Historical snapshot preserved under `archive/k8s-dropped/`.
 

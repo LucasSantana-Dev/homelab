@@ -4,6 +4,7 @@ Status Service
 Handles container status checks, health monitoring, and log retrieval
 """
 
+import logging
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -14,6 +15,7 @@ from rich.console import Console
 from ..models.service import ServiceRegistry
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 class StatusManager:
@@ -70,7 +72,14 @@ class StatusManager:
                             }
                         )
         except Exception as e:
-            console.print(f"Error getting container status: {e}")
+            # M1 hardening: do NOT echo exception details — Docker SDK errors
+            # can include auth tokens, env values, or socket paths in stderr.
+            # Log full detail at DEBUG only; user sees a generic message.
+            logger.debug("get_container_status failed", exc_info=True)
+            console.print(
+                "Error getting container status. Check Docker connectivity "
+                f"(error type: {type(e).__name__})."
+            )
 
         return containers
 
@@ -95,16 +104,44 @@ class StatusManager:
             return "unknown"
 
     def get_service_logs(self, service_name: str, lines: int = 50) -> str:
-        """Get logs for a specific service"""
+        """Get logs for a specific service.
+
+        H6 hardening: validate `service_name` against the ServiceRegistry
+        before invoking docker compose. Without this, a caller-controlled
+        string could become a docker-compose CLI flag (argument injection)
+        even though the list form of subprocess.run prevents shell injection.
+        Also caps `lines` to a sane positive int.
+        """
+        # H6: registry-based allowlist
+        if (
+            self.registry.get_service_by_container(service_name) is None
+            and self.registry.get_service(service_name) is None
+        ):
+            return (
+                f"Error: unknown service '{service_name}'. "
+                "Use `homelab services` to list registered services."
+            )
+
+        # Reject negative/insane line counts; cap at 10k for sanity.
+        try:
+            lines_int = max(1, min(int(lines), 10_000))
+        except (TypeError, ValueError):
+            return "Error: 'lines' must be a positive integer."
+
         try:
             result = subprocess.run(
-                ["docker", "compose", "logs", "--tail", str(lines), service_name],
+                ["docker", "compose", "logs", "--tail", str(lines_int), service_name],
                 capture_output=True,
                 text=True,
                 check=True,
             )
             return result.stdout
-        except subprocess.CalledProcessError as e:
-            return f"Error getting logs: {e.stderr}"
+        except subprocess.CalledProcessError:
+            # M1 hardening: stderr from docker can leak env values / paths.
+            logger.debug("docker compose logs failed", exc_info=True)
+            return (
+                f"Error getting logs for '{service_name}'. Check docker-compose state."
+            )
         except Exception as e:
-            return f"Logs error: {str(e)}"
+            logger.debug("get_service_logs unexpected error", exc_info=True)
+            return f"Logs error (type: {type(e).__name__})."
