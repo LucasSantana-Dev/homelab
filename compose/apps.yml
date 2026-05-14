@@ -57,7 +57,9 @@ services:
     image: ${IMG_N8N:-n8nio/n8n:1.110.1}
     container_name: n8n
     restart: unless-stopped
-    user: "root"  # Run as root to avoid permission issues with volume
+    # H2 hardening: dropped explicit user:root. Image's default 'node' user is UID 1000.
+    # Server prerequisite: `sudo chown -R 1000:1000 ../appdata/n8n` before next deploy.
+    user: "1000:1000"
     volumes:
       - ../appdata/n8n:/home/node/.n8n
     environment:
@@ -128,7 +130,7 @@ services:
 
   # Nextcloud Redis Cache
   nextcloud-redis:
-    image: ${IMG_REDIS_ALPINE:-redis:alpine}
+    image: ${IMG_REDIS_ALPINE:-redis:7.4-alpine}
     container_name: nextcloud-redis
     restart: unless-stopped
     volumes:
@@ -239,7 +241,7 @@ services:
 
   # Paperless Redis Broker
   paperless-redis:
-    image: ${IMG_REDIS_ALPINE:-redis:alpine}
+    image: ${IMG_REDIS_ALPINE:-redis:7.4-alpine}
     container_name: paperless-redis
     restart: unless-stopped
     volumes:
@@ -272,7 +274,8 @@ services:
       context: ../dockerfiles/paperless-ngx
       dockerfile: Dockerfile
       args:
-        PAPERLESS_BASE_IMAGE: ${IMG_PAPERLESS_BASE:-ghcr.io/paperless-ngx/paperless-ngx:latest}
+        # H4 hardening: was ':latest' (floating). Pinned to known recent semver.
+        PAPERLESS_BASE_IMAGE: ${IMG_PAPERLESS_BASE:-ghcr.io/paperless-ngx/paperless-ngx:2.13}
     image: paperless-ngx:custom
     container_name: paperless-ngx
     restart: unless-stopped

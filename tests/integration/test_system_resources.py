@@ -62,13 +62,26 @@ class TestCPUResources:
         assert psutil.cpu_count(logical=True) >= 1
 
     def test_cpu_below_warning_threshold(self):
-        """Warn when sustained CPU exceeds threshold (sampled twice, 0.5s apart)"""
-        sample1 = psutil.cpu_percent(interval=0.25)
-        sample2 = psutil.cpu_percent(interval=0.25)
-        avg = (sample1 + sample2) / 2
-        assert avg < CPU_WARN_THRESHOLD, (
-            f"CPU usage {avg:.1f}% exceeds warning threshold {CPU_WARN_THRESHOLD}%. "
-            "Check for runaway processes."
+        """Production smoke check — only runs when HOMELAB_HEALTH_CHECK=1.
+
+        M7 hardening: this test was brittle in pre-merge CI and on dev boxes
+        because pytest itself loads CPU. Real value is as a homelab-host
+        smoke check (run from a maintenance script), NOT as a merge gate.
+        Set HOMELAB_HEALTH_CHECK=1 to opt in.
+        """
+        import os
+        import statistics
+
+        if os.environ.get("HOMELAB_HEALTH_CHECK") != "1":
+            pytest.skip(
+                "Opt-in smoke check; set HOMELAB_HEALTH_CHECK=1 on the homelab host to run"
+            )
+
+        samples = [psutil.cpu_percent(interval=0.5) for _ in range(5)]
+        median = statistics.median(samples)
+        assert median < CPU_WARN_THRESHOLD, (
+            f"CPU usage median {median:.1f}% (samples {samples}) exceeds warning threshold "
+            f"{CPU_WARN_THRESHOLD}%. Check for runaway processes."
         )
 
     def test_cpu_per_core_readable(self):

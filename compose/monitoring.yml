@@ -270,7 +270,18 @@ services:
     image: ${IMG_CADVISOR:-gcr.io/cadvisor/cadvisor:v0.49.1}
     container_name: cadvisor
     restart: unless-stopped
-    privileged: true
+    # H3 hardening: replaced 'privileged: true' with explicit capabilities + devices.
+    # cadvisor only needs DAC_READ_SEARCH (read cgroup/proc fs) + SYS_PTRACE (process stats).
+    # devices: /dev/kmsg is required for some kernel-level event collection.
+    cap_drop:
+    - ALL
+    cap_add:
+    - DAC_READ_SEARCH
+    - SYS_PTRACE
+    devices:
+    - /dev/kmsg:/dev/kmsg
+    security_opt:
+    - no-new-privileges:true
     command:
     - --docker_only
     - --housekeeping_interval=30s
@@ -306,13 +317,23 @@ services:
         max-size: 10m
         max-file: '3'
   netdata:
-    image: ${IMG_NETDATA:-netdata/netdata:stable}
+    # H4 hardening: was ':stable' (floating). Pinned to a known semver; override via IMG_NETDATA.
+    image: ${IMG_NETDATA:-netdata/netdata:v1.48.0}
     container_name: netdata
     restart: unless-stopped
+    # M2 hardening: netdata needs SYS_PTRACE for process collection; explicit cap_drop
+    # narrows the surface vs leaving 'ALL' implicit. apparmor:unconfined is required
+    # by netdata's ebpf.plugin and apps.plugin to read /proc — this is documented
+    # upstream (https://learn.netdata.cloud/docs/agent/packaging/docker#host).
+    # Mitigation: container has no_new_privileges and is bound to LAN (127.0.0.1:19999).
+    cap_drop:
+    - ALL
     cap_add:
     - SYS_PTRACE
+    - DAC_READ_SEARCH
     security_opt:
     - apparmor:unconfined
+    - no-new-privileges:true
     volumes:
     - netdataconfig:/etc/netdata
     - netdatalib:/var/lib/netdata
@@ -355,9 +376,11 @@ services:
     - ../appdata/loki:/loki
     - ../config/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
     command: -config.file=/etc/loki/local-config.yaml
+    # M3 hardening: Loki is consumed only by Grafana over the internal docker
+    # network. Removed the 0.0.0.0 binding to eliminate unauth-API exposure
+    # when BIND_IP is unset. 127.0.0.1 retained for host-side debugging only.
     ports:
     - 127.0.0.1:3100:3100
-    - ${BIND_IP:-0.0.0.0}:3100:3100
     networks:
     - default
     healthcheck:
