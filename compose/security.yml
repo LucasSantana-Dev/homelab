@@ -94,5 +94,45 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  crowdsec:
+    image: ${IMG_CROWDSEC:-crowdsecurity/crowdsec:v1.6.5}
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      - GID=1000
+      - COLLECTIONS=crowdsecurity/linux crowdsecurity/caddy crowdsecurity/sshd crowdsecurity/http-cve crowdsecurity/base-http-scenarios
+      - TZ=${TIMEZONE}
+    volumes:
+      - crowdsec_db:/var/lib/crowdsec/data
+      - crowdsec_config:/etc/crowdsec
+      - /var/log:/var/log:ro
+      - /var/log/caddy:/var/log/caddy:ro
+    ports:
+      - ${BIND_IP:-127.0.0.1}:${CROWDSEC_API_PORT:-8090}:8080
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test: ["CMD", "cscli", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   pihole_data: null
+  crowdsec_db: null
+  crowdsec_config: null
