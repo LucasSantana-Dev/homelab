@@ -26,9 +26,7 @@ def _reset_docker_singleton():
 
 def make_monitor(registry=None):
     """Create a HealthMonitor with Docker client mocked out"""
-    with patch(
-        "homelab_manager.clients.docker_client.docker"
-    ) as mock_docker:
+    with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
         mock_docker.from_env.return_value = Mock()
         monitor = HealthMonitor(registry=registry)
     return monitor

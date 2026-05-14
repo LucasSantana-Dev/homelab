@@ -374,9 +374,7 @@ class TestValidateValueAndErrors:
     def test_get_validation_errors_lists_invalid_keys(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             config = make_config(tmp_dir)
-            errors = config.get_validation_errors(
-                {"PUID": "abc", "TIMEZONE": "UTC"}
-            )
+            errors = config.get_validation_errors({"PUID": "abc", "TIMEZONE": "UTC"})
             assert len(errors) == 1
             assert "PUID" in errors[0]
             assert "abc" in errors[0]
@@ -385,10 +383,7 @@ class TestValidateValueAndErrors:
         with tempfile.TemporaryDirectory() as tmp_dir:
             config = make_config(tmp_dir)
             assert (
-                config.get_validation_errors(
-                    {"PUID": "1000", "TIMEZONE": "UTC"}
-                )
-                == []
+                config.get_validation_errors({"PUID": "1000", "TIMEZONE": "UTC"}) == []
             )
 
 

@@ -10,10 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from homelab_manager.clients import docker_client as dc_module
-from homelab_manager.clients.docker_client import (
-    DockerClientFactory,
-    get_docker_client,
-)
+from homelab_manager.clients.docker_client import DockerClientFactory, get_docker_client
 
 
 @pytest.fixture(autouse=True)

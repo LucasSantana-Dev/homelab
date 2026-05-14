@@ -11,11 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from homelab_manager.clients.compose_cli import (
-    MAX_LOG_LINES,
-    ComposeCLI,
-    clamp_lines,
-)
+from homelab_manager.clients.compose_cli import MAX_LOG_LINES, ComposeCLI, clamp_lines
 from homelab_manager.core.errors import scrub_subprocess_error
 
 
@@ -71,9 +67,7 @@ class TestClampLines:
 class TestComposeCLIRun:
     def test_passes_list_form_with_compose_prefix(self):
         cli = ComposeCLI()
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
@@ -82,9 +76,7 @@ class TestComposeCLIRun:
 
     def test_respects_check_kwarg(self):
         cli = ComposeCLI()
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
@@ -108,9 +100,7 @@ class TestComposeCLILogs:
     def test_no_registry_skips_allowlist(self):
         """Without a registry, ComposeCLI does not gate service_name."""
         cli = ComposeCLI()
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="ok\n", stderr=""
             )
@@ -119,18 +109,14 @@ class TestComposeCLILogs:
 
     def test_unknown_service_rejected(self):
         cli = ComposeCLI(registry=_registry_allowing("grafana"))
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             out = cli.logs("ghost")
             assert "unknown service 'ghost'" in out
             mock_run.assert_not_called()
 
     def test_known_service_passes_allowlist(self):
         cli = ComposeCLI(registry=_registry_allowing("grafana"))
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="log\n", stderr=""
             )
@@ -138,9 +124,7 @@ class TestComposeCLILogs:
 
     def test_negative_lines_clamped_to_one(self):
         cli = ComposeCLI(registry=_registry_allowing("grafana"))
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
@@ -150,9 +134,7 @@ class TestComposeCLILogs:
 
     def test_huge_lines_capped(self):
         cli = ComposeCLI(registry=_registry_allowing("grafana"))
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
@@ -162,16 +144,11 @@ class TestComposeCLILogs:
 
     def test_non_integer_lines_rejected(self):
         cli = ComposeCLI(registry=_registry_allowing("grafana"))
-        assert (
-            "must be a positive integer"
-            in cli.logs("grafana", lines="not-a-number")
-        )
+        assert "must be a positive integer" in cli.logs("grafana", lines="not-a-number")
 
     def test_default_tail_is_50(self):
         cli = ComposeCLI(registry=_registry_allowing("grafana"))
-        with patch(
-            "homelab_manager.clients.compose_cli.subprocess.run"
-        ) as mock_run:
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
