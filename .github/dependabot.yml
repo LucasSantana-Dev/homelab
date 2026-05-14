@@ -20,13 +20,34 @@ updates:
       prefix: "deps"
       include: "scope"
 
+  # H3 hardening: was 'docker' at '/' which only scans Dockerfiles at repo
+  # root (none here). Switched to 'docker-compose' ecosystem pointed at the
+  # compose/ directory so floating tags like home-assistant:stable, netdata
+  # :stable, paperless-ngx:latest now get auto-PR'd. Requires Dependabot
+  # 2024-09+ which has docker-compose ecosystem GA.
+  - package-ecosystem: "docker-compose"
+    directory: "/compose"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "release"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "LucasSantana-Dev"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
+
+  # Dockerfile in homelab_manager/ (paperless-ngx build context)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
     target-branch: "release"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     reviewers:
       - "LucasSantana-Dev"
     labels:
