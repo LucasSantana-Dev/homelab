@@ -1,8 +1,8 @@
 # ADR 0008 — Wave 4: Compose Hygiene (Dead Anchors + Image Tag Pinning)
 
-**Status:** Accepted  
-**Date:** 2026-05-14  
-**Branch:** `refactor/wave4-audit-r2`  
+**Status:** Accepted
+**Date:** 2026-05-14
+**Branch:** `refactor/wave4-audit-r2`
 **Closes:** Audit-deep v2 findings I1 (dead anchors) and H4 partial (image tags)
 
 ---
