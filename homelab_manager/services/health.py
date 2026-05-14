@@ -7,11 +7,13 @@ Monitor health and status of homelab services
 import time
 from typing import Dict, List, Optional
 
-import docker
 import requests
 from rich.console import Console
 
+from ..clients.docker_client import docker, get_docker_client  # noqa: F401
 from ..models.service import ServiceRegistry
+
+# R1 Phase C: `docker` re-exported for test-patch back-compat; see status.py.
 
 # Initialize console
 console = Console()
@@ -23,10 +25,10 @@ class HealthMonitor:
     def __init__(self, registry: Optional[ServiceRegistry] = None):
         self.registry = registry or ServiceRegistry()
         self.timeout = 5
-        try:
-            self.docker_client = docker.from_env()
-        except Exception:
-            self.docker_client = None
+        # R1 Phase C: single owner for docker.from_env() lives in
+        # homelab_manager.clients.docker_client; factory returns None on
+        # daemon unreachable, matching the previous try/except fallback.
+        self.docker_client = get_docker_client()
 
     def check_service(
         self,

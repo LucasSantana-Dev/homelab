@@ -9,10 +9,15 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import docker
 from rich.console import Console
 
+from ..clients.docker_client import docker, get_docker_client  # noqa: F401
 from ..models.service import ServiceRegistry
+
+# R1 Phase C: `docker` is re-exported above only so existing test patches
+# targeting `homelab_manager.services.status.docker` keep working through the
+# migration window. Production code uses `get_docker_client()` instead. Removed
+# in Phase G when test mock paths are migrated.
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -22,7 +27,10 @@ class StatusManager:
     """Manages container status, health checks, and logs"""
 
     def __init__(self, registry: Optional[ServiceRegistry] = None):
-        self.docker_client = docker.from_env()
+        # R1 Phase C: docker.from_env() centralised in clients.docker_client.
+        # Behaviour change vs pre-R1: factory returns None on daemon failure
+        # rather than raising — callers already guard with `if self.docker_client`.
+        self.docker_client = get_docker_client()
         self.project_root = Path(__file__).parent.parent.parent
         self.registry = registry or ServiceRegistry()
 

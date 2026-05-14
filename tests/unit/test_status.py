@@ -12,7 +12,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from homelab_manager.clients.docker_client import DockerClientFactory
 from homelab_manager.services.status import StatusManager
+
+
+@pytest.fixture(autouse=True)
+def _reset_docker_singleton():
+    """R1 Phase C: docker client is now a module-singleton; reset per-test."""
+    DockerClientFactory._instance = None
+    yield
+    DockerClientFactory._instance = None
 
 
 def make_container(name, status="running", image_tags=None, health_status=None):
@@ -29,7 +38,9 @@ def make_container(name, status="running", image_tags=None, health_status=None):
 
 @pytest.fixture
 def manager_with_mocked_docker():
-    with patch("homelab_manager.services.status.docker") as mock_docker:
+    # R1 Phase C: patch the canonical seam in the factory module so
+    # `StatusManager.__init__ → get_docker_client()` returns the mock.
+    with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
         m = StatusManager()
@@ -120,7 +131,7 @@ class TestGetServiceLogs:
     @pytest.fixture
     def manager_with_registry(self):
         """StatusManager with a mocked registry that allow-lists 'grafana'."""
-        with patch("homelab_manager.services.status.docker") as mock_docker:
+        with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
             mock_client = MagicMock()
             mock_docker.from_env.return_value = mock_client
             m = StatusManager()

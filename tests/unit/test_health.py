@@ -6,12 +6,29 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
+from homelab_manager.clients.docker_client import DockerClientFactory
 from homelab_manager.services.health import HealthMonitor
+
+# R1 Phase C: docker.from_env() is now centralised in
+# homelab_manager.clients.docker_client. The old patch path
+# `homelab_manager.services.health.docker` still resolves (re-exported in
+# health.py for back-compat), but the factory's lazy singleton sits between
+# the import and the call, so we patch the canonical seam and reset the
+# cache per-test to avoid cross-test pollution.
+
+
+@pytest.fixture(autouse=True)
+def _reset_docker_singleton():
+    DockerClientFactory._instance = None
+    yield
+    DockerClientFactory._instance = None
 
 
 def make_monitor(registry=None):
     """Create a HealthMonitor with Docker client mocked out"""
-    with patch("homelab_manager.services.health.docker") as mock_docker:
+    with patch(
+        "homelab_manager.clients.docker_client.docker"
+    ) as mock_docker:
         mock_docker.from_env.return_value = Mock()
         monitor = HealthMonitor(registry=registry)
     return monitor
@@ -31,14 +48,14 @@ class TestHealthMonitorInit:
     def test_init_with_injected_registry(self):
         """Verify HealthMonitor uses the provided registry"""
         registry = make_registry()
-        with patch("homelab_manager.services.health.docker"):
+        with patch("homelab_manager.clients.docker_client.docker"):
             monitor = HealthMonitor(registry=registry)
         assert monitor.registry is registry
 
     def test_init_creates_default_registry(self):
         """Verify HealthMonitor creates ServiceRegistry when none provided"""
         with (
-            patch("homelab_manager.services.health.docker"),
+            patch("homelab_manager.clients.docker_client.docker"),
             patch("homelab_manager.services.health.ServiceRegistry") as mock_reg_cls,
         ):
             HealthMonitor()
@@ -47,14 +64,14 @@ class TestHealthMonitorInit:
     def test_init_docker_client_set_on_success(self):
         """Verify docker_client is set when Docker is available"""
         mock_client = Mock()
-        with patch("homelab_manager.services.health.docker") as mock_docker:
+        with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
             mock_docker.from_env.return_value = mock_client
             monitor = HealthMonitor(registry=make_registry())
         assert monitor.docker_client is mock_client
 
     def test_init_docker_client_none_on_failure(self):
         """Verify docker_client is None when Docker is unavailable"""
-        with patch("homelab_manager.services.health.docker") as mock_docker:
+        with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
             mock_docker.from_env.side_effect = Exception("Docker not available")
             monitor = HealthMonitor(registry=make_registry())
         assert monitor.docker_client is None
@@ -226,7 +243,7 @@ class TestCheckAllServices:
 
         registry = make_registry(services=[mock_service])
 
-        with patch("homelab_manager.services.health.docker") as mock_docker:
+        with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
             mock_client = Mock()
             mock_docker.from_env.return_value = mock_client
             mock_container = Mock()
@@ -364,7 +381,7 @@ class TestCheckServiceById:
         registry = make_registry()
         registry.get_service.return_value = mock_service
 
-        with patch("homelab_manager.services.health.docker") as mock_docker:
+        with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
             mock_client = Mock()
             mock_docker.from_env.return_value = mock_client
             mock_container = Mock()
