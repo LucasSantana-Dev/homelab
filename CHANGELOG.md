@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(empty — see [2.3.0] below)
+
+## [2.3.0] - 2026-05-14
+
+First release cut under the release-branch model. Batches 9 PRs (#77 → #85)
+focused on audit-deep remediation: security hardening, supply-chain pinning,
+test coverage, CI gate enforcement, and stale-config cleanup.
+
 ### Added
 
 - **Dependabot configuration** — `.github/dependabot.yml` enables weekly Monday audits for pip, docker, and github-actions ecosystems. Bot PRs target the `release` branch (matching the release-branch model) so `/dep-sweep` can batch them. Closes audit-deep HIGH H4.
