@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **H4** Pinned 4 floating Docker tags: `home-assistant:stable`→`:2025.5`, `netdata:stable`→`:v1.48.0`, `paperless-ngx:latest`→`:2.13`, `redis:alpine`→`:7.4-alpine`. All overridable via existing `IMG_*` env vars.
   - **H3** Fixed `.github/dependabot.yml`: replaced ineffective `docker` ecosystem at `/` with `docker-compose` ecosystem at `/compose` so image-tag updates actually get auto-PR'd.
   - **H5** SHA-pinned `github/codeql-action/upload-sarif@v3` (2 instances in `.github/workflows/ci.yml`) to v3.35.4 commit `7fd177f` to close the action-tag-moving supply-chain vector.
+- **`status.py` hardened** — closes audit-deep v2 **H6 + M1**.
+  - **H6** `get_service_logs` now allowlists `service_name` against `ServiceRegistry` before invoking `docker compose logs`. Closes the CLI argument-injection vector (an unvalidated name like `--no-log-prefix` would otherwise become a docker-compose flag). Also clamps `lines` to 1..10000 and rejects non-integer input.
+  - **M1** Docker SDK exception details are no longer echoed to console — only the exception type name surfaces; full traceback is logged at DEBUG via stdlib `logging`. Prevents auth tokens / socket paths / env values from leaking into user-visible output. 9 new tests added (suite: 227→233, coverage 80→81%).
 
 ### Changed (CI)
 

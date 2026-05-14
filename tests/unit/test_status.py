@@ -115,54 +115,113 @@ class TestCheckContainerHealth:
 
 
 class TestGetServiceLogs:
-    def test_success_returns_stdout(self, manager_with_mocked_docker):
-        m, _ = manager_with_mocked_docker
+    """After H6+M1 hardening: registry validation + exception scrubbing."""
+
+    @pytest.fixture
+    def manager_with_registry(self):
+        """StatusManager with a mocked registry that allow-lists 'grafana'."""
+        with patch("homelab_manager.services.status.docker") as mock_docker:
+            mock_client = MagicMock()
+            mock_docker.from_env.return_value = mock_client
+            m = StatusManager()
+            m.docker_client = mock_client
+            registry = MagicMock()
+            # Pretend 'grafana' is registered; everything else is unknown.
+            registry.get_service_by_container.side_effect = lambda n: (
+                object() if n == "grafana" else None
+            )
+            registry.get_service.side_effect = lambda n: (
+                object() if n == "grafana" else None
+            )
+            m.registry = registry
+            yield m
+
+    def test_unknown_service_rejected(self, manager_with_registry):
+        result = manager_with_registry.get_service_logs("ghost")
+        assert "unknown service 'ghost'" in result
+
+    def test_unknown_service_does_not_invoke_subprocess(self, manager_with_registry):
+        with patch("subprocess.run") as mock_run:
+            manager_with_registry.get_service_logs("ghost")
+            mock_run.assert_not_called()
+
+    def test_negative_lines_rejected(self, manager_with_registry):
+        # 'grafana' is allowed; lines=-5 should be rejected by max(1, ...).
+        # Actually max(1, ...) clamps to 1, NOT rejects — so this exercises clamp path.
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            manager_with_registry.get_service_logs("grafana", lines=-5)
+            cmd = mock_run.call_args.args[0]
+            assert cmd[cmd.index("--tail") + 1] == "1"  # clamped
+
+    def test_huge_lines_capped(self, manager_with_registry):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            manager_with_registry.get_service_logs("grafana", lines=999_999)
+            cmd = mock_run.call_args.args[0]
+            assert cmd[cmd.index("--tail") + 1] == "10000"  # capped
+
+    def test_non_integer_lines_rejected(self, manager_with_registry):
+        result = manager_with_registry.get_service_logs("grafana", lines="not-a-number")
+        assert "must be a positive integer" in result
+
+    def test_success_returns_stdout(self, manager_with_registry):
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="log line\n", stderr=""
             )
-            assert m.get_service_logs("grafana") == "log line\n"
+            assert manager_with_registry.get_service_logs("grafana") == "log line\n"
 
-    def test_default_tail_is_50(self, manager_with_mocked_docker):
-        m, _ = manager_with_mocked_docker
+    def test_default_tail_is_50(self, manager_with_registry):
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
-            m.get_service_logs("grafana")
+            manager_with_registry.get_service_logs("grafana")
             cmd = mock_run.call_args.args[0]
-            assert "--tail" in cmd
-            tail_idx = cmd.index("--tail")
-            assert cmd[tail_idx + 1] == "50"
+            assert cmd[cmd.index("--tail") + 1] == "50"
 
-    def test_custom_tail_propagates(self, manager_with_mocked_docker):
-        m, _ = manager_with_mocked_docker
+    def test_custom_tail_propagates(self, manager_with_registry):
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
-            m.get_service_logs("grafana", lines=200)
+            manager_with_registry.get_service_logs("grafana", lines=200)
             cmd = mock_run.call_args.args[0]
-            tail_idx = cmd.index("--tail")
-            assert cmd[tail_idx + 1] == "200"
+            assert cmd[cmd.index("--tail") + 1] == "200"
 
-    def test_called_process_error_returns_error_message(
-        self, manager_with_mocked_docker
-    ):
-        m, _ = manager_with_mocked_docker
+    def test_called_process_error_does_not_leak_stderr(self, manager_with_registry):
+        """M1 hardening: stderr from docker must not be echoed to caller."""
         with patch(
             "subprocess.run",
             side_effect=subprocess.CalledProcessError(
-                returncode=1, cmd=[], stderr="no such service"
+                returncode=1, cmd=[], stderr="auth-token=super-secret-leak"
             ),
         ):
-            result = m.get_service_logs("ghost")
-            assert "Error getting logs" in result
-            assert "no such service" in result
+            result = manager_with_registry.get_service_logs("grafana")
+            assert "super-secret-leak" not in result
+            assert "grafana" in result  # service name is fine to echo
 
-    def test_generic_exception_returns_logs_error(self, manager_with_mocked_docker):
-        m, _ = manager_with_mocked_docker
+    def test_generic_exception_returns_type_only(self, manager_with_registry):
         with patch("subprocess.run", side_effect=FileNotFoundError("missing docker")):
-            result = m.get_service_logs("any")
-            assert "Logs error" in result
-            assert "missing docker" in result
+            result = manager_with_registry.get_service_logs("grafana")
+            assert "missing docker" not in result  # raw message not echoed
+            assert "FileNotFoundError" in result
+
+
+class TestGetContainerStatusErrorScrubbing:
+    """M1: get_container_status should not leak Docker SDK exception detail."""
+
+    def test_docker_failure_message_scrubbed(self, manager_with_mocked_docker, capsys):
+        m, client = manager_with_mocked_docker
+        client.containers.list.side_effect = RuntimeError(
+            "connection refused on /var/run/docker.sock with token=ABC123"
+        )
+        m.get_container_status()
+        out = capsys.readouterr().out
+        assert "token=ABC123" not in out
+        assert "RuntimeError" in out  # type only
