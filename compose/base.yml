@@ -10,17 +10,8 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/24
-  backend:
-    driver: bridge
-    internal: true
-    ipam:
-      config:
-        - subnet: 172.29.0.0/24
-  monitoring:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
+  # Wave 5: dropped unused `backend` (172.29.0.0/24) and `monitoring`
+  # (172.30.0.0/24) network blocks — no service referenced them.
   database:
     driver: bridge
     internal: true
