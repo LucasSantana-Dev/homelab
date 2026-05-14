@@ -10,10 +10,8 @@ from typing import Dict, List, Optional
 import requests
 from rich.console import Console
 
-from ..clients.docker_client import docker, get_docker_client  # noqa: F401
+from ..clients.docker_client import get_docker_client
 from ..models.service import ServiceRegistry
-
-# R1 Phase C: `docker` re-exported for test-patch back-compat; see status.py.
 
 # Initialize console
 console = Console()

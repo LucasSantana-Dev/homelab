@@ -11,13 +11,8 @@ from typing import Dict, List, Optional
 from rich.console import Console
 
 from ..clients.compose_cli import ComposeCLI
-from ..clients.docker_client import docker, get_docker_client  # noqa: F401
+from ..clients.docker_client import get_docker_client
 from ..models.service import ServiceRegistry
-
-# R1 Phase C: `docker` is re-exported above only so existing test patches
-# targeting `homelab_manager.services.status.docker` keep working through the
-# migration window. Production code uses `get_docker_client()` instead. Removed
-# in Phase G when test mock paths are migrated.
 
 console = Console()
 logger = logging.getLogger(__name__)
