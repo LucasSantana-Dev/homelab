@@ -80,7 +80,7 @@ class ComposeCLI:
             result = self.run(
                 ["logs", "--tail", str(lines_int), service_name],
             )
-            return result.stdout
+            return str(result.stdout)
         except subprocess.CalledProcessError as exc:
             logger.debug("docker compose logs failed", exc_info=True)
             return scrub_subprocess_error(

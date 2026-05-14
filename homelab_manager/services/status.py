@@ -37,6 +37,7 @@ class StatusManager:
         containers = []
 
         try:
+            assert self.docker_client is not None
             for container in self.docker_client.containers.list(all=True):
                 # Try to match container to a known service
                 service = self.registry.get_service_by_container(container.name)
@@ -96,6 +97,7 @@ class StatusManager:
     def _check_container_health(self, container_name: str) -> str:
         """Check if a container is healthy"""
         try:
+            assert self.docker_client is not None
             container = self.docker_client.containers.get(container_name)
             if container.status != "running":
                 return "stopped"
