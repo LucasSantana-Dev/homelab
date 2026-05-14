@@ -128,6 +128,9 @@ omit = [
 ]
 
 [tool.coverage.report]
+# Wave 5: enforce a floor so coverage regressions surface in CI.
+# CI also passes --cov-fail-under=70 — keep the two in sync.
+fail_under = 70
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
