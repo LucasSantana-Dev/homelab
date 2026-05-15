@@ -88,14 +88,18 @@ class TestHealthMonitorHTTP:
     """HealthMonitor.check_service for automation endpoints."""
 
     def _make_monitor(self):
-        with patch("homelab_manager.services.health.get_docker_client", return_value=None):
+        with patch(
+            "homelab_manager.services.health.get_docker_client", return_value=None
+        ):
             return HealthMonitor()
 
     def test_healthy_response(self):
         monitor = self._make_monitor()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        with patch("homelab_manager.services.health.requests.get", return_value=mock_resp):
+        with patch(
+            "homelab_manager.services.health.requests.get", return_value=mock_resp
+        ):
             result = monitor.check_service("homeassistant", "http://homeassistant:8123")
         assert result["healthy"] is True
         assert result["status_code"] == 200
@@ -105,7 +109,9 @@ class TestHealthMonitorHTTP:
         monitor = self._make_monitor()
         mock_resp = MagicMock()
         mock_resp.status_code = 503
-        with patch("homelab_manager.services.health.requests.get", return_value=mock_resp):
+        with patch(
+            "homelab_manager.services.health.requests.get", return_value=mock_resp
+        ):
             result = monitor.check_service("homeassistant", "http://homeassistant:8123")
         assert result["healthy"] is False
 

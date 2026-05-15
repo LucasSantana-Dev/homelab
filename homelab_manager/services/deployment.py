@@ -36,6 +36,9 @@ class DeploymentManager:
         console.print(f"🔄 Restarting {service_name}...")
         try:
             self._cli.run(["restart", service_name], cwd=self.project_root)
-            return {"success": True, "message": f"{service_name} restarted successfully"}
+            return {
+                "success": True,
+                "message": f"{service_name} restarted successfully",
+            }
         except subprocess.CalledProcessError as exc:
             return {"success": False, "error": exc.stderr if exc.stderr else str(exc)}

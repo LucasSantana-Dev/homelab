@@ -10,10 +10,10 @@ import typer
 
 from ..core.config import HomelabConfig
 from ..models.service import ServiceRegistry
+from ..server import run_server
 from ..services.containers import ContainerManager
 from ..services.health import HealthMonitor
 from ..services.updates import UpdateManager
-from ..server import run_server
 from .management_commands import register_management_commands
 from .status_commands import register_status_commands
 

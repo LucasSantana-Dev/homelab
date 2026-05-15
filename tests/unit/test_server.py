@@ -20,7 +20,11 @@ class TestHandleHealth:
     def test_timestamp_is_utc_iso(self):
         _, body = handle_health("0.0.1")
         data = json.loads(body)
-        assert data["timestamp"].endswith("+00:00") or data["timestamp"].endswith("Z") or "T" in data["timestamp"]
+        assert (
+            data["timestamp"].endswith("+00:00")
+            or data["timestamp"].endswith("Z")
+            or "T" in data["timestamp"]
+        )
 
 
 class TestHandleStatus:
