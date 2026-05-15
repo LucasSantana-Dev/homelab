@@ -16,3 +16,6 @@
 - search:
     provider: google
     target: _blank
+
+- gatus:
+    url: http://gatus:8095
