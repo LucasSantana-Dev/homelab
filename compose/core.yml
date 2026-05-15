@@ -1,53 +1,3 @@
-# YAML Anchors for DRY configuration
-x-logging-defaults: &logging-defaults
-  driver: "json-file"
-  options:
-    max-size: "10m"
-    max-file: "3"
-
-x-healthcheck-minimal: &healthcheck-minimal
-  interval: 30s
-  timeout: 10s
-  retries: 3
-
-x-healthcheck-with-start: &healthcheck-with-start
-  interval: 30s
-  timeout: 10s
-  retries: 3
-  start_period: 30s
-
-x-resources-minimal: &resources-minimal
-  limits:
-    memory: 128M
-    cpus: '0.25'
-  reservations:
-    memory: 64M
-    cpus: '0.125'
-
-x-resources-small: &resources-small
-  limits:
-    memory: 256M
-    cpus: '0.5'
-  reservations:
-    memory: 128M
-    cpus: '0.25'
-
-x-resources-medium: &resources-medium
-  limits:
-    memory: 512M
-    cpus: '1.0'
-  reservations:
-    memory: 256M
-    cpus: '0.5'
-
-x-resources-large: &resources-large
-  limits:
-    memory: 1G
-    cpus: '2.0'
-  reservations:
-    memory: 512M
-    cpus: '1.0'
-
 services:
   # nginx-proxy service removed: Caddy + Cloudflared own all ingress now.
   # PR #78 deleted config/nginx/ but accidentally left this service block,
@@ -65,8 +15,6 @@ services:
     - run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN}
-    volumes:
-    - ../config/cloudflared:/etc/cloudflared:ro
     ports:
     - 127.0.0.1:2000:2000
     networks:
@@ -79,20 +27,12 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      test:
-      - CMD
-      - curl
-      - --fail
-      - http://127.0.0.1:2000/metrics
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      disable: true
   homepage:
     image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.0.3}
     container_name: homepage
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - ../config/homepage:/app/config
     - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -102,6 +42,7 @@ services:
     - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
     - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
     - DOMAIN=${DOMAIN}
+    - HOMEPAGE_GITHUB_TOKEN=${HOMEPAGE_GITHUB_TOKEN:-}
     ports:
     - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
     networks:
@@ -133,7 +74,6 @@ services:
     container_name: portainer
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - /var/run/docker.sock:/var/run/docker.sock
     - portainer_data:/data
     ports:
@@ -168,7 +108,6 @@ services:
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
     - whats_up_docker_data:/app/data
     environment:
@@ -206,6 +145,50 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+  homelab-manager:
+    image: ${IMG_HOMELAB_MANAGER:-python:3.11-slim}
+    container_name: homelab-manager
+    restart: unless-stopped
+    working_dir: /app
+    command:
+    - python
+    - -m
+    - homelab_manager
+    - serve
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8765'
+    volumes:
+    - ../:/app:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+    - 127.0.0.1:${HOMELAB_MANAGER_PORT:-8765}:8765
+    networks:
+    - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 volumes:
   portainer_data: null
   whats_up_docker_data: null

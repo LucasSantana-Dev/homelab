@@ -78,6 +78,10 @@ else
   echo "Warning: Pi-hole config dir not found at $PIHOLE_CONFIG_DIR"
 fi
 
+# 6. Docker Compose files
+echo "[$(date)] Backing up Docker Compose files..."
+cp -r "$COMPOSE_DIR"/compose "$TEMP_DIR/compose-files" 2>/dev/null || echo "Warning: Could not copy compose files"
+cp "$COMPOSE_DIR/docker-compose.yml" "$TEMP_DIR/" 2>/dev/null || echo "Warning: Could not copy docker-compose.yml"
 
 # 6.5. Home Assistant config (post-k3s migration)
 if [ -d "$HOMEASSISTANT_CONFIG_DIR" ]; then
@@ -129,11 +133,6 @@ if [ -d "$ALERTMANAGER_DATA_DIR" ]; then
 else
   echo "Warning: Alertmanager data dir not found at $ALERTMANAGER_DATA_DIR"
 fi
-
-# 6. Docker Compose files
-echo "[$(date)] Backing up Docker Compose files..."
-cp -r "$COMPOSE_DIR"/compose "$TEMP_DIR/compose-files" 2>/dev/null || echo "Warning: Could not copy compose files"
-cp "$COMPOSE_DIR/docker-compose.yml" "$TEMP_DIR/" 2>/dev/null || echo "Warning: Could not copy docker-compose.yml"
 
 # 7. .env files (if present; add to .sops.yaml encrypted)
 if [ -f "$COMPOSE_DIR/.env" ]; then

@@ -287,3 +287,251 @@ class TestGetMissingConfig:
 
             for var in ["DOMAIN", "TIMEZONE", "PUID", "PGID", "TAILSCALE_IP"]:
                 assert var not in missing
+
+
+# ---------------------------------------------------------------------------
+# R1 Phase F — close M4 coverage gap (62% -> ≥90%)
+# ---------------------------------------------------------------------------
+
+
+class TestLoadEnvVariableSubstitution:
+    """Lines 62-69: ${VAR} and ${VAR:-default} substitution in load_env."""
+
+    def test_var_substitution_with_default_uses_env(self, monkeypatch):
+        monkeypatch.setenv("FROM_ENV", "from-real-env")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, ".env").write_text("KEY=${FROM_ENV:-fallback}\n")
+            config = make_config(tmp_dir)
+            assert config.load_env()["KEY"] == "from-real-env"
+
+    def test_var_substitution_with_default_falls_back(self, monkeypatch):
+        monkeypatch.delenv("UNSET_VAR", raising=False)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, ".env").write_text("KEY=${UNSET_VAR:-fallback-value}\n")
+            config = make_config(tmp_dir)
+            assert config.load_env()["KEY"] == "fallback-value"
+
+    def test_bare_var_substitution_uses_env(self, monkeypatch):
+        monkeypatch.setenv("BARE_VAR", "env-value")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, ".env").write_text("KEY=${BARE_VAR}\n")
+            config = make_config(tmp_dir)
+            assert config.load_env()["KEY"] == "env-value"
+
+    def test_bare_var_substitution_unset_keeps_literal(self, monkeypatch):
+        monkeypatch.delenv("ALSO_UNSET", raising=False)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, ".env").write_text("KEY=${ALSO_UNSET}\n")
+            config = make_config(tmp_dir)
+            # Source code keeps the literal ${VAR} when env lookup misses.
+            assert config.load_env()["KEY"] == "${ALSO_UNSET}"
+
+
+class TestGetConfigSummaryPlaceholders:
+    """Lines 113, 125: 'Not configured' fallback for placeholder values."""
+
+    def test_required_placeholder_marked_not_configured(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, ".env").write_text("DOMAIN=your-domain.com\n")
+            config = make_config(tmp_dir)
+            summary = config.get_config_summary()
+            assert summary["DOMAIN"]["value"] == "Not configured"
+            assert summary["DOMAIN"]["valid"] is False
+
+    def test_optional_placeholder_marked_not_configured(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, ".env").write_text(
+                "CF_API_TOKEN=your_cloudflare_api_token_here\n"
+            )
+            config = make_config(tmp_dir)
+            summary = config.get_config_summary()
+            assert summary["CF_API_TOKEN"]["value"] == "Not configured"
+
+
+class TestValidateValueAndErrors:
+    """Lines 137-148: validate_value() + get_validation_errors()."""
+
+    def test_validate_value_unknown_key_returns_true(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = make_config(tmp_dir)
+            assert config.validate_value("UNKNOWN_KEY", "anything") is True
+
+    def test_validate_value_valid_known_key(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = make_config(tmp_dir)
+            assert config.validate_value("PUID", "1000") is True
+
+    def test_validate_value_invalid_known_key(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = make_config(tmp_dir)
+            assert config.validate_value("PUID", "not-a-number") is False
+
+    def test_validate_value_invalid_tailscale_ip(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = make_config(tmp_dir)
+            assert config.validate_value("TAILSCALE_IP", "not.an.ip") is False
+
+    def test_get_validation_errors_lists_invalid_keys(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = make_config(tmp_dir)
+            errors = config.get_validation_errors({"PUID": "abc", "TIMEZONE": "UTC"})
+            assert len(errors) == 1
+            assert "PUID" in errors[0]
+            assert "abc" in errors[0]
+
+    def test_get_validation_errors_empty_when_all_valid(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = make_config(tmp_dir)
+            assert (
+                config.get_validation_errors({"PUID": "1000", "TIMEZONE": "UTC"}) == []
+            )
+
+
+class TestIsConfigured:
+    """Line 153: staticmethod is_configured()."""
+
+    def test_empty_string_is_not_configured(self):
+        assert HomelabConfig.is_configured("") is False
+
+    def test_placeholder_your_prefix_is_not_configured(self):
+        assert HomelabConfig.is_configured("your_secret") is False
+
+    def test_your_domain_literal_is_not_configured(self):
+        assert HomelabConfig.is_configured("your-domain.com") is False
+
+    def test_real_value_is_configured(self):
+        assert HomelabConfig.is_configured("real-value") is True
+
+
+class TestGetServiceUrls:
+    """Lines 170-193: get_service_urls()."""
+
+    def _config_with_services(self, services, tmp_dir):
+        Path(tmp_dir, ".env").write_text(
+            "DOMAIN=example.com\nTAILSCALE_IP=100.64.0.1\n"
+        )
+        with patch("homelab_manager.core.config.ServiceRegistry") as mock_reg_cls:
+            registry = mock_reg_cls.return_value
+            registry.services = {s.id: s for s in services}
+            config = HomelabConfig(tmp_dir)
+            return config
+
+    def test_skips_services_without_ports(self):
+        from types import SimpleNamespace
+
+        svc = SimpleNamespace(
+            id="ghost",
+            has_port=False,
+            port=None,
+            localhost_only=False,
+            get_tailscale_url=lambda ip: None,
+            get_public_url=lambda d: None,
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = self._config_with_services([svc], tmp_dir)
+            urls = config.get_service_urls()
+            assert urls == {}
+
+    def test_includes_localhost_url_for_each_service_with_port(self):
+        from types import SimpleNamespace
+
+        svc = SimpleNamespace(
+            id="grafana",
+            has_port=True,
+            port=3000,
+            localhost_only=False,
+            get_tailscale_url=lambda ip: f"http://{ip}:3000",
+            get_public_url=lambda d: f"https://grafana.{d}",
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = self._config_with_services([svc], tmp_dir)
+            urls = config.get_service_urls()
+            assert urls["grafana"] == "http://localhost:3000"
+            assert urls["tailscale_grafana"] == "http://100.64.0.1:3000"
+            assert urls["public_grafana"] == "https://grafana.example.com"
+
+    def test_localhost_only_skips_tailscale_and_public(self):
+        from types import SimpleNamespace
+
+        svc = SimpleNamespace(
+            id="internal",
+            has_port=True,
+            port=9090,
+            localhost_only=True,
+            get_tailscale_url=lambda ip: f"http://{ip}:9090",
+            get_public_url=lambda d: f"https://internal.{d}",
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = self._config_with_services([svc], tmp_dir)
+            urls = config.get_service_urls()
+            assert urls["internal"] == "http://localhost:9090"
+            assert "tailscale_internal" not in urls
+            assert "public_internal" not in urls
+
+    def test_tailscale_url_omitted_when_helper_returns_none(self):
+        from types import SimpleNamespace
+
+        svc = SimpleNamespace(
+            id="svc",
+            has_port=True,
+            port=8000,
+            localhost_only=False,
+            get_tailscale_url=lambda ip: None,  # no tailscale binding
+            get_public_url=lambda d: None,  # no public binding either
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = self._config_with_services([svc], tmp_dir)
+            urls = config.get_service_urls()
+            assert urls == {"svc": "http://localhost:8000"}
+
+
+class TestGetServicesForDisplay:
+    """Lines 197-218: get_services_for_display()."""
+
+    def test_skips_localhost_only_services(self):
+        from types import SimpleNamespace
+
+        public_svc = SimpleNamespace(
+            id="grafana",
+            name="Grafana",
+            category="monitoring",
+            port=3000,
+            sensitive=False,
+            localhost_only=False,
+            get_tailscale_url=lambda ip: f"http://{ip}:3000",
+            get_public_url=lambda d: f"https://grafana.{d}",
+        )
+        internal_svc = SimpleNamespace(
+            id="loki",
+            name="Loki",
+            category="monitoring",
+            port=3100,
+            sensitive=False,
+            localhost_only=True,
+            get_tailscale_url=lambda ip: f"http://{ip}:3100",
+            get_public_url=lambda d: None,
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, ".env").write_text(
+                "DOMAIN=example.com\nTAILSCALE_IP=100.64.0.1\n"
+            )
+            with patch("homelab_manager.core.config.ServiceRegistry") as mock_reg_cls:
+                registry = mock_reg_cls.return_value
+                registry.get_services_with_ports.return_value = [
+                    public_svc,
+                    internal_svc,
+                ]
+                config = HomelabConfig(tmp_dir)
+                result = config.get_services_for_display()
+                assert len(result) == 1
+                assert result[0]["id"] == "grafana"
+                assert result[0]["localhost"] == "http://localhost:3000"
+                assert result[0]["tailscale"] == "http://100.64.0.1:3000"
+                assert result[0]["public"] == "https://grafana.example.com"
+
+    def test_returns_empty_when_no_services(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch("homelab_manager.core.config.ServiceRegistry") as mock_reg_cls:
+                mock_reg_cls.return_value.get_services_with_ports.return_value = []
+                config = HomelabConfig(tmp_dir)
+                assert config.get_services_for_display() == []

@@ -7,7 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(empty — see [2.3.0] below)
+## [2.4.0] - 2026-05-15
+
+Second release under the release-branch model. Batches 7 PRs (#115–#121) covering
+security hardening, deploy reliability, dashboard expansion, HTTP API, test
+coverage uplift, and code quality.
+
+### Added
+
+- **Homepage Projects tab** — new `pages:` tab with GitHub release + commit-activity
+  widgets for `homelab` and `ai-dev-toolkit` repos. Requires `HOMEPAGE_GITHUB_TOKEN`
+  (5 000 req/hr vs 15/hr unauthenticated). Closes #107, #108. (#117)
+- **Gatus uptime widget** — Homepage header now shows live endpoint-status summary
+  from the Gatus container (no additional network wiring needed). Closes #110. (#118)
+- **`homelab_manager` HTTP API server** — lightweight stdlib HTTP server with
+  `/health`, `/status`, and `/summary` endpoints on `127.0.0.1:8765` (loopback-only;
+  Caddy + Authentik forward-auth is the pre-condition for external exposure per
+  ADR-0009). Adds `homelab serve` CLI command and a `homelab-manager` compose service
+  in `compose/core.yml`. Homepage customapi widget shows total/healthy/unhealthy
+  service counts with 60 s auto-refresh. Closes #112. (#120)
+- **`homelab_manager` package restructure (R1)** — new `clients/` subpackage owns
+  Docker SDK + `docker compose` CLI invocations (`DockerClientFactory`, `ComposeCLI`).
+  H6 registry allowlist + M1 stderr-scrubbing lifted into `ComposeCLI.logs()` and
+  `core/errors.scrub_subprocess_error()`. (`docs/adr/0007-homelab-manager-clients-package.md`)
+- **Closed M4 coverage gap** — `core/config.py` 62% → 100% via 21 new tests.
+  Whole-package coverage 81% → 86%; suite 233 → 284 passed.
+
+### Changed
+
+- **`DeploymentManager` migrated to `ComposeCLI`** — drops `CommandSequence`/`Step`
+  dependency; constructor-injected `ComposeCLI` enables clean unit testing without
+  import-path patching. `ComposeCLI.run()` gains a `cwd` kwarg. Closes #113. (#121)
+- **15 real automation unit tests** — replaces placeholder boilerplate in
+  `tests/unit/test_automation.py` with `TestConfigValidator` (9), `TestRestartAutomationService` (3),
+  and `TestHealthMonitorHTTP` (3). Closes #111. (#119)
+
+### Fixed
+
+- **Stale volume mounts removed** — four dead bind-mounts in `compose/core.yml`
+  (`cloudflared` config dir, nginx/certbot path for homepage/portainer/whats-up-docker)
+  caused bind-mount errors on fresh deploys. Closes #105, #109. (#116)
+
+### Security
+
+- **n8n basic-auth dead vars removed** — `N8N_BASIC_AUTH_ACTIVE/USER/PASSWORD` env
+  vars are silently no-ops in n8n v1.0+ (basic auth removed in favour of built-in
+  user management); removed from `compose/apps.yml` and `.env.example`. Port 5678
+  now bound to `127.0.0.1` only (was `0.0.0.0`) — eliminates direct LAN bypass of
+  Caddy+Tinyauth. Closes #104, #106. (#115)
+- **Latent M1 violation closed in `services/updates.py`** — all 4 error handlers
+  now use `scrub_subprocess_error(exc, context=...)` instead of echoing raw
+  `e.stderr` (could leak env values / paths).
 
 ## [2.3.0] - 2026-05-14
 

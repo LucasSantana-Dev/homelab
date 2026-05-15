@@ -1,0 +1,43 @@
+---
+title: Luk's Homelab
+description: Self-hosted dashboard
+favicon: https://cdn0.iconfinder.com/data/icons/famous-character-vol-1-colored/48/JD-37-512.png
+
+theme: dark
+color: slate
+headerStyle: clean
+target: _self
+hideVersion: true
+hideErrors: false
+showStats: true
+statusStyle: dot
+language: en
+iconStyle: theme
+
+# Solid dark background (no image) — keeps text readable
+background:
+  blur: xl
+  saturate: 50
+  brightness: 50
+  opacity: 100
+cardBlur: md
+
+pages:
+  - name: Home
+    icon: mdi-home
+  - name: Projects
+    icon: mdi-source-repository
+
+layout:
+  Media:
+    style: row
+    columns: 4
+  Storage:
+    style: row
+    columns: 4
+  Apps:
+    style: row
+    columns: 4
+  Infrastructure:
+    style: row
+    columns: 4

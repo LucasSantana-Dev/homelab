@@ -59,6 +59,28 @@
         description: Local LLM chat
         container: open-webui
 
+- Management:
+    - Homelab Manager:
+        icon: si-python
+        href: http://homelab.home:8765/health
+        description: Service health & status API
+        container: homelab-manager
+        widget:
+          type: customapi
+          url: http://homelab-manager:8765/summary
+          refreshInterval: 60000
+          method: GET
+          mappings:
+            - field: total
+              label: Services
+              format: number
+            - field: healthy
+              label: Healthy
+              format: number
+            - field: unhealthy
+              label: Unhealthy
+              format: number
+
 - Infrastructure:
     - Pi-hole:
         icon: pi-hole

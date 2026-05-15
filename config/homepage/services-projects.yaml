@@ -1,0 +1,34 @@
+---
+# Projects tab — GitHub release tracker and commit activity
+# Rendered on the "Projects" page (settings.yaml pages:)
+# Requires HOMEPAGE_GITHUB_TOKEN for 5000 req/hr rate limit (vs 15/hr unauthenticated)
+
+- homelab:
+    - Release:
+        icon: mdi-tag-outline
+        description: Latest homelab release
+        widget:
+          type: github-releases
+          repository: LucasSantana-Dev/homelab
+
+    - Commits:
+        icon: mdi-source-commit
+        description: Commit activity — homelab
+        widget:
+          type: github-commit-activity
+          repository: LucasSantana-Dev/homelab
+
+- ai-dev-toolkit:
+    - Release:
+        icon: mdi-tag-outline
+        description: Latest ai-dev-toolkit release
+        widget:
+          type: github-releases
+          repository: LucasSantana-Dev/ai-dev-toolkit
+
+    - Commits:
+        icon: mdi-source-commit
+        description: Commit activity — ai-dev-toolkit
+        widget:
+          type: github-commit-activity
+          repository: LucasSantana-Dev/ai-dev-toolkit

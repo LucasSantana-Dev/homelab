@@ -5,12 +5,13 @@ Monitor health and status of homelab services
 """
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
-import docker
 import requests
 from rich.console import Console
 
+from ..clients.docker_client import get_docker_client
 from ..models.service import ServiceRegistry
 
 # Initialize console
@@ -23,10 +24,10 @@ class HealthMonitor:
     def __init__(self, registry: Optional[ServiceRegistry] = None):
         self.registry = registry or ServiceRegistry()
         self.timeout = 5
-        try:
-            self.docker_client = docker.from_env()
-        except Exception:
-            self.docker_client = None
+        # R1 Phase C: single owner for docker.from_env() lives in
+        # homelab_manager.clients.docker_client; factory returns None on
+        # daemon unreachable, matching the previous try/except fallback.
+        self.docker_client = get_docker_client()
 
     def check_service(
         self,
@@ -161,14 +162,19 @@ class HealthMonitor:
 
     def check_all_services(self) -> Dict[str, Dict]:
         """Check health of all services from the registry"""
-        results = {}
+        services = [
+            s
+            for s in self.registry.get_services_with_ports()
+            if (s.health_mode or "docker").lower() != "none"
+        ]
+        if not services:
+            return {}
 
-        for service in self.registry.get_services_with_ports():
-            if (service.health_mode or "docker").lower() == "none":
-                continue
-            results[service.id] = self._check_service_by_policy(service)
+        def _check(service):
+            return service.id, self._check_service_by_policy(service)
 
-        return results
+        with ThreadPoolExecutor(max_workers=min(len(services), 20)) as executor:
+            return dict(executor.map(_check, services))
 
     def get_health_summary(self) -> Dict:
         """Get summary of health status"""

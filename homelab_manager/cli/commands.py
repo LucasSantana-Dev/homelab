@@ -10,6 +10,7 @@ import typer
 
 from ..core.config import HomelabConfig
 from ..models.service import ServiceRegistry
+from ..server import run_server
 from ..services.containers import ContainerManager
 from ..services.health import HealthMonitor
 from ..services.updates import UpdateManager
@@ -55,5 +56,13 @@ def create_app(
     register_management_commands(
         app, _config_manager, _container_manager, _update_manager, _registry
     )
+
+    @app.command()
+    def serve(
+        host: str = typer.Option("127.0.0.1", help="Bind address"),
+        port: int = typer.Option(8765, help="Listen port"),
+    ):
+        """Start the homelab_manager HTTP API server."""
+        run_server(host=host, port=port)
 
     return app
