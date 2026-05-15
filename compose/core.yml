@@ -49,6 +49,8 @@ services:
     - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
     networks:
     - default
+    extra_hosts:
+    - host.docker.internal:host-gateway
     deploy:
       resources:
         limits:
