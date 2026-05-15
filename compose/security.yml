@@ -38,7 +38,7 @@ services:
       - CMD
       - curl
       - --fail
-      - http://localhost/admin/api.php
+      - http://localhost/api/
       interval: 30s
       timeout: 10s
       retries: 3
