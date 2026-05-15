@@ -81,12 +81,26 @@
               label: Unhealthy
               format: number
 
+    - What's Up Docker:
+        icon: si-docker
+        href: http://homelab.home:3003
+        description: Container update monitor
+        container: whats-up-docker
+        widget:
+          type: whatsupdocker
+          url: http://whats-up-docker:3000
+
 - Infrastructure:
     - Pi-hole:
         icon: pi-hole
         href: http://pihole.home/admin
         description: DNS sinkhole & ad blocking
         container: pihole
+        widget:
+          type: pihole
+          url: http://pihole:80
+          version: 6
+          key: "{{HOMEPAGE_VAR_PIHOLE_KEY}}"
 
     - Gatus:
         icon: si-statuspage
@@ -99,9 +113,17 @@
         href: http://homelab.home:9000
         description: Container management
         container: portainer
+        widget:
+          type: portainer
+          url: http://portainer:9000
+          env: 1
+          key: "{{HOMEPAGE_VAR_PORTAINER_KEY}}"
 
     - Netdata:
         icon: netdata
         href: http://homelab.home:19999
         description: Real-time host metrics
         container: netdata
+        widget:
+          type: netdata
+          url: http://netdata:19999

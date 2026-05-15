@@ -38,6 +38,9 @@ layout:
   Apps:
     style: row
     columns: 4
+  Management:
+    style: row
+    columns: 4
   Infrastructure:
     style: row
     columns: 4
