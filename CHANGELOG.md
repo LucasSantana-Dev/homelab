@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-05-15
+
+Patch fix for Pi-hole host networking and LAN-wide DNS resolution.
+
+### Fixed
+
+- **Pi-hole host networking** — switched Pi-hole to `network_mode: host` for LAN-wide
+  DNS resolution. Removes Docker bridge isolation that prevented LAN clients from using
+  Pi-hole as their DNS server. Fixes `listeningMode` (`all` → `local`), adds explicit
+  `FTLCONF_webserver_port=8054`, updates Homepage widget URL to
+  `http://host.docker.internal:8054`, and adds `host.docker.internal:host-gateway`
+  extra_hosts to Homepage container so the widget can reach the host-networked Pi-hole.
+  (#131)
+
 ## [2.4.0] - 2026-05-15
 
 Second release under the release-branch model. Batches 7 PRs (#115–#121) covering
