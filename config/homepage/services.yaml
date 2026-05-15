@@ -67,7 +67,7 @@
         container: homelab-manager
         widget:
           type: customapi
-          url: http://homelab-manager:8765/summary
+          url: http://host.docker.internal:8765/summary
           refreshInterval: 60000
           method: GET
           mappings:
@@ -126,4 +126,4 @@
         container: netdata
         widget:
           type: netdata
-          url: http://netdata:19999
+          url: http://host.docker.internal:19999
