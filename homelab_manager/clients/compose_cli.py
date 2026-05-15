@@ -43,6 +43,7 @@ class ComposeCLI:
         check: bool = True,
         capture_output: bool = True,
         timeout: Optional[int] = None,
+        cwd=None,
     ) -> subprocess.CompletedProcess:
         """Run `docker compose <args>` and return the CompletedProcess.
 
@@ -56,6 +57,7 @@ class ComposeCLI:
             capture_output=capture_output,
             text=True,
             timeout=timeout,
+            cwd=cwd,
         )
 
     def logs(self, service_name: str, lines: int = 50) -> str:
