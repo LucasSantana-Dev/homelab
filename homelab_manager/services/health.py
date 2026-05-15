@@ -5,6 +5,7 @@ Monitor health and status of homelab services
 """
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
 import requests
@@ -161,14 +162,19 @@ class HealthMonitor:
 
     def check_all_services(self) -> Dict[str, Dict]:
         """Check health of all services from the registry"""
-        results = {}
+        services = [
+            s
+            for s in self.registry.get_services_with_ports()
+            if (s.health_mode or "docker").lower() != "none"
+        ]
+        if not services:
+            return {}
 
-        for service in self.registry.get_services_with_ports():
-            if (service.health_mode or "docker").lower() == "none":
-                continue
-            results[service.id] = self._check_service_by_policy(service)
+        def _check(service):
+            return service.id, self._check_service_by_policy(service)
 
-        return results
+        with ThreadPoolExecutor(max_workers=min(len(services), 20)) as executor:
+            return dict(executor.map(_check, services))
 
     def get_health_summary(self) -> Dict:
         """Get summary of health status"""
