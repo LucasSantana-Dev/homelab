@@ -215,7 +215,6 @@ config/homeassistant/config/custom_components/
 config/grafana/plugins/
 
 # Service runtime configurations
-config/homepage/settings.yaml
 config/stremio/server-settings.json
 config/whats-up-docker/wud-config.json
 
