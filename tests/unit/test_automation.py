@@ -5,10 +5,12 @@ Covers: config validation for automation services, deployment restart of
 homeassistant, and HTTP health checks for automation endpoints.
 """
 
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from homelab_manager.clients.compose_cli import ComposeCLI
 from homelab_manager.services.deployment import DeploymentManager
 from homelab_manager.services.health import HealthMonitor
 from homelab_manager.utils.validators import ConfigValidator
@@ -48,40 +50,32 @@ class TestConfigValidator:
 class TestRestartAutomationService:
     """DeploymentManager.restart_service for automation-stack containers."""
 
-    def _run_restart(self, service_name: str, success: bool):
-        captured = {}
+    @pytest.fixture
+    def mock_cli(self):
+        return MagicMock(spec=ComposeCLI)
 
-        def fake_init(steps, cwd=None, **kw):
-            captured["cwd"] = cwd
-            captured["steps"] = steps
-            obj = MagicMock()
-            obj.run.return_value = {"success": success, "output": ""}
-            return obj
+    @pytest.fixture
+    def manager(self, mock_cli):
+        return DeploymentManager(compose_cli=mock_cli)
 
-        with patch(
-            "homelab_manager.services.deployment.CommandSequence",
-            side_effect=fake_init,
-        ):
-            dm = DeploymentManager()
-            result = dm.restart_service(service_name)
-
-        return result, captured
-
-    def test_restart_homeassistant_success(self):
-        result, captured = self._run_restart("homeassistant", success=True)
+    def test_restart_homeassistant_success(self, manager, mock_cli):
+        result = manager.restart_service("homeassistant")
         assert result["success"] is True
         assert "homeassistant" in result["message"]
-        step = captured["steps"][0]
-        assert "homeassistant" in step.cmd
+        args, _ = mock_cli.run.call_args
+        assert "homeassistant" in args[0]
 
-    def test_restart_homeassistant_failure(self):
-        result, captured = self._run_restart("homeassistant", success=False)
+    def test_restart_homeassistant_failure(self, manager, mock_cli):
+        mock_cli.run.side_effect = subprocess.CalledProcessError(
+            1, "docker compose restart", stderr="service error"
+        )
+        result = manager.restart_service("homeassistant")
         assert result["success"] is False
 
-    def test_restart_n8n_uses_correct_service_name(self):
-        result, captured = self._run_restart("n8n", success=True)
-        step = captured["steps"][0]
-        assert "n8n" in step.cmd
+    def test_restart_n8n_uses_correct_service_name(self, manager, mock_cli):
+        manager.restart_service("n8n")
+        args, _ = mock_cli.run.call_args
+        assert "n8n" in args[0]
 
 
 class TestHealthMonitorHTTP:
