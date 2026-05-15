@@ -28,11 +28,12 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # Pi-hole v6: /api/ returns 404; /api/info/version returns 200
       test:
       - CMD
       - curl
       - --fail
-      - http://localhost:${PIHOLE_WEB_PORT:-8054}/api/
+      - http://localhost:${PIHOLE_WEB_PORT:-8054}/api/info/version
       interval: 30s
       timeout: 10s
       retries: 3
