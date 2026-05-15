@@ -4,7 +4,6 @@ services:
     container_name: pihole
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - pihole_data:/etc/pihole
     - ../config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
     environment:

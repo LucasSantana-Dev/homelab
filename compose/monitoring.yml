@@ -4,7 +4,6 @@ services:
     container_name: grafana
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - grafana_data:/var/lib/grafana
     environment:
     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
@@ -138,7 +137,6 @@ services:
     container_name: prometheus
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - ../config/prometheus:/etc/prometheus
     - prometheus_data:/prometheus
     command:
@@ -181,7 +179,6 @@ services:
     container_name: node-exporter
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - /proc:/host/proc:ro
     - /sys:/host/sys:ro
     - /:/rootfs:ro
