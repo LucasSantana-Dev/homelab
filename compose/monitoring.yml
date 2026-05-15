@@ -6,6 +6,10 @@ services:
     volumes:
     - ../config/nginx/www/certbot:/var/www/certbot:ro
     - grafana_data:/var/lib/grafana
+    # Provisioning: datasources + dashboards versioned alongside this
+    # compose file. See config/grafana/provisioning/dashboards/dashboards.yml
+    # for the provider config that loads files from this directory.
+    - ../config/grafana/provisioning:/etc/grafana/provisioning:ro
     environment:
     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     - GF_SECURITY_ADMIN_USER=admin
@@ -152,6 +156,12 @@ services:
     - ${BIND_IP:-0.0.0.0}:${PROMETHEUS_PORT:-9091}:9090
     networks:
     - default
+    # `lucky-monitoring` is an external network owned by the Lucky
+    # docker-compose project. Joining it lets Prometheus resolve
+    # `lucky-bot` and `lucky-backend` by service DNS for the scrape
+    # targets defined in config/prometheus/prometheus.yml. See
+    # docs/runbooks/lucky-observability.md.
+    - lucky-monitoring
     depends_on:
     - alertmanager
     deploy:
@@ -473,3 +483,12 @@ volumes:
   netdatacache: null
   gatus_data: null
   healthchecks_data: null
+
+networks:
+  # External network created by the Lucky docker-compose project so the
+  # homelab Prometheus container can scrape Lucky's bot and backend
+  # without exposing their /metrics ports on the host. The Lucky-side
+  # change (network declaration + bot/backend membership) lands in a
+  # paired PR in the Lucky repo.
+  lucky-monitoring:
+    external: true
