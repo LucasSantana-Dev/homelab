@@ -1,9 +1,9 @@
 # Spec: Custom Web Dashboard Microservice (Tier 3 — Deferred)
 
-**Created:** 2026-05-15  
-**ADR:** docs/adr/0009-dashboard-expansion-github-widgets-api-tier.md (Tier 3)  
-**Effort:** l (>2d)  
-**Severity:** low  
+**Created:** 2026-05-15
+**ADR:** docs/adr/0009-dashboard-expansion-github-widgets-api-tier.md (Tier 3)
+**Effort:** l (>2d)
+**Severity:** low
 **Status:** DEFERRED — do not implement until trigger conditions are met
 
 ---

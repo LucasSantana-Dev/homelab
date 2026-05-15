@@ -1,9 +1,9 @@
 # Spec: Homepage "Projects" Tab — GitHub Release + Commit Widgets
 
-**Created:** 2026-05-15  
-**ADR:** docs/adr/0009-dashboard-expansion-github-widgets-api-tier.md (Tier 1)  
-**Effort:** s (1–4h)  
-**Severity:** medium  
+**Created:** 2026-05-15
+**ADR:** docs/adr/0009-dashboard-expansion-github-widgets-api-tier.md (Tier 1)
+**Effort:** s (1–4h)
+**Severity:** medium
 
 ---
 

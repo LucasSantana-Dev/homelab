@@ -1,8 +1,8 @@
 # Spec: Gatus Uptime Widget in Homepage Header
 
-**Created:** 2026-05-15  
-**Effort:** xs (<1h)  
-**Severity:** low  
+**Created:** 2026-05-15
+**Effort:** xs (<1h)
+**Severity:** low
 
 ---
 

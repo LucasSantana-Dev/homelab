@@ -1,8 +1,8 @@
 # ADR 0009 — Dashboard Expansion: Tiered GitHub Integration + API Layer
 
-**Status:** Accepted  
-**Date:** 2026-05-15  
-**Deciders:** Lucas Santana  
+**Status:** Accepted
+**Date:** 2026-05-15
+**Deciders:** Lucas Santana
 
 ---
 
