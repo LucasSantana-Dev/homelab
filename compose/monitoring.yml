@@ -421,6 +421,50 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  healthchecks:
+    image: ${IMG_HEALTHCHECKS:-healthchecks/healthchecks:v3.7}
+    container_name: healthchecks
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${HEALTHCHECKS_SECRET_KEY}
+      - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN:-home}
+      # ALLOWED_HOSTS — Django host-header allowlist. Restrict to expected
+      # access paths: LAN loopback, Tailscale magicDNS, and the public
+      # subdomain. `*` would disable the protection entirely.
+      - ALLOWED_HOSTS=healthchecks.${DOMAIN:-home},${TAILSCALE_IP:-100.64.0.0},localhost,127.0.0.1
+      - SITE_ROOT=https://healthchecks.${DOMAIN:-home}
+      - SITE_NAME=Homelab Healthchecks
+      - SUPERUSER_EMAIL=${HEALTHCHECKS_SUPERUSER_EMAIL}
+      - SUPERUSER_PASSWORD=${HEALTHCHECKS_SUPERUSER_PASSWORD}
+      - DEBUG=False
+      - TZ=${TIMEZONE}
+    volumes:
+      - healthchecks_data:/data
+    ports:
+      - ${BIND_IP:-0.0.0.0}:${HEALTHCHECKS_PORT:-8092}:8000
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/api/v1/notifications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 volumes:
   grafana_data: null
   prometheus_data: null
@@ -428,3 +472,4 @@ volumes:
   netdatalib: null
   netdatacache: null
   gatus_data: null
+  healthchecks_data: null

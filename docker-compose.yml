@@ -12,11 +12,12 @@
 #   - lan-proxy.yml:  Caddy reverse proxy (*.home routing)
 #   - monitoring.yml: Prometheus, Grafana, Loki, Alertmanager, Netdata, Promtail, etc.
 #   - media.yml:      Stremio
-#   - apps.yml:       n8n, Paperless-ngx, Nextcloud
-#   - security.yml:   Pi-hole
+#   - apps.yml:       n8n, Paperless-ngx, Nextcloud, Linkding, Miniflux, Forgejo, Vaultwarden
+#   - security.yml:   Pi-hole, CrowdSec
 #   - automation.yml: Home Assistant
 #   - auth.yml:        Tinyauth OAuth middleware
 #   - agent-box.yml:  Claude Code agent-box
+#   - backup.yml:     Kopia (encrypted snapshot backups → S3-compatible offsite)
 
 include:
   - path: compose/base.yml
@@ -29,3 +30,4 @@ include:
   - path: compose/automation.yml
   - path: compose/auth.yml
   - path: compose/agent-box.yml
+  - path: compose/backup.yml
