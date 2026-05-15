@@ -1,9 +1,9 @@
 # Spec: homelab_manager HTTP API Mode (/health /status /summary)
 
-**Created:** 2026-05-15  
-**ADR:** docs/adr/0009-dashboard-expansion-github-widgets-api-tier.md (Tier 2)  
-**Effort:** m (1–2d)  
-**Severity:** medium  
+**Created:** 2026-05-15
+**ADR:** docs/adr/0009-dashboard-expansion-github-widgets-api-tier.md (Tier 2)
+**Effort:** m (1–2d)
+**Severity:** medium
 
 ---
 
