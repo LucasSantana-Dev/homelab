@@ -149,6 +149,50 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+  homelab-manager:
+    image: ${IMG_HOMELAB_MANAGER:-python:3.11-slim}
+    container_name: homelab-manager
+    restart: unless-stopped
+    working_dir: /app
+    command:
+    - python
+    - -m
+    - homelab_manager
+    - serve
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8765'
+    volumes:
+    - ../:/app:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+    - 127.0.0.1:${HOMELAB_MANAGER_PORT:-8765}:8765
+    networks:
+    - default
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '3'
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 volumes:
   portainer_data: null
   whats_up_docker_data: null
