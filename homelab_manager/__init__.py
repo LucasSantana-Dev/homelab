@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("homelab-manager")
 except PackageNotFoundError:
-    __version__ = "2.1.0"  # Fallback for development
+    __version__ = "2.4.0"  # Fallback for development
 
 __author__ = "Luk Homelab"
 __description__ = "Modern homelab management CLI"
