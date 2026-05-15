@@ -1,0 +1,24 @@
+/* Dark gradient background */
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) fixed !important;
+}
+
+/* Service card hover lift */
+.service-block {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.service-block:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Status dot glow */
+.status-dot.good,
+span[title="Running"].status-dot {
+  box-shadow: 0 0 6px 2px rgba(34, 197, 94, 0.6);
+}
+.status-dot.bad,
+span[title="Stopped"].status-dot,
+span[title="Exited"].status-dot {
+  box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.6);
+}
