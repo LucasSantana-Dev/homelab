@@ -15,8 +15,6 @@ services:
     - run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN}
-    volumes:
-    - ../config/cloudflared:/etc/cloudflared:ro
     ports:
     - 127.0.0.1:2000:2000
     networks:
@@ -35,7 +33,6 @@ services:
     container_name: homepage
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - ../config/homepage:/app/config
     - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -76,7 +73,6 @@ services:
     container_name: portainer
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - /var/run/docker.sock:/var/run/docker.sock
     - portainer_data:/data
     ports:
@@ -111,7 +107,6 @@ services:
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
     - whats_up_docker_data:/app/data
     environment:
