@@ -13,6 +13,7 @@ from ..models.service import ServiceRegistry
 from ..services.containers import ContainerManager
 from ..services.health import HealthMonitor
 from ..services.updates import UpdateManager
+from ..server import run_server
 from .management_commands import register_management_commands
 from .status_commands import register_status_commands
 
@@ -55,5 +56,13 @@ def create_app(
     register_management_commands(
         app, _config_manager, _container_manager, _update_manager, _registry
     )
+
+    @app.command()
+    def serve(
+        host: str = typer.Option("127.0.0.1", help="Bind address"),
+        port: int = typer.Option(8765, help="Listen port"),
+    ):
+        """Start the homelab_manager HTTP API server."""
+        run_server(host=host, port=port)
 
     return app
