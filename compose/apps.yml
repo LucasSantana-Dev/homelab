@@ -13,15 +13,14 @@ services:
     volumes:
       - ../appdata/n8n:/home/node/.n8n
     environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      # n8n v1.0+ uses built-in user management; N8N_BASIC_AUTH_* removed (silently ignored).
+      # External route protected by Caddy + Tinyauth forward-auth.
       - WEBHOOK_URL=https://n8n.${DOMAIN}
       - TZ=${TIMEZONE}
       - PUID=1000
       - PGID=1000
     ports:
-      - "${BIND_IP:-0.0.0.0}:5678:5678"
+      - "127.0.0.1:5678:5678"
     networks:
       - default
     healthcheck:
