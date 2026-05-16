@@ -26,7 +26,4 @@ volumes:
   whats_up_docker_data:
   pihole_data:
   stremio_cache:
-  netdataconfig:
-  netdatalib:
-  netdatacache:
   gatus_data:

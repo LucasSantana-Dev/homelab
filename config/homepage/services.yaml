@@ -95,11 +95,3 @@
           env: 1
           key: "{{HOMEPAGE_VAR_PORTAINER_KEY}}"
 
-    - Netdata:
-        icon: netdata
-        href: http://homelab.home:19999
-        description: Real-time host metrics
-        container: netdata
-        widget:
-          type: netdata
-          url: http://netdata:19999

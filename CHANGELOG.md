@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **netdata service and homepage widget** — replaced by Prometheus + Grafana +
+  node-exporter + cadvisor stack. See ADR-0011 for full rationale.
+
+### Added
+
+- **docs/runbooks/fallback-observability.md** — direct-scrape fallback queries
+  for node-exporter and cadvisor when Prometheus or Grafana is unavailable.
+
 ## [2.4.3] - 2026-05-16
 
 Patch batch hot-fixing the v2.4.2 homelab-manager regression and recording the
