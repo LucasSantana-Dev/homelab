@@ -1,0 +1,31 @@
+# Snyk (https://snyk.io) policy file.
+# Excludes paths that are historical/upstream and do not reflect deployed code.
+
+version: v1.25.0
+
+exclude:
+  global:
+    # Historical assets from the k3s migration that was reverted per ADR-0004.
+    # Kept on disk for reference but never deployed; findings here are not
+    # actionable. The k3s Helm templates ship third-party charts whose vulns
+    # are upstream-owned.
+    - archive/**
+
+    # Upstream paperless-ngx image — we add a thin layer for OCR languages,
+    # but base-image CVEs are reported and fixed by the upstream
+    # paperless-ngx project. We pin to a recent tag and rebuild monthly.
+    - dockerfiles/paperless-ngx/**
+
+    # Local-only virtualenvs (never committed; just defensive against an
+    # accidental scan against a developer's interactive setup).
+    - .venv/**
+    - .venv-*/**
+    - venv/**
+
+    # Test fixtures and generated artifacts.
+    - tests/fixtures/**
+    - .pytest_cache/**
+    - .mypy_cache/**
+
+    # External tooling we vendor as scripts but is owned by other teams.
+    - claude-env/**
