@@ -150,22 +150,13 @@ services:
       retries: 3
       start_period: 30s
   homelab-manager:
-    image: ${IMG_HOMELAB_MANAGER:-python:3.11-slim}
+    image: homelab-manager:local
+    build:
+      context: ..
+      dockerfile: dockerfiles/homelab-manager/Dockerfile
     container_name: homelab-manager
     restart: unless-stopped
-    working_dir: /tmp/build
-    entrypoint:
-    - sh
-    - -c
-    # The /app mount is read-only for security, but pip's egg_info step
-    # writes `homelab_manager.egg-info/` into the source tree during build.
-    # Copy only the package source + setup metadata (a few hundred KB) to
-    # a writable tmpfs path. PR #141 copied the entire /app mount, which
-    # included appdata/ (22GB on a live server) and hung indefinitely.
-    command:
-    - "mkdir -p /tmp/build && cp /app/pyproject.toml /app/README.md /tmp/build/ && cp -r /app/homelab_manager /tmp/build/ && cd /tmp/build && pip install --target /tmp/site-packages . --quiet && PYTHONPATH=/tmp/site-packages python -m homelab_manager serve --host 0.0.0.0 --port 8765"
     volumes:
-    - ../:/app:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
     - 127.0.0.1:${HOMELAB_MANAGER_PORT:-8765}:8765
@@ -184,16 +175,6 @@ services:
       options:
         max-size: 5m
         max-file: '3'
-    healthcheck:
-      test:
-      - CMD
-      - python
-      - -c
-      - "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
 volumes:
   portainer_data: null
   whats_up_docker_data: null

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- homelab-manager now ships as a baked image built locally via compose `build:` — replaces the runtime pip-install pattern (ADR-0010). Source changes require `docker compose up -d --build homelab-manager`.
+
+### Removed
+
+- homelab-manager's runtime pip-install command and `../:/app:ro` bind mount.
+
 ## [2.4.3] - 2026-05-16
 
 Patch batch hot-fixing the v2.4.2 homelab-manager regression and recording the
