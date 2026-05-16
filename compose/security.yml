@@ -28,12 +28,14 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      # Pi-hole v6: /api/ returns 404; /api/info/version returns 200
+      # Pi-hole v6: all /api/* endpoints require auth and return 401. /admin/
+      # returns 302 (redirect to login), which curl --fail treats as success.
+      # Verified in-container post-deploy on 2026.04.0.
       test:
       - CMD
       - curl
       - --fail
-      - http://localhost:${PIHOLE_WEB_PORT:-8054}/api/info/version
+      - http://localhost:${PIHOLE_WEB_PORT:-8054}/admin/
       interval: 30s
       timeout: 10s
       retries: 3

@@ -153,12 +153,15 @@ services:
     image: ${IMG_HOMELAB_MANAGER:-python:3.11-slim}
     container_name: homelab-manager
     restart: unless-stopped
-    working_dir: /app
+    working_dir: /tmp/build
     entrypoint:
     - sh
     - -c
+    # The /app mount is read-only for security, but pip's egg_info step
+    # writes `homelab_manager.egg-info/` into the source tree during build.
+    # Copy /app to a writable tmpfs path first, then install + run from there.
     command:
-    - "pip install --target /tmp/site-packages /app --quiet 2>&1 && PYTHONPATH=/tmp/site-packages python -m homelab_manager serve --host 0.0.0.0 --port 8765"
+    - "cp -r /app /tmp/build && cd /tmp/build && pip install --target /tmp/site-packages . --quiet && PYTHONPATH=/tmp/site-packages python -m homelab_manager serve --host 0.0.0.0 --port 8765"
     volumes:
     - ../:/app:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -188,7 +191,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 60s
 volumes:
   portainer_data: null
   whats_up_docker_data: null
