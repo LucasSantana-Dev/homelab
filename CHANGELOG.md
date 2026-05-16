@@ -13,7 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **netdata service and homepage widget** — replaced by Prometheus + Grafana +
+  node-exporter + cadvisor stack. See ADR-0011 for full rationale.
 - homelab-manager's runtime pip-install command and `../:/app:ro` bind mount.
+
+### Added
+
+- **docs/runbooks/fallback-observability.md** — direct-scrape fallback queries
+  for node-exporter and cadvisor when Prometheus or Grafana is unavailable.
 
 ## [2.4.3] - 2026-05-16
 
