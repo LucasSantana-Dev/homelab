@@ -46,6 +46,28 @@ scrape_configs:
     scrape_interval: 15s
     metrics_path: /metrics
 
+  # Lucky bot — /metrics exposed by prom-client (PR #873).
+  # Requires the bot container to also be on the `lucky-monitoring`
+  # external network so Prom can resolve `lucky-bot` by service DNS.
+  - job_name: 'lucky-bot'
+    static_configs:
+      - targets: ['lucky-bot:9091']
+        labels:
+          service: 'lucky-bot'
+          environment: 'production'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Lucky backend — /metrics exposed by prom-client (PR #875).
+  - job_name: 'lucky-backend'
+    static_configs:
+      - targets: ['lucky-backend:5000']
+        labels:
+          service: 'lucky-backend'
+          environment: 'production'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
   # Blackbox Exporter - HTTP endpoint monitoring
   - job_name: 'blackbox'
     metrics_path: /probe
