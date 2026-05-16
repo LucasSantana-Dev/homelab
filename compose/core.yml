@@ -159,9 +159,11 @@ services:
     - -c
     # The /app mount is read-only for security, but pip's egg_info step
     # writes `homelab_manager.egg-info/` into the source tree during build.
-    # Copy /app to a writable tmpfs path first, then install + run from there.
+    # Copy only the package source + setup metadata (a few hundred KB) to
+    # a writable tmpfs path. PR #141 copied the entire /app mount, which
+    # included appdata/ (22GB on a live server) and hung indefinitely.
     command:
-    - "cp -r /app /tmp/build && cd /tmp/build && pip install --target /tmp/site-packages . --quiet && PYTHONPATH=/tmp/site-packages python -m homelab_manager serve --host 0.0.0.0 --port 8765"
+    - "mkdir -p /tmp/build && cp /app/pyproject.toml /app/README.md /tmp/build/ && cp -r /app/homelab_manager /tmp/build/ && cd /tmp/build && pip install --target /tmp/site-packages . --quiet && PYTHONPATH=/tmp/site-packages python -m homelab_manager serve --host 0.0.0.0 --port 8765"
     volumes:
     - ../:/app:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
