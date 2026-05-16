@@ -213,3 +213,108 @@ groups:
         annotations:
           summary: "Docker service is down on {{ $labels.instance }}"
           description: "node_systemd_unit_state reports docker.service is not active for at least 2 minutes."
+
+  # Lucky-specific alerts. Bot + backend scrape targets are added by
+  # PR — once `lucky-monitoring` external network is joined.
+  - name: lucky_alerts
+    interval: 30s
+    rules:
+      - alert: LuckyBotDown
+        expr: up{job="lucky-bot"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: lucky-bot
+        annotations:
+          summary: "Lucky bot /metrics scrape failing"
+          description: "Prometheus has not been able to scrape lucky-bot:9091/metrics for 2 minutes. Bot process may be down, METRICS_DISABLED may be set, or docker network membership changed."
+          runbook: "docs/runbooks/lucky-observability.md#luckybotdown"
+
+      - alert: LuckyBackendDown
+        expr: up{job="lucky-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: lucky-backend
+        annotations:
+          summary: "Lucky backend /metrics scrape failing"
+          description: "Prometheus has not been able to scrape lucky-backend:5000/metrics for 2 minutes."
+          runbook: "docs/runbooks/lucky-observability.md#luckybackenddown"
+
+      # Guild churn — bot loses >5% of active guilds over a 10-min window.
+      - alert: LuckyGuildCountDropping
+        expr: |
+          (
+            lucky_bot_guilds_total{state="active"}
+            - lucky_bot_guilds_total{state="active"} offset 10m
+          ) / lucky_bot_guilds_total{state="active"} offset 10m < -0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: lucky-bot
+        annotations:
+          summary: "Lucky active-guild count dropped >5% in 10m"
+          description: "Active guilds {{ $value | printf \"%.2f\" }}× — investigate mass kick / deploy / mis-reporting."
+          runbook: "docs/runbooks/lucky-observability.md#luckyguildcountdropping"
+
+      # Backend 5xx rate >0.1/s on any route.
+      - alert: LuckyBackendHighErrorRate
+        expr: |
+          sum by (route) (
+            rate(lucky_backend_http_server_errors_total[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: lucky-backend
+        annotations:
+          summary: "Lucky backend 5xx >0.1/s on {{ $labels.route }}"
+          description: "Route {{ $labels.route }} producing >0.1 server errors per second (5m avg). Cross-check Sentry."
+          runbook: "docs/runbooks/lucky-observability.md#luckybackendhigherrorrate"
+
+      # Backend p95 latency >1s sustained 10m.
+      - alert: LuckyBackendHighLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route) (
+              rate(lucky_backend_http_request_duration_seconds_bucket[5m])
+            )
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: lucky-backend
+        annotations:
+          summary: "Lucky backend p95 >1s on {{ $labels.route }}"
+          description: "Route p95 = {{ $value | printf \"%.2f\" }}s. Likely slow downstream (Discord, Spotify, Last.fm) or missing DB index."
+          runbook: "docs/runbooks/lucky-observability.md#luckybackendhighlatency"
+
+      # Event loop blocked (default prom-client metric).
+      - alert: LuckyBotEventLoopBlocked
+        expr: |
+          nodejs_eventloop_lag_p99_seconds{service="lucky-bot"} > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: lucky-bot
+        annotations:
+          summary: "Lucky bot event loop p99 lag >200ms"
+          description: "p99 lag {{ $value | printf \"%.3f\" }}s for 5m. Sync hot path or GC pressure."
+          runbook: "docs/runbooks/lucky-observability.md#luckyboteventloopblocked"
+
+      # Heap approaching limit.
+      - alert: LuckyBotHeapHigh
+        expr: |
+          (
+            nodejs_heap_size_used_bytes{service="lucky-bot"}
+            / nodejs_heap_size_total_bytes{service="lucky-bot"}
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: lucky-bot
+        annotations:
+          summary: "Lucky bot heap >90% used"
+          description: "V8 heap {{ $value | humanizePercentage }} full for 10m — risk of OOMKilled."
+          runbook: "docs/runbooks/lucky-observability.md#luckybotheaphigh"
