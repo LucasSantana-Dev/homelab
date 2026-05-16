@@ -10,7 +10,6 @@ services:
     - STREMIO_SERVER_HOST=0.0.0.0
     - STREMIO_SERVER_URL=${STREMIO_PUBLIC_URL:-https://server-do-luk.tailab88e9.ts.net}
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - ../config/stremio:/root/.stremio-server
     - stremio_cache:/root/.stremio-server/stremio-cache
     ports:

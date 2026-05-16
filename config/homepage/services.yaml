@@ -17,27 +17,9 @@
         container: nextcloud
 
 - Apps:
-    - Miniflux:
-        icon: miniflux
-        href: http://miniflux.home
-        description: RSS reader
-        container: miniflux
-
-    - Forgejo:
-        icon: forgejo
-        href: http://forgejo.home
-        description: Self-hosted git
-        container: forgejo
-
-    - Linkding:
-        icon: linkding
-        href: http://linkding.home
-        description: Bookmarks
-        container: linkding
-
     - n8n:
         icon: n8n
-        href: http://n8n.home
+        href: https://n8n.luk-homeserver.com.br
         description: Workflow automation
         container: n8n
 
@@ -52,12 +34,6 @@
         href: https://craftvaria.luk-homeserver.com.br
         description: Minecraft server admin
         container: craftvaria-admin-frontend
-
-    - Open WebUI:
-        icon: open-webui
-        href: http://ai.home
-        description: Local LLM chat
-        container: open-webui
 
 - Management:
     - Homelab Manager:
@@ -81,12 +57,26 @@
               label: Unhealthy
               format: number
 
+    - What's Up Docker:
+        icon: si-docker
+        href: http://homelab.home:3003
+        description: Container update monitor
+        container: whats-up-docker
+        widget:
+          type: whatsupdocker
+          url: http://whats-up-docker:3000
+
 - Infrastructure:
     - Pi-hole:
         icon: pi-hole
-        href: http://pihole.home/admin
+        href: http://homelab.home:8054/admin
         description: DNS sinkhole & ad blocking
         container: pihole
+        widget:
+          type: pihole
+          url: http://host.docker.internal:8054
+          version: 6
+          key: "{{HOMEPAGE_VAR_PIHOLE_KEY}}"
 
     - Gatus:
         icon: si-statuspage
@@ -99,9 +89,8 @@
         href: http://homelab.home:9000
         description: Container management
         container: portainer
-
-    - Netdata:
-        icon: netdata
-        href: http://homelab.home:19999
-        description: Real-time host metrics
-        container: netdata
+        widget:
+          type: portainer
+          url: http://portainer:9000
+          env: 1
+          key: "{{HOMEPAGE_VAR_PORTAINER_KEY}}"

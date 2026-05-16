@@ -43,10 +43,14 @@ services:
     - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
     - DOMAIN=${DOMAIN}
     - HOMEPAGE_GITHUB_TOKEN=${HOMEPAGE_GITHUB_TOKEN:-}
+    - HOMEPAGE_VAR_PIHOLE_KEY=${PIHOLE_API_KEY:-}
+    - HOMEPAGE_VAR_PORTAINER_KEY=${HOMEPAGE_VAR_PORTAINER_KEY:-}
     ports:
     - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
     networks:
     - default
+    extra_hosts:
+    - host.docker.internal:host-gateway
     deploy:
       resources:
         limits:
@@ -146,21 +150,13 @@ services:
       retries: 3
       start_period: 30s
   homelab-manager:
-    image: ${IMG_HOMELAB_MANAGER:-python:3.11-slim}
+    image: homelab-manager:local
+    build:
+      context: ..
+      dockerfile: dockerfiles/homelab-manager/Dockerfile
     container_name: homelab-manager
     restart: unless-stopped
-    working_dir: /app
-    command:
-    - python
-    - -m
-    - homelab_manager
-    - serve
-    - --host
-    - 0.0.0.0
-    - --port
-    - '8765'
     volumes:
-    - ../:/app:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
     - 127.0.0.1:${HOMELAB_MANAGER_PORT:-8765}:8765
@@ -179,16 +175,6 @@ services:
       options:
         max-size: 5m
         max-file: '3'
-    healthcheck:
-      test:
-      - CMD
-      - python
-      - -c
-      - "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 volumes:
   portainer_data: null
   whats_up_docker_data: null

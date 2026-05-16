@@ -7,6 +7,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.4] - 2026-05-16
+
+Patch batch retiring netdata per ADR-0011 and shipping the baked-image
+homelab-manager per ADR-0010. New deploy contract: source changes to
+homelab-manager require `docker compose up -d --build homelab-manager`.
+Post-deploy: drop the stale `homelab_netdataconfig`, `homelab_netdatalib`,
+`homelab_netdatacache` volumes.
+
+### Changed
+
+- **homelab-manager now ships as a baked image** built locally via compose
+  `build:` — replaces the runtime pip-install pattern (ADR-0010). Source
+  changes require `docker compose up -d --build homelab-manager`. (#147)
+
+### Removed
+
+- **netdata service and homepage widget** — replaced by Prometheus + Grafana
+  + node-exporter + cadvisor stack. See ADR-0011 for full rationale. (#146)
+- homelab-manager's runtime pip-install command and `../:/app:ro` bind
+  mount. (#147)
+
+### Added
+
+- **docs/runbooks/fallback-observability.md** — direct-scrape fallback
+  queries for node-exporter and cadvisor when Prometheus or Grafana is
+  unavailable. (#146)
+- **ADR-0011** — full rationale for retiring netdata: CAP_FOWNER root
+  cause, 90% capability/feature overlap with cadvisor + node-exporter,
+  revisit triggers. (#146)
+
+## [2.4.3] - 2026-05-16
+
+Patch batch hot-fixing the v2.4.2 homelab-manager regression and recording the
+packaging decision that retires the runtime pip-install pattern.
+
+### Fixed
+
+- **homelab-manager: copy only build artifacts, not the entire repo** — PR #141's
+  `cp -r /app /tmp/build` copied the full `../:/app:ro` bind mount. On the live
+  server that mount includes `appdata/` (Nextcloud, Paperless, etc.) and weighs
+  **22 GB**, so `cp` hung and the container went unhealthy after `start_period`.
+  Switch to a selective copy of `pyproject.toml`, `README.md`, and
+  `homelab_manager/` only. Hot-patched on the server with `sed -i` during the
+  v2.4.2 deploy; this release makes the fix durable. (#143)
+
+### Documentation
+
+- **ADR-0010: homelab-manager local Dockerfile build over runtime pip-install** —
+  records the decision to retire the runtime pip-install pattern (which produced
+  two release-impacting bugs in 24 h) in favour of a baked image built locally
+  via compose `build:`. Includes seven alternatives considered, five revisit
+  triggers (multi-server deployment, build time > 2 min, source > 50 MB,
+  hot-reload workflow, base-image CVE), and implementation guidance for the
+  follow-up PR. Decision is accepted; the Dockerfile rewrite ships in a later
+  version under task #26. (#144)
+
+## [2.4.2] - 2026-05-16
+
+Patch batch addressing dashboard widget regressions discovered during v2.4.1
+post-deploy QA, plus a Snyk policy to suppress dead-code noise.
+
+### Fixed
+
+- **Pi-hole healthcheck hits unauth endpoint** — PR #132's switch to
+  `/api/info/version` regressed because Pi-hole v6 requires auth on all `/api/*`
+  endpoints, returning 401 to `curl --fail`. Switch healthcheck to `/admin/`
+  (returns 302, passes `--fail`). Container now reports healthy. (#139)
+- **homelab-manager pip install fails on read-only mount** — `../:/app:ro` mount
+  combined with pip's `egg_info` step writing into source tree caused
+  `Cannot update time stamp of directory 'homelab_manager.egg-info'` and a
+  restart loop. Copy `/app` to a writable tmpfs dir before invoking pip.
+  Read-only mount preserved for security. (#141)
+- **Homepage widget URLs use container-name routing for same-network services** —
+  `host.docker.internal:<port>` only works for services bound to `0.0.0.0` on
+  the host. `homelab-manager` and `netdata` are on the same `default` docker
+  network as homepage; use their container names directly. `pihole` remains on
+  `host.docker.internal` because it uses `network_mode: host`. Resolves
+  `<!DOCTYPE` JSON-parse errors and `ECONNREFUSED 172.17.0.1:19999`. (#141)
+- **Gatus healthcheck fails because image is distroless** — `twinproduction/gatus`
+  ships only the `gatus` binary; no `curl`, `wget`, or `sh` for the
+  `curl --fail` healthcheck. Container reported `(unhealthy)` despite serving
+  traffic. Disable docker-level healthcheck; Gatus self-monitors via its own
+  check loop. (#141)
+
+### Changed
+
+- **Snyk policy** — added `.snyk` excluding `archive/**` (k3s historical per
+  ADR-0004), `dockerfiles/paperless-ngx/**` (upstream image), virtualenvs,
+  test caches, and `claude-env/`. Eliminates ~80% of dashboard noise from
+  third-party Helm charts and upstream-owned images. Fresh `snyk monitor`
+  snapshots confirm 0 live vulns in scope. (#140)
+
+## [2.4.1] - 2026-05-15
+
+Patch batch covering Pi-hole DNS/healthcheck/widget fixes, cross-compose hostname
+resolution, and removal of deprecated services from the dashboard.
+
+### Fixed
+
+- **Pi-hole host networking** — switched Pi-hole to `network_mode: host` for LAN-wide
+  DNS resolution. Removes Docker bridge isolation that prevented LAN clients from using
+  Pi-hole as their DNS server. Fixes `listeningMode` (`all` → `local`), adds explicit
+  `FTLCONF_webserver_port=8054`, updates Homepage widget URL to
+  `http://host.docker.internal:8054`, and adds `host.docker.internal:host-gateway`
+  extra_hosts to Homepage container so the widget can reach the host-networked Pi-hole.
+  (#131)
+- **Pi-hole v6 healthcheck endpoint** — container reported `(unhealthy)` because the
+  legacy `/api/` endpoint returns 404 in Pi-hole v6. Healthcheck now probes
+  `/api/info/version`, which returns 200 on a working FTL instance. (#132)
+- **Cross-compose widget hostnames** — Homepage widgets for `homelab-manager`,
+  `netdata`, and `pihole` were hitting ENOTFOUND because containers in separate
+  Compose files cannot resolve each other by service name. Widget URLs now use
+  `http://host.docker.internal:<port>` consistently. (#133)
+- **Pi-hole widget API key** — `HOMEPAGE_VAR_PIHOLE_KEY` was wired to
+  `${PIHOLE_WEB_PASSWORD}`, which made the widget post the web-UI password to the v6
+  API and receive HTML back instead of JSON. Renamed to `${PIHOLE_API_KEY:-}` so the
+  widget uses a Pi-hole App Password generated under Settings → API. Server-side
+  manual step: generate the App Password and set `PIHOLE_API_KEY` in `.env`. (#134)
+
+### Removed
+
+- **Deprecated services pruned** — `linkding`, `miniflux` (+ `miniflux-db`), `forgejo`,
+  and `open-webui` removed from `compose/apps.yml` and the Homepage dashboard. None
+  were in active use; their presence caused dashboard noise and stale healthcheck
+  warnings. n8n confirmed in use and retained. (#136)
+
 ## [2.4.0] - 2026-05-15
 
 Second release under the release-branch model. Batches 7 PRs (#115–#121) covering
