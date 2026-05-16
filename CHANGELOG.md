@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-05-16
+
+Patch batch hot-fixing the v2.4.2 homelab-manager regression and recording the
+packaging decision that retires the runtime pip-install pattern.
+
+### Fixed
+
+- **homelab-manager: copy only build artifacts, not the entire repo** — PR #141's
+  `cp -r /app /tmp/build` copied the full `../:/app:ro` bind mount. On the live
+  server that mount includes `appdata/` (Nextcloud, Paperless, etc.) and weighs
+  **22 GB**, so `cp` hung and the container went unhealthy after `start_period`.
+  Switch to a selective copy of `pyproject.toml`, `README.md`, and
+  `homelab_manager/` only. Hot-patched on the server with `sed -i` during the
+  v2.4.2 deploy; this release makes the fix durable. (#143)
+
+### Documentation
+
+- **ADR-0010: homelab-manager local Dockerfile build over runtime pip-install** —
+  records the decision to retire the runtime pip-install pattern (which produced
+  two release-impacting bugs in 24 h) in favour of a baked image built locally
+  via compose `build:`. Includes seven alternatives considered, five revisit
+  triggers (multi-server deployment, build time > 2 min, source > 50 MB,
+  hot-reload workflow, base-image CVE), and implementation guidance for the
+  follow-up PR. Decision is accepted; the Dockerfile rewrite ships in a later
+  version under task #26. (#144)
+
 ## [2.4.2] - 2026-05-16
 
 Patch batch addressing dashboard widget regressions discovered during v2.4.1
