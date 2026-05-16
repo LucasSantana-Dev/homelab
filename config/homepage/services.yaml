@@ -94,4 +94,3 @@
           url: http://portainer:9000
           env: 1
           key: "{{HOMEPAGE_VAR_PORTAINER_KEY}}"
-
