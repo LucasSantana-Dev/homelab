@@ -311,17 +311,6 @@ services:
     description: "DNS filtering and ad blocking"
     sensitive: true
 
-  vaultwarden:
-    name: "Vaultwarden"
-    category: security
-    container_name: vaultwarden
-    port: 8200
-    internal_port: 80
-    health_endpoint: "/"
-    description: "Password manager (Bitwarden compatible)"
-    sensitive: true
-    url_path: "vault"
-
   authentik-server:
     name: "Authentik"
     category: security

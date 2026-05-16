@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **vaultwarden** — operator no longer uses the self-hosted Bitwarden vault.
+  Service block removed from `compose/apps.yml`; declaration removed from
+  `homelab_manager/data/services.yaml`; env vars (`VAULTWARDEN_ADMIN_TOKEN`,
+  `IMG_VAULTWARDEN`, `VAULTWARDEN_PORT`, and the vaultwarden-scoped `SMTP_*`
+  block) removed from `.env.example`. Server-side: stop + remove container,
+  retain `appdata/vaultwarden` directory until the operator confirms data
+  doesn't need to be exported. K8s helm chart already archived under
+  `archive/k8s-dropped/helm/vaultwarden/` and is untouched.
+
 ## [2.4.4] - 2026-05-16
 
 Patch batch retiring netdata per ADR-0011 and shipping the baked-image
