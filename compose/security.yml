@@ -11,7 +11,8 @@ services:
     - TZ=${TIMEZONE}
     - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
     - PIHOLE_DNS_=8.8.8.8;1.1.1.1
-    - FTLCONF_dns_listeningMode=local
+    - FTLCONF_dns_listeningMode=all
+    - FTLCONF_misc_etc_dnsmasq_d=true
     - FTLCONF_webserver_api_password=${PIHOLE_WEB_PASSWORD}
     - FTLCONF_webserver_port=${PIHOLE_WEB_PORT:-8054}
     deploy:
