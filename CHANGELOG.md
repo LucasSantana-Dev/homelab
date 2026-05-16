@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-05-15
+
+Patch batch covering Pi-hole DNS/healthcheck/widget fixes, cross-compose hostname
+resolution, and removal of deprecated services from the dashboard.
+
+### Fixed
+
+- **Pi-hole host networking** — switched Pi-hole to `network_mode: host` for LAN-wide
+  DNS resolution. Removes Docker bridge isolation that prevented LAN clients from using
+  Pi-hole as their DNS server. Fixes `listeningMode` (`all` → `local`), adds explicit
+  `FTLCONF_webserver_port=8054`, updates Homepage widget URL to
+  `http://host.docker.internal:8054`, and adds `host.docker.internal:host-gateway`
+  extra_hosts to Homepage container so the widget can reach the host-networked Pi-hole.
+  (#131)
+- **Pi-hole v6 healthcheck endpoint** — container reported `(unhealthy)` because the
+  legacy `/api/` endpoint returns 404 in Pi-hole v6. Healthcheck now probes
+  `/api/info/version`, which returns 200 on a working FTL instance. (#132)
+- **Cross-compose widget hostnames** — Homepage widgets for `homelab-manager`,
+  `netdata`, and `pihole` were hitting ENOTFOUND because containers in separate
+  Compose files cannot resolve each other by service name. Widget URLs now use
+  `http://host.docker.internal:<port>` consistently. (#133)
+- **Pi-hole widget API key** — `HOMEPAGE_VAR_PIHOLE_KEY` was wired to
+  `${PIHOLE_WEB_PASSWORD}`, which made the widget post the web-UI password to the v6
+  API and receive HTML back instead of JSON. Renamed to `${PIHOLE_API_KEY:-}` so the
+  widget uses a Pi-hole App Password generated under Settings → API. Server-side
+  manual step: generate the App Password and set `PIHOLE_API_KEY` in `.env`. (#134)
+
+### Removed
+
+- **Deprecated services pruned** — `linkding`, `miniflux` (+ `miniflux-db`), `forgejo`,
+  and `open-webui` removed from `compose/apps.yml` and the Homepage dashboard. None
+  were in active use; their presence caused dashboard noise and stale healthcheck
+  warnings. n8n confirmed in use and retained. (#136)
+
 ## [2.4.0] - 2026-05-15
 
 Second release under the release-branch model. Batches 7 PRs (#115–#121) covering

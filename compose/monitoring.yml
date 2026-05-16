@@ -4,7 +4,6 @@ services:
     container_name: grafana
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - grafana_data:/var/lib/grafana
     environment:
     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
@@ -138,7 +137,6 @@ services:
     container_name: prometheus
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - ../config/prometheus:/etc/prometheus
     - prometheus_data:/prometheus
     command:
@@ -181,7 +179,6 @@ services:
     container_name: node-exporter
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - /proc:/host/proc:ro
     - /sys:/host/sys:ro
     - /:/rootfs:ro
@@ -268,7 +265,7 @@ services:
         max-file: '3'
   netdata:
     # H4 hardening: was ':stable' (floating). Pinned to a known semver; override via IMG_NETDATA.
-    image: ${IMG_NETDATA:-netdata/netdata:v1.48.0}
+    image: ${IMG_NETDATA:-netdata/netdata:v2.10.3}
     container_name: netdata
     restart: unless-stopped
     # M2 hardening: netdata needs SYS_PTRACE for process collection; explicit cap_drop
