@@ -43,10 +43,14 @@ services:
     - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
     - DOMAIN=${DOMAIN}
     - HOMEPAGE_GITHUB_TOKEN=${HOMEPAGE_GITHUB_TOKEN:-}
+    - HOMEPAGE_VAR_PIHOLE_KEY=${PIHOLE_API_KEY:-}
+    - HOMEPAGE_VAR_PORTAINER_KEY=${HOMEPAGE_VAR_PORTAINER_KEY:-}
     ports:
     - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
     networks:
     - default
+    extra_hosts:
+    - host.docker.internal:host-gateway
     deploy:
       resources:
         limits:
@@ -150,15 +154,11 @@ services:
     container_name: homelab-manager
     restart: unless-stopped
     working_dir: /app
+    entrypoint:
+    - sh
+    - -c
     command:
-    - python
-    - -m
-    - homelab_manager
-    - serve
-    - --host
-    - 0.0.0.0
-    - --port
-    - '8765'
+    - "pip install --target /tmp/site-packages /app --quiet 2>&1 && PYTHONPATH=/tmp/site-packages python -m homelab_manager serve --host 0.0.0.0 --port 8765"
     volumes:
     - ../:/app:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -4,23 +4,16 @@ services:
     container_name: pihole
     restart: unless-stopped
     volumes:
-    - ../config/nginx/www/certbot:/var/www/certbot:ro
     - pihole_data:/etc/pihole
     - ../config/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    network_mode: host
     environment:
     - TZ=${TIMEZONE}
     - WEBPASSWORD=${PIHOLE_WEB_PASSWORD}
     - PIHOLE_DNS_=8.8.8.8;1.1.1.1
-    - FTLCONF_dns_listeningMode=all
+    - FTLCONF_dns_listeningMode=local
     - FTLCONF_webserver_api_password=${PIHOLE_WEB_PASSWORD}
-    - VIRTUAL_HOST=pihole.${DOMAIN}
-    - VIRTUAL_PORT=80
-    ports:
-    - ${BIND_IP:-0.0.0.0}:${PIHOLE_WEB_PORT:-8054}:80
-    - ${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/tcp
-    - ${BIND_IP:-0.0.0.0}:${PIHOLE_DNS_PORT:-53}:53/udp
-    networks:
-    - default
+    - FTLCONF_webserver_port=${PIHOLE_WEB_PORT:-8054}
     deploy:
       resources:
         limits:
@@ -35,11 +28,12 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # Pi-hole v6: /api/ returns 404; /api/info/version returns 200
       test:
       - CMD
       - curl
       - --fail
-      - http://localhost/admin/api.php
+      - http://localhost:${PIHOLE_WEB_PORT:-8054}/api/info/version
       interval: 30s
       timeout: 10s
       retries: 3
