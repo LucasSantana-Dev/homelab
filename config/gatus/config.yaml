@@ -73,13 +73,6 @@ endpoints:
     conditions:
       - "[STATUS] == any(200, 301, 302, 403)"
 
-  - name: Netdata
-    group: infrastructure
-    url: http://host.docker.internal:19999/api/v1/info
-    interval: 60s
-    conditions:
-      - "[STATUS] == 200"
-
   - name: Portainer
     group: infrastructure
     url: http://host.docker.internal:9000/api/system/status

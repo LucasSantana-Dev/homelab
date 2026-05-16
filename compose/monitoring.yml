@@ -263,58 +263,6 @@ services:
       options:
         max-size: 10m
         max-file: '3'
-  netdata:
-    # H4 hardening: was ':stable' (floating). Pinned to a known semver; override via IMG_NETDATA.
-    image: ${IMG_NETDATA:-netdata/netdata:v2.10.3}
-    container_name: netdata
-    restart: unless-stopped
-    # M2 hardening: netdata needs SYS_PTRACE for process collection; explicit cap_drop
-    # narrows the surface vs leaving 'ALL' implicit. apparmor:unconfined is required
-    # by netdata's ebpf.plugin and apps.plugin to read /proc — this is documented
-    # upstream (https://learn.netdata.cloud/docs/agent/packaging/docker#host).
-    # Mitigation: container has no_new_privileges and is bound to LAN (127.0.0.1:19999).
-    cap_drop:
-    - ALL
-    cap_add:
-    - SYS_PTRACE
-    - DAC_READ_SEARCH
-    security_opt:
-    - apparmor:unconfined
-    - no-new-privileges:true
-    volumes:
-    - netdataconfig:/etc/netdata
-    - netdatalib:/var/lib/netdata
-    - netdatacache:/var/cache/netdata
-    - /proc:/host/proc:ro
-    - /sys:/host/sys:ro
-    environment:
-    - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
-    ports:
-    - ${BIND_IP:-0.0.0.0}:19999:19999
-    networks:
-    - default
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: '3'
-    healthcheck:
-      test:
-      - CMD
-      - curl
-      - --fail
-      - http://localhost:19999/
-      interval: 30s
-      timeout: 10s
-      retries: 3
   loki:
     image: ${IMG_LOKI:-grafana/loki:2.9.13}
     container_name: loki
@@ -462,8 +410,5 @@ services:
 volumes:
   grafana_data: null
   prometheus_data: null
-  netdataconfig: null
-  netdatalib: null
-  netdatacache: null
   gatus_data: null
   healthchecks_data: null
