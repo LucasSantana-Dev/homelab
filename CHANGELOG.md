@@ -7,20 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.4] - 2026-05-16
+
+Patch batch retiring netdata per ADR-0011 and shipping the baked-image
+homelab-manager per ADR-0010. New deploy contract: source changes to
+homelab-manager require `docker compose up -d --build homelab-manager`.
+Post-deploy: drop the stale `homelab_netdataconfig`, `homelab_netdatalib`,
+`homelab_netdatacache` volumes.
+
 ### Changed
 
-- homelab-manager now ships as a baked image built locally via compose `build:` — replaces the runtime pip-install pattern (ADR-0010). Source changes require `docker compose up -d --build homelab-manager`.
+- **homelab-manager now ships as a baked image** built locally via compose
+  `build:` — replaces the runtime pip-install pattern (ADR-0010). Source
+  changes require `docker compose up -d --build homelab-manager`. (#147)
 
 ### Removed
 
-- **netdata service and homepage widget** — replaced by Prometheus + Grafana +
-  node-exporter + cadvisor stack. See ADR-0011 for full rationale.
-- homelab-manager's runtime pip-install command and `../:/app:ro` bind mount.
+- **netdata service and homepage widget** — replaced by Prometheus + Grafana
+  + node-exporter + cadvisor stack. See ADR-0011 for full rationale. (#146)
+- homelab-manager's runtime pip-install command and `../:/app:ro` bind
+  mount. (#147)
 
 ### Added
 
-- **docs/runbooks/fallback-observability.md** — direct-scrape fallback queries
-  for node-exporter and cadvisor when Prometheus or Grafana is unavailable.
+- **docs/runbooks/fallback-observability.md** — direct-scrape fallback
+  queries for node-exporter and cadvisor when Prometheus or Grafana is
+  unavailable. (#146)
+- **ADR-0011** — full rationale for retiring netdata: CAP_FOWNER root
+  cause, 90% capability/feature overlap with cadvisor + node-exporter,
+  revisit triggers. (#146)
 
 ## [2.4.3] - 2026-05-16
 
