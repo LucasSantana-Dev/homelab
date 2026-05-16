@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-05-16
+
+Patch batch addressing dashboard widget regressions discovered during v2.4.1
+post-deploy QA, plus a Snyk policy to suppress dead-code noise.
+
+### Fixed
+
+- **Pi-hole healthcheck hits unauth endpoint** — PR #132's switch to
+  `/api/info/version` regressed because Pi-hole v6 requires auth on all `/api/*`
+  endpoints, returning 401 to `curl --fail`. Switch healthcheck to `/admin/`
+  (returns 302, passes `--fail`). Container now reports healthy. (#139)
+- **homelab-manager pip install fails on read-only mount** — `../:/app:ro` mount
+  combined with pip's `egg_info` step writing into source tree caused
+  `Cannot update time stamp of directory 'homelab_manager.egg-info'` and a
+  restart loop. Copy `/app` to a writable tmpfs dir before invoking pip.
+  Read-only mount preserved for security. (#141)
+- **Homepage widget URLs use container-name routing for same-network services** —
+  `host.docker.internal:<port>` only works for services bound to `0.0.0.0` on
+  the host. `homelab-manager` and `netdata` are on the same `default` docker
+  network as homepage; use their container names directly. `pihole` remains on
+  `host.docker.internal` because it uses `network_mode: host`. Resolves
+  `<!DOCTYPE` JSON-parse errors and `ECONNREFUSED 172.17.0.1:19999`. (#141)
+- **Gatus healthcheck fails because image is distroless** — `twinproduction/gatus`
+  ships only the `gatus` binary; no `curl`, `wget`, or `sh` for the
+  `curl --fail` healthcheck. Container reported `(unhealthy)` despite serving
+  traffic. Disable docker-level healthcheck; Gatus self-monitors via its own
+  check loop. (#141)
+
+### Changed
+
+- **Snyk policy** — added `.snyk` excluding `archive/**` (k3s historical per
+  ADR-0004), `dockerfiles/paperless-ngx/**` (upstream image), virtualenvs,
+  test caches, and `claude-env/`. Eliminates ~80% of dashboard noise from
+  third-party Helm charts and upstream-owned images. Fresh `snyk monitor`
+  snapshots confirm 0 live vulns in scope. (#140)
+
 ## [2.4.1] - 2026-05-15
 
 Patch batch covering Pi-hole DNS/healthcheck/widget fixes, cross-compose hostname
