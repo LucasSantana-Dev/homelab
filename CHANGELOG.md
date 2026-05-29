@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     in a 15-minute window (catches crash-loops like the 4861-restart incident).
     Both alerts route via `severity: critical` to pagerduty/slack; existing
     cadvisor metrics provide the signal (no additional scrape job needed).
+- **ADR-0016** — keep kopia server-mode (reject CLI-timer / restic migration on
+  pull-signal grounds); add backup-verification roadmap (B2 Object Lock,
+  snapshot-freshness alert, `verify --verify-files-percent=1`).
 
 ## [2.5.1] - 2026-05-28
 
