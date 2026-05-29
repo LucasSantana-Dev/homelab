@@ -4,6 +4,7 @@ Health Monitoring Service
 Monitor health and status of homelab services
 """
 
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
@@ -12,10 +13,12 @@ import requests
 from rich.console import Console
 
 from ..clients.docker_client import get_docker_client
+from ..core.errors import scrub_subprocess_error
 from ..models.service import ServiceRegistry
 
 # Initialize console
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 class HealthMonitor:
@@ -111,12 +114,13 @@ class HealthMonitor:
                 "source": "docker",
             }
         except Exception as e:
+            logger.debug("docker check failed", exc_info=True)
             return {
                 "healthy": False,
                 "status_code": None,
                 "response_time": None,
                 "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "error": str(e),
+                "error": scrub_subprocess_error(e, context="Docker check failed"),
                 "source": "docker",
             }
 
