@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-05-28
+
+Minor release adding Lucky bot monitoring (Prometheus scrape + alert rules +
+Grafana dashboard), Pi-hole v6 and CrowdSec connectivity fixes, vaultwarden
+retirement, and a batch of CI dependency bumps. Batches PRs #135, #149–#159.
+
+### Added
+
+- **Lucky bot monitoring** — Prometheus scrape targets, alert rules, and a
+  Grafana dashboard for the Lucky Discord bot and its backend. (#135)
+- **ADR-0012** — polish the existing Grafana stack post-netdata; defer ML
+  anomaly detection. (#150)
+- **ADR-0013** — auto-deploy pipeline: host-side systemd timer that polls git
+  for new `v*.*.*` tags and redeploys. (#149)
+
+### Fixed
+
+- **Pi-hole v6 compatibility** — set `listeningMode=ALL` and read drop-in
+  configs from `/etc/dnsmasq.d`. (#151)
+- **CrowdSec API port** bumped to 8091 to avoid a host-port collision with
+  lucky-nginx (silent-orphan symptom). (#152)
+
 ### Removed
 
 - **vaultwarden** — operator no longer uses the self-hosted Bitwarden vault.
@@ -17,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retain `appdata/vaultwarden` directory until the operator confirms data
   doesn't need to be exported. K8s helm chart already archived under
   `archive/k8s-dropped/helm/vaultwarden/` and is untouched.
+
+### Changed
+
+- CI dependency bumps: `actions/setup-python` 5.6.0→6.2.0 (#154),
+  `codecov/codecov-action` 6.0.0→6.0.1 (#155), `github/codeql-action`
+  4.35.4→4.36.0 (#156, #157), `hashicorp/setup-terraform` 3.1.2→4.0.1 (#158),
+  `docker/setup-buildx-action` 3.12.0→4.1.0 (#159).
 
 ## [2.4.4] - 2026-05-16
 
