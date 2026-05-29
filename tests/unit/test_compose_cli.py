@@ -180,3 +180,35 @@ class TestComposeCLILogs:
             out = cli.logs("grafana")
             assert "missing docker" not in out
             assert "FileNotFoundError" in out
+
+
+# ---------------------------------------------------------------------------
+# ComposeCLI.scrub_error — M1 stderr-scrub contract for callers
+# ---------------------------------------------------------------------------
+
+
+class TestComposeCLIScrubError:
+    def test_scrubs_called_process_error_with_context(self):
+        cli = ComposeCLI()
+        exc = subprocess.CalledProcessError(
+            1, ["docker", "compose", "up"], stderr="auth-token=secret"
+        )
+        msg = cli.scrub_error(exc, context="deployment failed")
+        assert "CalledProcessError" in msg
+        assert "deployment failed" in msg
+        assert "secret" not in msg
+
+    def test_scrubs_other_exceptions_with_context(self):
+        cli = ComposeCLI()
+        exc = RuntimeError("don't leak")
+        msg = cli.scrub_error(exc, context="process error")
+        assert "RuntimeError" in msg
+        assert "process error" in msg
+        assert "don't leak" not in msg
+
+    def test_scrubs_without_context(self):
+        cli = ComposeCLI()
+        exc = subprocess.CalledProcessError(1, ["cmd"], stderr="leaked")
+        msg = cli.scrub_error(exc)
+        assert "CalledProcessError" in msg
+        assert "leaked" not in msg

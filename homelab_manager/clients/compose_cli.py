@@ -60,6 +60,15 @@ class ComposeCLI:
             cwd=cwd,
         )
 
+    def scrub_error(self, exc: Exception, context: str = "") -> str:
+        """Return a safe-to-echo description of a subprocess failure.
+
+        Used by callers (e.g., DeploymentManager) to scrub errors from
+        `run()` invocations. Never echoes raw stderr or message content.
+        """
+        logger.debug("Scrubbing error", exc_info=True)
+        return scrub_subprocess_error(exc, context=context)
+
     def logs(self, service_name: str, lines: int = 50) -> str:
         """Return `docker compose logs --tail N <service>` stdout.
 

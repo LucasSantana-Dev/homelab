@@ -32,10 +32,12 @@ class TestDeploy:
         mock_cli.run.side_effect = subprocess.CalledProcessError(
             1, "docker compose up", stderr="network unavailable"
         )
+        mock_cli.scrub_error.return_value = "deployment failed (CalledProcessError)"
         result = manager.deploy()
         assert result["success"] is False
-        assert "network unavailable" in result["error"]
+        assert result["error"] == "deployment failed (CalledProcessError)"
         assert "message" not in result
+        mock_cli.scrub_error.assert_called_once()
 
     def test_uses_project_root_as_cwd(self, manager, mock_cli):
         manager.deploy()
@@ -57,9 +59,11 @@ class TestRestartService:
         mock_cli.run.side_effect = subprocess.CalledProcessError(
             1, "docker compose restart", stderr="no such service"
         )
+        mock_cli.scrub_error.return_value = "restart 'phantom' failed (CalledProcessError)"
         result = manager.restart_service("phantom")
         assert result["success"] is False
-        assert "no such service" in result["error"]
+        assert result["error"] == "restart 'phantom' failed (CalledProcessError)"
+        mock_cli.scrub_error.assert_called_once()
 
     @pytest.mark.parametrize(
         "service_name",

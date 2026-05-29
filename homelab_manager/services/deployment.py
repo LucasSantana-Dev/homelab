@@ -29,7 +29,10 @@ class DeploymentManager:
             self._cli.run(["up", "-d"], cwd=self.project_root)
             return {"success": True, "message": "Homelab deployed successfully"}
         except subprocess.CalledProcessError as exc:
-            return {"success": False, "error": exc.stderr if exc.stderr else str(exc)}
+            return {
+                "success": False,
+                "error": self._cli.scrub_error(exc, context="deployment failed"),
+            }
 
     def restart_service(self, service_name: str) -> Dict:
         """Restart a specific service"""
@@ -41,4 +44,9 @@ class DeploymentManager:
                 "message": f"{service_name} restarted successfully",
             }
         except subprocess.CalledProcessError as exc:
-            return {"success": False, "error": exc.stderr if exc.stderr else str(exc)}
+            return {
+                "success": False,
+                "error": self._cli.scrub_error(
+                    exc, context=f"restart '{service_name}' failed"
+                ),
+            }
