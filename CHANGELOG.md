@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-05-28
+
+Patch batch hardening homelab-manager error handling (no raw subprocess/
+exception strings reach the HTTP API or CLI) and removing the redundant Snyk
+SaaS layer in favour of the existing OSS scanning stack. Batches PRs #161, #162.
+
 ### Fixed
 
 - **homelab-manager: subprocess/exception error messages are now scrubbed at
