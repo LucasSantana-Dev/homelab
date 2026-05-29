@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-05-28
+
+Patch batch hardening homelab-manager error handling (no raw subprocess/
+exception strings reach the HTTP API or CLI) and removing the redundant Snyk
+SaaS layer in favour of the existing OSS scanning stack. Batches PRs #161, #162.
+
+### Fixed
+
+- **homelab-manager: subprocess/exception error messages are now scrubbed at
+  every egress site** (M1 hardening, ADR-0007), closing paths where raw stderr
+  or exception strings — env values, tokens, socket paths, checked URLs — could
+  reach the HTTP API / CLI:
+  - `deploy`/`restart` route compose failures through a new `ComposeCLI`
+    seam method (`run_result`); `deployment.py` no longer has inline
+    `try`/`except`/`run()` — the seam owns error handling.
+  - `CommandSequence.run()` (backup/restore) scrubs both the
+    `CalledProcessError` and generic-exception branches.
+  - `HealthMonitor.check_container_health` and `check_service` scrub their
+    Docker and HTTP error branches.
+
+### Removed
+
+- **homelab-manager: dead `utils/display.py` (`DisplayManager`)** — zero
+  importers, zero tests; CLI builds Rich tables inline. Removed from
+  `utils/__init__` exports.
+- **Snyk (SaaS) security scanning** — removed the `.snyk` policy and the
+  `snyk/` `.dockerignore` entry. Snyk's coverage is fully redundant with the
+  free/OSS stack already in CI: CodeQL (SAST), Trivy (dependency + container +
+  compose-config CVEs), gitleaks + GitGuardian (secrets), Socket (supply chain).
+  The `code/snyk` check had been quota-failing on every PR. The `.snyk` path
+  exclusions (`archive/**`, `dockerfiles/paperless-ngx/**`) are now mirrored into
+  the Trivy `fs` step via `skip-dirs`. See ADR-0014. (Operator: uninstall the
+  Snyk GitHub App to clear the `security/snyk` + `code/snyk` checks.)
+
+### Added
+
+- **ADR-0014** — replace Snyk with the existing OSS scanning stack; records the
+  redundancy analysis, the Trivy exclusion migration, and revisit triggers.
+
 ## [2.5.0] - 2026-05-28
 
 Minor release adding Lucky bot monitoring (Prometheus scrape + alert rules +
