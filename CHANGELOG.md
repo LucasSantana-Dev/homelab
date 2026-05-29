@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **kopia backup container crash-loop** — removed the invalid
+  `--without-password=false` flag from `compose/backup.yml`. In kopia 0.21.x
+  `--without-password` is a no-value boolean; `=false` made kopia parse `false`
+  as a stray positional (`unexpected false`) and exit 1, looping 4861× — so
+  offsite B2 backups had never actually run. Password auth is the default when
+  `--server-password` is set; added a guard comment. (ADR-0015)
+
+### Added
+
+- **ADR-0015** — hotfix lane reserved for active incidents, not long-standing
+  broken features ("important" ≠ "urgent").
+
 ## [2.5.1] - 2026-05-28
 
 Patch batch hardening homelab-manager error handling (no raw subprocess/

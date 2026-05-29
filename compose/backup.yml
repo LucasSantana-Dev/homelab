@@ -27,7 +27,10 @@ services:
       - --address=0.0.0.0:51515
       - --server-username=${KOPIA_SERVER_USERNAME:-admin}
       - --server-password=${KOPIA_SERVER_PASSWORD}
-      - --without-password=false
+      # NOTE: do NOT add `--without-password` here. In kopia 0.21.x it is a
+      # no-value boolean; `--without-password=false` makes kopia parse `false`
+      # as a stray positional -> `unexpected false` -> exit 1 -> restart loop.
+      # Password auth is the default when --server-password is set.
     volumes:
       - kopia_config:/app/config
       - kopia_cache:/app/cache
