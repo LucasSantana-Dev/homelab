@@ -20,8 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ADR-0015** — hotfix lane reserved for active incidents, not long-standing
   broken features ("important" ≠ "urgent").
-### Added
-
 - **Prometheus alerting for Kopia backup service** — two new critical-severity
   alerts to catch backup container failures immediately:
   - `KopiaBackupDown`: fires when the kopia container is not seen by cAdvisor
@@ -33,8 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ADR-0016** — keep kopia server-mode (reject CLI-timer / restic migration on
   pull-signal grounds); add backup-verification roadmap (B2 Object Lock,
   snapshot-freshness alert, `verify --verify-files-percent=1`).
-### Added
-
 - **ADR-0017** — Portainer keeps read-write `docker.sock` (accepted risk;
   `:ro` breaks it, socket-proxy is theater for a Tailscale-only solo host).
   Inline defending-comments added on `compose/core.yml` (Portainer socket) and
