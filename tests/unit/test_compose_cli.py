@@ -180,3 +180,100 @@ class TestComposeCLILogs:
             out = cli.logs("grafana")
             assert "missing docker" not in out
             assert "FileNotFoundError" in out
+
+
+# ---------------------------------------------------------------------------
+# ComposeCLI.scrub_error — M1 stderr-scrub contract for callers
+# ---------------------------------------------------------------------------
+
+
+class TestComposeCLIScrubError:
+    def test_scrubs_called_process_error_with_context(self):
+        cli = ComposeCLI()
+        exc = subprocess.CalledProcessError(
+            1, ["docker", "compose", "up"], stderr="auth-token=secret"
+        )
+        msg = cli.scrub_error(exc, context="deployment failed")
+        assert "CalledProcessError" in msg
+        assert "deployment failed" in msg
+        assert "secret" not in msg
+
+    def test_scrubs_other_exceptions_with_context(self):
+        cli = ComposeCLI()
+        exc = RuntimeError("don't leak")
+        msg = cli.scrub_error(exc, context="process error")
+        assert "RuntimeError" in msg
+        assert "process error" in msg
+        assert "don't leak" not in msg
+
+    def test_scrubs_without_context(self):
+        cli = ComposeCLI()
+        exc = subprocess.CalledProcessError(1, ["cmd"], stderr="leaked")
+        msg = cli.scrub_error(exc)
+        assert "CalledProcessError" in msg
+        assert "leaked" not in msg
+
+
+# ---------------------------------------------------------------------------
+# ComposeCLI.run_result — uniform dict return + seam-owned error handling
+# ---------------------------------------------------------------------------
+
+
+class TestComposeCLIRunResult:
+    def test_success_returns_dict_with_success_true(self):
+        cli = ComposeCLI()
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            result = cli.run_result(["ps"])
+            assert result == {"success": True}
+
+    def test_passes_all_kwargs_to_run(self):
+        cli = ComposeCLI()
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            cli.run_result(["up", "-d"], cwd="/some/path", timeout=30, check=False)
+            assert mock_run.call_args.kwargs["cwd"] == "/some/path"
+            assert mock_run.call_args.kwargs["timeout"] == 30
+            assert mock_run.call_args.kwargs["check"] is False
+
+    def test_called_process_error_returns_scrubbed_dict(self):
+        cli = ComposeCLI()
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(
+                returncode=1,
+                cmd=[],
+                stderr="auth-token=super-secret-leak",
+            )
+            result = cli.run_result(["up"], context="deployment failed")
+            assert result["success"] is False
+            assert "CalledProcessError" in result["error"]
+            assert "deployment failed" in result["error"]
+            assert "super-secret-leak" not in result["error"]
+
+    def test_context_included_in_scrubbed_error(self):
+        cli = ComposeCLI()
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(
+                returncode=1, cmd=[], stderr="leak"
+            )
+            result = cli.run_result(
+                ["restart", "grafana"],
+                context="restart 'grafana' failed",
+            )
+            assert "restart 'grafana' failed" in result["error"]
+            assert "leak" not in result["error"]
+
+    def test_error_without_context(self):
+        cli = ComposeCLI()
+        with patch("homelab_manager.clients.compose_cli.subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(
+                returncode=1, cmd=[], stderr="leak"
+            )
+            result = cli.run_result(["ps"])
+            assert result["success"] is False
+            assert "CalledProcessError" in result["error"]
+            assert "leak" not in result["error"]
