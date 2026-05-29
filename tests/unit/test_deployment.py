@@ -3,7 +3,6 @@
 Unit tests for homelab_manager.services.deployment.
 """
 
-import subprocess
 from unittest.mock import MagicMock
 
 import pytest
@@ -23,53 +22,69 @@ def manager(mock_cli):
 
 
 class TestDeploy:
-    def test_success_attaches_message(self, manager):
+    def test_success_attaches_message(self, manager, mock_cli):
+        mock_cli.run_result.return_value = {"success": True}
         result = manager.deploy()
         assert result["success"] is True
         assert "deployed successfully" in result["message"]
 
     def test_failure_propagates_error(self, manager, mock_cli):
-        mock_cli.run.side_effect = subprocess.CalledProcessError(
-            1, "docker compose up", stderr="network unavailable"
-        )
-        mock_cli.scrub_error.return_value = "deployment failed (CalledProcessError)"
+        mock_cli.run_result.return_value = {
+            "success": False,
+            "error": "deployment failed (CalledProcessError)",
+        }
         result = manager.deploy()
         assert result["success"] is False
         assert result["error"] == "deployment failed (CalledProcessError)"
         assert "message" not in result
-        mock_cli.scrub_error.assert_called_once()
 
-    def test_uses_project_root_as_cwd(self, manager, mock_cli):
+    def test_calls_run_result_with_cwd_and_context(self, manager, mock_cli):
+        mock_cli.run_result.return_value = {"success": True}
         manager.deploy()
-        mock_cli.run.assert_called_once_with(["up", "-d"], cwd=manager.project_root)
+        mock_cli.run_result.assert_called_once_with(
+            ["up", "-d"],
+            cwd=manager.project_root,
+            context="deployment failed",
+        )
 
 
 class TestRestartService:
-    def test_success_attaches_message_with_service_name(self, manager):
+    def test_success_attaches_message_with_service_name(self, manager, mock_cli):
+        mock_cli.run_result.return_value = {"success": True}
         result = manager.restart_service("grafana")
         assert result["success"] is True
         assert "grafana restarted successfully" in result["message"]
 
     def test_command_includes_service_name(self, manager, mock_cli):
+        mock_cli.run_result.return_value = {"success": True}
         manager.restart_service("caddy")
-        args, _ = mock_cli.run.call_args
+        args, kwargs = mock_cli.run_result.call_args
         assert "caddy" in args[0]
 
     def test_failure_propagates_error(self, manager, mock_cli):
-        mock_cli.run.side_effect = subprocess.CalledProcessError(
-            1, "docker compose restart", stderr="no such service"
-        )
-        mock_cli.scrub_error.return_value = "restart 'phantom' failed (CalledProcessError)"
+        mock_cli.run_result.return_value = {
+            "success": False,
+            "error": "restart 'phantom' failed (CalledProcessError)",
+        }
         result = manager.restart_service("phantom")
         assert result["success"] is False
         assert result["error"] == "restart 'phantom' failed (CalledProcessError)"
-        mock_cli.scrub_error.assert_called_once()
+
+    def test_calls_run_result_with_correct_context(self, manager, mock_cli):
+        mock_cli.run_result.return_value = {"success": True}
+        manager.restart_service("grafana")
+        mock_cli.run_result.assert_called_once_with(
+            ["restart", "grafana"],
+            cwd=manager.project_root,
+            context="restart 'grafana' failed",
+        )
 
     @pytest.mark.parametrize(
         "service_name",
         ["grafana", "homepage", "n8n", "homeassistant", "service-with-dashes"],
     )
     def test_various_service_names_pass_through(self, manager, mock_cli, service_name):
+        mock_cli.run_result.return_value = {"success": True}
         manager.restart_service(service_name)
-        args, _ = mock_cli.run.call_args
+        args, kwargs = mock_cli.run_result.call_args
         assert service_name in args[0]

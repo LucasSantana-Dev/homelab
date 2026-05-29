@@ -4,7 +4,6 @@ Deployment Service
 Handles Docker Compose deployment and service restart operations
 """
 
-import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -25,28 +24,26 @@ class DeploymentManager:
     def deploy(self) -> Dict:
         """Deploy homelab services"""
         console.print("🚀 Deploying homelab services...")
-        try:
-            self._cli.run(["up", "-d"], cwd=self.project_root)
+        result = self._cli.run_result(
+            ["up", "-d"],
+            cwd=self.project_root,
+            context="deployment failed",
+        )
+        if result["success"]:
             return {"success": True, "message": "Homelab deployed successfully"}
-        except subprocess.CalledProcessError as exc:
-            return {
-                "success": False,
-                "error": self._cli.scrub_error(exc, context="deployment failed"),
-            }
+        return {"success": False, "error": result["error"]}
 
     def restart_service(self, service_name: str) -> Dict:
         """Restart a specific service"""
         console.print(f"🔄 Restarting {service_name}...")
-        try:
-            self._cli.run(["restart", service_name], cwd=self.project_root)
+        result = self._cli.run_result(
+            ["restart", service_name],
+            cwd=self.project_root,
+            context=f"restart '{service_name}' failed",
+        )
+        if result["success"]:
             return {
                 "success": True,
                 "message": f"{service_name} restarted successfully",
             }
-        except subprocess.CalledProcessError as exc:
-            return {
-                "success": False,
-                "error": self._cli.scrub_error(
-                    exc, context=f"restart '{service_name}' failed"
-                ),
-            }
+        return {"success": False, "error": result["error"]}

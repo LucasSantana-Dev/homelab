@@ -60,6 +60,31 @@ class ComposeCLI:
             cwd=cwd,
         )
 
+    def run_result(
+        self,
+        args: List[str],
+        *,
+        context: str = "",
+        **kwargs,
+    ) -> dict:
+        """Run `docker compose <args>` and return a uniform result dict.
+
+        Calls `run()` with all kwargs passed through (cwd, timeout, check, etc.).
+        On success: returns {"success": True}.
+        On subprocess.CalledProcessError: returns {"success": False, "error": scrubbed_msg},
+        logging full detail via logger.debug(..., exc_info=True).
+
+        This is the ONLY subprocess-error-handling site for callers like
+        DeploymentManager — the seam owns scrubbing and logging.
+        """
+        try:
+            self.run(args, **kwargs)
+            return {"success": True}
+        except subprocess.CalledProcessError as exc:
+            logger.debug("docker compose command failed", exc_info=True)
+            error_msg = scrub_subprocess_error(exc, context=context)
+            return {"success": False, "error": error_msg}
+
     def scrub_error(self, exc: Exception, context: str = "") -> str:
         """Return a safe-to-echo description of a subprocess failure.
 
