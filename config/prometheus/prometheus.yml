@@ -81,7 +81,6 @@ scrape_configs:
           - https://grafana.homelab.example.com
           - https://portainer.homelab.example.com
           - https://jellyfin.homelab.example.com
-          - https://vault.homelab.example.com
           - https://n8n.homelab.example.com
           - https://cloud.homelab.example.com
     relabel_configs:
