@@ -5,6 +5,10 @@ Configuration Validators — thin shim over HomelabConfig.
 Validation patterns and logic now live in HomelabConfig.validate_value(),
 get_validation_errors(), and is_configured(). This module exists for
 backwards-compatible imports only.
+
+INTENTIONALLY RETAINED (per ADR-0007): this is a deliberate compat shim, and
+it is exercised by tests (tests/unit/test_automation.py::TestConfigValidator).
+It is NOT dead code — do not flag for deletion in audits.
 """
 
 from ..core.config import HomelabConfig as _HomelabConfig
