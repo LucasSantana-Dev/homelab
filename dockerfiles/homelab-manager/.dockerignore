@@ -21,7 +21,6 @@ claude-env/
 .vscode/
 .idea/
 node_modules/
-snyk/
 *.log
 docs/
 .github/
