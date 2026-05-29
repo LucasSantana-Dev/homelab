@@ -195,6 +195,31 @@ class TestCheckService:
         assert result["response_time"] is not None
         assert result["response_time"] >= 0
 
+    def test_check_service_scrubs_request_exception_error(self):
+        """Verify check_service scrubs RequestException error messages"""
+        monitor = make_monitor(registry=make_registry())
+
+        # Create an exception that would leak the URL if str() is used directly
+        exc = requests.exceptions.ConnectionError(
+            "Failed to establish a new connection to 'http://secret.example.com:8080'"
+        )
+
+        with patch(
+            "homelab_manager.services.health.requests.get", side_effect=exc
+        ):
+            result = monitor.check_service("test-svc", "http://secret.example.com:8080")
+
+        # Verify error is scrubbed: should contain exception type, NOT the URL
+        assert result["healthy"] is False
+        assert result["error"] is not None
+        # The scrubbed error should contain the exception type
+        assert "RequestException" in result["error"] or "ConnectionError" in result[
+            "error"
+        ]
+        # The URL should NOT appear in the scrubbed error
+        assert "secret.example.com" not in result["error"]
+        assert "8080" not in result["error"]
+
 
 class TestCheckAllServices:
     """Tests for HealthMonitor.check_all_services()"""

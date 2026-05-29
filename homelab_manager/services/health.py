@@ -56,12 +56,13 @@ class HealthMonitor:
             }
 
         except requests.exceptions.RequestException as e:
+            logger.debug("http check failed", exc_info=True)
             return {
                 "healthy": False,
                 "status_code": None,
                 "response_time": None,
                 "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "error": str(e),
+                "error": scrub_subprocess_error(e, context="HTTP check failed"),
                 "source": "http",
             }
 
