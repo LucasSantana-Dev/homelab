@@ -204,18 +204,17 @@ class TestCheckService:
             "Failed to establish a new connection to 'http://secret.example.com:8080'"
         )
 
-        with patch(
-            "homelab_manager.services.health.requests.get", side_effect=exc
-        ):
+        with patch("homelab_manager.services.health.requests.get", side_effect=exc):
             result = monitor.check_service("test-svc", "http://secret.example.com:8080")
 
         # Verify error is scrubbed: should contain exception type, NOT the URL
         assert result["healthy"] is False
         assert result["error"] is not None
         # The scrubbed error should contain the exception type
-        assert "RequestException" in result["error"] or "ConnectionError" in result[
-            "error"
-        ]
+        assert (
+            "RequestException" in result["error"]
+            or "ConnectionError" in result["error"]
+        )
         # The URL should NOT appear in the scrubbed error
         assert "secret.example.com" not in result["error"]
         assert "8080" not in result["error"]
