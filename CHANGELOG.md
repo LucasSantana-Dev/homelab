@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **homelab-manager: `deploy`/`restart` no longer echo raw subprocess stderr.**
+  `DeploymentManager` now routes compose failures through a new `ComposeCLI`
+  seam method (`run_result`), which scrubs `CalledProcessError` via
+  `scrub_subprocess_error` (M1 hardening, ADR-0007). Closes a path where raw
+  stderr — env values, tokens, socket paths — could reach the HTTP API / CLI.
+  `deployment.py` now has no inline `try`/`except`/`run()`; the seam owns
+  subprocess error handling.
+
 ## [2.5.0] - 2026-05-28
 
 Minor release adding Lucky bot monitoring (Prometheus scrape + alert rules +
