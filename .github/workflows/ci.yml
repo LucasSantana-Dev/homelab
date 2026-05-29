@@ -191,6 +191,11 @@ jobs:
       with:
         scan-type: 'fs'
         scan-ref: '.'
+        # Mirrors the exclusions formerly in .snyk (removed per ADR-0014):
+        # archive/** is reverted k3s history (ADR-0004), paperless-ngx is an
+        # upstream image whose base CVEs are upstream-owned. Neither is deployed
+        # from source here, so findings there are not actionable.
+        skip-dirs: 'archive,dockerfiles/paperless-ngx'
         format: 'sarif'
         output: 'trivy-results.sarif'
 

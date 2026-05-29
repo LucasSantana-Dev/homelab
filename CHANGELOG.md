@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Snyk (SaaS) security scanning** — removed the `.snyk` policy and the
+  `snyk/` `.dockerignore` entry. Snyk's coverage is fully redundant with the
+  free/OSS stack already in CI: CodeQL (SAST), Trivy (dependency + container +
+  compose-config CVEs), gitleaks + GitGuardian (secrets), Socket (supply chain).
+  The `code/snyk` check had been quota-failing on every PR. The `.snyk` path
+  exclusions (`archive/**`, `dockerfiles/paperless-ngx/**`) are now mirrored into
+  the Trivy `fs` step via `skip-dirs`. See ADR-0014. (Operator: uninstall the
+  Snyk GitHub App to clear the `security/snyk` + `code/snyk` checks.)
+
+### Added
+
+- **ADR-0014** — replace Snyk with the existing OSS scanning stack; records the
+  redundancy analysis, the Trivy exclusion migration, and revisit triggers.
+
 ## [2.5.0] - 2026-05-28
 
 Minor release adding Lucky bot monitoring (Prometheus scrape + alert rules +
