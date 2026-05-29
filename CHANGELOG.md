@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ADR-0017** — Portainer keeps read-write `docker.sock` (accepted risk;
+  `:ro` breaks it, socket-proxy is theater for a Tailscale-only solo host).
+  Inline defending-comments added on `compose/core.yml` (Portainer socket) and
+  `homelab_manager/utils/validators.py` (intentional ADR-0007 shim, test-backed)
+  so future audits reconcile via comment instead of re-flagging.
+
 ## [2.5.1] - 2026-05-28
 
 Patch batch hardening homelab-manager error handling (no raw subprocess/
