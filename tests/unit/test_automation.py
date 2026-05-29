@@ -59,22 +59,25 @@ class TestRestartAutomationService:
         return DeploymentManager(compose_cli=mock_cli)
 
     def test_restart_homeassistant_success(self, manager, mock_cli):
+        mock_cli.run_result.return_value = {"success": True}
         result = manager.restart_service("homeassistant")
         assert result["success"] is True
         assert "homeassistant" in result["message"]
-        args, _ = mock_cli.run.call_args
+        args, _ = mock_cli.run_result.call_args
         assert "homeassistant" in args[0]
 
     def test_restart_homeassistant_failure(self, manager, mock_cli):
-        mock_cli.run.side_effect = subprocess.CalledProcessError(
-            1, "docker compose restart", stderr="service error"
-        )
+        mock_cli.run_result.return_value = {
+            "success": False,
+            "error": "restart failed (CalledProcessError)",
+        }
         result = manager.restart_service("homeassistant")
         assert result["success"] is False
 
     def test_restart_n8n_uses_correct_service_name(self, manager, mock_cli):
+        mock_cli.run_result.return_value = {"success": True}
         manager.restart_service("n8n")
-        args, _ = mock_cli.run.call_args
+        args, _ = mock_cli.run_result.call_args
         assert "n8n" in args[0]
 
 

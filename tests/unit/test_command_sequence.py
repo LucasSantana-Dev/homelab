@@ -64,7 +64,9 @@ class TestCommandSequenceRun:
             result = CommandSequence([Step(["false"], "first")]).run()
             assert result["success"] is False
             assert "first failed" in result["error"]
-            assert "boom" in result["error"]
+            # Verify error is scrubbed (contains exception type, no raw stderr)
+            assert "CalledProcessError" in result["error"]
+            assert "boom" not in result["error"]
 
     def test_mid_sequence_failure_short_circuits(self):
         """A failure on step 2 must prevent step 3 from running."""
@@ -90,15 +92,19 @@ class TestCommandSequenceRun:
             ).run()
             assert result["success"] is False
             assert "beta failed" in result["error"]
-            assert "step2 broke" in result["error"]
+            # Verify error is scrubbed (contains exception type, no raw stderr)
+            assert "CalledProcessError" in result["error"]
+            assert "step2 broke" not in result["error"]
             assert call_count["n"] == 2  # gamma never ran
 
     def test_generic_exception_path(self):
         with patch("subprocess.run", side_effect=FileNotFoundError("no such cmd")):
             result = CommandSequence([Step(["ghost"], "phantom")]).run()
             assert result["success"] is False
-            assert "phantom error" in result["error"]
-            assert "no such cmd" in result["error"]
+            assert "phantom failed" in result["error"]
+            # Verify error is scrubbed (contains exception type, no raw message)
+            assert "FileNotFoundError" in result["error"]
+            assert "no such cmd" not in result["error"]
 
     def test_sequence_cwd_applied_when_step_cwd_unset(self, tmp_path):
         captured = {}
@@ -153,3 +159,5 @@ class TestCommandSequenceRun:
         result = CommandSequence([Step(["false"], "real-false")]).run()
         assert result["success"] is False
         assert "real-false failed" in result["error"]
+        # Verify error is scrubbed (contains exception type)
+        assert "CalledProcessError" in result["error"]

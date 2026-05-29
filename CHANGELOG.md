@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **homelab-manager: subprocess/exception error messages are now scrubbed at
+  every egress site** (M1 hardening, ADR-0007), closing paths where raw stderr
+  or exception strings — env values, tokens, socket paths, checked URLs — could
+  reach the HTTP API / CLI:
+  - `deploy`/`restart` route compose failures through a new `ComposeCLI`
+    seam method (`run_result`); `deployment.py` no longer has inline
+    `try`/`except`/`run()` — the seam owns error handling.
+  - `CommandSequence.run()` (backup/restore) scrubs both the
+    `CalledProcessError` and generic-exception branches.
+  - `HealthMonitor.check_container_health` and `check_service` scrub their
+    Docker and HTTP error branches.
+
+### Removed
+
+- **homelab-manager: dead `utils/display.py` (`DisplayManager`)** — zero
+  importers, zero tests; CLI builds Rich tables inline. Removed from
+  `utils/__init__` exports.
+
 ## [2.5.0] - 2026-05-28
 
 Minor release adding Lucky bot monitoring (Prometheus scrape + alert rules +

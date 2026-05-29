@@ -7,10 +7,15 @@ them in order and returns on the first failure, so callers never see a
 partial-success state with no error attached.
 """
 
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from ..core.errors import scrub_subprocess_error
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -39,13 +44,15 @@ class CommandSequence:
                     cwd=effective_cwd,
                 )
             except subprocess.CalledProcessError as e:
+                logger.debug("command sequence step failed", exc_info=True)
                 return {
                     "success": False,
-                    "error": f"{step.label} failed: {e.stderr.strip()}",
+                    "error": scrub_subprocess_error(e, context=f"{step.label} failed"),
                 }
             except Exception as e:
+                logger.debug("command sequence step failed", exc_info=True)
                 return {
                     "success": False,
-                    "error": f"{step.label} error: {str(e)}",
+                    "error": scrub_subprocess_error(e, context=f"{step.label} failed"),
                 }
         return {"success": True}
