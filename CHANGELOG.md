@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **kopia now backs up to a local filesystem repository** (`/opt/kopia-repo`)
+  instead of S3/B2 — interim, no offsite DR yet (see ADR-0016). The container
+  connects-or-creates the repo on start and registers a daily-scheduled
+  snapshot of the homelab's critical state (docker volumes + `appdata`, ~13G).
+  Bare `kopia server start` never initialised a repository, so backups had
+  never actually run; offsite B2 can be layered on later once creds exist.
+
 ### Fixed
 
 - **kopia backup container crash-loop** — removed the invalid
