@@ -9,8 +9,6 @@ set -uo pipefail
 # Usage: ./scripts/security/validate-env.sh
 #        ./scripts/security/validate-env.sh --strict  # Exit with error if optional vars missing
 
-set -uo pipefail
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Paths (overridable for tests).
@@ -184,7 +182,12 @@ if [[ -d "$COMPOSE_DIR" ]]; then
     # breakage (exactly how the kopia backup ran credential-less for days). This
     # check is self-maintaining: add a service, its required vars are validated
     # automatically — no hand-edited list to drift out of sync.
-    compose_vars=$(grep -rhoE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' "$COMPOSE_DIR" 2>/dev/null \
+    # Strip comments first — a ${VAR} inside a YAML comment is not a real
+    # reference (e.g. the BIND_IP note in backup.yml). Match "#" at line start
+    # or after whitespace so values containing "#" are not truncated.
+    compose_vars=$(grep -rhE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' "$COMPOSE_DIR" 2>/dev/null \
+        | sed -E 's/(^|[[:space:]])#.*$//' \
+        | grep -oE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' \
         | sed -E 's/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/\1/' | sort -u)
     for var in $compose_vars; do
         # Already covered by the curated loops above — skip to avoid double-report.

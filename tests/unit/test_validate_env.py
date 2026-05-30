@@ -83,3 +83,16 @@ def test_placeholder_value_fails(tmp_path):
     result = _run(env, tmp_path / "compose")
     assert result.returncode == 1, result.stdout
     assert "placeholder" in result.stdout.lower()
+
+
+def test_comment_referenced_var_not_required(tmp_path):
+    """A ${VAR} that appears only in a YAML comment must NOT become required."""
+    env = tmp_path / ".env"
+    env.write_text(_BASE_ENV)
+    _compose(
+        tmp_path / "compose",
+        "services:\n  s:\n    # ${COMMENTED_ONLY} is documented here, not used\n    image: nginx\n",
+    )
+    result = _run(env, tmp_path / "compose")
+    assert result.returncode == 0, result.stdout
+    assert "COMMENTED_ONLY" not in result.stdout
