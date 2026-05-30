@@ -71,14 +71,15 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      # Hits the unauthenticated /api/v1/repo/status endpoint. wget returns
-      # non-zero on connection failure (server down) and 4xx/5xx; that's
-      # the real "kopia is broken" signal. No `|| exit 0` mask.
-      test: ["CMD-SHELL", "wget -q -O- --tries=1 --timeout=5 http://localhost:51515/api/v1/repo/status >/dev/null"]
+      # `kopia repository status` exits non-zero if the repo is missing or
+      # unreachable. The image ships no wget/curl (the old wget check could
+      # never pass), and this also reports healthy during the initial snapshot
+      # — the repo is connected before the server endpoint comes up.
+      test: ["CMD", "kopia", "repository", "status"]
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 120s
 
 volumes:
   kopia_config: null
