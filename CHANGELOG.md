@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Compose-derived env preflight** — `validate-env.sh` now derives required
+  variables from `${VAR}` references in `compose/*.yml` (no hand-maintained
+  list to drift) and hard-fails on any missing/placeholder value, with an
+  opt-out list for genuinely-optional integrations. Wired into `make deploy` /
+  `make update`. Closes the gap that let the kopia backup run credential-less.
 - **ADR-0015** — hotfix lane reserved for active incidents, not long-standing
   broken features ("important" ≠ "urgent").
 - **Prometheus alerting for Kopia backup service** — two new critical-severity
