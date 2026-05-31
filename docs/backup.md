@@ -29,7 +29,7 @@ See **Caveats** below.
 The kopia service runs in `compose/backup.yml`:
 - **Image**: `kopia/kopia:0.21.1`
 - **Port**: `127.0.0.1:51515` (HTTP, Tailscale-only reach)
-- **Volumes**: 
+- **Volumes**:
   - `kopia_config`, `kopia_cache`, `kopia_logs` (Docker named volumes for state)
   - `/opt/kopia-repo:/repo` (the actual backup destination, read-write)
   - `/var/lib/docker/volumes:/source/docker-volumes:ro` (backup source)
