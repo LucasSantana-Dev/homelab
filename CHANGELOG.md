@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-05-30
+
+### Changed
+
+- **kopia now backs up to a local filesystem repository** (`/opt/kopia-repo`)
+  instead of S3/B2 — interim, no offsite DR yet (see ADR-0016). The container
+  connects-or-creates the repo on start and registers a daily-scheduled
+  snapshot of the homelab's critical state (docker volumes + `appdata`, ~13G).
+  Bare `kopia server start` never initialised a repository, so backups had
+  never actually run; offsite B2 can be layered on later once creds exist.
+
+### Fixed
+
+- **kopia backup container crash-loop** — removed the invalid
+  `--without-password=false` flag from `compose/backup.yml`. In kopia 0.21.x
+  `--without-password` is a no-value boolean; `=false` made kopia parse `false`
+  as a stray positional (`unexpected false`) and exit 1, looping 4861× — so
+  offsite B2 backups had never actually run. Password auth is the default when
+  `--server-password` is set; added a guard comment. (ADR-0015)
+
+### Added
+
+- **Compose-derived env preflight** — `validate-env.sh` now derives required
+  variables from `${VAR}` references in `compose/*.yml` (no hand-maintained
+  list to drift) and hard-fails on any missing/placeholder value, with an
+  opt-out list for genuinely-optional integrations. Wired into `make deploy` /
+  `make update`. Closes the gap that let the kopia backup run credential-less.
+- **ADR-0015** — hotfix lane reserved for active incidents, not long-standing
+  broken features ("important" ≠ "urgent").
+- **Prometheus alerting for Kopia backup service** — two new critical-severity
+  alerts to catch backup container failures immediately:
+  - `KopiaBackupDown`: fires when the kopia container is not seen by cAdvisor
+    for >5m (container down, crashed, or unreachable).
+  - `KopiaBackupRestartLoop`: fires when the kopia container restarts >3 times
+    in a 15-minute window (catches crash-loops like the 4861-restart incident).
+    Both alerts route via `severity: critical` to pagerduty/slack; existing
+    cadvisor metrics provide the signal (no additional scrape job needed).
+- **ADR-0016** — keep kopia server-mode (reject CLI-timer / restic migration on
+  pull-signal grounds); add backup-verification roadmap (B2 Object Lock,
+  snapshot-freshness alert, `verify --verify-files-percent=1`).
+- **ADR-0017** — Portainer keeps read-write `docker.sock` (accepted risk;
+  `:ro` breaks it, socket-proxy is theater for a Tailscale-only solo host).
+  Inline defending-comments added on `compose/core.yml` (Portainer socket) and
+  `homelab_manager/utils/validators.py` (intentional ADR-0007 shim, test-backed)
+  so future audits reconcile via comment instead of re-flagging.
+
 ## [2.5.1] - 2026-05-28
 
 Patch batch hardening homelab-manager error handling (no raw subprocess/

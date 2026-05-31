@@ -78,6 +78,9 @@ services:
     container_name: portainer
     restart: unless-stopped
     volumes:
+    # Read-WRITE docker.sock is REQUIRED — Portainer manages containers
+    # (create/start/stop/remove/deploy); `:ro` would break it. Accepted risk
+    # (Tailscale-only, solo operator); socket-proxy is theater here. See ADR-0017.
     - /var/run/docker.sock:/var/run/docker.sock
     - portainer_data:/data
     ports:

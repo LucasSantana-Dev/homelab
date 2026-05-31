@@ -1,7 +1,7 @@
 # Homelab Management Makefile
 # Provides convenient targets for homelab operations
 
-.PHONY: help install deploy status logs health backup restore security-scan monitor clean test \
+.PHONY: help install validate-env deploy status logs health backup restore security-scan monitor clean test \
         update update-safe update-timer-install update-timer-status update-timer-enable update-timer-disable \
         image-lock-status image-lock-refresh image-lock-refresh-dry-run \
         watchdog-install watchdog-status watchdog-run-now watchdog-disable automation-reconcile \
@@ -29,7 +29,10 @@ install: ## Install homelab manager and dependencies
 	@echo "✅ Installation complete"
 
 # Container management
-deploy: ## Deploy all homelab services
+validate-env: ## Validate required env vars (compose-derived) before deploy
+	@bash scripts/security/validate-env.sh
+
+deploy: validate-env ## Deploy all homelab services
 	@echo "🚀 Deploying homelab services..."
 	docker compose up -d
 	@echo "✅ Deployment complete"
@@ -220,7 +223,7 @@ docker-clean: ## Clean Docker system (prune unused images/containers)
 	@docker system prune -f
 	@echo "✅ Cleanup complete"
 
-update: ## Update all container images (fast mode)
+update: validate-env ## Update all container images (fast mode)
 	@echo "🔄 Updating container images..."
 	docker compose pull
 	docker compose up -d

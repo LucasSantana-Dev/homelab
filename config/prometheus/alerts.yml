@@ -214,6 +214,25 @@ groups:
           summary: "Docker service is down on {{ $labels.instance }}"
           description: "node_systemd_unit_state reports docker.service is not active for at least 2 minutes."
 
+      # Kopia Backup Service Alerts
+      - alert: KopiaBackupDown
+        expr: absent(container_last_seen{name="kopia"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kopia backup container is not running"
+          description: "Kopia container has not been seen by cAdvisor for more than 5 minutes. Container may be down, crashed, or unreachable."
+
+      - alert: KopiaBackupRestartLoop
+        expr: changes(container_start_time_seconds{name="kopia"}[15m]) > 3
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kopia backup container is crash-looping"
+          description: "Kopia container has restarted {{ $value | humanize }} times in the last 15 minutes. Investigate logs for the root cause."
+
   # Lucky-specific alerts. Bot + backend scrape targets are added by
   # PR — once `lucky-monitoring` external network is joined.
   - name: lucky_alerts
