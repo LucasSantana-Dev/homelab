@@ -35,11 +35,22 @@ services:
         # (~7.3G); the ~183G bulk of /home is intentionally left for a future
         # offsite target, not this same-disk interim repo.
         kopia snapshot create /source/docker-volumes /source/appdata || true
+        # Create htpasswd file from environment variables instead of passing
+        # password on the command line (visible in docker inspect/ps). Uses
+        # apr1-hashed passwords for security. File is readable only by root.
+        HTPASSWD_FILE="/tmp/kopia-htpasswd"
+        {
+          USERNAME="${KOPIA_SERVER_USERNAME:-admin}"
+          PASSWORD="${KOPIA_SERVER_PASSWORD}"
+          # Use openssl to generate Apache apr1-hashed password (standard htpasswd format)
+          HASH=$(printf "%s" "$PASSWORD" | openssl passwd -apr1 -stdin)
+          echo "$USERNAME:$HASH" > "$HTPASSWD_FILE"
+          chmod 600 "$HTPASSWD_FILE"
+        }
         # --insecure: HTTP-only, safe because the port binds to ${BIND_IP}
         # (default 127.0.0.1) and the host is reachable only via Tailscale.
         exec kopia server start --insecure --address=0.0.0.0:51515 \
-          --server-username="${KOPIA_SERVER_USERNAME:-admin}" \
-          --server-password="${KOPIA_SERVER_PASSWORD}"
+          --htpasswd-file="$HTPASSWD_FILE"
     volumes:
       - kopia_config:/app/config
       - kopia_cache:/app/cache
