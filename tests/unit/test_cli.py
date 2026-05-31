@@ -326,3 +326,161 @@ class TestRestartCommand:
         runner = CliRunner()
         result = runner.invoke(make_app(), ["restart", "grafana"])
         assert result.exit_code == 0
+
+
+class TestManagementCommandExceptionHandling:
+    """Tests for exception scrubbing in management commands"""
+
+    def test_deploy_exception_scrubbed(self):
+        """Verify deploy command scrubs raw exception messages"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        # Mock deploy to raise an exception
+        container_manager.deploy.side_effect = RuntimeError(
+            "leaked_token=secret123 socket=/tmp/bad.sock"
+        )
+
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["deploy"])
+        assert result.exit_code != 0
+        # Verify the raw exception message is NOT in output
+        assert "leaked_token=secret123" not in result.output
+        assert "socket=/tmp/bad.sock" not in result.output
+        # Verify scrubbed message IS in output
+        assert "RuntimeError" in result.output
+        assert "deploy failed" in result.output
+
+    def test_update_exception_scrubbed(self):
+        """Verify update command scrubs raw exception messages"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        update_manager.update_all.side_effect = ValueError(
+            "DB_PASSWORD=super_secret port=5432"
+        )
+
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["update"])
+        assert result.exit_code != 0
+        assert "DB_PASSWORD=super_secret" not in result.output
+        assert "port=5432" not in result.output
+        assert "ValueError" in result.output
+        assert "update failed" in result.output
+
+    def test_backup_exception_scrubbed(self):
+        """Verify backup command scrubs raw exception messages"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        container_manager.create_backup.side_effect = IOError(
+            "AWS_KEY=AKIAIOSFODNN7EXAMPLE mount=/mnt/sensitive"
+        )
+
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["backup"])
+        assert result.exit_code != 0
+        assert "AWS_KEY=AKIAIOSFODNN7EXAMPLE" not in result.output
+        assert "mount=/mnt/sensitive" not in result.output
+        assert "OSError" in result.output
+        assert "backup failed" in result.output
+
+    def test_restore_exception_scrubbed(self):
+        """Verify restore command scrubs raw exception messages"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        container_manager.restore_backup.side_effect = OSError(
+            "API_TOKEN=bearer_xyz_sensitive /etc/secrets/key"
+        )
+
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["restore", "/tmp/backup.tar.gz"])
+        assert result.exit_code != 0
+        assert "API_TOKEN=bearer_xyz_sensitive" not in result.output
+        assert "/etc/secrets/key" not in result.output
+        assert "OSError" in result.output
+        assert "restore failed" in result.output
+
+    def test_restart_exception_scrubbed(self):
+        """Verify restart command scrubs raw exception messages"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        container_manager.deploy.side_effect = RuntimeError(
+            "connection_string=postgresql://user:passwd@localhost"
+        )
+
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["restart"])
+        assert result.exit_code != 0
+        assert (
+            "connection_string=postgresql://user:passwd@localhost" not in result.output
+        )
+        assert "RuntimeError" in result.output
+        assert "restart failed" in result.output
+
+    def test_restart_service_exception_scrubbed(self):
+        """Verify restart with service name scrubs exceptions"""
+        registry, config_manager, container_manager, health_monitor, update_manager = (
+            make_mocks()
+        )
+        container_manager.restart_service.side_effect = RuntimeError(
+            "secret_env_value=shhh /private/mount"
+        )
+
+        app = create_app(
+            config_manager=config_manager,
+            container_manager=container_manager,
+            health_monitor=health_monitor,
+            update_manager=update_manager,
+            registry=registry,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["restart", "grafana"])
+        assert result.exit_code != 0
+        assert "secret_env_value=shhh" not in result.output
+        assert "/private/mount" not in result.output
+        assert "RuntimeError" in result.output
+        assert "restart failed" in result.output
