@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Management and deployment commands for homelab CLI"""
 
+import logging
 from typing import Optional
 
 import typer
@@ -8,9 +9,12 @@ from rich.console import Console
 from rich.panel import Panel
 
 from ..core.config import HomelabConfig
+from ..core.errors import scrub_subprocess_error
 from ..models.service import ServiceRegistry
 from ..services.containers import ContainerManager
 from ..services.updates import UpdateManager
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -37,7 +41,10 @@ def register_management_commands(
                 console.print(f"❌ Deployment failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Deployment error: {e!s}")
+            logger.debug("deployment command exception", exc_info=True)
+            console.print(
+                f"❌ Deployment error: {scrub_subprocess_error(e, context='deploy failed')}"
+            )
             raise typer.Exit(1) from e
 
     @app.command()
@@ -53,7 +60,10 @@ def register_management_commands(
                 console.print(f"❌ Update failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Update error: {e!s}")
+            logger.debug("update command exception", exc_info=True)
+            console.print(
+                f"❌ Update error: {scrub_subprocess_error(e, context='update failed')}"
+            )
             raise typer.Exit(1) from e
 
     @app.command()
@@ -71,7 +81,10 @@ def register_management_commands(
                 console.print(f"❌ Backup failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Backup error: {e!s}")
+            logger.debug("backup command exception", exc_info=True)
+            console.print(
+                f"❌ Backup error: {scrub_subprocess_error(e, context='backup failed')}"
+            )
             raise typer.Exit(1) from e
 
     @app.command()
@@ -87,7 +100,10 @@ def register_management_commands(
                 console.print(f"❌ Restore failed: {result['error']}")
                 raise typer.Exit(1)
         except Exception as e:
-            console.print(f"❌ Restore error: {e!s}")
+            logger.debug("restore command exception", exc_info=True)
+            console.print(
+                f"❌ Restore error: {scrub_subprocess_error(e, context='restore failed')}"
+            )
             raise typer.Exit(1) from e
 
     @app.command()
@@ -116,7 +132,10 @@ def register_management_commands(
                     raise typer.Exit(1)
 
         except Exception as e:
-            console.print(f"❌ Restart error: {e!s}")
+            logger.debug("restart command exception", exc_info=True)
+            console.print(
+                f"❌ Restart error: {scrub_subprocess_error(e, context='restart failed')}"
+            )
             raise typer.Exit(1) from e
 
     @app.command()
