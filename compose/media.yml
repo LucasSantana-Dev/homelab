@@ -30,11 +30,14 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # stremio/server ships curl. The previous path /manifest.json returns 404
+      # (no manifest at root) → "unhealthy". "/" returns 307 (server is up),
+      # which curl --fail accepts (only HTTP >= 400 fails it).
       test:
       - CMD
       - curl
       - --fail
-      - http://localhost:11470/manifest.json
+      - http://localhost:11470/
       interval: 30s
       timeout: 10s
       retries: 3
