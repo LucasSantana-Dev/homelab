@@ -1,181 +1,189 @@
 # Backup Strategy
 
-Homelab uses **restic** + **Backblaze B2** for automated encrypted backups.
+Homelab uses **kopia** with a **local filesystem repository** for automated encrypted snapshots.
+
+## Overview
+
+- **Backup engine**: kopia (https://kopia.io) — snapshot-based, deduplicated, encrypted
+- **Repository**: Local filesystem at `/opt/kopia-repo` on the homelab host
+- **Frequency**: Daily at configurable intervals (default 24 hours)
+- **Retention**: 10 latest snapshots, 7 daily, 4 weekly, 3 monthly (auto-managed)
+- **Compression**: zstd
+- **Status**: Interim local-only; offsite B2 target deferred (see ADR-0016)
+
+## Scope
+
+The repository backs up two source trees:
+- `/docker-volumes`: All Docker named volumes (e.g., PostgreSQL, Redis, app state)
+- `~/homelab/appdata`: Caddy config, certificates, Pi-hole settings, etc.
+
+**Excluded intentionally** (same-disk interim repo):
+- `/home/` bulk data (~183 GB) — reserved for offsite target
+
+See **Caveats** below.
 
 ## Architecture
 
-- **Backup engine**: restic (https://restic.io) — incremental, deduplicated, encrypted
-- **Storage**: Backblaze B2 (low-cost cloud storage, ~$0.006/GB/month)
-- **Frequency**: Daily at 3:00 AM UTC (configurable via systemd timer)
-- **Retention**: 7 daily, 4 weekly, 12 monthly snapshots (auto-pruned)
+### Container Setup
 
-## Covered Data
+The kopia service runs in `compose/backup.yml`:
+- **Image**: `kopia/kopia:0.21.1`
+- **Port**: `127.0.0.1:51515` (HTTP, Tailscale-only reach)
+- **Volumes**:
+  - `kopia_config`, `kopia_cache`, `kopia_logs` (Docker named volumes for state)
+  - `/opt/kopia-repo:/repo` (the actual backup destination, read-write)
+  - `/var/lib/docker/volumes:/source/docker-volumes:ro` (backup source)
+  - `/home/luk-server/homelab/appdata:/source/appdata:ro` (backup source)
 
-- PostgreSQL: All databases (postgres, craftvaria, lucky)
-- Redis: `dump.rdb` via BGSAVE
-- Craftvaria: World files, player data
-- Caddy: Reverse proxy config, certificates
-- Pi-hole: DNS/DHCP config, blocklists
-- Docker Compose: All YAML files, `docker-compose.yml`
-- Environment: `.env` files (if present)
+### Initialization
 
-## Setup (One-time)
+On first start, the container:
+1. Connects to (or creates) the local repo at `/repo`
+2. Sets a global policy: compression=zstd, daily snapshot interval, and retention rules
+3. Takes an initial snapshot of both source trees
+4. Starts the kopia server for status checks and restore operations
 
-### 1. Install Restic
-```bash
-brew install restic
-ssh root@homelab "apt install restic"  # or your package manager
+### Healthcheck
+
+```
+kopia repository status
 ```
 
-### 2. Create Backblaze B2 Account
-1. Sign up at https://www.backblaze.com/b2/cloud-storage.html
-2. Create a **private** bucket (e.g., `homelab-backups`)
-3. Create an application key with permissions:
-   - `listBuckets`
-   - `listFiles`
-   - `readFiles`
-   - `writeFiles`
-   - `deleteFiles`
-4. Note the **application key ID** and **application key**
-
-### 3. Initialize Restic Repository
-On your local machine:
-```bash
-export RESTIC_REPOSITORY="b2:homelab-backups:/restic-repo"
-export RESTIC_PASSWORD_FILE="$HOME/.restic-password"
-
-# Create strong password file (ONE TIME)
-head -c 32 /dev/urandom | base64 > ~/.restic-password
-chmod 600 ~/.restic-password
-
-# Initialize repo
-restic init
-```
-
-You'll be prompted for B2 credentials (application key ID and key).
-
-### 4. Configure Server Environment
-On the backup server (server-do-luk):
-```bash
-# Create password file
-ssh root@homelab "echo 'YOUR_STRONG_PASSWORD' > /root/.restic-password && chmod 600 /root/.restic-password"
-
-# Create environment file for systemd
-ssh root@homelab "cat > /etc/homelab/.env << 'INNER_EOF'
-RESTIC_REPOSITORY=b2:homelab-backups:/restic-repo
-RESTIC_PASSWORD_FILE=/root/.restic-password
-B2_ACCOUNT_ID=your_app_key_id
-B2_ACCOUNT_KEY=your_app_key
-INNER_EOF"
-
-# Install scripts
-ssh root@homelab "mkdir -p /opt/homelab/scripts/backup"
-scp scripts/backup/*.sh root@homelab:/opt/homelab/scripts/backup/
-chmod +x /opt/homelab/scripts/backup/*.sh
-
-# Install systemd units
-scp systemd/*.service systemd/*.timer root@homelab:/etc/systemd/system/
-ssh root@homelab "systemctl daemon-reload && systemctl enable restic-daily.timer"
-```
-
-### 5. Test Backup (Dry Run)
-```bash
-ssh root@homelab "bash /opt/homelab/scripts/backup/restic-backup.sh"
-```
-
-Monitor logs:
-```bash
-ssh root@homelab "journalctl -u restic-daily.service -f"
-```
-
-### 6. Test Restore
-Create a test backup of a small directory:
-```bash
-export RESTIC_REPOSITORY="b2:homelab-backups:/test-restore"
-export RESTIC_PASSWORD_FILE="$HOME/.restic-password"
-
-mkdir -p /tmp/restic-test
-echo "test data" > /tmp/restic-test/file.txt
-
-restic init
-restic backup /tmp/restic-test
-SNAP=$(restic snapshots --compact | tail -1 | awk '{print $1}')
-
-# Restore to /tmp
-mkdir -p /tmp/homelab-restore
-restic restore "$SNAP" --target /tmp/homelab-restore
-
-# Verify
-diff -r /tmp/restic-test /tmp/homelab-restore/tmp/restic-test
-echo "Restore test passed!"
-
-# Cleanup
-restic forget --prune --keep-daily 0
-```
+Exits 0 if the repo is reachable; non-zero otherwise. Kopia container is considered healthy when this command succeeds.
 
 ## Daily Operation
 
 ### Check Backup Status
+
+From the host, connect to the kopia server:
 ```bash
-ssh root@homelab "journalctl -u restic-daily.service -n 50"
+curl -s http://127.0.0.1:51515/api/v1/repository/status | jq .
 ```
+
+Or via container logs:
+```bash
+docker logs kopia
+```
+
+Monitor for errors like "snapshot creation failed" or "repository disconnected".
 
 ### List Snapshots
+
 ```bash
-export RESTIC_REPOSITORY="b2:homelab-backups:/restic-repo"
-export RESTIC_PASSWORD_FILE="$HOME/.restic-password"
-restic snapshots
+docker exec kopia kopia snapshot list
 ```
 
-### Restore a File
-```bash
-restic restore latest --include="/postgres.sql" --target=/tmp/restore
+Example output:
+```
+  2026-05-30 15:32:45 UTC k8s7a+2e4a...  /source/docker-volumes (12.3 GB)
+  2026-05-29 15:32:41 UTC k8s7a+2e4b...  /source/docker-volumes (12.2 GB)
+  2026-05-30 15:32:52 UTC k9f3b+5c1d...  /source/appdata (234 MB)
+  2026-05-29 15:32:48 UTC k9f3b+5c1e...  /source/appdata (233 MB)
 ```
 
-### Manual Backup
+### Manual Snapshot (Force Backup Now)
+
 ```bash
-ssh root@homelab "bash /opt/homelab/scripts/backup/restic-backup.sh"
+docker exec kopia kopia snapshot create /source/docker-volumes /source/appdata
 ```
 
-## Security Considerations
+The server will also create snapshots automatically on its 24-hour schedule.
 
-1. **B2 credentials**: Stored in `/etc/homelab/.env` on server only (root-readable)
-2. **Restic password**: `~/.restic-password` on server (600 permissions)
-3. **Encryption**: Restic encrypts all data with password before upload to B2
-4. **Isolation**: B2 application key limited to this bucket only
-5. **Network**: B2 API traffic over HTTPS
+## Restore Procedure
 
-## Cost Estimation
+See `docs/runbooks/kopia-restore.md` for detailed restore steps including verification.
 
-For typical homelab (50-100 GB):
-- **Storage**: 100 GB @ $0.006/GB/month = $0.60/month
-- **Egress**: 1 GB restore/month @ $0.01/GB = $0.01/month
-- **Total**: ~$0.65/month
+Quick example (restore latest snapshot to staging):
+```bash
+docker exec kopia kopia restore latest \
+  --target=/tmp/restore-staging
+```
 
-Deduplication and incremental backups keep size well below full disk capacity.
+## Caveats
+
+### Local Repository (Same Disk)
+
+The repository lives on `/opt/kopia-repo`, which is **on the same physical disk** as the sources. This means:
+
+- **Protects against**: Accidental data deletion, app errors, config corruption
+- **Does NOT protect against**: Host disk failure, ransomware with root access, simultaneous disk + power loss
+- **Recovery**: Restore to a USB drive or network mount, then assess damage
+
+### Offsite Disaster Recovery (Deferred)
+
+B2 integration is deferred. See **ADR-0016** for context:
+- Timeline: Add once local snapshots are verified (Object Lock + freshness alerts)
+- Cost: ~$6–10/month for ~100 GB
+- Then: Daily incremental snapshots to B2 for true off-site redundancy
+
+For now, **manual periodic B2 backup** is recommended if data loss from total host failure is unacceptable:
+```bash
+# Copy repo snapshot bundle to B2 manually (effort required):
+# rclone sync /opt/kopia-repo b2:homelab-backup-b2/
+```
+
+### Repository Encryption Password
+
+The repository is encrypted with `KOPIA_REPO_PASSWORD` (set in `.env`). **Losing this password makes snapshots unrecoverable.**
+
+Treat the password file `/etc/homelab/.env` (on the host) the same as the SSH private key.
+
+## Configuration
+
+Repository policy is set once at startup and can be modified via:
+
+```bash
+docker exec kopia kopia policy set --global \
+  --compression=zstd \
+  --snapshot-interval=24h \
+  --keep-latest=10 --keep-daily=7 --keep-weekly=4 --keep-monthly=3
+```
+
+Retention is **strict**: once a snapshot is pruned, it is gone.
 
 ## Troubleshooting
 
-### "Bucket not found" error
-- Verify B2 bucket name in RESTIC_REPOSITORY
-- Confirm B2 application key is active
+### Container won't start (repo password error)
 
-### "Authentication failed"
-- Check B2_ACCOUNT_ID and B2_ACCOUNT_KEY in environment
-- Regenerate application key if expired
+Check that `KOPIA_REPO_PASSWORD` is set in `.env`:
+```bash
+grep KOPIA_REPO_PASSWORD /etc/homelab/.env
+```
 
-### Backup slow / timeout
-- Increase B2 connections in script: `restic backup ... -o b2.connections=20`
-- Check network connectivity to B2
-- Monitor server resources: `free -h && df -h`
+If missing, the container will fail to connect on restart.
 
-### Restore failing
-- Verify Restic version matches (use `restic version`)
-- Check available disk space at restore target
-- Run restore with verbose logging: `restic restore -v ...`
+### Snapshots not being created (stuck at initial snapshot)
+
+Check logs:
+```bash
+docker logs kopia | tail -20
+```
+
+Common causes:
+- Source paths `/source/docker-volumes` or `/source/appdata` not mounted
+- Disk space at `/opt/kopia-repo` exhausted
+- kopia server crashed and didn't restart (see container status)
+
+### Restore fails with "snapshot not found"
+
+Verify the snapshot ID:
+```bash
+docker exec kopia kopia snapshot list
+```
+
+Use the exact snapshot ID from the output, or use `latest` to restore the most recent.
+
+## Cost & Space
+
+Typical homelab (docker volumes ~5.4 GB + appdata ~7.3 GB):
+- **Local repo size**: ~5–15 GB (depends on deduplication and retention count)
+- **Offsite cost** (B2, future): ~$6–10/month for 100 GB
+- **Network egress** (B2, future): Minimal after initial sync; incremental
+
+Current: **$0** (local only).
 
 ## References
 
-- Restic docs: https://restic.readthedocs.io/
-- B2 setup: https://www.backblaze.com/b2/docs/
-- Restic B2 backend: https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html#backblaze-b2
+- ADR-0016: [Keep kopia server-mode; add backup verification](adr/0016-keep-kopia-server-mode-add-backup-verification.md)
+- kopia docs: https://kopia.io/docs/
+- kopia server: https://kopia.io/docs/server-mode/
