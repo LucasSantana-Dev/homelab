@@ -100,6 +100,7 @@ def test_comment_referenced_var_not_required(tmp_path):
 
 # Edge cases: parser robustness and special syntax handling
 
+
 def test_var_in_multiline_string(tmp_path):
     """A ${VAR} inside a YAML multi-line (quoted) value should be extracted."""
     env = tmp_path / ".env"
@@ -158,7 +159,7 @@ def test_var_with_default_syntax(tmp_path):
         "services:\n  s:\n    ports:\n      - ${OPTIONAL_PORT:-8888}:9000\n",
     )
     result = _run(env, tmp_path / "compose")
-    # The script's grep will extract "OPTIONAL_PORT" (before the :-), 
+    # The script's grep will extract "OPTIONAL_PORT" (before the :-),
     # so it WILL be checked as required unless explicitly added to defaults.
     # This test documents the ACTUAL behavior:
     assert "OPTIONAL_PORT" in result.stdout or result.returncode == 0
@@ -166,7 +167,8 @@ def test_var_with_default_syntax(tmp_path):
 
 def test_malformed_yaml_with_var_reference(tmp_path):
     """Ensure the parser doesn't crash on malformed YAML that contains a var reference.
-    (The script greps first, then validates, so malformed YAML shouldn't cause a crash.)"""
+    (The script greps first, then validates, so malformed YAML shouldn't cause a crash.)
+    """
     env = tmp_path / ".env"
     env.write_text(_BASE_ENV + "MYVAR=value\n")
     # Write intentionally malformed YAML with a var reference
