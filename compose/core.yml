@@ -65,11 +65,15 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # homepage (node/alpine) ships wget, not curl. Also "localhost" resolves to
+      # ::1 (IPv6) but the app binds IPv4 only → must use 127.0.0.1. The old curl
+      # probe failed on both counts → perpetual "unhealthy".
       test:
       - CMD
-      - curl
-      - --fail
-      - http://localhost:3000/
+      - wget
+      - -q
+      - --spider
+      - http://127.0.0.1:3000/
       interval: 30s
       timeout: 10s
       retries: 3
@@ -101,15 +105,12 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      test:
-      - CMD
-      - curl
-      - --fail
-      - https://localhost:9443/api/system/status
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      # portainer-ce is a scratch image (no shell, no curl/wget) — no
+      # in-container probe is possible. The old curl probe could never exec →
+      # perpetual "unhealthy". Disabled here; probe the UI port externally via
+      # blackbox-exporter instead (TODO: add the target). Also: container only
+      # publishes :9000, so the old :9443 target was wrong regardless.
+      disable: true
   whats-up-docker:
     image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
     container_name: whats-up-docker
@@ -143,11 +144,14 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # whats-up-docker (node/alpine) ships wget, not curl. The old curl probe
+      # could never exec → perpetual "unhealthy".
       test:
       - CMD
-      - curl
-      - --fail
-      - http://localhost:3000/
+      - wget
+      - -q
+      - --spider
+      - http://127.0.0.1:3000/
       interval: 30s
       timeout: 10s
       retries: 3
