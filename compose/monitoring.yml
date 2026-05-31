@@ -176,10 +176,13 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # prom/prometheus is busybox-based: ships wget, NOT curl. The old curl
+      # probe could never exec ("curl: not found") → perpetual "unhealthy".
       test:
       - CMD
-      - curl
-      - --fail
+      - wget
+      - -q
+      - --spider
       - http://localhost:9090/-/healthy
       interval: 30s
       timeout: 10s
@@ -215,10 +218,12 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # prom/node-exporter ships wget, not curl (busybox). curl probe never ran.
       test:
       - CMD
-      - curl
-      - --fail
+      - wget
+      - -q
+      - --spider
       - http://localhost:9100/metrics
       interval: 30s
       timeout: 10s
@@ -330,14 +335,12 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      test:
-      - CMD
-      - curl
-      - --fail
-      - http://localhost:9080/ready
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      # grafana/promtail ships no curl/wget/nc/python — no in-container probe is
+      # possible (same constraint as gatus/loki below). The old curl probe could
+      # never exec → perpetual "unhealthy". Disabled here; promtail liveness is
+      # observable via Loki ingestion, and an external blackbox-exporter probe of
+      # :9080/ready is the correct monitoring (TODO: add the blackbox target).
+      disable: true
   gatus:
     image: ${IMG_GATUS:-twinproduction/gatus:v5.16.0}
     container_name: gatus
@@ -380,6 +383,12 @@ services:
     restart: unless-stopped
     environment:
       - SECRET_KEY=${HEALTHCHECKS_SECRET_KEY}
+      # SQLite DB must live on the mounted, writable /data volume. Without this,
+      # healthchecks defaults DB_NAME to BASE_DIR/hc.sqlite (/opt/healthchecks,
+      # root-owned, not writable by the hc user) → "unable to open database
+      # file" → HTTP 500 on every route. The /data volume was mounted but unused.
+      - DB=sqlite
+      - DB_NAME=/data/hc.sqlite
       - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN:-home}
       # ALLOWED_HOSTS — Django host-header allowlist. Restrict to expected
       # access paths: LAN loopback, Tailscale magicDNS, and the public
@@ -411,7 +420,10 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/api/v1/notifications"]
+      # healthchecks/healthchecks ships python3 only (no curl/wget). urllib
+      # raises on any HTTP error, so this reports unhealthy on the DB-500 and
+      # healthy once the app serves 200. 127.0.0.1 (not localhost) avoids ::1.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3

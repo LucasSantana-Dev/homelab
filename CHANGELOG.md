@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Container healthchecks: 8 services stuck `running/unhealthy` (false positives).**
+  Probes invoked `curl`/`wget` binaries the images don't ship, so the check could
+  never run — the services were healthy all along, but the broken probes blinded
+  monitoring to any *real* failure.
+  - `curl`→`wget` for prometheus, node-exporter, whats-up-docker, homepage
+    (homepage also: `localhost`→`127.0.0.1`, the app binds IPv4 only).
+  - stremio-server: probe path `/manifest.json` (404) → `/` (307, server up).
+  - promtail + portainer: no in-container probe tool (promtail ships none;
+    portainer is a scratch image with no shell) → `healthcheck: disable: true`,
+    matching the existing gatus/loki pattern; external blackbox probes TODO.
+- **healthchecks: HTTP 500 on every route (`unable to open database file`).** The
+  SQLite DB defaulted to the root-owned app dir instead of the mounted `/data`
+  volume; set `DB=sqlite` + `DB_NAME=/data/hc.sqlite`. Probe switched to a
+  python3 urllib check (the image ships python3 only).
+
 ## [2.6.0] - 2026-05-30
 
 ### Changed
