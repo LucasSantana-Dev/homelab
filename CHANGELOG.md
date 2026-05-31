@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.2] - 2026-05-31
+
+### Changed
+
+- **Watchdog workflows pin `actions/checkout` to v6.0.2** (was v4), matching the
+  main CI pipeline so Renovate tracks them together. (#178)
+
+### Added
+
+- **Backup docs rewritten for kopia + a restore runbook.** `docs/backup.md` now
+  describes the actual local-filesystem kopia repo (`/opt/kopia-repo`, retention
+  10/7/4/3, daily snapshots) instead of the stale restic/Backblaze-B2 setup, with
+  the same-disk / no-offsite caveat; new `docs/runbooks/kopia-restore.md` documents
+  the restore procedure. Offsite B2 remains the deferred follow-up (ADR-0016). (#176)
+- **validate-env: parser edge-case test coverage** — multiline values, escaped
+  `$$`, var-name boundaries, with-default refs, and malformed YAML (8 new tests). (#177)
+
 ## [2.6.1] - 2026-05-31
 
 ### Fixed
