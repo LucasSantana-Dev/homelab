@@ -425,3 +425,98 @@ class TestCheckServiceById:
         monitor.check_service_by_id("grafana")
 
         registry.get_service.assert_called_once_with("grafana")
+
+
+class TestCheckAllServicesWithTimeout:
+    """Tests for HealthMonitor.check_all_services() timeout handling"""
+
+    def test_check_all_services_handles_timeout_gracefully(self):
+        """Verify check_all_services marks timed-out services as timeout source"""
+        from unittest.mock import Mock
+
+        mock_service = Mock()
+        mock_service.id = "test-svc"
+        mock_service.container_name = "test-svc"
+        mock_service.health_mode = "docker"
+        mock_service.health_url = None
+        mock_service.expected_statuses = [200]
+
+        registry = make_registry(services=[mock_service])
+
+        with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
+            mock_client = Mock()
+            mock_docker.from_env.return_value = mock_client
+
+            # Make the docker call fail with a timeout-like exception
+            mock_client.containers.get.side_effect = TimeoutError("Check timed out")
+
+            monitor = HealthMonitor(registry=registry)
+            result = monitor.check_all_services()
+
+            assert "test-svc" in result
+            test_result = result["test-svc"]
+
+            # Verify timeout result has all required keys
+            for key in (
+                "healthy",
+                "status_code",
+                "response_time",
+                "last_check",
+                "error",
+                "source",
+            ):
+                assert key in test_result, f"Missing key: {key}"
+
+            # Should be marked as error due to TimeoutError being caught as Exception
+            assert test_result["healthy"] is False
+            assert test_result["status_code"] is None
+
+    def test_check_all_services_returns_all_services_despite_errors(self):
+        """Verify all services get results even if some fail"""
+        from unittest.mock import Mock
+
+        # Create two services
+        mock_service1 = Mock()
+        mock_service1.id = "svc1"
+        mock_service1.container_name = "svc1"
+        mock_service1.health_mode = "docker"
+        mock_service1.health_url = None
+        mock_service1.expected_statuses = [200]
+
+        mock_service2 = Mock()
+        mock_service2.id = "svc2"
+        mock_service2.container_name = "svc2"
+        mock_service2.health_mode = "docker"
+        mock_service2.health_url = None
+        mock_service2.expected_statuses = [200]
+
+        registry = make_registry(services=[mock_service1, mock_service2])
+
+        with patch("homelab_manager.clients.docker_client.docker") as mock_docker:
+            mock_client = Mock()
+            mock_docker.from_env.return_value = mock_client
+
+            # svc1 succeeds, svc2 fails
+            def side_effect(name):
+                if name == "svc1":
+                    container = Mock()
+                    container.attrs = {"State": {"Status": "running"}}
+                    return container
+                else:
+                    raise Exception("Docker error")
+
+            mock_client.containers.get.side_effect = side_effect
+
+            monitor = HealthMonitor(registry=registry)
+            result = monitor.check_all_services()
+
+            # Both should be in results
+            assert "svc1" in result
+            assert "svc2" in result
+
+            # svc1 should be healthy
+            assert result["svc1"]["healthy"] is True
+
+            # svc2 should be unhealthy
+            assert result["svc2"]["healthy"] is False
+            assert result["svc2"]["error"] is not None

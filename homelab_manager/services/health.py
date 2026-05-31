@@ -6,7 +6,7 @@ Monitor health and status of homelab services
 
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from typing import Dict, List, Optional
 
 import requests
@@ -19,6 +19,9 @@ from ..models.service import ServiceRegistry
 # Initialize console
 console = Console()
 logger = logging.getLogger(__name__)
+
+# Per-check timeout in seconds
+CHECK_TIMEOUT = 15
 
 
 class HealthMonitor:
@@ -166,7 +169,7 @@ class HealthMonitor:
         return docker_result
 
     def check_all_services(self) -> Dict[str, Dict]:
-        """Check health of all services from the registry"""
+        """Check health of all services from the registry with per-service timeout."""
         services = [
             s
             for s in self.registry.get_services_with_ports()
@@ -178,8 +181,64 @@ class HealthMonitor:
         def _check(service):
             return service.id, self._check_service_by_policy(service)
 
+        results = {}
         with ThreadPoolExecutor(max_workers=min(len(services), 20)) as executor:
-            return dict(executor.map(_check, services))
+            # Submit all tasks
+            futures = {
+                executor.submit(_check, service): service for service in services
+            }
+
+            # Process results as they complete, with timeout for overall sweep
+            try:
+                for future in as_completed(futures, timeout=CHECK_TIMEOUT):
+                    service = futures[future]
+                    try:
+                        service_id, result = future.result(timeout=1)
+                        results[service_id] = result
+                    except TimeoutError:
+                        # Single check timed out; mark it as timeout and continue
+                        logger.warning(
+                            "Health check timeout for service %s", service.id
+                        )
+                        results[service.id] = {
+                            "healthy": False,
+                            "status_code": None,
+                            "response_time": None,
+                            "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "error": "Health check timed out",
+                            "source": "timeout",
+                        }
+                    except Exception as e:
+                        # Other exceptions during check execution
+                        logger.error(
+                            "Error during health check for service %s: %s",
+                            service.id,
+                            e,
+                            exc_info=True,
+                        )
+                        results[service.id] = {
+                            "healthy": False,
+                            "status_code": None,
+                            "response_time": None,
+                            "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "error": "Health check failed: " + str(type(e).__name__),
+                            "source": "error",
+                        }
+            except TimeoutError:
+                # Overall sweep timeout - mark unfinished futures as timeout
+                logger.warning("Overall health check sweep timeout")
+                for future, service in futures.items():
+                    if service.id not in results:
+                        results[service.id] = {
+                            "healthy": False,
+                            "status_code": None,
+                            "response_time": None,
+                            "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "error": "Health check timed out",
+                            "source": "timeout",
+                        }
+
+        return results
 
     def get_health_summary(self) -> Dict:
         """Get summary of health status"""
