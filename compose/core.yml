@@ -37,7 +37,11 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
     - PUID=${PUID}
-    - PGID=${PGID}
+    # PGID must be 983 (host docker group GID) so that su-exec runs next-server
+    # with GID 983, granting read access to /var/run/docker.sock (srw-rw---- root:docker).
+    # group_add alone is insufficient — it adds to PID 1 (root) but su-exec resets
+    # supplemental groups when dropping to the node user.
+    - PGID=983
     - TZ=${TIMEZONE}
     - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
     - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
