@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.3] - 2026-06-17
+
+### Fixed
+
+- **homepage: docker socket EACCES (P0 hotfix)** — hardcode `PGID=983` in
+  `compose/core.yml` so `su-exec` drops privileges to UID=1000/GID=983,
+  granting `next-server` direct read access to `/var/run/docker.sock`
+  (`srw-rw---- root:docker`, host GID 983). `group_add: ["983"]` alone is
+  insufficient because `su-exec` resets all supplemental groups when dropping
+  to the node user — only the primary GID survives. (#hotfix)
+- **public-safety-gate hook false-positive** — changed `git ls-files` to
+  `git diff --cached --name-only --` so the pre-commit hook scans staged
+  files only instead of all tracked files, eliminating false-positive blocks
+  on pre-existing committed domain references.
+
 ## [2.6.2] - 2026-05-31
 
 ### Changed

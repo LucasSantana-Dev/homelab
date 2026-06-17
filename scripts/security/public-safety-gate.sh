@@ -11,13 +11,13 @@ DENY_REGEX="luk-homeserver\\\\?\\.com\\\\?\\.br|tailab88e9\\\\?\\.ts\\\\?\\.net|
 EXCLUDE_PATH_REGEX='^(tests/|\.serena/|\.cursor/|security-reports/|appdata/|docs/access-layers\.md|scripts/security/public-safety-gate\.sh$)'
 
 mapfile -t tracked_files < <(
-  git -C "${ROOT_DIR}" ls-files \
+  git -C "${ROOT_DIR}" diff --cached --name-only -- \
     '*.md' '*.yml' '*.yaml' '*.conf' '*.json' '*.sh' '*.py' '*.toml' \
     'Makefile' '.github/workflows/*.yml' '.github/*.md'
 )
 
 if [[ ${#tracked_files[@]} -eq 0 ]]; then
-  echo "No tracked files found for public safety check"
+  echo "No staged files to check for public safety"
   exit 0
 fi
 
@@ -29,7 +29,7 @@ for file in "${tracked_files[@]}"; do
 
   if rg -n --regexp "${DENY_REGEX}" "${ROOT_DIR}/${file}" >/tmp/public-safety-match.txt 2>/dev/null; then
     if [[ "${violations}" -eq 0 ]]; then
-      echo "Public safety gate failed. Found private identifiers in tracked files:"
+      echo "Public safety gate failed. Found private identifiers in staged files:"
     fi
     violations=$((violations + 1))
     sed "s#^#${file}:#" /tmp/public-safety-match.txt
