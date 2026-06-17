@@ -36,6 +36,16 @@ scrape_configs:
           expression: (?P<container_name>(?:[^|]*[^|]))
           source: tag
 
+      # Cardinality guard: collapse ephemeral `docker compose run --rm`
+      # containers (e.g. lucky-backend-run-8a7a4be9f677, spawned per deploy by
+      # prisma migrate / relation guards) back onto their service name. The
+      # logging `tag: "{{.Name}}"` emits a unique name for each one, so without
+      # this every deploy would mint ~3 new never-recurring container_name label
+      # values, unbounded over time. See Lucky decisions/2026-06-16-info-log-aggregation-loki.md.
+      - template:
+          source: container_name
+          template: '{{ regexReplaceAll "-run-[0-9a-f]+$" .Value "" }}'
+
       # Parse log levels (ERROR, WARN, INFO, DEBUG)
       - regex:
           expression: '.*(?P<level>ERROR|WARN|INFO|DEBUG|FATAL|CRITICAL).*'
