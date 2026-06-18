@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.6.3] - 2026-06-17
+## [2.6.4] - 2026-06-18
+
+> Cut from `main`. The `release` branch already tags the EACCES hotfix as
+> v2.6.3 (patch-equivalent, see ADR-0019); `main`'s lineage skips 2.6.3, so
+> this version batches the hotfix together with the other commits that landed
+> on `main` since v2.6.2.
+
+### Added
+
+- **Grafana: Loki log panels on the Lucky app-metrics dashboard** — surface
+  container logs next to metrics for faster incident triage. (2e436c3)
+- **HTTP integration tests for the homelab-manager server routes** — end-to-end
+  coverage of the route layer. (#181)
 
 ### Fixed
 
@@ -21,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `git diff --cached --name-only --` so the pre-commit hook scans staged
   files only instead of all tracked files, eliminating false-positive blocks
   on pre-existing committed domain references.
+- **Loki: persist data to the `/loki` bind mount** instead of ephemeral `/tmp`,
+  so logs survive container restarts. (#191)
+- **promtail: collapse ephemeral `run` containers** in Loki labels to stop
+  label-cardinality blowups from one-shot containers. (#192)
+- **CLI: scrub exceptions in management command handlers** so stack traces no
+  longer leak in command output. (#180)
 
 ## [2.6.2] - 2026-05-31
 
