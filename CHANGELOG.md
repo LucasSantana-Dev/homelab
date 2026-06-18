@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Grafana auth: switch OAuth from Authentik to Google direct** (ADR-0020). (#224)
 - **CI: align watchdog `actions/checkout` to v6.0.2** with the main pipeline. (#178)
 - **deps (Renovate/Dependabot):** `actions/cache` → 5.0.5 (#187),
   `github/codeql-action` → 4.36.1 (#189), `black` → 26.5.1 (#188),
