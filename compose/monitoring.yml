@@ -16,20 +16,23 @@ services:
     - GF_SERVER_DOMAIN=grafana.${DOMAIN}
     - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
     - GF_AUTH_GENERIC_OAUTH_ENABLED=${GRAFANA_OAUTH_ENABLED:-true}
-    - GF_AUTH_GENERIC_OAUTH_NAME=Authentik
+    - GF_AUTH_GENERIC_OAUTH_NAME=Google
     - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
-    - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${AUTHENTIK_GRAFANA_CLIENT_ID}
-    - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${AUTHENTIK_GRAFANA_CLIENT_SECRET}
+    - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     - GF_AUTH_GENERIC_OAUTH_SCOPES=openid profile email
-    - GF_AUTH_GENERIC_OAUTH_AUTH_URL=https://auth.${DOMAIN}/application/o/authorize/
-    - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=https://auth.${DOMAIN}/application/o/token/
-    - GF_AUTH_GENERIC_OAUTH_API_URL=https://auth.${DOMAIN}/application/o/userinfo/
+    - GF_AUTH_GENERIC_OAUTH_USE_PKCE=true
+    - GF_AUTH_GENERIC_OAUTH_AUTH_URL=https://accounts.google.com/o/oauth2/v2/auth
+    - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=https://oauth2.googleapis.com/token
+    - GF_AUTH_GENERIC_OAUTH_API_URL=https://openidconnect.googleapis.com/v1/userinfo
     - GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH=email
     - GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH=email
     - GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH=name
-    - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'Grafana Admins')
-      && 'Admin' || contains(groups[*], 'Grafana Editors') && 'Editor' || 'Viewer'
-    - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_DISABLE_LOGIN_FORM:-true}
+    # Tinyauth edge already enforces TINYAUTH_ALLOWED_EMAILS; any Google account that
+    # passes the edge is the operator → always Admin (ADR-0020).
+    - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH='Admin'
+    # Keep form enabled — fallback if Google is unreachable (ADR-0020)
+    - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_DISABLE_LOGIN_FORM:-false}
     ports:
     - ${BIND_IP:-0.0.0.0}:${GRAFANA_PORT:-3002}:3000
     networks:
@@ -195,11 +198,13 @@ services:
     - /proc:/host/proc:ro
     - /sys:/host/sys:ro
     - /:/rootfs:ro
+    - /var/lib/node_exporter/textfile:/var/lib/node_exporter/textfile:ro
     command:
     - --path.procfs=/host/proc
     - --path.rootfs=/rootfs
     - --path.sysfs=/host/sys
     - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    - --collector.textfile.directory=/var/lib/node_exporter/textfile
     ports:
     - 127.0.0.1:${NODE_EXPORTER_PORT:-9100}:9100
     networks:
@@ -253,6 +258,7 @@ services:
     - --store_container_labels=false
     volumes:
     - /:/rootfs:ro
+    - /var/lib/node_exporter/textfile:/var/lib/node_exporter/textfile:ro
     - /var/run:/var/run:ro
     - /sys:/sys:ro
     - /var/lib/docker/:/var/lib/docker:ro
@@ -342,7 +348,7 @@ services:
       # :9080/ready is the correct monitoring (TODO: add the blackbox target).
       disable: true
   gatus:
-    image: ${IMG_GATUS:-twinproduction/gatus:v5.16.0}
+    image: ${IMG_GATUS:-twinproduction/gatus:v5.36.0}
     container_name: gatus
     restart: unless-stopped
     volumes:

@@ -7,6 +7,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.4] - 2026-06-18
+
+### Fixed
+
+- **version-drift-exporter: `git -c safe.directory`** — under systemd (root, clean
+  env) git rejected the operator-owned repo with "dubious ownership" (exit 128),
+  so the exporter never produced metrics. Scoping `safe.directory` per git call
+  fixes it. (ADR-0023)
+- **deploy-health gate now polls** — `record-deploy-health.sh` curled `/health`
+  once immediately, false-failing `make deploy` because the manager binds `:8765`
+  a few seconds after `compose up`. Now retries up to ~30s. (ADR-0023)
+
+## [2.7.3] - 2026-06-18
+
+### Fixed
+
+- **`caddy` image default `2.10.4-alpine` → `2.10.2-alpine`** — `2.10.4` is a
+  non-existent tag (introduced in #230). caddy is the reverse-proxy edge, so the
+  bad default risked taking down ingress on deploy. This was the last of the
+  #230 non-existent image tags (after homepage and `whats-up-docker`); all
+  compose image defaults are now valid. First fully-deployable tag of the v2.7.x line.
+
+## [2.7.2] - 2026-06-18
+
+### Fixed
+
+- **`whats-up-docker` image default `6.7.0` → `6.6.1`** (`compose/core.yml`). `6.7.0`
+  is a non-existent tag (introduced in #230); the compose default now matches
+  `.env.example`, so a deploy without an `IMG_WUD` override no longer fails to pull.
+  (homepage's bad `v1.1.0` default was already corrected to `v1.13.2`.)
+
+## [2.7.1] - 2026-06-18
+
+### Added
+
+- **Deploy observability (ADR-0023)** — `version-drift-exporter` reports running
+  version (from `/health`) vs the latest release tag; `make deploy` records a
+  deploy-health metric; three Prometheus alerts (`HomelabVersionDrift`,
+  `HomelabDeployUnhealthy`, `HomelabVersionExporterStale`). Makes "prod silently
+  behind a release" a loud signal. (#231, #232)
+- **Homepage: service-catalog overhaul** — public domains, refreshed service
+  catalog, and container-update widgets. (#230)
+
+### Fixed
+
+- **`make deploy` now runs `docker compose up -d --build`** (ADR-0010). The
+  `homelab-manager` image was never rebuilt on source change — the root cause of
+  production silently running a stale version (was v2.5.1 vs released v2.7.0).
+
+### Changed
+
+- **Branch strategy reconciled + documented** (ADR-0022): `main`↔`release` were
+  refused a clean `/release-cut`; reconciled by back-merge, and CONTRIBUTING fixed
+  (feature PRs base `release`, not `main`). The **PR Base Guard** CI check enforces it.
+
+## [2.7.0] - 2026-06-18
+
+> First release cut from the reconciled `release` branch (ADR-0022). Ships the
+> work that had accumulated on `release` but never reached `main`/a deploy tag —
+> kopia freshness monitoring, healthcheck fixes, and the routing gate. The
+> EACCES hotfix already shipped in v2.6.4 and is not repeated here.
+
+### Added
+
+- **kopia snapshot-freshness metric + alert** — exports last-snapshot age and
+  alerts when backups go stale (ADR-0016). (#184)
+- **PR Base Guard** — CI check enforcing the release-branch routing from ADR-0022:
+  feature/dependency PRs must target `release`, not `main`. (#227)
+- **validate-env: parser edge-case test coverage** — multiline values, escaped
+  `$$`, var-name boundaries, with-default refs, malformed YAML (8 tests). (#177)
+- **Backup docs rewrite + kopia restore runbook** — `docs/backup.md` now reflects
+  the actual local kopia repo; new `docs/runbooks/kopia-restore.md`. (#176)
+
+### Fixed
+
+- **Container healthchecks: 8 services stuck `running/unhealthy` (false positives)**
+  — probes called binaries the images don't ship; repaired probes + healthchecks
+  DB path. (#173)
+- **healthcheck: use `127.0.0.1` not `localhost`** in 4 probes (the apps bind IPv4
+  only) (ADR-0018). (#175)
+- **health: bound per-service check timeout** so one hung service can't block the
+  whole sweep. (#183)
+- **public-safety-gate: scope off intentional doc identifiers** + pin black to
+  unbreak release CI. (#185, #186)
+
+### Changed
+
+- **Grafana auth: switch OAuth from Authentik to Google direct** (ADR-0020). (#224)
+- **CI: align watchdog `actions/checkout` to v6.0.2** with the main pipeline. (#178)
+- **deps (Renovate/Dependabot):** `actions/cache` → 5.0.5 (#187),
+  `github/codeql-action` → 4.36.1 (#189), `black` → 26.5.1 (#188),
+  `actions/checkout` → 6.0.3 (#190).
+
+## [2.6.4] - 2026-06-18
+
+> Cut from `main`. The `release` branch already tags the EACCES hotfix as
+> v2.6.3 (patch-equivalent, see ADR-0019); `main`'s lineage skipped 2.6.3, so
+> this version batched the hotfix together with the other commits that landed
+> on `main` since v2.6.2. After ADR-0022, `main` and `release` are reconciled
+> and both versions appear in this single history.
+
+### Added
+
+- **Grafana: Loki log panels on the Lucky app-metrics dashboard** — surface
+  container logs next to metrics for faster incident triage. (2e436c3)
+- **HTTP integration tests for the homelab-manager server routes** — end-to-end
+  coverage of the route layer. (#181)
+
+### Fixed
+
+- **homepage: docker socket EACCES (P0 hotfix)** — hardcode `PGID=983` in
+  `compose/core.yml` so `su-exec` drops privileges to UID=1000/GID=983,
+  granting `next-server` direct read access to `/var/run/docker.sock`
+  (`srw-rw---- root:docker`, host GID 983). `group_add: ["983"]` alone is
+  insufficient because `su-exec` resets all supplemental groups when dropping
+  to the node user — only the primary GID survives. (#hotfix)
+- **public-safety-gate hook false-positive** — changed `git ls-files` to
+  `git diff --cached --name-only --` so the pre-commit hook scans staged
+  files only instead of all tracked files, eliminating false-positive blocks
+  on pre-existing committed domain references.
+- **Loki: persist data to the `/loki` bind mount** instead of ephemeral `/tmp`,
+  so logs survive container restarts. (#191)
+- **promtail: collapse ephemeral `run` containers** in Loki labels to stop
+  label-cardinality blowups from one-shot containers. (#192)
+- **CLI: scrub exceptions in management command handlers** so stack traces no
+  longer leak in command output. (#180)
+
 ## [2.6.3] - 2026-06-17
 
 ### Fixed

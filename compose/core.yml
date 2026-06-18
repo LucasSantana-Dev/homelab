@@ -29,7 +29,7 @@ services:
     healthcheck:
       disable: true
   homepage:
-    image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.0.3}
+    image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.13.2}
     container_name: homepage
     restart: unless-stopped
     volumes:
@@ -47,7 +47,7 @@ services:
     - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
     - DOMAIN=${DOMAIN}
     - HOMEPAGE_GITHUB_TOKEN=${HOMEPAGE_GITHUB_TOKEN:-}
-    - HOMEPAGE_VAR_PIHOLE_KEY=${PIHOLE_API_KEY:-}
+    - HOMEPAGE_VAR_PIHOLE_KEY=${HOMEPAGE_VAR_PIHOLE_KEY:-}
     - HOMEPAGE_VAR_PORTAINER_KEY=${HOMEPAGE_VAR_PORTAINER_KEY:-}
     ports:
     - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
@@ -82,7 +82,7 @@ services:
       timeout: 10s
       retries: 3
   portainer:
-    image: ${IMG_PORTAINER:-portainer/portainer-ce:2.21.4}
+    image: ${IMG_PORTAINER:-portainer/portainer-ce:2.42.0}
     container_name: portainer
     restart: unless-stopped
     volumes:

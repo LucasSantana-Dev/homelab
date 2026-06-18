@@ -24,6 +24,8 @@ unit_files=(
     "homelab-update.timer"
     "homelab-watchdog.service"
     "homelab-watchdog.timer"
+    "version-drift-exporter.service"
+    "version-drift-exporter.timer"
 )
 installed_units=()
 
@@ -53,7 +55,7 @@ enable_units=(
     "lukbot.service"
 )
 
-for timer_unit in homelab-update.timer homelab-watchdog.timer; do
+for timer_unit in homelab-update.timer homelab-watchdog.timer version-drift-exporter.timer; do
     if [[ " ${installed_units[*]} " == *" ${timer_unit} "* ]]; then
         enable_units+=("${timer_unit}")
     fi
@@ -62,7 +64,7 @@ done
 systemctl enable "${enable_units[@]}"
 
 echo "Starting timers..."
-for timer_unit in homelab-update.timer homelab-watchdog.timer; do
+for timer_unit in homelab-update.timer homelab-watchdog.timer version-drift-exporter.timer; do
     if [[ " ${installed_units[*]} " == *" ${timer_unit} "* ]]; then
         systemctl start "${timer_unit}"
     fi

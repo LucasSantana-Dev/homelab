@@ -1,6 +1,6 @@
 services:
   stremio:
-    image: ${IMG_STREMIO:-stremio/server:v4.20.17}
+    image: ${IMG_STREMIO:-stremio/server:v4.21.0}
     container_name: stremio-server
     restart: unless-stopped
     environment:

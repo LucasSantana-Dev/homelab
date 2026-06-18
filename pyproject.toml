@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "homelab-manager"
-version = "2.6.3"
+version = "2.7.4"
 description = "Modern homelab management CLI"
 authors = [{name = "Luk Homelab", email = "luk@homelab.com"}]
 license = { text = "MIT" }
@@ -40,7 +40,7 @@ dev = [
     "pytest-mock>=3.14.0",
     "pytest-asyncio>=0.24.0",
     # Linting and Code Quality
-    "black>=24.8.0",
+    "black==26.5.1",
     "isort>=5.13.0",
     "flake8>=7.1.0",
     "mypy>=1.11.0",
