@@ -184,6 +184,7 @@ http://healthchecks.luk-homeserver.com.br {
 }
 
 http://kopia.luk-homeserver.com.br {
+	import protected
 	reverse_proxy 127.0.0.1:51515
 }
 
