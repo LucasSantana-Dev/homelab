@@ -90,3 +90,13 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # Grafana self-monitoring — exposes /metrics on :3000. Unblocks the Grafana
+  # health panels in the monitoring dashboards (ADR-0023 audit found no scrape).
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+    scrape_interval: 15s
+    metrics_path: /metrics

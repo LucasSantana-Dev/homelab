@@ -1,0 +1,110 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DRIFT", "color": "red" }, "1": { "text": "Up to date", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "pluginVersion": "11.4.6",
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "homelab_version_up_to_date", "instant": true, "refId": "A" } ],
+      "title": "Deployed Version Up To Date",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "FAIL", "color": "red" }, "1": { "text": "OK", "color": "green" } } }
+          ],
+          "noValue": "no deploy recorded"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "pluginVersion": "11.4.6",
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "homelab_last_deploy_success", "instant": true, "refId": "A" } ],
+      "title": "Last Deploy Healthy",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 21600 }, { "color": "red", "value": 25200 } ] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "pluginVersion": "11.4.6",
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "time() - homelab_version_exporter_last_run_timestamp_seconds", "instant": true, "refId": "A" } ],
+      "title": "Drift-check Age (exporter freshness)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "custom": { "filterable": true } }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 18, "x": 0, "y": 5 },
+      "id": 4,
+      "options": { "showHeader": true },
+      "pluginVersion": "11.4.6",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "homelab_running_version_info", "format": "table", "instant": true, "legendFormat": "running", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "homelab_latest_version_info", "format": "table", "instant": true, "legendFormat": "latest", "refId": "B" }
+      ],
+      "title": "Running vs Latest Version",
+      "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value #A": true, "Value #B": true, "__name__": true }, "renameByName": {} } } ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 20, "pointSize": 5 },
+          "max": 1, "min": 0,
+          "mappings": [ { "type": "value", "options": { "0": { "text": "drift" }, "1": { "text": "current" } } } ]
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 18, "x": 0, "y": 11 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+      "pluginVersion": "11.4.6",
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "homelab_version_up_to_date", "refId": "A", "legendFormat": "up_to_date" } ],
+      "title": "Version Up-To-Date Over Time",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": ["homelab", "deploy", "release", "adr-0023"],
+  "templating": { "list": [] },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Homelab Deploy & Version Observability",
+  "uid": "homelab-deploy-obs",
+  "version": 1,
+  "weekStart": ""
+}
