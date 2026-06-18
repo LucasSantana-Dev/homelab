@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.4] - 2026-06-18
+
+### Fixed
+
+- **version-drift-exporter: `git -c safe.directory`** — under systemd (root, clean
+  env) git rejected the operator-owned repo with "dubious ownership" (exit 128),
+  so the exporter never produced metrics. Scoping `safe.directory` per git call
+  fixes it. (ADR-0023)
+- **deploy-health gate now polls** — `record-deploy-health.sh` curled `/health`
+  once immediately, false-failing `make deploy` because the manager binds `:8765`
+  a few seconds after `compose up`. Now retries up to ~30s. (ADR-0023)
+
 ## [2.7.3] - 2026-06-18
 
 ### Fixed
