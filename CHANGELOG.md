@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.3] - 2026-06-18
+
+### Fixed
+
+- **`caddy` image default `2.10.4-alpine` → `2.10.2-alpine`** — `2.10.4` is a
+  non-existent tag (introduced in #230). caddy is the reverse-proxy edge, so the
+  bad default risked taking down ingress on deploy. This was the last of the
+  #230 non-existent image tags (after homepage and `whats-up-docker`); all
+  compose image defaults are now valid. First fully-deployable tag of the v2.7.x line.
+
 ## [2.7.2] - 2026-06-18
 
 ### Fixed
