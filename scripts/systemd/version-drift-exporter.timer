@@ -1,0 +1,12 @@
+[Unit]
+Description=Homelab Version Drift Exporter (hourly)
+Requires=version-drift-exporter.service
+
+[Timer]
+OnCalendar=*-*-* *:07:00
+Persistent=true
+RandomizedDelaySec=2m
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target
