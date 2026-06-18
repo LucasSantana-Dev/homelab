@@ -157,6 +157,36 @@ http://portainer.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:9000
 }
 
+http://pihole.luk-homeserver.com.br {
+	import protected
+	redir / /admin/ permanent
+	reverse_proxy 127.0.0.1:8054
+}
+
+http://manager.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:8765
+}
+
+http://wud.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:3003
+}
+
+http://paperless.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:8400
+}
+
+http://healthchecks.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:8092
+}
+
+http://kopia.luk-homeserver.com.br {
+	reverse_proxy 127.0.0.1:51515
+}
+
 # ---------- Catch-all ----------
 
 :80 {

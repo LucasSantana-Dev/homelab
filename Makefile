@@ -34,7 +34,8 @@ validate-env: ## Validate required env vars (compose-derived) before deploy
 
 deploy: validate-env ## Deploy all homelab services
 	@echo "🚀 Deploying homelab services..."
-	docker compose up -d
+	docker compose up -d --build
+	@bash scripts/deployment/record-deploy-health.sh
 	@echo "✅ Deployment complete"
 
 forge-space-up: ## Deploy Forge Space MCP Gateway profile
