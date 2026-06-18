@@ -1,6 +1,6 @@
 services:
   pihole:
-    image: ${IMG_PIHOLE:-pihole/pihole:2026.04.0}
+    image: ${IMG_PIHOLE:-pihole/pihole:2026.06.0}
     container_name: pihole
     restart: unless-stopped
     volumes:
@@ -43,7 +43,7 @@ services:
       start_period: 30s
 
   crowdsec:
-    image: ${IMG_CROWDSEC:-crowdsecurity/crowdsec:v1.6.5}
+    image: ${IMG_CROWDSEC:-crowdsecurity/crowdsec:v1.7.8}
     container_name: crowdsec
     restart: unless-stopped
     environment:
