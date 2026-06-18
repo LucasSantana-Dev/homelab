@@ -355,3 +355,41 @@ groups:
           summary: "Lucky bot heap >90% used"
           description: "V8 heap {{ $value | humanizePercentage }} full for 10m — risk of OOMKilled."
           runbook: "docs/runbooks/lucky-observability.md#luckybotheaphigh"
+
+  # Deploy drift + deploy-health observability (ADR-0023).
+  - name: homelab_deploy_alerts
+    interval: 1m
+    rules:
+      # Production has been running behind the latest release for too long.
+      - alert: HomelabVersionDrift
+        expr: homelab_version_up_to_date == 0 and homelab_running_version_known == 1 and homelab_latest_version_known == 1
+        for: 7d
+        labels:
+          severity: warning
+        annotations:
+          summary: "Homelab deployed version is behind the latest release"
+          description: "homelab_version_up_to_date=0 for >7d — production is behind the latest release tag. SSH the host and run `make deploy`."
+          runbook: "docs/adr/0023-deploy-drift-observability.md"
+
+      # The most recent make-deploy did not bring the manager up healthy.
+      - alert: HomelabDeployUnhealthy
+        expr: homelab_last_deploy_success == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Last homelab deploy did not report healthy"
+          description: "homelab_last_deploy_success=0 — the most recent `make deploy` finished without homelab-manager reporting ok."
+          runbook: "docs/adr/0023-deploy-drift-observability.md"
+
+      # Meta-healthcheck: the drift exporter itself stopped writing. Without this,
+      # a dead exporter silently reproduces the original blind spot one level up.
+      - alert: HomelabVersionExporterStale
+        expr: time() - homelab_version_exporter_last_run_timestamp_seconds > 25200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Homelab version-drift exporter is stale"
+          description: "No version-drift export in >7h — the exporter (systemd timer) may be dead; drift detection is blind."
+          runbook: "docs/adr/0023-deploy-drift-observability.md"

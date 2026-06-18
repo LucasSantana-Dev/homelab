@@ -1,0 +1,19 @@
+[Unit]
+Description=Homelab Version Drift Exporter (running vs latest release)
+Documentation=file:///home/luk-server/homelab/scripts/monitoring/version-drift-exporter.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/home/luk-server/homelab/scripts/monitoring/version-drift-exporter.sh
+StandardOutput=journal
+StandardError=journal
+Environment="TEXTFILE_DIR=/var/lib/node_exporter/textfile"
+Environment="REPO_DIR=/home/luk-server/homelab"
+Environment="HEALTH_URL=http://127.0.0.1:8765/health"
+
+[Install]
+WantedBy=multi-user.target
