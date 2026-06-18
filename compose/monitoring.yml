@@ -383,18 +383,57 @@ services:
       # Disable docker healthcheck; Gatus self-monitors via its own UI.
       disable: true
 
+  healthchecks-db:
+    image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
+    container_name: healthchecks-db
+    restart: unless-stopped
+    volumes:
+      - healthchecks_db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=healthchecks
+      - POSTGRES_USER=healthchecks
+      - POSTGRES_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:-changeme}
+      - TZ=${TIMEZONE}
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d healthchecks -U healthchecks"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
   healthchecks:
-    image: ${IMG_HEALTHCHECKS:-healthchecks/healthchecks:v3.7}
+    image: ${IMG_HEALTHCHECKS:-healthchecks/healthchecks:v4.2}
     container_name: healthchecks
     restart: unless-stopped
+    depends_on:
+      healthchecks-db:
+        condition: service_healthy
     environment:
       - SECRET_KEY=${HEALTHCHECKS_SECRET_KEY}
-      # SQLite DB must live on the mounted, writable /data volume. Without this,
-      # healthchecks defaults DB_NAME to BASE_DIR/hc.sqlite (/opt/healthchecks,
-      # root-owned, not writable by the hc user) → "unable to open database
-      # file" → HTTP 500 on every route. The /data volume was mounted but unused.
-      - DB=sqlite
-      - DB_NAME=/data/hc.sqlite
+      # v4.0+ requires Postgres or MySQL (SQLite support removed). Use Postgres
+      # for consistency with Paperless. Requires DB_ENGINE, DB_NAME, DB_HOST,
+      # DB_USER, DB_PASSWORD to be set.
+      - DB_ENGINE=postgres
+      - DB_NAME=healthchecks
+      - DB_HOST=healthchecks-db
+      - DB_USER=healthchecks
+      - DB_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:-changeme}
+      - DB_PORT=5432
       - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN:-home}
       # ALLOWED_HOSTS — Django host-header allowlist. Restrict to expected
       # access paths: LAN loopback, Tailscale magicDNS, and the public
@@ -440,6 +479,7 @@ volumes:
   prometheus_data: null
   gatus_data: null
   healthchecks_data: null
+  healthchecks_db: null
 
 networks:
   # External network created by the Lucky docker-compose project so the
