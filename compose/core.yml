@@ -29,7 +29,7 @@ services:
     healthcheck:
       disable: true
   homepage:
-    image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.1.0}
+    image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.13.2}
     container_name: homepage
     restart: unless-stopped
     volumes:
@@ -116,7 +116,7 @@ services:
       # publishes :9000, so the old :9443 target was wrong regardless.
       disable: true
   whats-up-docker:
-    image: ${IMG_WUD:-fmartinou/whats-up-docker:6.7.0}
+    image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
