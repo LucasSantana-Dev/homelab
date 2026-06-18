@@ -426,9 +426,9 @@ services:
     environment:
       - SECRET_KEY=${HEALTHCHECKS_SECRET_KEY}
       # v4.0+ requires Postgres or MySQL (SQLite support removed). Use Postgres
-      # for consistency with Paperless. Requires DB_ENGINE, DB_NAME, DB_HOST,
+      # for consistency with Paperless. Requires DB, DB_NAME, DB_HOST,
       # DB_USER, DB_PASSWORD to be set.
-      - DB_ENGINE=postgres
+      - DB=postgres
       - DB_NAME=healthchecks
       - DB_HOST=healthchecks-db
       - DB_USER=healthchecks
