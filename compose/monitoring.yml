@@ -285,7 +285,7 @@ services:
         max-size: 10m
         max-file: '3'
   loki:
-    image: ${IMG_LOKI:-grafana/loki:2.9.13}
+    image: ${IMG_LOKI:-grafana/loki:3.7.2}
     container_name: loki
     restart: unless-stopped
     volumes:
@@ -315,7 +315,7 @@ services:
         max-size: 10m
         max-file: '3'
   promtail:
-    image: ${IMG_PROMTAIL:-grafana/promtail:2.9.13}
+    image: ${IMG_PROMTAIL:-grafana/promtail:3.7.2}
     container_name: promtail
     restart: unless-stopped
     volumes:
