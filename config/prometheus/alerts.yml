@@ -3,15 +3,6 @@ groups:
     interval: 30s
     rules:
       # Container Down Alerts
-      - alert: ContainerDown
-        expr: up{job="cadvisor"} == 0
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Container {{ $labels.instance }} is down"
-          description: "Container {{ $labels.instance }} has been down for more than 5 minutes."
-
       - alert: CadvisorDown
         expr: up{job="cadvisor"} == 0
         for: 5m
@@ -32,13 +23,13 @@ groups:
             max by (name, image, instance, job) (
               container_spec_memory_limit_bytes{name!="", image!=""}
             )
-          )
+          ) > 0.9
           and on(name, image, instance, job)
           (
             max by (name, image, instance, job) (
               container_spec_memory_limit_bytes{name!="", image!=""}
             ) > 0
-          ) > 0.9
+          )
         for: 10m
         labels:
           severity: warning
@@ -56,13 +47,13 @@ groups:
             max by (name, image, instance, job) (
               container_spec_memory_limit_bytes{name!="", image!=""}
             )
-          )
+          ) > 0.95
           and on(name, image, instance, job)
           (
             max by (name, image, instance, job) (
               container_spec_memory_limit_bytes{name!="", image!=""}
             ) > 0
-          ) > 0.95
+          )
         for: 5m
         labels:
           severity: critical
