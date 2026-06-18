@@ -348,7 +348,7 @@ services:
       # :9080/ready is the correct monitoring (TODO: add the blackbox target).
       disable: true
   gatus:
-    image: ${IMG_GATUS:-twinproduction/gatus:v5.16.0}
+    image: ${IMG_GATUS:-twinproduction/gatus:v5.36.0}
     container_name: gatus
     restart: unless-stopped
     volumes:

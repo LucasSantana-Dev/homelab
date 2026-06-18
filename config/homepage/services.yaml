@@ -6,7 +6,7 @@
     - Stremio:
         icon: stremio
         href: https://stremio.luk-homeserver.com.br
-        description: Streaming
+        description: Streaming server
         container: stremio-server
 
 - Storage:
@@ -15,6 +15,18 @@
         href: https://cloud.luk-homeserver.com.br
         description: Files, photos, sync
         container: nextcloud
+    - Paperless:
+        icon: paperless-ngx
+        href: https://paperless.luk-homeserver.com.br
+        description: Document management
+        container: paperless-ngx
+
+- Home:
+    - Home Assistant:
+        icon: home-assistant
+        href: https://homeassistant.luk-homeserver.com.br
+        description: Home automation
+        container: homeassistant
 
 - Apps:
     - n8n:
@@ -22,13 +34,11 @@
         href: https://n8n.luk-homeserver.com.br
         description: Workflow automation
         container: n8n
-
     - Lucky:
         icon: discord
         href: https://lucky.luk-homeserver.com.br
         description: Discord bot dashboard
         container: lucky-frontend
-
     - Craftvaria:
         icon: minecraft
         href: https://craftvaria.luk-homeserver.com.br
@@ -38,7 +48,7 @@
 - Management:
     - Homelab Manager:
         icon: si-python
-        href: http://homelab.home:8765/health
+        href: https://manager.luk-homeserver.com.br/health
         description: Service health & status API
         container: homelab-manager
         widget:
@@ -56,20 +66,31 @@
             - field: unhealthy
               label: Unhealthy
               format: number
-
     - What's Up Docker:
         icon: si-docker
-        href: http://homelab.home:3003
+        href: https://wud.luk-homeserver.com.br
         description: Container update monitor
         container: whats-up-docker
         widget:
           type: whatsupdocker
           url: http://whats-up-docker:3000
+    - Healthchecks:
+        icon: healthchecks
+        href: https://healthchecks.luk-homeserver.com.br
+        description: Cron job monitoring
+        container: healthchecks
+
+- Backup:
+    - Kopia:
+        icon: kopia
+        href: https://kopia.luk-homeserver.com.br
+        description: Backup & snapshots
+        container: kopia
 
 - Infrastructure:
     - Pi-hole:
         icon: pi-hole
-        href: http://homelab.home:8054/admin
+        href: https://pihole.luk-homeserver.com.br/admin
         description: DNS sinkhole & ad blocking
         container: pihole
         widget:
@@ -77,16 +98,19 @@
           url: http://host.docker.internal:8054
           version: 6
           key: "{{HOMEPAGE_VAR_PIHOLE_KEY}}"
-
     - Gatus:
         icon: si-statuspage
-        href: http://homelab.home:8095
+        href: https://status.luk-homeserver.com.br
         description: Service status & uptime
         container: gatus
-
+    - Grafana:
+        icon: grafana
+        href: https://grafana.luk-homeserver.com.br
+        description: Metrics & dashboards
+        container: grafana
     - Portainer:
         icon: portainer
-        href: http://homelab.home:9000
+        href: https://portainer.luk-homeserver.com.br
         description: Container management
         container: portainer
         widget:
