@@ -37,8 +37,9 @@ def find_free_port() -> int:
 class HTTPServerFixture:
     """Manage HTTP server lifecycle for testing."""
 
-    def __init__(self, health_monitor):
+    def __init__(self, health_monitor, rate_limiter=None):
         self.health_monitor = health_monitor
+        self.rate_limiter = rate_limiter
         self.port = find_free_port()
         self.server = None
         self.thread = None
@@ -47,7 +48,7 @@ class HTTPServerFixture:
         """Start the server in a background thread."""
         from http.server import HTTPServer
 
-        handler_class = _make_handler(self.health_monitor)
+        handler_class = _make_handler(self.health_monitor, self.rate_limiter)
         self.server = HTTPServer(("127.0.0.1", self.port), handler_class)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
@@ -366,3 +367,207 @@ class TestAuthenticationWithAPIKey:
         assert status == 401
         data = json.loads(body)
         assert data == {"error": "Unauthorized"}
+
+
+class TestSecurityHeaders:
+    """Test security headers are present on all responses."""
+
+    def test_health_response_has_security_headers(self, http_server):
+        """Verify 200 response includes all security headers."""
+        from http.client import HTTPConnection
+
+        conn = HTTPConnection("127.0.0.1", http_server.port, timeout=5)
+        try:
+            conn.request("GET", "/health")
+            response = conn.getresponse()
+            response.read()
+            headers = response.headers
+
+            assert headers.get("X-Content-Type-Options") == "nosniff"
+            assert headers.get("X-Frame-Options") == "DENY"
+            assert headers.get("X-XSS-Protection") == "1; mode=block"
+            assert headers.get("Content-Security-Policy") == "default-src 'self'"
+        finally:
+            conn.close()
+
+    def test_404_response_has_security_headers(self, http_server):
+        """Verify 404 response includes all security headers."""
+        from http.client import HTTPConnection
+
+        conn = HTTPConnection("127.0.0.1", http_server.port, timeout=5)
+        try:
+            conn.request("GET", "/nonexistent")
+            response = conn.getresponse()
+            response.read()
+            headers = response.headers
+
+            assert headers.get("X-Content-Type-Options") == "nosniff"
+            assert headers.get("X-Frame-Options") == "DENY"
+            assert headers.get("X-XSS-Protection") == "1; mode=block"
+            assert headers.get("Content-Security-Policy") == "default-src 'self'"
+        finally:
+            conn.close()
+
+    def test_401_response_has_security_headers(self, mock_health_monitor, monkeypatch):
+        """Verify 401 response includes all security headers."""
+        from http.client import HTTPConnection
+
+        monkeypatch.setenv("HOMELAB_API_KEY", "test-secret-key-123")
+        server = HTTPServerFixture(mock_health_monitor)
+        server.start()
+        try:
+            conn = HTTPConnection("127.0.0.1", server.port, timeout=5)
+            try:
+                conn.request("GET", "/health")
+                response = conn.getresponse()
+                response.read()
+                headers = response.headers
+
+                assert headers.get("X-Content-Type-Options") == "nosniff"
+                assert headers.get("X-Frame-Options") == "DENY"
+                assert headers.get("X-XSS-Protection") == "1; mode=block"
+                assert headers.get("Content-Security-Policy") == "default-src 'self'"
+            finally:
+                conn.close()
+        finally:
+            server.stop()
+
+
+class TestRateLimiting:
+    """Test rate limiting returns 429 after exceeding threshold."""
+
+    def test_rate_limit_exceeded_returns_429(self, mock_health_monitor):
+        """Verify rate limit returns 429 after 60+ requests."""
+        from homelab_manager.server.app import RateLimiter
+
+        # Create a fresh rate limiter and server for this test
+        limiter = RateLimiter()
+        server = HTTPServerFixture(mock_health_monitor, rate_limiter=limiter)
+        server.start()
+        try:
+            # Make 61 requests to the same server
+            for i in range(61):
+                status, _ = server.request("/health")
+                if i < 60:
+                    assert status == 200, f"Request {i} should be 200, got {status}"
+                else:
+                    # 61st request should be rate limited
+                    assert (
+                        status == 429
+                    ), f"Request {i} should be 429 (rate limited), got {status}"
+        finally:
+            server.stop()
+
+    def test_rate_limit_response_is_json(self, mock_health_monitor):
+        """Verify 429 response is valid JSON with error message."""
+        from homelab_manager.server.app import RateLimiter
+
+        limiter = RateLimiter()
+        server = HTTPServerFixture(mock_health_monitor, rate_limiter=limiter)
+        server.start()
+        try:
+            # Exceed rate limit
+            for _ in range(61):
+                server.request("/health")
+
+            status, body = server.request("/health")
+            assert status == 429
+            data = json.loads(body)
+            assert data == {"error": "Too many requests"}
+        finally:
+            server.stop()
+
+    def test_rate_limit_has_security_headers(self, mock_health_monitor):
+        """Verify 429 response includes security headers."""
+        from http.client import HTTPConnection
+
+        from homelab_manager.server.app import RateLimiter
+
+        limiter = RateLimiter()
+        server = HTTPServerFixture(mock_health_monitor, rate_limiter=limiter)
+        server.start()
+        try:
+            # Exceed rate limit
+            for _ in range(61):
+                server.request("/health")
+
+            conn = HTTPConnection("127.0.0.1", server.port, timeout=5)
+            try:
+                conn.request("GET", "/health")
+                response = conn.getresponse()
+                response.read()
+                headers = response.headers
+
+                assert headers.get("X-Content-Type-Options") == "nosniff"
+                assert headers.get("X-Frame-Options") == "DENY"
+                assert headers.get("X-XSS-Protection") == "1; mode=block"
+                assert headers.get("Content-Security-Policy") == "default-src 'self'"
+            finally:
+                conn.close()
+        finally:
+            server.stop()
+
+
+class TestQueryParameterValidation:
+    """Test query parameter validation for 'lines' parameter."""
+
+    def test_valid_lines_parameter_accepted(self, http_server):
+        """Verify valid 'lines' parameter (1-10000) is accepted."""
+        status, _ = http_server.request("/health?lines=100")
+        assert status == 200
+
+    def test_invalid_lines_parameter_returns_400(self, http_server):
+        """Verify invalid 'lines' parameter returns 400."""
+        status, body = http_server.request("/health?lines=invalid")
+        assert status == 400
+        data = json.loads(body)
+        assert data == {"error": "lines must be an integer between 1 and 10000"}
+
+    def test_lines_parameter_zero_returns_400(self, http_server):
+        """Verify 'lines' parameter value 0 returns 400."""
+        status, body = http_server.request("/health?lines=0")
+        assert status == 400
+        data = json.loads(body)
+        assert data == {"error": "lines must be an integer between 1 and 10000"}
+
+    def test_lines_parameter_negative_returns_400(self, http_server):
+        """Verify negative 'lines' parameter returns 400."""
+        status, body = http_server.request("/health?lines=-5")
+        assert status == 400
+        data = json.loads(body)
+        assert data == {"error": "lines must be an integer between 1 and 10000"}
+
+    def test_lines_parameter_too_large_returns_400(self, http_server):
+        """Verify 'lines' parameter > 10000 returns 400."""
+        status, body = http_server.request("/health?lines=10001")
+        assert status == 400
+        data = json.loads(body)
+        assert data == {"error": "lines must be an integer between 1 and 10000"}
+
+    def test_lines_parameter_boundary_min(self, http_server):
+        """Verify 'lines' parameter value 1 is accepted."""
+        status, _ = http_server.request("/health?lines=1")
+        assert status == 200
+
+    def test_lines_parameter_boundary_max(self, http_server):
+        """Verify 'lines' parameter value 10000 is accepted."""
+        status, _ = http_server.request("/health?lines=10000")
+        assert status == 200
+
+    def test_lines_parameter_validation_has_security_headers(self, http_server):
+        """Verify 400 response for invalid lines includes security headers."""
+        from http.client import HTTPConnection
+
+        conn = HTTPConnection("127.0.0.1", http_server.port, timeout=5)
+        try:
+            conn.request("GET", "/health?lines=invalid")
+            response = conn.getresponse()
+            response.read()
+            headers = response.headers
+
+            assert headers.get("X-Content-Type-Options") == "nosniff"
+            assert headers.get("X-Frame-Options") == "DENY"
+            assert headers.get("X-XSS-Protection") == "1; mode=block"
+            assert headers.get("Content-Security-Policy") == "default-src 'self'"
+        finally:
+            conn.close()
