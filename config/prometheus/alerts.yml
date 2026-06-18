@@ -233,6 +233,24 @@ groups:
           summary: "Kopia backup container is crash-looping"
           description: "Kopia container has restarted {{ $value | humanize }} times in the last 15 minutes. Investigate logs for the root cause."
 
+      - alert: KopiaSnapshotStale
+        expr: (time() - kopia_last_snapshot_timestamp_seconds) > 172800
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kopia last snapshot older than 48 hours"
+          description: "Last successful snapshot is {{ $value | humanizeDuration }} old. Kopia may be healthy but not actually creating new snapshots."
+
+      - alert: KopiaSnapshotListFailed
+        expr: kopia_snapshot_list_ok == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kopia snapshot list query failed"
+          description: "Failed to query kopia snapshot list. Container may be down, repo unreachable, or authentication failed."
+
   # Lucky-specific alerts. Bot + backend scrape targets are added by
   # PR — once `lucky-monitoring` external network is joined.
   - name: lucky_alerts
@@ -337,3 +355,41 @@ groups:
           summary: "Lucky bot heap >90% used"
           description: "V8 heap {{ $value | humanizePercentage }} full for 10m — risk of OOMKilled."
           runbook: "docs/runbooks/lucky-observability.md#luckybotheaphigh"
+
+  # Deploy drift + deploy-health observability (ADR-0023).
+  - name: homelab_deploy_alerts
+    interval: 1m
+    rules:
+      # Production has been running behind the latest release for too long.
+      - alert: HomelabVersionDrift
+        expr: homelab_version_up_to_date == 0 and homelab_running_version_known == 1 and homelab_latest_version_known == 1
+        for: 7d
+        labels:
+          severity: warning
+        annotations:
+          summary: "Homelab deployed version is behind the latest release"
+          description: "homelab_version_up_to_date=0 for >7d — production is behind the latest release tag. SSH the host and run `make deploy`."
+          runbook: "docs/adr/0023-deploy-drift-observability.md"
+
+      # The most recent make-deploy did not bring the manager up healthy.
+      - alert: HomelabDeployUnhealthy
+        expr: homelab_last_deploy_success == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Last homelab deploy did not report healthy"
+          description: "homelab_last_deploy_success=0 — the most recent `make deploy` finished without homelab-manager reporting ok."
+          runbook: "docs/adr/0023-deploy-drift-observability.md"
+
+      # Meta-healthcheck: the drift exporter itself stopped writing. Without this,
+      # a dead exporter silently reproduces the original blind spot one level up.
+      - alert: HomelabVersionExporterStale
+        expr: time() - homelab_version_exporter_last_run_timestamp_seconds > 25200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Homelab version-drift exporter is stale"
+          description: "No version-drift export in >7h — the exporter (systemd timer) may be dead; drift detection is blind."
+          runbook: "docs/adr/0023-deploy-drift-observability.md"

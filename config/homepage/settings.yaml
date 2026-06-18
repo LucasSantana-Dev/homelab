@@ -35,10 +35,16 @@ layout:
   Storage:
     style: row
     columns: 4
+  Home:
+    style: row
+    columns: 4
   Apps:
     style: row
     columns: 4
   Management:
+    style: row
+    columns: 4
+  Backup:
     style: row
     columns: 4
   Infrastructure:

@@ -1,0 +1,17 @@
+[Unit]
+Description=Homelab Kopia Snapshot Freshness Exporter
+Documentation=file:///opt/homelab/scripts/monitoring/kopia-snapshot-freshness.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/opt/homelab/scripts/monitoring/kopia-snapshot-freshness.sh
+StandardOutput=journal
+StandardError=journal
+Environment="TEXTFILE_DIR=/var/lib/node_exporter/textfile"
+
+[Install]
+WantedBy=multi-user.target
