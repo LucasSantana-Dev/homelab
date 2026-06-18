@@ -63,11 +63,11 @@ class HTTPServerFixture:
         if self.thread:
             self.thread.join(timeout=2)
 
-    def request(self, path: str) -> Tuple[int, str]:
+    def request(self, path: str, headers: dict = None) -> Tuple[int, str]:
         """Make an HTTP GET request and return (status_code, body)."""
         conn = HTTPConnection("127.0.0.1", self.port, timeout=5)
         try:
-            conn.request("GET", path)
+            conn.request("GET", path, headers=headers or {})
             response = conn.getresponse()
             status = response.status
             body = response.read().decode()
@@ -297,3 +297,72 @@ class TestHTTPHeaders:
             assert int(content_length) > 0
         finally:
             conn.close()
+
+
+class TestAuthenticationWithAPIKey:
+    """Test X-API-Key authentication on protected endpoints."""
+
+    @pytest.fixture
+    def protected_http_server(self, mock_health_monitor, monkeypatch):
+        """Start HTTP server with HOMELAB_API_KEY set."""
+        monkeypatch.setenv("HOMELAB_API_KEY", "test-secret-key-123")
+        server = HTTPServerFixture(mock_health_monitor)
+        server.start()
+        yield server
+        server.stop()
+
+    def test_request_with_missing_key_returns_401(self, protected_http_server):
+        """Missing X-API-Key header returns 401 Unauthorized."""
+        status, body = protected_http_server.request("/health")
+        assert status == 401
+
+    def test_request_with_missing_key_returns_error_json(self, protected_http_server):
+        """Missing X-API-Key returns valid error JSON."""
+        _, body = protected_http_server.request("/health")
+        data = json.loads(body)
+        assert data == {"error": "Unauthorized"}
+
+    def test_request_with_wrong_key_returns_401(self, protected_http_server):
+        """Wrong X-API-Key value returns 401 Unauthorized."""
+        status, body = protected_http_server.request(
+            "/health", headers={"X-API-Key": "wrong-key"}
+        )
+        assert status == 401
+
+    def test_request_with_wrong_key_returns_error_json(self, protected_http_server):
+        """Wrong X-API-Key returns valid error JSON."""
+        _, body = protected_http_server.request(
+            "/health", headers={"X-API-Key": "wrong-key"}
+        )
+        data = json.loads(body)
+        assert data == {"error": "Unauthorized"}
+
+    def test_request_with_correct_key_returns_200(self, protected_http_server):
+        """Correct X-API-Key header returns 200 OK."""
+        status, _ = protected_http_server.request(
+            "/health", headers={"X-API-Key": "test-secret-key-123"}
+        )
+        assert status == 200
+
+    def test_request_with_correct_key_returns_health_json(self, protected_http_server):
+        """Correct X-API-Key returns valid health response."""
+        _, body = protected_http_server.request(
+            "/health", headers={"X-API-Key": "test-secret-key-123"}
+        )
+        data = json.loads(body)
+        assert "status" in data
+        assert data["status"] == "ok"
+
+    def test_status_endpoint_requires_auth(self, protected_http_server):
+        """Status endpoint returns 401 without correct X-API-Key."""
+        status, body = protected_http_server.request("/status")
+        assert status == 401
+        data = json.loads(body)
+        assert data == {"error": "Unauthorized"}
+
+    def test_summary_endpoint_requires_auth(self, protected_http_server):
+        """Summary endpoint returns 401 without correct X-API-Key."""
+        status, body = protected_http_server.request("/summary")
+        assert status == 401
+        data = json.loads(body)
+        assert data == {"error": "Unauthorized"}

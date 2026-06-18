@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import secrets
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from homelab_manager import __version__
@@ -39,7 +40,7 @@ def _make_handler(health_monitor: HealthMonitor):
             if not api_key:
                 return True
             provided_key = self.headers.get("X-API-Key")
-            if provided_key != api_key:
+            if not secrets.compare_digest(provided_key or "", api_key):
                 return False
             return True
 
