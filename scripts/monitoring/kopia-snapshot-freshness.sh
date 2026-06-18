@@ -58,10 +58,12 @@ EOF
         return
     fi
 
-    # Extract the latest snapshot's startTime (JSON paths: snapshots[].startTime)
-    # If no snapshots exist, jq returns null → write 0
+    # Extract the latest snapshot's startTime. `kopia snapshot list --json`
+    # emits a top-level JSON array of snapshot manifests (no `.snapshots`
+    # wrapper), each with a `.startTime`. On an empty array max_by → null →
+    # `// empty` yields "" so the no-snapshots branch below writes 0.
     latest_timestamp=$(echo "${snapshot_json}" | \
-        jq -r '.snapshots | max_by(.startTime) | .startTime // empty' 2>/dev/null || echo "")
+        jq -r 'max_by(.startTime) | .startTime // empty' 2>/dev/null || echo "")
 
     if [ -z "${latest_timestamp}" ]; then
         # No snapshots found
