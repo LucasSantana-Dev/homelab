@@ -40,7 +40,9 @@ Examples from recent history:
 
 ## Pull requests
 
-- Base branch is `main`. Linear history is required — no merge commits, all PRs are squash-merged.
+- **Base branch is `release`, not `main`** ([`ADR-0022`](../docs/adr/0022-keep-tag-driven-release-branch-model.md)). Feature, fix, and dependency PRs target the long-lived `release` branch (use `/pr-to-release`). `main` is the released/deployed branch: only a release-cut (`chore/release-*`), a `hotfix/*`, or a reconcile (`chore/reconcile-*`) branch may PR into `main`. The **PR Base Guard** check enforces this — a PR with the wrong head→`main` will fail.
+- Releases batch on `release`, then `/release-cut` opens the `chore/release-vX.Y.Z` PR into `main` and tags it (tag push triggers deploy — [`ADR-0013`](../docs/adr/0013-auto-deploy-pipeline.md)).
+- Linear history is required on `main` — no merge commits, no rebase merges; all PRs into `main` are squash-merged.
 - Required CI checks: `pre-commit`, `test (3.12)`, `repo-hygiene`, `terraform-check`, `CodeQL`. The `docker`, `security`, and `container-security` jobs also run but are advisory.
 - Renovate owns dependency bumps — do not open manual dep-update PRs unless Renovate is misconfigured.
 - If your change is non-trivial, draft a spec under [`docs/specs/`](../docs/specs/) first following the existing format (`spec.md` + `tasks.md`, frontmatter with `status`/`created`/`tags`).

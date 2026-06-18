@@ -1,0 +1,34 @@
+name: PR Base Guard
+
+# Enforces the release-branch routing decided in ADR-0022: feature and
+# dependency work targets `release`; only a release-cut, hotfix, or
+# reconcile branch may open a PR against `main`. This prevents the
+# main<->release divergence that broke /release-cut (see ADR-0022).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, edited, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  base-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce release-branch routing
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            release|chore/release-*|chore/reconcile-*|hotfix/*)
+              echo "OK: '$HEAD_REF' is allowed to target main."
+              ;;
+            *)
+              echo "::error::Per ADR-0022, feature and dependency PRs target 'release', not 'main'."
+              echo "::error::Only 'release', 'chore/release-*', 'hotfix/*', or 'chore/reconcile-*' may PR into main. Got '$HEAD_REF'."
+              echo "Re-target this PR's base to 'release' (via /pr-to-release), or cut a release with /release-cut."
+              exit 1
+              ;;
+          esac

@@ -7,12 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-06-18
+
+> First release cut from the reconciled `release` branch (ADR-0022). Ships the
+> work that had accumulated on `release` but never reached `main`/a deploy tag —
+> kopia freshness monitoring, healthcheck fixes, and the routing gate. The
+> EACCES hotfix already shipped in v2.6.4 and is not repeated here.
+
+### Added
+
+- **kopia snapshot-freshness metric + alert** — exports last-snapshot age and
+  alerts when backups go stale (ADR-0016). (#184)
+- **PR Base Guard** — CI check enforcing the release-branch routing from ADR-0022:
+  feature/dependency PRs must target `release`, not `main`. (#227)
+- **validate-env: parser edge-case test coverage** — multiline values, escaped
+  `$$`, var-name boundaries, with-default refs, malformed YAML (8 tests). (#177)
+- **Backup docs rewrite + kopia restore runbook** — `docs/backup.md` now reflects
+  the actual local kopia repo; new `docs/runbooks/kopia-restore.md`. (#176)
+
+### Fixed
+
+- **Container healthchecks: 8 services stuck `running/unhealthy` (false positives)**
+  — probes called binaries the images don't ship; repaired probes + healthchecks
+  DB path. (#173)
+- **healthcheck: use `127.0.0.1` not `localhost`** in 4 probes (the apps bind IPv4
+  only) (ADR-0018). (#175)
+- **health: bound per-service check timeout** so one hung service can't block the
+  whole sweep. (#183)
+- **public-safety-gate: scope off intentional doc identifiers** + pin black to
+  unbreak release CI. (#185, #186)
+
+### Changed
+
+- **Grafana auth: switch OAuth from Authentik to Google direct** (ADR-0020). (#224)
+- **CI: align watchdog `actions/checkout` to v6.0.2** with the main pipeline. (#178)
+- **deps (Renovate/Dependabot):** `actions/cache` → 5.0.5 (#187),
+  `github/codeql-action` → 4.36.1 (#189), `black` → 26.5.1 (#188),
+  `actions/checkout` → 6.0.3 (#190).
+
 ## [2.6.4] - 2026-06-18
 
 > Cut from `main`. The `release` branch already tags the EACCES hotfix as
-> v2.6.3 (patch-equivalent, see ADR-0019); `main`'s lineage skips 2.6.3, so
-> this version batches the hotfix together with the other commits that landed
-> on `main` since v2.6.2.
+> v2.6.3 (patch-equivalent, see ADR-0019); `main`'s lineage skipped 2.6.3, so
+> this version batched the hotfix together with the other commits that landed
+> on `main` since v2.6.2. After ADR-0022, `main` and `release` are reconciled
+> and both versions appear in this single history.
 
 ### Added
 
@@ -39,6 +78,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   label-cardinality blowups from one-shot containers. (#192)
 - **CLI: scrub exceptions in management command handlers** so stack traces no
   longer leak in command output. (#180)
+
+## [2.6.3] - 2026-06-17
+
+### Fixed
+
+- **homepage: docker socket EACCES (P0 hotfix)** — hardcode `PGID=983` in
+  `compose/core.yml` so `su-exec` drops privileges to UID=1000/GID=983,
+  granting `next-server` direct read access to `/var/run/docker.sock`
+  (`srw-rw---- root:docker`, host GID 983). `group_add: ["983"]` alone is
+  insufficient because `su-exec` resets all supplemental groups when dropping
+  to the node user — only the primary GID survives. (#hotfix)
+- **public-safety-gate hook false-positive** — changed `git ls-files` to
+  `git diff --cached --name-only --` so the pre-commit hook scans staged
+  files only instead of all tracked files, eliminating false-positive blocks
+  on pre-existing committed domain references.
 
 ## [2.6.2] - 2026-05-31
 
