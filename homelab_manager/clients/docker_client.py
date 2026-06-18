@@ -45,10 +45,10 @@ class DockerClientFactory:
         if not self._probed:
             try:
                 self._client = docker.from_env()
+                self._probed = True
             except Exception:
                 logger.debug("docker.from_env() failed", exc_info=True)
                 self._client = None
-            self._probed = True
         return self._client
 
     def is_available(self) -> bool:
