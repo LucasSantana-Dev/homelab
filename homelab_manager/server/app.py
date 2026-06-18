@@ -33,7 +33,20 @@ def _make_handler(health_monitor: HealthMonitor):
             self.end_headers()
             self.wfile.write(encoded)
 
+        def _check_auth(self) -> bool:
+            """Check X-API-Key header if API key is configured."""
+            api_key = os.environ.get("HOMELAB_API_KEY")
+            if not api_key:
+                return True
+            provided_key = self.headers.get("X-API-Key")
+            if provided_key != api_key:
+                return False
+            return True
+
         def do_GET(self):
+            if not self._check_auth():
+                self._send(401, json.dumps({"error": "Unauthorized"}))
+                return
             route = _ROUTES.get(self.path)
             if route == "health":
                 code, body = handle_health(__version__)
@@ -51,6 +64,9 @@ def _make_handler(health_monitor: HealthMonitor):
 
 def run_server(host: str = "127.0.0.1", port: int = 8765) -> None:
     port = int(os.environ.get("HOMELAB_MANAGER_HTTP_PORT", port))
+    api_key = os.environ.get("HOMELAB_API_KEY")
+    if not api_key:
+        logger.warning("HOMELAB_API_KEY not set — all HTTP endpoints are unprotected")
     registry = ServiceRegistry()
     monitor = HealthMonitor(registry=registry)
     handler = _make_handler(monitor)
