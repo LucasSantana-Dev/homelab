@@ -315,7 +315,7 @@ services:
         max-size: 10m
         max-file: '3'
   promtail:
-    image: ${IMG_PROMTAIL:-grafana/promtail:3.7.2}
+    image: ${IMG_PROMTAIL:-grafana/promtail:3.6.11}
     container_name: promtail
     restart: unless-stopped
     volumes:
