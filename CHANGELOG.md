@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-06-18
+
+### Fixed
+
+- **`whats-up-docker` image default `6.7.0` → `6.6.1`** (`compose/core.yml`). `6.7.0`
+  is a non-existent tag (introduced in #230); the compose default now matches
+  `.env.example`, so a deploy without an `IMG_WUD` override no longer fails to pull.
+  (homepage's bad `v1.1.0` default was already corrected to `v1.13.2`.)
+
 ## [2.7.1] - 2026-06-18
 
 ### Added
