@@ -144,8 +144,12 @@ echo "Tables after recovery: $TABLE_COUNT"
 
 if [[ "$TABLE_COUNT" -gt 5 ]]; then
     echo "Recovery successful!"
-    docker restart lucky-backend 2>/dev/null || true
-    echo "lucky-backend restarted."
+    if docker restart lucky-backend 2>/dev/null; then
+        echo "lucky-backend restarted."
+    else
+        echo "WARNING: Recovery succeeded but lucky-backend restart failed."
+        exit 1
+    fi
 else
     echo "ERROR: Recovery failed - still $TABLE_COUNT tables."
     exit 1
