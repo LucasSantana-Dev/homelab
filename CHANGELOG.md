@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-06-18
+
+### Added
+
+- **Deploy observability (ADR-0023)** — `version-drift-exporter` reports running
+  version (from `/health`) vs the latest release tag; `make deploy` records a
+  deploy-health metric; three Prometheus alerts (`HomelabVersionDrift`,
+  `HomelabDeployUnhealthy`, `HomelabVersionExporterStale`). Makes "prod silently
+  behind a release" a loud signal. (#231, #232)
+- **Homepage: service-catalog overhaul** — public domains, refreshed service
+  catalog, and container-update widgets. (#230)
+
+### Fixed
+
+- **`make deploy` now runs `docker compose up -d --build`** (ADR-0010). The
+  `homelab-manager` image was never rebuilt on source change — the root cause of
+  production silently running a stale version (was v2.5.1 vs released v2.7.0).
+
+### Changed
+
+- **Branch strategy reconciled + documented** (ADR-0022): `main`↔`release` were
+  refused a clean `/release-cut`; reconciled by back-merge, and CONTRIBUTING fixed
+  (feature PRs base `release`, not `main`). The **PR Base Guard** CI check enforces it.
+
 ## [2.7.0] - 2026-06-18
 
 > First release cut from the reconciled `release` branch (ADR-0022). Ships the

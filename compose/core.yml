@@ -116,7 +116,7 @@ services:
       # publishes :9000, so the old :9443 target was wrong regardless.
       disable: true
   whats-up-docker:
-    image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
+    image: ${IMG_WUD:-fmartinou/whats-up-docker:6.7.0}
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
