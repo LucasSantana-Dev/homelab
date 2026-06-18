@@ -3,7 +3,7 @@
 
 services:
   caddy-lan:
-    image: ${IMG_CADDY:-caddy:2.10.4-alpine}
+    image: ${IMG_CADDY:-caddy:2.10.2-alpine}
     container_name: caddy-lan
     restart: unless-stopped
     network_mode: host
