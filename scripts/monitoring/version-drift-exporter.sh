@@ -36,8 +36,11 @@ fi
 latest=""
 latest_known=0
 if [ -d "${REPO_DIR}/.git" ]; then
-    git -C "${REPO_DIR}" fetch --tags --quiet 2>/dev/null || true
-    latest="$(git -C "${REPO_DIR}" tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -1 | sed 's/^v//')"
+    # -c safe.directory: under systemd the service runs as root with a clean env
+    # (no HOME/gitconfig), so git rejects the luk-server-owned repo with
+    # "fatal: detected dubious ownership" (exit 128). Scope the exception per-call.
+    git -c safe.directory="${REPO_DIR}" -C "${REPO_DIR}" fetch --tags --quiet 2>/dev/null || true
+    latest="$(git -c safe.directory="${REPO_DIR}" -C "${REPO_DIR}" tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -1 | sed 's/^v//')"
     [ -n "${latest}" ] && latest_known=1
 fi
 
