@@ -1,9 +1,9 @@
 {
   "uid": "lucky-app-metrics",
   "title": "Lucky — Application Metrics",
-  "tags": ["lucky", "prometheus", "bot", "backend"],
+  "tags": ["lucky", "prometheus", "loki", "bot", "backend"],
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "timezone": "browser",
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
@@ -16,6 +16,14 @@
         "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
         "hide": 0,
         "label": "Prometheus"
+      },
+      {
+        "name": "DS_LOKI",
+        "type": "datasource",
+        "query": "loki",
+        "current": { "selected": false, "text": "Loki", "value": "Loki" },
+        "hide": 0,
+        "label": "Loki"
       }
     ]
   },
@@ -319,6 +327,85 @@
           "expr": "lucky_bot_guilds_total{state=\"active\"}",
           "legendFormat": "active",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Logs",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 1 }
+    },
+    {
+      "id": 12,
+      "title": "Lucky — all service logs",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 29, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{container_name=~\"lucky-bot|lucky-backend|lucky-frontend|lucky-webhook\"}",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" }
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Lucky bot — ERROR / WARN",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 39, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{container_name=\"lucky-bot\", level=~\"ERROR|WARN|FATAL\"}",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Lucky backend — ERROR / WARN",
+      "type": "logs",
+      "gridPos": { "x": 12, "y": 39, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{container_name=\"lucky-backend\", level=~\"ERROR|WARN|FATAL\"}",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" }
         }
       ]
     }
