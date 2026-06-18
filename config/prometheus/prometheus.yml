@@ -59,9 +59,11 @@ scrape_configs:
     metrics_path: /metrics
 
   # Lucky backend — /metrics exposed by prom-client (PR #875).
+  # Backend listens on :3000 (not :5000) — wrong port left up=0 + empty
+  # Lucky Application Metrics dashboard panels (2026-06-18 audit).
   - job_name: 'lucky-backend'
     static_configs:
-      - targets: ['lucky-backend:5000']
+      - targets: ['lucky-backend:3000']
         labels:
           service: 'lucky-backend'
           environment: 'production'
