@@ -27,20 +27,26 @@ for _ in $(seq 1 10); do
     sleep 3
 done
 
-# Best-effort metric write (textfile dir is root-owned; skip silently if not writable).
+# Metric write. The node-exporter textfile dir is root-owned but `make deploy`
+# runs as the deploy user, so a direct write fails — fall back to `sudo -n tee`
+# (passwordless sudo is configured on the host). Stays best-effort: if neither
+# path works the deploy-health gate (exit code below) still functions.
+metric_body() {
+    echo "# HELP homelab_last_deploy_timestamp_seconds Unix time of the last make-deploy run"
+    echo "# TYPE homelab_last_deploy_timestamp_seconds gauge"
+    echo "homelab_last_deploy_timestamp_seconds ${now}"
+    echo "# HELP homelab_last_deploy_success 1 if the manager reported healthy after deploy, else 0"
+    echo "# TYPE homelab_last_deploy_success gauge"
+    echo "homelab_last_deploy_success ${success}"
+    echo "# HELP homelab_last_deploy_version_info Version reported by the manager after the last deploy"
+    echo "# TYPE homelab_last_deploy_version_info gauge"
+    [ -n "${version}" ] && echo "homelab_last_deploy_version_info{version=\"${version}\"} 1"
+}
 if [ -w "${TEXTFILE_DIR}" ] || { [ -d "${TEXTFILE_DIR}" ] && touch "${TEXTFILE_DIR}/.w" 2>/dev/null && rm -f "${TEXTFILE_DIR}/.w"; }; then
     tmp="${METRIC_FILE}.tmp"
-    {
-        echo "# HELP homelab_last_deploy_timestamp_seconds Unix time of the last make-deploy run"
-        echo "# TYPE homelab_last_deploy_timestamp_seconds gauge"
-        echo "homelab_last_deploy_timestamp_seconds ${now}"
-        echo "# HELP homelab_last_deploy_success 1 if the manager reported healthy after deploy, else 0"
-        echo "# TYPE homelab_last_deploy_success gauge"
-        echo "homelab_last_deploy_success ${success}"
-        echo "# HELP homelab_last_deploy_version_info Version reported by the manager after the last deploy"
-        echo "# TYPE homelab_last_deploy_version_info gauge"
-        [ -n "${version}" ] && echo "homelab_last_deploy_version_info{version=\"${version}\"} 1"
-    } > "${tmp}" && mv "${tmp}" "${METRIC_FILE}"
+    metric_body > "${tmp}" && mv "${tmp}" "${METRIC_FILE}"
+elif command -v sudo >/dev/null 2>&1; then
+    metric_body | sudo -n tee "${METRIC_FILE}" >/dev/null 2>&1 || true
 fi
 
 if [ "${success}" -eq 1 ]; then
