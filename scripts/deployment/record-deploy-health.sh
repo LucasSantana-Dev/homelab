@@ -16,11 +16,16 @@ now="$(date +%s)"
 
 version=""
 success=0
-if resp="$(curl -s --max-time 8 "${HEALTH_URL}" 2>/dev/null)"; then
-    status="$(printf '%s' "${resp}" | jq -r '.status // empty' 2>/dev/null || echo "")"
-    version="$(printf '%s' "${resp}" | jq -r '.version // empty' 2>/dev/null || echo "")"
-    [ "${status}" = "ok" ] && success=1
-fi
+# Poll: the manager binds :8765 a few seconds after `docker compose up` returns,
+# so a single immediate curl false-fails. Retry up to ~30s before declaring failure.
+for _ in $(seq 1 10); do
+    if resp="$(curl -s --max-time 5 "${HEALTH_URL}" 2>/dev/null)"; then
+        status="$(printf '%s' "${resp}" | jq -r '.status // empty' 2>/dev/null || echo "")"
+        version="$(printf '%s' "${resp}" | jq -r '.version // empty' 2>/dev/null || echo "")"
+        if [ "${status}" = "ok" ]; then success=1; break; fi
+    fi
+    sleep 3
+done
 
 # Best-effort metric write (textfile dir is root-owned; skip silently if not writable).
 if [ -w "${TEXTFILE_DIR}" ] || { [ -d "${TEXTFILE_DIR}" ] && touch "${TEXTFILE_DIR}/.w" 2>/dev/null && rm -f "${TEXTFILE_DIR}/.w"; }; then
