@@ -83,15 +83,66 @@ class TestCreateBackup:
 
 
 class TestRestoreBackup:
+    def test_path_traversal_outside_backup_dir(self, manager, tmp_path):
+        """Test that paths outside backup_dir are rejected"""
+        # Try to restore from parent directory
+        traversal_path = manager.backup_dir.parent / "etc" / "shadow"
+        result = manager.restore_backup(str(traversal_path))
+        assert result["success"] is False
+        assert "must be within the backup directory" in result["error"]
+
+    def test_path_traversal_with_dotdot(self, manager, tmp_path):
+        """Test that ../ sequences are rejected"""
+        # Construct a path that uses ../ to escape backup_dir
+        traversal_path = str(manager.backup_dir / ".." / "evil.tar.gz")
+        result = manager.restore_backup(traversal_path)
+        assert result["success"] is False
+        assert "must be within the backup directory" in result["error"]
+
+    def test_valid_path_within_backup_dir_succeeds_with_valid_file(
+        self, manager, tmp_path
+    ):
+        """Test that valid paths within backup_dir are accepted"""
+        # Create a real backup file inside backup_dir
+        backup_file = manager.backup_dir / "homelab_backup_test.tar.gz"
+        backup_file.write_bytes(b"")
+        captured = {}
+
+        with patch(
+            "homelab_manager.services.backup_manager.CommandSequence"
+        ) as mock_seq:
+            mock_seq.return_value.run.return_value = {"success": True}
+
+            def remember(steps, cwd=None):
+                captured["steps"] = steps
+                captured["cwd"] = cwd
+                return mock_seq.return_value
+
+            mock_seq.side_effect = remember
+            result = manager.restore_backup(str(backup_file))
+            assert result["success"] is True
+            assert "restored successfully" in result["message"]
+
+    def test_directory_not_file_rejected(self, manager, tmp_path):
+        """Test that directories are rejected"""
+        # Create a directory inside backup_dir
+        backup_dir_path = manager.backup_dir / "subdir"
+        backup_dir_path.mkdir(exist_ok=True)
+        result = manager.restore_backup(str(backup_dir_path))
+        assert result["success"] is False
+        assert "must be a regular file" in result["error"]
+
     def test_missing_file_returns_error(self, manager, tmp_path):
-        missing = tmp_path / "no-such.tar.gz"
+        """Test that missing files within backup_dir are reported"""
+        missing = manager.backup_dir / "no-such.tar.gz"
         result = manager.restore_backup(str(missing))
         assert result["success"] is False
         assert "not found" in result["error"]
-        assert str(missing) in result["error"]
 
     def test_success_runs_three_steps_and_attaches_message(self, manager, tmp_path):
-        backup_file = tmp_path / "homelab_backup_x.tar.gz"
+        """Test successful restore runs all three steps"""
+        # Create file in the backup_dir to pass validation
+        backup_file = manager.backup_dir / "homelab_backup_x.tar.gz"
         backup_file.write_bytes(b"")
         captured = {}
 
@@ -114,7 +165,9 @@ class TestRestoreBackup:
             assert captured["cwd"] == manager.project_root
 
     def test_failure_propagates_error(self, manager, tmp_path):
-        backup_file = tmp_path / "homelab_backup_y.tar.gz"
+        """Test that command failure is propagated"""
+        # Create file in the backup_dir to pass validation
+        backup_file = manager.backup_dir / "homelab_backup_y.tar.gz"
         backup_file.write_bytes(b"")
         with patch(
             "homelab_manager.services.backup_manager.CommandSequence"
