@@ -56,9 +56,26 @@ class BackupManager:
 
     def restore_backup(self, backup_path: str) -> Dict:
         """Restore homelab from backup"""
-        backup_file = Path(backup_path)
+        # Resolve paths to prevent traversal attacks
+        backup_file = Path(backup_path).resolve()
+        backup_dir_resolved = Path(self.backup_dir).resolve()
+
+        # Verify backup path is within backup directory
+        try:
+            backup_file.relative_to(backup_dir_resolved)
+        except ValueError:
+            return {
+                "success": False,
+                "error": "Backup path must be within the backup directory",
+            }
+
+        # Verify file exists
         if not backup_file.exists():
             return {"success": False, "error": f"Backup file not found: {backup_path}"}
+
+        # Verify it's a regular file, not a directory or symlink
+        if not backup_file.is_file():
+            return {"success": False, "error": "Backup path must be a regular file"}
 
         console.print(f"🔄 Restoring from backup: {backup_file.name}")
 
