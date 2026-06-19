@@ -93,11 +93,6 @@
         href: https://pihole.luk-homeserver.com.br/admin
         description: DNS sinkhole & ad blocking
         container: pihole
-        widget:
-          type: pihole
-          url: http://host.docker.internal:8054
-          version: 6
-          key: "{{HOMEPAGE_VAR_PIHOLE_KEY}}"
     - Gatus:
         icon: si-statuspage
         href: https://status.luk-homeserver.com.br
