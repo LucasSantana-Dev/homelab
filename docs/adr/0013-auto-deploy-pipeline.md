@@ -1,11 +1,44 @@
 # 0013 — Auto-deploy pipeline: host-side systemd timer + git poll on tag
 
-- **Status:** Accepted
+- **Status:** Superseded (2026-06-18) by ADR-0023 + a compensating CI control — see "Superseded" below.
 - **Date:** 2026-05-16
 - **Deciders:** Lucas Santana
 - **Related:** ADR-0010 (homelab-manager baked image — defines what is built;
   this ADR defines when/where that build runs at deploy time), ADR-0004
-  (drop k3s — single-host operating posture), ADR-0008 (image pinning).
+  (drop k3s — single-host operating posture), ADR-0008 (image pinning),
+  ADR-0023 (deploy drift observability — the superseding decision).
+
+## Superseded (2026-06-18) — keep deliberate deploy, do not build tag-auto-deploy
+
+This ADR was Accepted but **never implemented** (no tag-deploy timer ever ran). A
+`/research-and-decide` review (with `decision-critic`) decided **not to build it**.
+Tag-push auto-deploy is **superseded** by the deliberate `git pull + make deploy`
+model now made reliable + observable, plus one compensating control.
+
+**Why not auto-deploy (single-operator, single prod host):**
+- ADR-0023 fixed the original motivation. The failure that motivated ADR-0013 was
+  silent staleness (prod ran v2.5.1 for ~2 weeks while v2.7.0 shipped). Root cause
+  was the `make deploy` no-`--build` bug — **fixed in ADR-0023** — not the operator
+  forgetting. ADR-0023 also added a version-drift alert that fires when running <
+  latest for >7d, so silent staleness is now caught without auto-deploy.
+- **Auto-deploy would have shipped broken config to prod this week.** PR #230
+  introduced three non-existent image tags (homepage `v1.1.0`, wud `6.7.0`, caddy
+  `2.10.4` — caddy is the reverse-proxy edge). An auto-deploy-on-tag would have
+  pull-failed / taken down ingress; the deliberate model let them be corrected first.
+
+**Compensating control (REQUIRED — the critic's condition for closing this):**
+- The `#230` breakages are a **CI gap, not a deploy-automation argument** (decision-critic).
+  CI already runs `docker compose config` + pulls images for Trivy, but it does **not
+  fail on a non-existent tag** (the pull error is un-gated in a `while` loop). **Harden
+  CI to fail the build if any `docker compose config --images` entry fails to pull**
+  — this catches the bad-tag class pre-merge, the actual root cause. (`compose config`
+  alone is insufficient: a non-existent tag is syntactically valid and only fails at pull.)
+
+**Reopen triggers (rebuild auto-deploy — Option C, approval-gated — if any fire):**
+- Operator unavailable >7 consecutive days with an undeployed released tag.
+- The drift alert is snoozed/ignored >2× in a 4-week window (vigilance not holding).
+- A security patch must ship outside hours and manual SSH+deploy adds >15 min latency.
+- A second operator joins (changes the absence/coordination calculus).
 
 ## Context
 
