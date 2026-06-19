@@ -392,7 +392,7 @@ services:
     environment:
       - POSTGRES_DB=healthchecks
       - POSTGRES_USER=healthchecks
-      - POSTGRES_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:-changeme}
+      - POSTGRES_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:?HEALTHCHECKS_DB_PASSWORD must be set}
       - TZ=${TIMEZONE}
     networks:
       - default
@@ -432,7 +432,7 @@ services:
       - DB_NAME=healthchecks
       - DB_HOST=healthchecks-db
       - DB_USER=healthchecks
-      - DB_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:-changeme}
+      - DB_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:?HEALTHCHECKS_DB_PASSWORD must be set}
       - DB_PORT=5432
       - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN:-home}
       # ALLOWED_HOSTS — Django host-header allowlist. Restrict to expected

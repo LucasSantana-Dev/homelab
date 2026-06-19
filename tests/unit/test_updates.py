@@ -6,16 +6,27 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from homelab_manager.models.service import Service
 from homelab_manager.services.updates import UpdateManager
 
 
 def make_registry(services=None):
-    """Create a mock ServiceRegistry"""
+    """Create a mock ServiceRegistry with proper services dict"""
     registry = Mock()
     registry.services = services or {}
     registry.get_service.return_value = None
     registry.get_service_by_container.return_value = None
     return registry
+
+
+def make_service(service_id, container_name=None):
+    """Create a mock Service"""
+    return Service(
+        id=service_id,
+        name=service_id,
+        category="test",
+        container_name=container_name or service_id,
+    )
 
 
 class TestUpdateManagerInit:
@@ -120,22 +131,26 @@ class TestUpdateService:
     def test_update_service_unknown_service(self):
         """Test update_service returns failure for unknown service"""
         registry = make_registry()
-        registry.get_service.return_value = None
-        registry.get_service_by_container.return_value = None
         manager = UpdateManager(registry=registry)
 
         result = manager.update_service("nonexistent-service")
 
         assert result["success"] is False
-        assert "Unknown service" in result["error"]
+        assert "unknown service" in result["error"]
+
+    def test_update_service_unknown_does_not_invoke_subprocess(self):
+        """Test update_service does NOT invoke subprocess for unknown service"""
+        registry = make_registry()
+        manager = UpdateManager(registry=registry)
+
+        with patch("subprocess.run") as mock_run:
+            manager.update_service("nonexistent-service")
+            mock_run.assert_not_called()
 
     def test_update_service_success_by_id(self):
         """Test update_service succeeds for known service ID"""
-        mock_service = Mock()
-        mock_service.name = "test-service"
-
-        registry = make_registry()
-        registry.get_service.return_value = mock_service
+        service = make_service("test-service")
+        registry = make_registry(services={"test-service": service})
         manager = UpdateManager(registry=registry)
 
         mock_result = Mock()
@@ -147,14 +162,10 @@ class TestUpdateService:
         assert result["success"] is True
         assert "message" in result
 
-    def test_update_service_falls_back_to_container_name(self):
-        """Test update_service falls back to container name lookup"""
-        mock_service = Mock()
-        mock_service.name = "test-service"
-
-        registry = make_registry()
-        registry.get_service.return_value = None
-        registry.get_service_by_container.return_value = mock_service
+    def test_update_service_succeeds_by_container_name(self):
+        """Test update_service succeeds when called by container name"""
+        service = make_service("test-service", container_name="test-container")
+        registry = make_registry(services={"test-service": service})
         manager = UpdateManager(registry=registry)
 
         mock_result = Mock()
@@ -167,11 +178,8 @@ class TestUpdateService:
 
     def test_update_service_subprocess_failure(self):
         """Test update_service returns failure on subprocess error"""
-        mock_service = Mock()
-        mock_service.name = "test-service"
-
-        registry = make_registry()
-        registry.get_service.return_value = mock_service
+        service = make_service("test-service")
+        registry = make_registry(services={"test-service": service})
         manager = UpdateManager(registry=registry)
 
         with patch(
@@ -187,11 +195,8 @@ class TestUpdateService:
 
     def test_update_service_generic_exception(self):
         """Test update_service returns failure on unexpected exception"""
-        mock_service = Mock()
-        mock_service.name = "test-service"
-
-        registry = make_registry()
-        registry.get_service.return_value = mock_service
+        service = make_service("test-service")
+        registry = make_registry(services={"test-service": service})
         manager = UpdateManager(registry=registry)
 
         with patch("subprocess.run", side_effect=RuntimeError("unexpected")):
