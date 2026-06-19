@@ -9,7 +9,9 @@ services:
     # compose file. See config/grafana/provisioning/dashboards/dashboards.yml
     # for the provider config that loads files from this directory.
     - ../config/grafana/provisioning:/etc/grafana/provisioning:ro
+    - ../config/grafana/plugins/grafana-sentry-datasource:/var/lib/grafana/plugins/grafana-sentry-datasource:ro
     environment:
+    - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=grafana-sentry-datasource
     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     - GF_SECURITY_ADMIN_USER=admin
     - GF_USERS_ALLOW_SIGN_UP=false
@@ -74,7 +76,8 @@ services:
     - --storage.path=/alertmanager
     - --cluster.listen-address=
     ports:
-    - ${BIND_IP:-0.0.0.0}:9093:9093
+    - 127.0.0.1:9093:9093
+    - ${TAILSCALE_IP}:9093:9093
     networks:
     - default
     healthcheck:
@@ -154,7 +157,8 @@ services:
     - --storage.tsdb.retention.time=200h
     - --web.enable-lifecycle
     ports:
-    - ${BIND_IP:-0.0.0.0}:${PROMETHEUS_PORT:-9091}:9090
+    - 127.0.0.1:${PROMETHEUS_PORT:-9091}:9090
+    - ${TAILSCALE_IP}:${PROMETHEUS_PORT:-9091}:9090
     networks:
     - default
     # `lucky-monitoring` is an external network owned by the Lucky
@@ -269,6 +273,8 @@ services:
     - default
     healthcheck:
       disable: true
+    mem_limit: 768M
+    memswap_limit: 1536M
     deploy:
       resources:
         limits:
@@ -356,7 +362,8 @@ services:
     - TZ=${TIMEZONE}
     - GATUS_CONFIG_PATH=/config
     ports:
-    - ${BIND_IP:-0.0.0.0}:${GATUS_PORT:-8095}:8080
+    - 127.0.0.1:${GATUS_PORT:-8095}:8080
+    - ${TAILSCALE_IP}:${GATUS_PORT:-8095}:8080
     extra_hosts:
     - host.docker.internal:host-gateway
     networks:
@@ -436,7 +443,7 @@ services:
       # ALLOWED_HOSTS — Django host-header allowlist. Restrict to expected
       # access paths: LAN loopback, Tailscale magicDNS, and the public
       # subdomain. `*` would disable the protection entirely.
-      - ALLOWED_HOSTS=healthchecks.${DOMAIN:-home},${TAILSCALE_IP:-100.64.0.0},localhost,127.0.0.1
+      - ALLOWED_HOSTS=healthchecks.${DOMAIN:-home},${TAILSCALE_IP:-100.64.0.0},localhost,127.0.0.1,healthchecks
       - SITE_ROOT=https://healthchecks.${DOMAIN:-home}
       - SITE_NAME=Homelab Healthchecks
       - SUPERUSER_EMAIL=${HEALTHCHECKS_SUPERUSER_EMAIL}

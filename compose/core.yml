@@ -34,6 +34,7 @@ services:
     restart: unless-stopped
     volumes:
     - ../config/homepage:/app/config
+    - ../config/homepage/icons:/app/public/icons:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
     - PUID=${PUID}
@@ -47,8 +48,12 @@ services:
     - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
     - DOMAIN=${DOMAIN}
     - HOMEPAGE_GITHUB_TOKEN=${HOMEPAGE_GITHUB_TOKEN:-}
-    - HOMEPAGE_VAR_PIHOLE_KEY=${HOMEPAGE_VAR_PIHOLE_KEY:-}
-    - HOMEPAGE_VAR_PORTAINER_KEY=${HOMEPAGE_VAR_PORTAINER_KEY:-}
+    - HOMEPAGE_VAR_PIHOLE_KEY=${HOMEPAGE_VAR_PIHOLE_KEY}
+    - HOMEPAGE_VAR_HEALTHCHECKS_KEY=${HOMEPAGE_VAR_HEALTHCHECKS_KEY}
+    - HOMEPAGE_VAR_PORTAINER_KEY=${HOMEPAGE_VAR_PORTAINER_KEY}
+    - HOMEPAGE_VAR_GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
+    - HOMEPAGE_VAR_KOPIA_PASSWORD=${KOPIA_SERVER_PASSWORD}
+    - HOMEPAGE_VAR_PAPERLESS_PASSWORD=${PAPERLESS_ADMIN_PASSWORD}
     ports:
     - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
     networks:
@@ -131,7 +136,8 @@ services:
     - WUD_SMTP_USER=${WUD_SMTP_USER}
     - WUD_SMTP_PASS=${WUD_SMTP_PASS}
     ports:
-    - ${BIND_IP:-0.0.0.0}:${WUD_PORT:-3003}:3000
+    - 127.0.0.1:${WUD_PORT:-3003}:3000
+    - ${TAILSCALE_IP}:${WUD_PORT:-3003}:3000
     networks:
     - default
     deploy:
