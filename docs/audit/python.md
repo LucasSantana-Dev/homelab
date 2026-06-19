@@ -1,5 +1,7 @@
 # Python Audit — homelab_manager
 
+> **Historical snapshot (2026-04-14)** — This is part of the homelab audit series. Refer to the audit README for current status and follow-up PRs.
+
 ## LOC per file
  1672 total
   315 homelab_manager/cli/commands.py

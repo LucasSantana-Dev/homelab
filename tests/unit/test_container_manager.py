@@ -2,8 +2,6 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
-
 from homelab_manager.services.containers import ContainerManager
 
 

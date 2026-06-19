@@ -89,6 +89,7 @@ jobs:
       # after the typer-based CLI rewrite landed in PR #75. The brittle
       # test_cpu_below_warning_threshold integration test skips on CI runners
       # (M7 hardening). If pytest fails here, the CI run must fail.
+      # Coverage threshold 70: sync with pyproject.toml [tool.coverage.report] fail_under.
       run: |
         pytest tests/ --cov=homelab_manager --cov-report=xml --cov-report=html --cov-fail-under=70 --tb=short -v
 
@@ -148,15 +149,22 @@ jobs:
         PAPERLESS_DB_PASSWORD=test_password_123
         PAPERLESS_SECRET_KEY=test_secret_key_123
         PAPERLESS_ADMIN_PASSWORD=test_password_123
-        AUTHENTIK_SECRET_KEY=test_secret_key_123
-        AUTHENTIK_DB_PASSWORD=test_password_123
-        VAULTWARDEN_ADMIN_TOKEN=test_token_123
+        HEALTHCHECKS_DB_PASSWORD=test_password_123
+        HEALTHCHECKS_SECRET_KEY=test_secret_key_123
+        HEALTHCHECKS_SUPERUSER_EMAIL=admin@example.com
+        HEALTHCHECKS_SUPERUSER_PASSWORD=test_password_123
+        KOPIA_REPO_PASSWORD=test_password_123
+        KOPIA_SERVER_PASSWORD=test_password_123
+        TINYAUTH_ALLOWED_EMAILS=admin@example.com
+        GITHUB_CLIENT_ID=test_client_id_123
+        GITHUB_CLIENT_SECRET=test_client_secret_123
+        GOOGLE_CLIENT_ID=test_client_id_123
+        GOOGLE_CLIENT_SECRET=test_client_secret_123
+        BIND_IP=127.0.0.1
+        CLOUDFLARED_TUNNEL_TOKEN=test_cf_tunnel_token_123
         FORGE_MCP_JWT_SECRET_KEY=test_forge_jwt_secret_key_123
         FORGE_MCP_BASIC_AUTH_PASSWORD=test_forge_basic_auth_password_123
         FORGE_MCP_ADMIN_PASSWORD=test_forge_admin_password_123
-        CF_TUNNEL_TOKEN=test_cf_tunnel_token_123
-        AUTHENTIK_GRAFANA_CLIENT_ID=test_authentik_client_id_123
-        AUTHENTIK_GRAFANA_CLIENT_SECRET=test_authentik_client_secret_123
         EOF
 
     - name: Set up Docker Buildx
@@ -254,15 +262,22 @@ jobs:
         PAPERLESS_DB_PASSWORD=test_password_123
         PAPERLESS_SECRET_KEY=test_secret_key_123
         PAPERLESS_ADMIN_PASSWORD=test_password_123
-        AUTHENTIK_SECRET_KEY=test_secret_key_123
-        AUTHENTIK_DB_PASSWORD=test_password_123
-        VAULTWARDEN_ADMIN_TOKEN=test_token_123
+        HEALTHCHECKS_DB_PASSWORD=test_password_123
+        HEALTHCHECKS_SECRET_KEY=test_secret_key_123
+        HEALTHCHECKS_SUPERUSER_EMAIL=admin@example.com
+        HEALTHCHECKS_SUPERUSER_PASSWORD=test_password_123
+        KOPIA_REPO_PASSWORD=test_password_123
+        KOPIA_SERVER_PASSWORD=test_password_123
+        TINYAUTH_ALLOWED_EMAILS=admin@example.com
+        GITHUB_CLIENT_ID=test_client_id_123
+        GITHUB_CLIENT_SECRET=test_client_secret_123
+        GOOGLE_CLIENT_ID=test_client_id_123
+        GOOGLE_CLIENT_SECRET=test_client_secret_123
+        BIND_IP=127.0.0.1
+        CLOUDFLARED_TUNNEL_TOKEN=test_cf_tunnel_token_123
         FORGE_MCP_JWT_SECRET_KEY=test_forge_jwt_secret_key_123
         FORGE_MCP_BASIC_AUTH_PASSWORD=test_forge_basic_auth_password_123
         FORGE_MCP_ADMIN_PASSWORD=test_forge_admin_password_123
-        CF_TUNNEL_TOKEN=test_cf_tunnel_token_123
-        AUTHENTIK_GRAFANA_CLIENT_ID=test_authentik_client_id_123
-        AUTHENTIK_GRAFANA_CLIENT_SECRET=test_authentik_client_secret_123
         EOF
 
     - name: Set up Docker Buildx

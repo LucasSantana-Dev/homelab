@@ -20,10 +20,9 @@ homelab/
 │   ├── cli_tools.py           # CLI tools
 │   └── cli.py                 # Legacy CLI
 ├── 📁 config/                  # Service configurations
-│   ├── 📁 nginx/              # Nginx configurations
-│   │   ├── nginx.conf
-│   │   ├── homelab-proxy.conf
-│   │   └── nginx-config/
+│   ├── 📁 caddy-lan/          # Caddy LAN reverse proxy configurations
+│   │   ├── Caddyfile
+│   │   └── certificates/
 │   ├── 📁 homepage/           # Homepage configurations
 │   │   ├── services.yaml
 │   │   ├── widgets.yaml
@@ -48,7 +47,6 @@ homelab/
 │   ├── 📁 pihole/             # Pi-hole configurations
 │   ├── 📁 stremio/            # Stremio configurations
 │   ├── 📁 portainer/          # Portainer configurations
-│   ├── 📁 uptime-kuma/        # Uptime Kuma configurations
 │   ├── 📁 whats-up-docker/    # What's Up Docker configurations
 │   │   └── wud-config.json    # What's Up Docker configuration
 │   └── cloudflared-config.yml   # Cloudflare tunnel configuration
@@ -77,7 +75,6 @@ homelab/
 │   ├── pihole/
 │   ├── stremio/
 │   ├── portainer/
-│   ├── uptime-kuma/
 │   └── whats-up-docker/
 ├── 📁 backups/                # Backup storage
 ├── 📁 logs/                   # Log files
@@ -117,14 +114,12 @@ homelab/
 
 ## 📋 **Service Configuration Structure**
 
-### **Nginx Configuration**
+### **Caddy LAN Reverse Proxy Configuration**
 
 ```
-config/nginx/
-├── nginx.conf                 # Main Nginx configuration
-├── homelab-proxy.conf        # Proxy configuration
-└── nginx-config/
-    └── conf.d/               # Additional configurations
+config/caddy-lan/
+├── Caddyfile                 # Main Caddy configuration
+└── certificates/             # Auto-managed TLS certificates
 ```
 
 ### **Homepage Configuration**
@@ -188,12 +183,12 @@ config_path = Path("config/nginx/nginx.conf")
 ### **Docker Compose Integration**
 
 ```yaml
-# docker-compose.yml
+# docker-compose.yml (core.yml)
 services:
-  nginx:
+  caddy-lan:
     volumes:
-      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./config/nginx/nginx-config/conf.d:/etc/nginx/conf.d:ro
+      - ./config/caddy-lan/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
 ```
 
 ### **Interactive CLI**

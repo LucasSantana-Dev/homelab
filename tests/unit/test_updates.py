@@ -4,8 +4,6 @@
 import subprocess
 from unittest.mock import Mock, patch
 
-import pytest
-
 from homelab_manager.models.service import Service
 from homelab_manager.services.updates import UpdateManager
 

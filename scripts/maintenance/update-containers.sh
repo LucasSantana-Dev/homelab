@@ -70,17 +70,15 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Container groups for safe rolling updates (order matters)
-declare -a GROUP_DATABASES=("nextcloud-db" "authentik-db" "paperless-db" "nextcloud-redis" "authentik-redis" "paperless-redis")
-declare -a GROUP_SECURITY=("authentik-server" "authentik-worker")
-declare -a GROUP_CORE=("caddy-lan" "homepage" "homeassistant" "vaultwarden")
+declare -a GROUP_DATABASES=("nextcloud-db" "paperless-db" "nextcloud-redis" "paperless-redis")
+declare -a GROUP_CORE=("caddy-lan" "homepage" "homeassistant")
 declare -a GROUP_APPS=("jellyfin" "stremio-server" "n8n" "nextcloud" "paperless-ngx" "filebrowser")
-declare -a GROUP_MONITORING=("prometheus" "grafana" "loki" "promtail" "alertmanager" "netdata" "blackbox-exporter" "node-exporter" "cadvisor")
-declare -a GROUP_UTILITIES=("portainer" "uptime-kuma" "whats-up-docker" "pihole")
+declare -a GROUP_MONITORING=("prometheus" "grafana" "loki" "promtail" "alertmanager" "blackbox-exporter" "node-exporter" "cadvisor")
+declare -a GROUP_UTILITIES=("portainer" "whats-up-docker" "pihole")
 
 # Health check wait times per group (seconds)
 declare -A GROUP_WAIT_TIMES=(
     ["databases"]=30
-    ["security"]=25
     ["core"]=20
     ["apps"]=20
     ["monitoring"]=15
@@ -95,7 +93,6 @@ UNCHANGED_CONTAINERS=0
 declare -a UPDATED_LIST=()
 declare -a FAILED_LIST=()
 declare -a UNCHANGED_LIST=()
-RELOAD_NGINX_AFTER_AUTHENTIK=0
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -175,65 +172,6 @@ EOF
 container_exists() {
     local container_name="$1"
     docker ps -a --format '{{.Names}}' | grep -q "^${container_name}$"
-}
-
-requires_nginx_reload_for_container() {
-    local container_name="$1"
-    case "$container_name" in
-        authentik-server|authentik-worker)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-queue_nginx_reload_after_authentik_update() {
-    local container_name="$1"
-
-    if requires_nginx_reload_for_container "$container_name"; then
-        RELOAD_NGINX_AFTER_AUTHENTIK=1
-        log_info "Queued caddy-lan reload after $container_name recreate to refresh Authentik upstream resolution"
-    fi
-}
-
-reload_nginx_proxy_after_authentik_updates() {
-    if [[ "$RELOAD_NGINX_AFTER_AUTHENTIK" -eq 0 ]]; then
-        return 0
-    fi
-
-    log "Refreshing caddy-lan after Authentik updates..."
-
-    if ! container_exists "caddy-lan"; then
-        log_warning "caddy-lan container not found; skipping Authentik post-update reload"
-        return 0
-    fi
-
-    local caddy_status
-    caddy_status=$(docker inspect --format='{{.State.Status}}' caddy-lan 2>/dev/null || echo "not_found")
-    if [[ "$caddy_status" != "running" ]]; then
-        log_warning "caddy-lan is not running (status: $caddy_status); skipping Authentik post-update reload"
-        return 0
-    fi
-
-    if docker exec caddy-lan caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "caddy-lan reloaded after Authentik updates"
-        RELOAD_NGINX_AFTER_AUTHENTIK=0
-        return 0
-    fi
-
-    log_warning "caddy-lan reload failed after Authentik updates; attempting recreate fallback"
-    if docker compose -f "$HOMELAB_DIR/docker-compose.yml" up -d --no-deps --force-recreate caddy-lan 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "caddy-lan recreated after Authentik updates"
-        RELOAD_NGINX_AFTER_AUTHENTIK=0
-        return 0
-    fi
-
-    log_error "Failed to refresh caddy-lan after Authentik updates"
-    FAILED_LIST+=("caddy-lan(refresh-after-authentik)")
-    FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
-    return 1
 }
 
 # Check container health
@@ -397,8 +335,6 @@ update_container() {
         FAILED_CONTAINERS=$((FAILED_CONTAINERS + 1))
         return 1
     fi
-
-    queue_nginx_reload_after_authentik_update "$container_name"
 
     local new_digest
     new_digest=$(get_image_digest "$container_name")
@@ -694,8 +630,6 @@ main() {
 
     # Update groups in safe order
     update_group "databases" "${GROUP_WAIT_TIMES[databases]}" "${GROUP_DATABASES[@]}"
-    update_group "security" "${GROUP_WAIT_TIMES[security]}" "${GROUP_SECURITY[@]}"
-    reload_nginx_proxy_after_authentik_updates
     update_group "core" "${GROUP_WAIT_TIMES[core]}" "${GROUP_CORE[@]}"
     update_group "apps" "${GROUP_WAIT_TIMES[apps]}" "${GROUP_APPS[@]}"
     update_group "monitoring" "${GROUP_WAIT_TIMES[monitoring]}" "${GROUP_MONITORING[@]}"
@@ -750,7 +684,6 @@ case "${1:-}" in
         preflight_checks
         log "Would update the following groups:"
         log "  Databases: ${GROUP_DATABASES[*]}"
-        log "  Security: ${GROUP_SECURITY[*]}"
         log "  Core: ${GROUP_CORE[*]}"
         log "  Apps: ${GROUP_APPS[*]}"
         log "  Monitoring: ${GROUP_MONITORING[*]}"

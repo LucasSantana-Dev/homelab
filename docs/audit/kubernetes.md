@@ -1,5 +1,7 @@
 # Kubernetes / Helm Audit
 
+> **Historical snapshot (2026-04-14)** — This is part of the homelab audit series. Some services listed here have since been retired. Refer to the audit README for current status.
+
 ## Cluster state
       1 observability promtail-promtail-k5j8d Evicted 0
       1 observability prometheus-prometheus-7d867d959b-v48ml Completed 9

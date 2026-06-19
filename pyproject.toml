@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "homelab-manager"
-version = "2.8.0"
+version = "2.9.0"
 description = "Modern homelab management CLI"
 authors = [{name = "Luk Homelab", email = "luk@homelab.com"}]
 license = { text = "MIT" }
@@ -104,6 +104,8 @@ skip = [".git", ".mypy_cache", ".pytest_cache", ".venv", "venv", "build", "dist"
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
+# Gradual typing: disallow_untyped_defs is false to permit incremental adoption.
+# Warnings surface untyped code; enforcement deferred to a later strictness wave.
 disallow_untyped_defs = false
 explicit_package_bases = true
 exclude = [

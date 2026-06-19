@@ -7,10 +7,7 @@ and the check=False option.
 """
 
 import subprocess
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from homelab_manager.utils.command_sequence import CommandSequence, Step
 
