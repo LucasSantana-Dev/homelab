@@ -101,9 +101,7 @@ monitor: ## Open monitoring dashboards
 	@echo "Available dashboards:"
 	@echo "  • Grafana:     https://grafana.homelab.example.com"
 	@echo "  • Prometheus:  https://prometheus.homelab.example.com"
-	@echo "  • Netdata:     https://netdata.homelab.example.com"
 	@echo "  • cAdvisor:    https://cadvisor.homelab.example.com"
-	@echo "  • Uptime Kuma: https://uptime.homelab.example.com"
 	@if command -v xdg-open >/dev/null 2>&1; then \
 		xdg-open https://grafana.homelab.example.com; \
 	elif command -v open >/dev/null 2>&1; then \
@@ -598,7 +596,6 @@ urls: ## Show service URLs
 	@echo "🔬 Monitoring Dashboards"
 	@echo "========================"
 	@echo "Prometheus:      https://prometheus.homelab.example.com"
-	@echo "Netdata:         https://netdata.homelab.example.com"
 	@echo "cAdvisor:        https://cadvisor.homelab.example.com"
 	@echo ""
 	@echo "📊 Security Reports"

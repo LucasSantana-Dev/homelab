@@ -69,17 +69,6 @@ services:
     description: "Docker container management UI"
     sensitive: true
 
-  uptime-kuma:
-    name: "Uptime Kuma"
-    category: core
-    container_name: uptime-kuma
-    port: 3001
-    internal_port: 3001
-    health_endpoint: "/"
-    description: "Uptime monitoring"
-    sensitive: false
-    url_path: "uptime"
-
   whats-up-docker:
     name: "What's Up Docker"
     category: core

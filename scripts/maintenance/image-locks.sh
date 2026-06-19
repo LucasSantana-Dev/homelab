@@ -8,12 +8,9 @@ HOMELAB_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 ENV_FILE="${HOMELAB_DIR}/.env"
 
 LOCK_KEYS=(
-    "IMG_NGINX"
     "IMG_CLOUDFLARED"
     "IMG_HOMEASSISTANT"
-    "IMG_VAULTWARDEN"
     "IMG_PIHOLE"
-    "IMG_AUTHENTIK_SERVER"
     "IMG_POSTGRES_15_ALPINE"
     "IMG_REDIS_ALPINE"
     "IMG_NEXTCLOUD"
@@ -28,12 +25,9 @@ LOCK_KEYS=(
 )
 
 declare -A KEY_DEFAULTS=(
-    [IMG_NGINX]="nginx:alpine"
     [IMG_CLOUDFLARED]="cloudflare/cloudflared:latest"
     [IMG_HOMEASSISTANT]="ghcr.io/home-assistant/home-assistant:stable"
-    [IMG_VAULTWARDEN]="vaultwarden/server:latest"
     [IMG_PIHOLE]="pihole/pihole:latest"
-    [IMG_AUTHENTIK_SERVER]="ghcr.io/goauthentik/server:latest"
     [IMG_POSTGRES_15_ALPINE]="postgres:15-alpine"
     [IMG_REDIS_ALPINE]="redis:alpine"
     [IMG_NEXTCLOUD]="nextcloud:latest"
@@ -48,14 +42,11 @@ declare -A KEY_DEFAULTS=(
 )
 
 declare -A KEY_CONTAINERS=(
-    [IMG_NGINX]="nginx-proxy"
     [IMG_CLOUDFLARED]="cloudflared"
     [IMG_HOMEASSISTANT]="homeassistant"
-    [IMG_VAULTWARDEN]="vaultwarden"
     [IMG_PIHOLE]="pihole"
-    [IMG_AUTHENTIK_SERVER]="authentik-server authentik-worker"
-    [IMG_POSTGRES_15_ALPINE]="authentik-db paperless-db"
-    [IMG_REDIS_ALPINE]="authentik-redis nextcloud-redis paperless-redis"
+    [IMG_POSTGRES_15_ALPINE]="paperless-db healthchecks-db"
+    [IMG_REDIS_ALPINE]="nextcloud-redis paperless-redis"
     [IMG_NEXTCLOUD]="nextcloud"
     [IMG_MARIADB]="nextcloud-db"
     [IMG_N8N]="n8n"
