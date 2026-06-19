@@ -7,6 +7,8 @@ services:
     # Home Assistant requires root for USB device access (Zigbee/Z-Wave dongles via /dev/tty*)
     # and the supervisor's /config/deps install step. Bridge-networked, not host-networked.
     user: root
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
     - ../config/homeassistant/config:/config
     - /etc/localtime:/etc/localtime:ro

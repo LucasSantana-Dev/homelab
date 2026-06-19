@@ -288,6 +288,8 @@ services:
     image: ${IMG_LOKI:-grafana/loki:3.7.2}
     container_name: loki
     restart: unless-stopped
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
     - ../appdata/loki:/loki
     - ../config/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
@@ -318,6 +320,8 @@ services:
     image: ${IMG_PROMTAIL:-grafana/promtail:3.6.11}
     container_name: promtail
     restart: unless-stopped
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
     - ../config/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
     - /var/log:/var/log:ro

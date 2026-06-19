@@ -10,6 +10,8 @@ services:
     # H2 hardening: dropped explicit user:root. Image's default 'node' user is UID 1000.
     # Server prerequisite: `sudo chown -R 1000:1000 ../appdata/n8n` before next deploy.
     user: "1000:1000"
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
       - ../appdata/n8n:/home/node/.n8n
     environment:
@@ -47,6 +49,8 @@ services:
     image: ${IMG_MARIADB:-mariadb:11.4.10}
     container_name: nextcloud-db
     restart: unless-stopped
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
       - ../appdata/nextcloud/db:/var/lib/mysql
     environment:
@@ -82,6 +86,8 @@ services:
     image: ${IMG_REDIS_ALPINE:-redis:7.4-alpine}
     container_name: nextcloud-redis
     restart: unless-stopped
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
       - ../appdata/nextcloud/redis:/data
     command: redis-server --save 60 1 --loglevel warning
@@ -159,6 +165,8 @@ services:
     image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
     container_name: paperless-db
     restart: unless-stopped
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
       - ../appdata/paperless/db:/var/lib/postgresql/data
     environment:
@@ -193,6 +201,8 @@ services:
     image: ${IMG_REDIS_ALPINE:-redis:7.4-alpine}
     container_name: paperless-redis
     restart: unless-stopped
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     volumes:
       - ../appdata/paperless/redis:/data
     command: redis-server --save 60 1 --loglevel warning

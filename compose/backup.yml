@@ -9,6 +9,8 @@ services:
     restart: unless-stopped
     hostname: homelab-kopia
     user: root
+    labels:
+      - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
     environment:
       - TZ=${TIMEZONE}
       # Repo encryption password — consumed by `repository create/connect` below.
