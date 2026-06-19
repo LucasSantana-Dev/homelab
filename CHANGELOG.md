@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-06-18
+
+### Added
+
+- **Loki/Promtail 2.9.13 → 3.7.2/3.6.11** — upgraded to Loki 3.x with TSDB schema; Promtail pinned to 3.6.11 (latest published; 3.7.2 not released). (#237)
+- **Healthchecks v3.7 → v4.2 with Postgres** — SQLite removed in v4; migrated to a dedicated Postgres sidecar. Requires HEALTHCHECKS_DB_PASSWORD env var. (#235)
+- **Grafana deploy-observability dashboard** — scrape job for Lucky backend + deploy-observability dashboard added to provisioning. (#241)
+- **ADR-0021** — skill header constraint enforcement strategy documented. (#228)
+
+### Fixed
+
+- **Prometheus alerts** — corrected broken alert rules, stale SSO refs, and service reliability thresholds. (#221)
+- **Promtail default tag** — downgraded erroneous default 3.7.2 → 3.6.11  (3.7.2 not published on DockerHub). (#237)
+- **Monitoring: lucky-backend scrape port** — corrected port 5000 → 3000 ; deploy-health write fixed. (#242)
+- **Cloudflared ingress** — added 7 missing subdomains (portainer, pihole, manager, kopia, paperless, healthchecks, wud) that caused DNS_PROBE_POSSIBLE / 502 errors. Kopia now protected behind tinyauth. (#240)
+- **Security audit remediation** — critical/high vulnerabilities from security audit resolved. (#234)
+
+
 ## [2.7.4] - 2026-06-18
 
 ### Fixed

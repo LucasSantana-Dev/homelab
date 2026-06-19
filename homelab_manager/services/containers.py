@@ -17,7 +17,7 @@ class ContainerManager:
 
     def __init__(self, registry: Optional[ServiceRegistry] = None):
         self.registry = registry or ServiceRegistry()
-        self.deployment = DeploymentManager()
+        self.deployment = DeploymentManager(registry=self.registry)
         self.backup = BackupManager()
         self.status = StatusManager(registry=self.registry)
 

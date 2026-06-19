@@ -76,5 +76,40 @@ ingress:
     originRequest:
       httpHostHeader: status.luk-homeserver.com.br
 
+  - hostname: portainer.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: portainer.luk-homeserver.com.br
+
+  - hostname: pihole.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: pihole.luk-homeserver.com.br
+
+  - hostname: manager.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: manager.luk-homeserver.com.br
+
+  - hostname: kopia.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: kopia.luk-homeserver.com.br
+
+  - hostname: paperless.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: paperless.luk-homeserver.com.br
+
+  - hostname: healthchecks.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: healthchecks.luk-homeserver.com.br
+
+  - hostname: wud.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: wud.luk-homeserver.com.br
+
   # Final catch-all — cloudflared returns 404 for any hostname not listed above.
   - service: http_status:404

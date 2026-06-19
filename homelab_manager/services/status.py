@@ -111,10 +111,30 @@ class StatusManager:
         except Exception:
             return "unknown"
 
+    def _validate_service_name(self, service_name: str) -> tuple[bool, str]:
+        """Validate service_name is in the registry.
+
+        Returns (is_valid, error_msg). If registry is None, skips validation.
+        """
+        if self.registry is None:
+            return True, ""
+        known = {s.id for s in self.registry.services.values()} | {
+            s.container_name for s in self.registry.services.values()
+        }
+        if service_name not in known:
+            return (
+                False,
+                f"unknown service {service_name!r}. Known services: {sorted(known)}",
+            )
+        return True, ""
+
     def get_service_logs(self, service_name: str, lines: int = 50) -> str:
         """Get logs for a specific service.
 
         R1 Phase D: thin wrapper over ComposeCLI.logs(). H6 allowlist + M1
         stderr scrub live in clients.compose_cli — see audit-deep notes there.
         """
+        is_valid, error_msg = self._validate_service_name(service_name)
+        if not is_valid:
+            return error_msg
         return self._compose.logs(service_name, lines=lines)

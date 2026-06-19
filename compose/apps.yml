@@ -108,7 +108,7 @@ services:
 
   # Nextcloud Cloud Storage - Tailscale Only
   nextcloud:
-    image: ${IMG_NEXTCLOUD:-nextcloud:29-fpm-alpine}
+    image: ${IMG_NEXTCLOUD:-nextcloud:29-apache}
     container_name: nextcloud
     restart: unless-stopped
     volumes:

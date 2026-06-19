@@ -78,7 +78,7 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 1
 fi
 
-check_non_empty_env "CF_TUNNEL_TOKEN"
+check_non_empty_env "CLOUDFLARED_TUNNEL_TOKEN"
 check_non_empty_env "AUTHENTIK_ALLOWED_EMAIL"
 check_non_empty_env "AUTHENTIK_ALLOWED_GITHUB_USERNAME"
 check_non_empty_env "AUTHENTIK_SESSION_DAYS"
@@ -110,7 +110,7 @@ else
 fi
 
 outpost_status=""
-if is_container_running "nginx-proxy"; then
+if is_container_running "caddy-lan"; then
     outpost_status="$(curl -k -sS -o /dev/null -w "%{http_code}" "https://127.0.0.1:8443/outpost.goauthentik.io/auth/nginx" -H "Host: ${outpost_probe_host}" || true)"
 elif is_container_running "authentik-server"; then
     outpost_status="$(docker exec -i -e AK_OUTPOST_HOST="${outpost_probe_host}" authentik-server python3 - <<'PY' 2>/dev/null || true

@@ -3,15 +3,6 @@ groups:
     interval: 30s
     rules:
       # Container Down Alerts
-      - alert: ContainerDown
-        expr: up{job="homelab-services"} == 0
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Container {{ $labels.instance }} is down"
-          description: "Container {{ $labels.instance }} has been down for more than 5 minutes."
-
       - alert: CadvisorDown
         expr: up{job="cadvisor"} == 0
         for: 5m
@@ -30,9 +21,15 @@ groups:
             )
             /
             max by (name, image, instance, job) (
-              container_spec_memory_limit_bytes{name!="", image!=""} > 0
+              container_spec_memory_limit_bytes{name!="", image!=""}
             )
           ) > 0.9
+          and on(name, image, instance, job)
+          (
+            max by (name, image, instance, job) (
+              container_spec_memory_limit_bytes{name!="", image!=""}
+            ) > 0
+          )
         for: 10m
         labels:
           severity: warning
@@ -48,9 +45,15 @@ groups:
             )
             /
             max by (name, image, instance, job) (
-              container_spec_memory_limit_bytes{name!="", image!=""} > 0
+              container_spec_memory_limit_bytes{name!="", image!=""}
             )
           ) > 0.95
+          and on(name, image, instance, job)
+          (
+            max by (name, image, instance, job) (
+              container_spec_memory_limit_bytes{name!="", image!=""}
+            ) > 0
+          )
         for: 5m
         labels:
           severity: critical
@@ -117,7 +120,7 @@ groups:
 
       # Docker Container Restart Alerts
       - alert: ContainerRestarting
-        expr: rate(container_start_time_seconds[5m]) > 0
+        expr: changes(container_start_time_seconds[5m]) > 3
         for: 1m
         labels:
           severity: warning

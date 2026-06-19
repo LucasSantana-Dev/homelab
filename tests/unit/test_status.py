@@ -144,6 +144,11 @@ class TestGetServiceLogs:
             registry.get_service.side_effect = lambda n: (
                 object() if n == "grafana" else None
             )
+            # Add services dict for validation: grafana is known by id and container_name
+            grafana_service = MagicMock()
+            grafana_service.id = "grafana"
+            grafana_service.container_name = "grafana"
+            registry.services = {"grafana": grafana_service}
             m.registry = registry
             yield m
 
