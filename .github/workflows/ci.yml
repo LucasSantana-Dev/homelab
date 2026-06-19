@@ -89,6 +89,7 @@ jobs:
       # after the typer-based CLI rewrite landed in PR #75. The brittle
       # test_cpu_below_warning_threshold integration test skips on CI runners
       # (M7 hardening). If pytest fails here, the CI run must fail.
+      # Coverage threshold 70: sync with pyproject.toml [tool.coverage.report] fail_under.
       run: |
         pytest tests/ --cov=homelab_manager --cov-report=xml --cov-report=html --cov-fail-under=70 --tb=short -v
 
