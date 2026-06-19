@@ -12,6 +12,10 @@ services:
     - ../config/grafana/plugins/grafana-sentry-datasource:/var/lib/grafana/plugins/grafana-sentry-datasource:ro
     environment:
     - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=grafana-sentry-datasource
+    # Consumed by the Sentry datasource provisioning (authToken: ${SENTRY_AUTH_TOKEN}).
+    # Grafana interpolates provisioning vars from its own process env, so the token
+    # must be passed into the container — not just present in the host .env.
+    - SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     - GF_SECURITY_ADMIN_USER=admin
     - GF_USERS_ALLOW_SIGN_UP=false
@@ -445,6 +449,12 @@ services:
       # subdomain. `*` would disable the protection entirely.
       - ALLOWED_HOSTS=healthchecks.${DOMAIN:-home},${TAILSCALE_IP:-100.64.0.0},localhost,127.0.0.1,healthchecks
       - SITE_ROOT=https://healthchecks.${DOMAIN:-home}
+      # caddy/cloudflared terminate TLS and proxy plain http to this container.
+      # Without this Django treats the request as http, so the https browser
+      # Origin mismatches and every login POST fails CSRF (403). Honor the
+      # proxy's X-Forwarded-Proto so Django knows the request originated https.
+      # (healthchecks has no CSRF_TRUSTED_ORIGINS env; this is the supported knob.)
+      - SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
       - SITE_NAME=Homelab Healthchecks
       - SUPERUSER_EMAIL=${HEALTHCHECKS_SUPERUSER_EMAIL}
       - SUPERUSER_PASSWORD=${HEALTHCHECKS_SUPERUSER_PASSWORD}
