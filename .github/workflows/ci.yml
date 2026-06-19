@@ -187,7 +187,7 @@ jobs:
         pip install -e ".[dev]"
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.30.0
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
       with:
         scan-type: 'fs'
         scan-ref: '.'
@@ -269,12 +269,40 @@ jobs:
       uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
     - name: Run Trivy on Docker Compose config
-      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.30.0
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
       with:
         scan-type: 'config'
         scan-ref: 'docker-compose.yml'
         format: 'sarif'
         output: 'trivy-docker-config.sarif'
+
+    - name: Verify image tags exist (ADR-0013 compensating control)
+      run: |
+        # A non-existent image tag passes `docker compose config` (valid syntax) but
+        # fails at deploy-time pull — which would break prod (ADR-0013 supersede; PR
+        # #230 shipped homepage v1.1.0 / wud 6.7.0 / caddy 2.10.4, none of which exist).
+        # Fail the build here, pre-merge. Locally-built images (a `build:` section, e.g.
+        # homelab-manager:local) are skipped — they aren't on a registry.
+        set -uo pipefail
+        built=$(docker compose config --format json 2>/dev/null \
+          | python3 -c "import json,sys; d=json.load(sys.stdin); print(' '.join(s.get('image','') for s in d.get('services',{}).values() if s.get('build')))" 2>/dev/null || true)
+        fail=0
+        # process substitution keeps the loop in the parent shell so `fail` propagates
+        while read -r image; do
+          [ -z "$image" ] && continue
+          case " $built " in *" $image "*) echo "  - skip (built locally): $image"; continue ;; esac
+          if docker manifest inspect "$image" >/dev/null 2>&1; then
+            echo "  ✓ exists: $image"
+          else
+            echo "::error::image tag does not exist on its registry: $image"
+            fail=1
+          fi
+        done < <(docker compose config --images | sort -u)
+        if [ "$fail" -ne 0 ]; then
+          echo "❌ one or more image tags do not exist — fix the tag (compose default or .env) before merge."
+          exit 1
+        fi
+        echo "✅ all referenced image tags exist on their registries"
 
     - name: Scan container images
       run: |
