@@ -22,6 +22,19 @@ LOCK_KEYS=(
     "IMG_ALERTMANAGER"
     "IMG_CADVISOR"
     "IMG_PAPERLESS_BASE"
+    "IMG_BLACKBOX"
+    "IMG_CADDY"
+    "IMG_CROWDSEC"
+    "IMG_GATUS"
+    "IMG_HEALTHCHECKS"
+    "IMG_HOMEPAGE"
+    "IMG_KOPIA"
+    "IMG_LOKI"
+    "IMG_NODE_EXPORTER"
+    "IMG_PROMTAIL"
+    "IMG_STREMIO"
+    "IMG_TINYAUTH"
+    "IMG_WUD"
 )
 
 declare -A KEY_DEFAULTS=(
@@ -39,6 +52,19 @@ declare -A KEY_DEFAULTS=(
     [IMG_ALERTMANAGER]="prom/alertmanager:latest"
     [IMG_CADVISOR]="gcr.io/cadvisor/cadvisor:latest"
     [IMG_PAPERLESS_BASE]="ghcr.io/paperless-ngx/paperless-ngx:latest"
+    [IMG_BLACKBOX]="prom/blackbox-exporter:v0.28.0"
+    [IMG_CADDY]="caddy:2.10.2-alpine"
+    [IMG_CROWDSEC]="crowdsecurity/crowdsec:v1.7.8"
+    [IMG_GATUS]="twinproduction/gatus:v5.36.0"
+    [IMG_HEALTHCHECKS]="healthchecks/healthchecks:v4.2"
+    [IMG_HOMEPAGE]="ghcr.io/gethomepage/homepage:v1.13.2"
+    [IMG_KOPIA]="kopia/kopia:0.21.1"
+    [IMG_LOKI]="grafana/loki:3.7.2"
+    [IMG_NODE_EXPORTER]="prom/node-exporter:v1.9.1"
+    [IMG_PROMTAIL]="grafana/promtail:3.6.11"
+    [IMG_STREMIO]="stremio/server:v4.21.0"
+    [IMG_TINYAUTH]="ghcr.io/steveiliop56/tinyauth:v5.0.7"
+    [IMG_WUD]="fmartinou/whats-up-docker:6.6.1"
 )
 
 declare -A KEY_CONTAINERS=(
@@ -55,6 +81,20 @@ declare -A KEY_CONTAINERS=(
     [IMG_PROMETHEUS]="prometheus"
     [IMG_ALERTMANAGER]="alertmanager"
     [IMG_CADVISOR]="cadvisor"
+    [IMG_PAPERLESS_BASE]="paperless-ngx"
+    [IMG_BLACKBOX]="blackbox-exporter"
+    [IMG_CADDY]="caddy-lan"
+    [IMG_CROWDSEC]="crowdsec"
+    [IMG_GATUS]="gatus"
+    [IMG_HEALTHCHECKS]="healthchecks"
+    [IMG_HOMEPAGE]="homepage"
+    [IMG_KOPIA]="kopia"
+    [IMG_LOKI]="loki"
+    [IMG_NODE_EXPORTER]="node-exporter"
+    [IMG_PROMTAIL]="promtail"
+    [IMG_STREMIO]="stremio-server"
+    [IMG_TINYAUTH]="tinyauth"
+    [IMG_WUD]="whats-up-docker"
 )
 
 usage() {
