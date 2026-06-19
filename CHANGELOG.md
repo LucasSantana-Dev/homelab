@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-06-19
+
+### Added
+
+- **Loki logs on the Lucky Project dashboard** — a "Lucky — Service Logs (Loki)" panel so Sentry errors and Loki logs sit side by side (previously the Project dashboard was Sentry-only). (#260)
+- **Homepage refresh** — Star Wars (Yoda) favicon/logo, `boxedWidgets` layout, Paperless and Kopia service widgets, and service-card depth styling. (#260)
+
+### Changed
+
+- **Security hardening** — Prometheus, Alertmanager, Gatus, What's-Up-Docker, and Stremio now bind to `127.0.0.1` + the Tailscale IP instead of `0.0.0.0`, removing unintended LAN exposure. (#260)
+- **Repo reconciled with verified host config** — Gatus endpoint cleanup (dropped retired Open WebUI/Craftvaria; Nextcloud/Stremio switched to Docker-DNS), a protected public `lucky` Caddy route, the cadvisor `mem_limit` re-added for real enforcement (`deploy.resources` is ignored without swarm), and `healthchecks` added to the Healthchecks `ALLOWED_HOSTS`. (#260)
+- **Homepage Pi-hole widget** reverted to link-only.
+
+### Fixed
+
+- **Healthchecks login CSRF 403** — added `SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https` so Django honors the proxy's forwarded scheme (Caddy/Cloudflared terminate TLS upstream); same-origin login POSTs now pass CSRF. (#260)
+- **Grafana Sentry datasource "No data"** — `SENTRY_AUTH_TOKEN` is now passed into the Grafana container and the datasource provisioning uses Grafana's `$__env{}` secure-field syntax (bare `${VAR}` does not interpolate into `secureJsonData`). (#260)
+
 ## [2.9.0] - 2026-06-19
 
 ### Added
