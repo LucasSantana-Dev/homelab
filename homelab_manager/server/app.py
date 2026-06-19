@@ -93,10 +93,19 @@ def _make_handler(
                 return False
             return True
 
+        def _client_ip(self) -> str:
+            """Real client IP — prefer the first X-Forwarded-For hop. The server binds
+            127.0.0.1, so the socket peer is always the trusted local proxy
+            (caddy/cloudflared); keying the rate limit on the proxy IP would lump all
+            users into one bucket and cause cross-user 429s (cubic #5)."""
+            xff = self.headers.get("X-Forwarded-For")
+            if xff:
+                return xff.split(",")[0].strip()
+            return self.client_address[0]
+
         def _check_rate_limit(self) -> bool:
-            """Check if client IP is within rate limit."""
-            client_ip = self.client_address[0]
-            return _actual_rate_limiter.is_allowed(client_ip)
+            """Check if the client IP is within rate limit."""
+            return _actual_rate_limiter.is_allowed(self._client_ip())
 
         def _validate_query_param_lines(self) -> tuple[bool, str | None]:
             """
@@ -126,16 +135,16 @@ def _make_handler(
                 return False, "lines must be an integer between 1 and 10000"
 
         def do_GET(self):
-            # Check auth first
-            if not self._check_auth():
-                self._send_secure_response(401, json.dumps({"error": "Unauthorized"}))
-                return
-
-            # Check rate limit after auth but before route dispatch
+            # Rate-limit BEFORE auth so invalid-key attempts are throttled, not just
+            # 401'd without bound (cubic #2: 401 brute-force/flood was unthrottled).
             if not self._check_rate_limit():
                 self._send_secure_response(
                     429, json.dumps({"error": "Too many requests"})
                 )
+                return
+
+            if not self._check_auth():
+                self._send_secure_response(401, json.dumps({"error": "Unauthorized"}))
                 return
 
             # Validate query parameters
