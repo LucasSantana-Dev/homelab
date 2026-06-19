@@ -1,8 +1,10 @@
 # Network Segmentation Migration Guide
 
+> **Historical snapshot** — This guide documents a migration plan that has been superseded. The homelab has evolved since this plan was drafted; refer to `docs/project-structure.md` for current architecture.
+
 ## Overview
 
-This guide documents the migration of 27 services from a single default bridge network to a segmented network architecture with four isolated networks. This migration is **deferred to a maintenance window** due to the risk of service disruption.
+This guide documents a proposed migration of services from a single default bridge network to a segmented network architecture with four isolated networks. This migration is **deferred** — the current architecture uses a simplified overlay with Caddy (LAN proxy) and Cloudflared (WAN tunnel) for ingress.
 
 ## Network Architecture
 
@@ -26,18 +28,19 @@ This guide documents the migration of 27 services from a single default bridge n
 
 ### Frontend Network (172.20.0.0/24)
 
-User-facing services accessible via Nginx reverse proxy:
+User-facing services accessible via reverse proxy (Caddy LAN, Cloudflared WAN):
 
-- `nginx` (also monitoring) - Routes to all services, Prometheus metrics
+- `caddy-lan` - LAN reverse proxy (replaces retired Nginx)
 - `homepage` - Dashboard
 - `homeassistant` - Home automation
 - `stremio` - Media server
-- `vaultwarden` - Password manager
 - `jellyfin` - Media server
 - `n8n` - Workflow automation
 - `nextcloud` - Cloud storage
 - `pihole` - DNS/Ad blocker
 - `filebrowser` - File manager
+
+**Retired**: `nginx`, `vaultwarden` (SSO handled by tinyauth)
 
 ### Monitoring Network (172.22.0.0/24)
 
@@ -51,10 +54,10 @@ Observability and monitoring services:
 - `promtail` (also backend) - Log collection
 - `node-exporter` - Host metrics
 - `cadvisor` - Container metrics
-- `netdata` - Real-time monitoring
-- `uptime-kuma` (also frontend) - Status page
 - `whats-up-docker` (also frontend) - Container updates
 - `portainer` (also frontend) - Container management
+
+**Retired**: `netdata`, `uptime-kuma` (status page now handled via Healthchecks)
 
 ### Backend Network (172.21.0.0/24, Internal)
 
@@ -112,8 +115,8 @@ Database services without internet access:
 Update `docker-compose.yml` for frontend services:
 
 ```yaml
-# Nginx - Routes to all services
-nginx:
+# Caddy LAN - Routes to all services
+caddy-lan:
   networks:
     - frontend
     - monitoring  # For Prometheus metrics
@@ -128,10 +131,6 @@ homeassistant:
     - frontend
 
 stremio:
-  networks:
-    - frontend
-
-vaultwarden:
   networks:
     - frontend
 
@@ -155,17 +154,17 @@ filebrowser:
 **Deploy frontend services:**
 
 ```bash
-docker compose up -d --no-deps nginx homepage homeassistant stremio vaultwarden jellyfin n8n pihole filebrowser
+docker compose up -d --no-deps caddy-lan homepage homeassistant stremio jellyfin n8n pihole filebrowser
 ```
 
 **Validation:**
 
 ```bash
 # Check services are up
-docker ps | grep -E 'nginx|homepage|homeassistant|stremio|vaultwarden|jellyfin|n8n|pihole|filebrowser'
+docker ps | grep -E 'caddy-lan|homepage|homeassistant|stremio|jellyfin|n8n|pihole|filebrowser'
 
 # Test access via homepage
-curl -I https://homelab.example.com
+curl -I https://homelab.local
 ```
 
 ### Step 2: Monitoring Services (Medium Risk)
@@ -207,16 +206,7 @@ cadvisor:
   networks:
     - monitoring
 
-netdata:
-  networks:
-    - monitoring
-
 # Multi-network monitoring services
-uptime-kuma:
-  networks:
-    - frontend  # User access
-    - monitoring  # Monitor other services
-
 whats-up-docker:
   networks:
     - frontend  # User access
@@ -231,7 +221,7 @@ portainer:
 **Deploy monitoring services:**
 
 ```bash
-docker compose up -d --no-deps prometheus grafana alertmanager blackbox-exporter loki node-exporter cadvisor netdata uptime-kuma whats-up-docker portainer
+docker compose up -d --no-deps prometheus grafana alertmanager blackbox-exporter loki node-exporter cadvisor whats-up-docker portainer
 ```
 
 **Validation:**

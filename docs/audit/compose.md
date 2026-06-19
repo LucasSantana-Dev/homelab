@@ -1,5 +1,7 @@
 # Compose / Dockerfile Audit
 
+> **Historical snapshot (2026-04-14)** — This is part of the homelab audit series. Some services listed here have since been retired (e.g., authentik, vaultwarden, nginx, netdata, uptime-kuma). Refer to the audit README for current status and follow-up PRs.
+
 ## Services using :latest or no pin
 compose/apps.yml:7:    image: ${IMG_N8N:-n8nio/n8n:latest}
 compose/apps.yml:46:    image: ${IMG_MARIADB:-mariadb:latest}

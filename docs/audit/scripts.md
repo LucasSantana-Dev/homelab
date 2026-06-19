@@ -1,5 +1,7 @@
 # Scripts Audit
 
+> **Historical snapshot (2026-04-14)** — This is part of the homelab audit series. Refer to the audit README for current status and follow-up PRs.
+
 ## Count by dir
 31  scripts/maintenance/
 11  scripts/migration/

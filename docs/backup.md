@@ -13,12 +13,13 @@ Homelab uses **kopia** with a **local filesystem repository** for automated encr
 
 ## Scope
 
-The repository backs up two source trees:
+The repository backs up three source trees:
 - `/docker-volumes`: All Docker named volumes (e.g., PostgreSQL, Redis, app state)
-- `~/homelab/appdata`: Caddy config, certificates, Pi-hole settings, etc.
+- `~/homelab/appdata`: Application data (Pi-hole, Stremio, etc.)
+- `~/homelab/config`: Service configurations (Caddy, Prometheus, Grafana, Pi-hole, Home Assistant, etc.)
 
 **Excluded intentionally** (same-disk interim repo):
-- `/home/` bulk data (~183 GB) — reserved for offsite target
+- `/home/` bulk media (~183 GB) — reserved for offsite target
 
 See **Caveats** below.
 
@@ -34,6 +35,7 @@ The kopia service runs in `compose/backup.yml`:
   - `/opt/kopia-repo:/repo` (the actual backup destination, read-write)
   - `/var/lib/docker/volumes:/source/docker-volumes:ro` (backup source)
   - `/home/luk-server/homelab/appdata:/source/appdata:ro` (backup source)
+  - `/home/luk-server/homelab/config:/source/config:ro` (service configurations, backed up since PR #247)
 
 ### Initialization
 
@@ -79,12 +81,14 @@ Example output:
   2026-05-29 15:32:41 UTC k8s7a+2e4b...  /source/docker-volumes (12.2 GB)
   2026-05-30 15:32:52 UTC k9f3b+5c1d...  /source/appdata (234 MB)
   2026-05-29 15:32:48 UTC k9f3b+5c1e...  /source/appdata (233 MB)
+  2026-05-30 15:32:58 UTC k7d2c+9e5a...  /source/config (45 MB)
+  2026-05-29 15:32:54 UTC k7d2c+9e5b...  /source/config (44 MB)
 ```
 
 ### Manual Snapshot (Force Backup Now)
 
 ```bash
-docker exec kopia kopia snapshot create /source/docker-volumes /source/appdata
+docker exec kopia kopia snapshot create /source/docker-volumes /source/appdata /source/config
 ```
 
 The server will also create snapshots automatically on its 24-hour schedule.
@@ -160,7 +164,7 @@ docker logs kopia | tail -20
 ```
 
 Common causes:
-- Source paths `/source/docker-volumes` or `/source/appdata` not mounted
+- Source paths `/source/docker-volumes`, `/source/appdata`, or `/source/config` not mounted
 - Disk space at `/opt/kopia-repo` exhausted
 - kopia server crashed and didn't restart (see container status)
 
@@ -175,7 +179,7 @@ Use the exact snapshot ID from the output, or use `latest` to restore the most r
 
 ## Cost & Space
 
-Typical homelab (docker volumes ~5.4 GB + appdata ~7.3 GB):
+Typical homelab (docker volumes ~5.4 GB + appdata ~7.3 GB + config ~45 MB):
 - **Local repo size**: ~5–15 GB (depends on deduplication and retention count)
 - **Offsite cost** (B2, future): ~$6–10/month for 100 GB
 - **Network egress** (B2, future): Minimal after initial sync; incremental
