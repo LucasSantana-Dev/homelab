@@ -195,6 +195,11 @@ http://kopia.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:51515
 }
 
+http://lucky.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:8090
+}
+
 # ---------- Catch-all ----------
 
 :80 {

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Rebind no-auth services off 0.0.0.0 to 127.0.0.1 + Tailscale** — prometheus, alertmanager, gatus, whats-up-docker, and stremio now dual-bind to 127.0.0.1 and ${TAILSCALE_IP}, closing unauthenticated exposure on LAN and Tailscale networks. registry binds at runtime and awaits runtime-compose integration.
+- **Remove hardcoded widget keys from compose** — pihole and portainer API keys removed from homepage environment variables in compose, now read from .env only.
+
+### Fixed
+
+- **Add lucky public route** — added public caddy block for lucky service with tinyauth protection and localhost:8090 reverse proxy.
+- **Fix gatus widget port** — homepage widgets.yaml gatus URL changed from service DNS to host.docker.internal for correct port access.
+- **WUD tag-exclude filter** — added label to 12 services (homeassistant, homepage, caddy-lan, crowdsec, kopia, loki, promtail, n8n, nextcloud-db, nextcloud-redis, paperless-db, paperless-redis, portainer, whats-up-docker) to exclude non-release tags (beta, alpha, nightly, dev, etc.) and short git SHAs from WUD image update checks.
+
 ## [2.9.0] - 2026-06-19
 
 ### Added

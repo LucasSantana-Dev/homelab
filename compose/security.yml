@@ -78,6 +78,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
 
 volumes:
   pihole_data: null

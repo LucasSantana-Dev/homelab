@@ -13,7 +13,8 @@ services:
     - ../config/stremio:/root/.stremio-server
     - stremio_cache:/root/.stremio-server/stremio-cache
     ports:
-    - ${BIND_IP:-0.0.0.0}:11470:11470
+    - 127.0.0.1:11470:11470
+    - ${TAILSCALE_IP}:11470:11470
     networks:
     - default
     deploy:

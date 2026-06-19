@@ -41,6 +41,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
 
   # Nextcloud Database - MariaDB
   nextcloud-db:
@@ -76,6 +78,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
 
   # Nextcloud Redis Cache
   nextcloud-redis:
@@ -105,6 +109,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
 
   # Nextcloud Cloud Storage - Tailscale Only
   nextcloud:
@@ -187,6 +193,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
 
   # Paperless Redis Broker
   paperless-redis:
@@ -216,6 +224,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
 
   # Paperless-ngx Document Management
   paperless-ngx:

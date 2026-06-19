@@ -30,6 +30,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
 
 volumes:
   caddy_lan_data:

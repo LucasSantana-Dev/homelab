@@ -47,8 +47,8 @@ services:
     - HOMEASSISTANT_KEY=${HOMEASSISTANT_KEY}
     - DOMAIN=${DOMAIN}
     - HOMEPAGE_GITHUB_TOKEN=${HOMEPAGE_GITHUB_TOKEN:-}
-    - HOMEPAGE_VAR_PIHOLE_KEY=${HOMEPAGE_VAR_PIHOLE_KEY:-}
-    - HOMEPAGE_VAR_PORTAINER_KEY=${HOMEPAGE_VAR_PORTAINER_KEY:-}
+    - HOMEPAGE_VAR_PIHOLE_KEY=${HOMEPAGE_VAR_PIHOLE_KEY}
+    - HOMEPAGE_VAR_PORTAINER_KEY=${HOMEPAGE_VAR_PORTAINER_KEY}
     ports:
     - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
     networks:
@@ -81,6 +81,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
   portainer:
     image: ${IMG_PORTAINER:-portainer/portainer-ce:2.42.0}
     container_name: portainer
@@ -115,6 +117,8 @@ services:
       # blackbox-exporter instead (TODO: add the target). Also: container only
       # publishes :9000, so the old :9443 target was wrong regardless.
       disable: true
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
   whats-up-docker:
     image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
     container_name: whats-up-docker
@@ -131,7 +135,8 @@ services:
     - WUD_SMTP_USER=${WUD_SMTP_USER}
     - WUD_SMTP_PASS=${WUD_SMTP_PASS}
     ports:
-    - ${BIND_IP:-0.0.0.0}:${WUD_PORT:-3003}:3000
+    - 127.0.0.1:${WUD_PORT:-3003}:3000
+    - ${TAILSCALE_IP}:${WUD_PORT:-3003}:3000
     networks:
     - default
     deploy:
@@ -160,6 +165,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
   homelab-manager:
     image: homelab-manager:local
     build:

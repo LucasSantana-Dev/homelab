@@ -74,7 +74,8 @@ services:
     - --storage.path=/alertmanager
     - --cluster.listen-address=
     ports:
-    - ${BIND_IP:-0.0.0.0}:9093:9093
+    - 127.0.0.1:9093:9093
+    - ${TAILSCALE_IP}:9093:9093
     networks:
     - default
     healthcheck:
@@ -154,7 +155,8 @@ services:
     - --storage.tsdb.retention.time=200h
     - --web.enable-lifecycle
     ports:
-    - ${BIND_IP:-0.0.0.0}:${PROMETHEUS_PORT:-9091}:9090
+    - 127.0.0.1:${PROMETHEUS_PORT:-9091}:9090
+    - ${TAILSCALE_IP}:${PROMETHEUS_PORT:-9091}:9090
     networks:
     - default
     # `lucky-monitoring` is an external network owned by the Lucky
@@ -312,6 +314,8 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
   promtail:
     image: ${IMG_PROMTAIL:-grafana/promtail:3.6.11}
     container_name: promtail
@@ -345,6 +349,8 @@ services:
       # observable via Loki ingestion, and an external blackbox-exporter probe of
       # :9080/ready is the correct monitoring (TODO: add the blackbox target).
       disable: true
+    labels:
+    - "wud.tag.exclude=(?i)(windows|beta|alpha|nightly|dev|debug|dependabot|insider|^main-|^feature|^rc-|-rc$|ltsc|armv7|32bit|^[0-9a-f]{7,40}$)"
   gatus:
     image: ${IMG_GATUS:-twinproduction/gatus:v5.36.0}
     container_name: gatus
@@ -356,7 +362,8 @@ services:
     - TZ=${TIMEZONE}
     - GATUS_CONFIG_PATH=/config
     ports:
-    - ${BIND_IP:-0.0.0.0}:${GATUS_PORT:-8095}:8080
+    - 127.0.0.1:${GATUS_PORT:-8095}:8080
+    - ${TAILSCALE_IP}:${GATUS_PORT:-8095}:8080
     extra_hosts:
     - host.docker.internal:host-gateway
     networks:

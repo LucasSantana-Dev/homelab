@@ -18,4 +18,4 @@
     target: _blank
 
 - gatus:
-    url: http://gatus:8095
+    url: http://host.docker.internal:8095
