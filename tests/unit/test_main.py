@@ -2,7 +2,6 @@
 
 from unittest.mock import Mock
 
-import pytest
 from typer.testing import CliRunner
 
 from homelab_manager.cli import create_app

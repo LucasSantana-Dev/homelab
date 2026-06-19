@@ -17,7 +17,7 @@ import threading
 import time
 from http.client import HTTPConnection
 from typing import Tuple
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

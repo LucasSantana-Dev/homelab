@@ -5,7 +5,6 @@ Covers: config validation for automation services, deployment restart of
 homeassistant, and HTTP health checks for automation endpoints.
 """
 
-import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest

@@ -132,7 +132,7 @@ class TestRestartService:
         # creates a default ServiceRegistry(), which may be empty if
         # services.yaml doesn't exist in the test environment.
         mock_cli.run_result.return_value = {"success": True}
-        result = manager_no_registry.restart_service("any-service")
+        manager_no_registry.restart_service("any-service")
         # If the default registry is empty, validation will reject any service.
         # If services.yaml exists, "any-service" might pass if it's defined there.
         # To be safe, we just verify the manager has a registry.
