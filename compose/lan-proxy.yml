@@ -23,6 +23,7 @@ services:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
       interval: 30s
       timeout: 5s
+      start_period: 10s
       retries: 3
     logging:
       driver: "json-file"
