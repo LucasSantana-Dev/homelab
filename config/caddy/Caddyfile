@@ -23,6 +23,11 @@ http://craftvaria.home {
 	reverse_proxy 127.0.0.1:3333
 }
 
+http://lucky.luk-homeserver.com.br {
+	import protected
+	reverse_proxy 127.0.0.1:8090
+}
+
 http://lucky.home {
 	reverse_proxy 127.0.0.1:8090
 }

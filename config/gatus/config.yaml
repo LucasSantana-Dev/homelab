@@ -22,7 +22,7 @@ endpoints:
 
   - name: Nextcloud
     group: storage
-    url: https://cloud.luk-homeserver.com.br/status.php
+    url: http://nextcloud:80/status.php
     interval: 60s
     conditions:
       - "[STATUS] == 200"
@@ -30,17 +30,10 @@ endpoints:
 
   - name: Stremio
     group: media
-    url: http://host.docker.internal:11470/
+    url: http://stremio-server:11470/
     interval: 60s
     conditions:
-      - "[STATUS] == 200"
-
-  - name: Open WebUI
-    group: apps
-    url: http://host.docker.internal:3000/
-    interval: 60s
-    conditions:
-      - "[STATUS] == any(200, 302, 307)"
+      - "[STATUS] == any(200, 307)"
 
   - name: Lucky Web
     group: apps
@@ -49,29 +42,23 @@ endpoints:
     conditions:
       - "[STATUS] == any(200, 301, 302)"
 
-  - name: Craftvaria Admin
-    group: apps
-    url: http://host.docker.internal:3333/
-    interval: 60s
-    conditions:
-      - "[STATUS] == any(200, 301, 302)"
-
-  - name: Pi-hole DNS
-    group: infrastructure
-    dns:
-      query-name: pi.hole
-      query-type: A
-    url: 192.168.0.11:53
-    interval: 60s
-    conditions:
-      - "[DNS_RCODE] == NOERROR"
-
-  - name: Pi-hole Web
-    group: infrastructure
-    url: http://host.docker.internal:8054/admin/
-    interval: 60s
-    conditions:
-      - "[STATUS] == any(200, 301, 302, 403)"
+  # Pi-hole DNS & Web checks disabled — Pi-hole runs on host network, not reachable from gatus container
+  # - name: Pi-hole DNS
+  #   group: infrastructure
+  #   dns:
+  #     query-name: pi.hole
+  #     query-type: A
+  #   url: 192.168.0.11:53
+  #   interval: 60s
+  #   conditions:
+  #     - "[DNS_RCODE] == NOERROR"
+  #
+  # - name: Pi-hole Web
+  #   group: infrastructure
+  #   url: http://host.docker.internal:8054/admin/
+  #   interval: 60s
+  #   conditions:
+  #     - "[STATUS] == any(200, 301, 302, 403)"
 
   - name: Portainer
     group: infrastructure

@@ -27,7 +27,10 @@ datasources:
       orgSlug: lucas-santana-gm
       projectSlug: luk-bot
     secureJsonData:
-      authToken: ${SENTRY_AUTH_TOKEN}
+      # Grafana's reliable env-injection for secure fields is $__env{}, not bare
+      # ${VAR} (whose interpolation does not apply to secureJsonData). Requires
+      # SENTRY_AUTH_TOKEN to be passed into the grafana container (compose env).
+      authToken: $__env{SENTRY_AUTH_TOKEN}
     version: 1
 
   # Node Exporter - System metrics (using main Prometheus instance)

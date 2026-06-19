@@ -22,3 +22,33 @@ span[title="Stopped"].status-dot,
 span[title="Exited"].status-dot {
   box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.6);
 }
+
+/* Group section separation + depth hierarchy */
+.group-section {
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+.group-section:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+
+/* Enhanced service card depth for dark theme */
+.service-block {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border: 1px solid rgba(71, 85, 105, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.service-block:hover {
+  transform: translateY(-2px);
+  background: rgba(30, 41, 59, 0.9) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  border-color: rgba(71, 85, 105, 0.4);
+}
+
+/* Ops groups (Management/Infrastructure) get subtle accent */
+[data-group-id="management"],
+[data-group-id="infrastructure"] {
+  background: rgba(15, 23, 42, 0.4);
+}
