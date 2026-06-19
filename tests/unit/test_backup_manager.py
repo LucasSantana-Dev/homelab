@@ -7,7 +7,6 @@ existence check + 3-step sequence. Heavy use of CommandSequence patching
 to keep tests fast and side-effect-free.
 """
 
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest

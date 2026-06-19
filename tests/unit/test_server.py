@@ -1,9 +1,7 @@
 """Unit tests for homelab_manager HTTP server."""
 
 import json
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from homelab_manager.server.routes import handle_health, handle_status, handle_summary
 

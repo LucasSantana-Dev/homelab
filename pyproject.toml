@@ -104,6 +104,8 @@ skip = [".git", ".mypy_cache", ".pytest_cache", ".venv", "venv", "build", "dist"
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
+# Gradual typing: disallow_untyped_defs is false to permit incremental adoption.
+# Warnings surface untyped code; enforcement deferred to a later strictness wave.
 disallow_untyped_defs = false
 explicit_package_bases = true
 exclude = [

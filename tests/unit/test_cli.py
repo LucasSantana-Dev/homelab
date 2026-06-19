@@ -2,7 +2,6 @@
 
 from unittest.mock import Mock
 
-import pytest
 import typer
 from typer.testing import CliRunner
 
