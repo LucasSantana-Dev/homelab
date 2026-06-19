@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-06-19
+
+### Added
+
+- **Kopia backs up `config/`** — service configs (Home Assistant, Grafana, Pi-hole, Caddy) are now included in Kopia's backup scope alongside docker-volumes and appdata, closing a gap where a Home Assistant config loss was unrecoverable. (#247)
+- **Image-lock coverage for 13 more images** — caddy, kopia, loki, promtail, gatus, healthchecks, tinyauth, blackbox-exporter, node-exporter, stremio, whats-up-docker, homepage, and crowdsec are now tracked for digest-pinning. (#251)
+
+### Changed
+
+- **Compose hygiene** — added `start_period` to the caddy-lan healthcheck (prevents false-fail rollbacks), removed the deprecated cadvisor `mem_limit`/`memswap_limit`, and removed the obsolete `observability/docker-compose.yml` duplicate stack. (#249)
+- **CI: fail on non-existent image tags** — `docker compose config` validation now verifies every referenced image tag exists on its registry, and the test env provides all required compose variables (ADR-0013 compensating control). (#245)
+- **Tighter quality gates** — flake8 `F401`/`F841` now enforced (unused imports/vars removed repo-wide), coverage-threshold sync documented, and mypy gradual-typing intent noted. (#252)
+
+### Fixed
+
+- **Cubic review findings on v2.8.0** — 2 P1 issues plus a security finding resolved. (#246)
+
+### Removed
+
+- **Retired-service drift** — pruned authentik / vaultwarden / nginx / netdata / uptime-kuma references across `image-locks.sh`, `update-containers.sh`, `Makefile`, `services.yaml`, the CI test env, and docs (zero remaining references). (#248)
+
+### Docs
+
+- **ADR-0013 superseded** — deliberate deploy + observability chosen over auto-deploy. (#244)
+- **Docs sync** — `backup.md` updated for the new `config/` backup scope, `infra/terraform/README.md` added, and retired-service references pruned from migration/structure/audit docs. (#253)
+
 ## [2.8.0] - 2026-06-18
 
 ### Added

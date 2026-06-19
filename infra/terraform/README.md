@@ -43,6 +43,7 @@ terraform plan
 ### Regular Operations
 
 Verify no drift:
+
 ```bash
 terraform plan
 terraform plan   # Should output "No changes. Your infrastructure matches the configuration."
@@ -74,6 +75,7 @@ To remove a route from Terraform management:
 Phase-1 uses `terraform_data` to track route declarations without managing remote state. To detect drift:
 
 1. Run a plan after any manual Cloudflare console changes:
+
    ```bash
    terraform plan
    ```
