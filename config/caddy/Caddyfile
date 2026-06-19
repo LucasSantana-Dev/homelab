@@ -81,10 +81,16 @@ http://luk-homeserver.com.br, http://www.luk-homeserver.com.br, http://home.luk-
 }
 
 # Docker-native services on host ports (no k3s dependency)
+# No `import protected` by design: Home Assistant has its own login (+ optional MFA),
+# and its mobile app / REST API authenticate with long-lived tokens that a tinyauth
+# forward-auth gate would block. Public exposure relies on HA's own auth — intentional
+# (audit-deep 2026-06-19 reconciliation; do not "fix" without breaking the HA app).
 http://homeassistant.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:8123
 }
 
+# No `import protected` by design: Nextcloud has its own login; desktop/mobile sync
+# clients use app passwords that a tinyauth forward-auth gate would block. Intentional.
 http://cloud.luk-homeserver.com.br {
 	reverse_proxy 127.0.0.1:8300 {
 		transport http {
@@ -184,6 +190,7 @@ http://healthchecks.luk-homeserver.com.br {
 }
 
 http://kopia.luk-homeserver.com.br {
+	# tinyauth SSO gate (PR #240) — kopia UI is NOT unauthenticated
 	import protected
 	reverse_proxy 127.0.0.1:51515
 }
