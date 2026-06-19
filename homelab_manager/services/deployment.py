@@ -56,21 +56,33 @@ class DeploymentManager:
             )
         return True, ""
 
+    def _resolve_service_id(self, service_name: str) -> str:
+        """`docker compose restart` targets the compose service id, not the
+        container_name. If a container_name was passed, map it to its service id
+        (cubic #6: accepting container_names let un-restartable targets through)."""
+        if self.registry is None:
+            return service_name
+        for s in self.registry.services.values():
+            if s.container_name == service_name and s.id != service_name:
+                return s.id
+        return service_name
+
     def restart_service(self, service_name: str) -> Dict:
         """Restart a specific service"""
         is_valid, error_msg = self._validate_service_name(service_name)
         if not is_valid:
             return {"success": False, "error": error_msg}
 
-        console.print(f"🔄 Restarting {service_name}...")
+        service_id = self._resolve_service_id(service_name)
+        console.print(f"🔄 Restarting {service_id}...")
         result = self._cli.run_result(
-            ["restart", service_name],
+            ["restart", service_id],
             cwd=self.project_root,
-            context=f"restart '{service_name}' failed",
+            context=f"restart '{service_id}' failed",
         )
         if result["success"]:
             return {
                 "success": True,
-                "message": f"{service_name} restarted successfully",
+                "message": f"{service_id} restarted successfully",
             }
         return {"success": False, "error": result["error"]}

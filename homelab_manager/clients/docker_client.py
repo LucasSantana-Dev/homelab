@@ -39,8 +39,10 @@ class DockerClientFactory:
     def get_client(self) -> Optional[DockerClient]:
         """Return a cached `DockerClient`, or `None` if the daemon is unreachable.
 
-        The first call probes `docker.from_env()`. Subsequent calls return the
-        cached result without re-probing — call `reset()` if you want to retry.
+        The first call probes `docker.from_env()`. Once a probe SUCCEEDS the client
+        is cached and returned without re-probing. While the daemon stays unreachable
+        `_probed` remains False, so each call re-probes — a daemon that starts later
+        is picked up automatically. Call `reset()` to force a re-probe after success.
         """
         if not self._probed:
             try:

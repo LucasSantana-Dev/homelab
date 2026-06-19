@@ -110,7 +110,7 @@ else
 fi
 
 outpost_status=""
-if is_container_running "caddy"; then
+if is_container_running "caddy-lan"; then
     outpost_status="$(curl -k -sS -o /dev/null -w "%{http_code}" "https://127.0.0.1:8443/outpost.goauthentik.io/auth/nginx" -H "Host: ${outpost_probe_host}" || true)"
 elif is_container_running "authentik-server"; then
     outpost_status="$(docker exec -i -e AK_OUTPOST_HOST="${outpost_probe_host}" authentik-server python3 - <<'PY' 2>/dev/null || true
