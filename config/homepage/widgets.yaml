@@ -1,11 +1,16 @@
 ---
 - logo:
-    icon: https://cdn0.iconfinder.com/data/icons/famous-character-vol-1-colored/48/JD-37-512.png
+    icon: /icons/yoda.png
 
 - resources:
     cpu: true
     memory: true
     disk: /
+    uptime: true
+    cputemp: true
+    tempmin: 0
+    tempmax: 100
+    units: metric
 
 - datetime:
     text_size: xl
@@ -18,4 +23,12 @@
     target: _blank
 
 - gatus:
-    url: http://gatus:8095
+    url: http://gatus:8080
+
+- openmeteo:
+    label: São Paulo
+    latitude: -23.5505
+    longitude: -46.6333
+    timezone: America/Sao_Paulo
+    units: metric
+    cache: 5

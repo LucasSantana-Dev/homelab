@@ -34,7 +34,7 @@ services:
         # scheduling). Space-bounded: docker volumes (~5.4G) + homelab appdata
         # (~7.3G); the ~183G bulk of /home is intentionally left for a future
         # offsite target, not this same-disk interim repo.
-        kopia snapshot create /source/docker-volumes /source/appdata /source/config || true
+        kopia snapshot create /source/docker-volumes /source/appdata || true
         # --insecure: HTTP-only, safe because the port binds to ${BIND_IP}
         # (default 127.0.0.1) and the host is reachable only via Tailscale.
         exec kopia server start --insecure --address=0.0.0.0:51515 \
