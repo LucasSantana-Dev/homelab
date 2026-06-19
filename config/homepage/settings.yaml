@@ -5,7 +5,7 @@ favicon: https://cdn0.iconfinder.com/data/icons/famous-character-vol-1-colored/4
 
 theme: dark
 color: slate
-headerStyle: clean
+headerStyle: boxedWidgets
 target: _self
 hideVersion: true
 hideErrors: false
@@ -29,6 +29,8 @@ pages:
     icon: mdi-source-repository
 
 layout:
+  maxGroupColumns: 6
+  useEqualHeights: true
   Media:
     style: row
     columns: 4
@@ -43,10 +45,10 @@ layout:
     columns: 4
   Management:
     style: row
-    columns: 4
+    columns: 6
   Backup:
     style: row
     columns: 4
   Infrastructure:
     style: row
-    columns: 4
+    columns: 6

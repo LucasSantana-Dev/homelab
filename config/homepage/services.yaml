@@ -20,6 +20,11 @@
         href: https://paperless.luk-homeserver.com.br
         description: Document management
         container: paperless-ngx
+        widget:
+          type: paperlessngx
+          url: http://host.docker.internal:8400
+          username: admin
+          password: "{{HOMEPAGE_VAR_PAPERLESS_PASSWORD}}"
 
 - Home:
     - Home Assistant:
@@ -86,6 +91,10 @@
         href: https://kopia.luk-homeserver.com.br
         description: Backup & snapshots
         container: kopia
+        widget:
+          type: kopia
+          url: http://kopia:51515
+          password: "{{HOMEPAGE_VAR_KOPIA_PASSWORD}}"
 
 - Infrastructure:
     - Pi-hole:
@@ -119,6 +128,11 @@
         href: https://grafana.luk-homeserver.com.br
         description: Metrics & dashboards
         container: grafana
+        widget:
+          type: grafana
+          url: http://grafana:3000
+          username: admin
+          password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
     - Portainer:
         icon: portainer
         href: https://portainer.luk-homeserver.com.br
