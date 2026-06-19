@@ -269,8 +269,6 @@ services:
     - default
     healthcheck:
       disable: true
-    mem_limit: 768M
-    memswap_limit: 1536M
     deploy:
       resources:
         limits:
