@@ -6,6 +6,11 @@
     cpu: true
     memory: true
     disk: /
+    uptime: true
+    cputemp: true
+    tempmin: 0
+    tempmax: 100
+    units: metric
 
 - datetime:
     text_size: xl
@@ -19,3 +24,11 @@
 
 - gatus:
     url: http://gatus:8095
+
+- openmeteo:
+    label: São Paulo
+    latitude: -23.5505
+    longitude: -46.6333
+    timezone: America/Sao_Paulo
+    units: metric
+    cache: 5

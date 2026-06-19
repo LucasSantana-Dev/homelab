@@ -103,6 +103,17 @@
         href: https://status.luk-homeserver.com.br
         description: Service status & uptime
         container: gatus
+        widget:
+          type: gatus
+          url: http://gatus:8095
+    - Prometheus:
+        icon: prometheus
+        href: https://grafana.luk-homeserver.com.br
+        description: Time-series metrics
+        container: prometheus
+        widget:
+          type: prometheus
+          url: http://prometheus:9090
     - Grafana:
         icon: grafana
         href: https://grafana.luk-homeserver.com.br
