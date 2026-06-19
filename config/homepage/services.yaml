@@ -1,118 +1,134 @@
----
-# Luk's Homelab — service catalog
-# https://gethomepage.dev/configs/services
-
 - Media:
-    - Stremio:
-        icon: stremio
-        href: https://stremio.luk-homeserver.com.br
-        description: Streaming server
-        container: stremio-server
-
+  - Stremio:
+      icon: stremio
+      href: https://stremio.luk-homeserver.com.br
+      description: Streaming server
+      container: stremio-server
 - Storage:
-    - Nextcloud:
-        icon: nextcloud
-        href: https://cloud.luk-homeserver.com.br
-        description: Files, photos, sync
-        container: nextcloud
-    - Paperless:
-        icon: paperless-ngx
-        href: https://paperless.luk-homeserver.com.br
-        description: Document management
-        container: paperless-ngx
-
+  - Nextcloud:
+      icon: nextcloud
+      href: https://cloud.luk-homeserver.com.br
+      description: Files, photos, sync
+      container: nextcloud
+  - Paperless:
+      icon: paperless-ngx
+      href: https://paperless.luk-homeserver.com.br
+      description: Document management
+      container: paperless-ngx
+      widget:
+        type: paperlessngx
+        url: http://host.docker.internal:8400
+        username: admin
+        password: '{{HOMEPAGE_VAR_PAPERLESS_PASSWORD}}'
 - Home:
-    - Home Assistant:
-        icon: home-assistant
-        href: https://homeassistant.luk-homeserver.com.br
-        description: Home automation
-        container: homeassistant
-
+  - Home Assistant:
+      icon: home-assistant
+      href: https://homeassistant.luk-homeserver.com.br
+      description: Home automation
+      container: homeassistant
 - Apps:
-    - n8n:
-        icon: n8n
-        href: https://n8n.luk-homeserver.com.br
-        description: Workflow automation
-        container: n8n
-    - Lucky:
-        icon: discord
-        href: https://lucky.luk-homeserver.com.br
-        description: Discord bot dashboard
-        container: lucky-frontend
-    - Craftvaria:
-        icon: minecraft
-        href: https://craftvaria.luk-homeserver.com.br
-        description: Minecraft server admin
-        container: craftvaria-admin-frontend
-
+  - n8n:
+      icon: n8n
+      href: https://n8n.luk-homeserver.com.br
+      description: Workflow automation
+      container: n8n
+  - Lucky:
+      icon: discord
+      href: https://lucky.luk-homeserver.com.br
+      description: Discord bot dashboard
+      container: lucky-frontend
+  - Craftvaria:
+      icon: minecraft
+      href: https://craftvaria.luk-homeserver.com.br
+      description: Minecraft server admin
+      container: craftvaria-admin-frontend
 - Management:
-    - Homelab Manager:
-        icon: si-python
-        href: https://manager.luk-homeserver.com.br/health
-        description: Service health & status API
-        container: homelab-manager
-        widget:
-          type: customapi
-          url: http://homelab-manager:8765/summary
-          refreshInterval: 60000
-          method: GET
-          mappings:
-            - field: total
-              label: Services
-              format: number
-            - field: healthy
-              label: Healthy
-              format: number
-            - field: unhealthy
-              label: Unhealthy
-              format: number
-    - What's Up Docker:
-        icon: si-docker
-        href: https://wud.luk-homeserver.com.br
-        description: Container update monitor
-        container: whats-up-docker
-        widget:
-          type: whatsupdocker
-          url: http://whats-up-docker:3000
-    - Healthchecks:
-        icon: healthchecks
-        href: https://healthchecks.luk-homeserver.com.br
-        description: Cron job monitoring
-        container: healthchecks
-
+  - Homelab Manager:
+      icon: si-python
+      href: https://manager.luk-homeserver.com.br/health
+      description: Service health & status API
+      container: homelab-manager
+      widget:
+        type: customapi
+        url: http://homelab-manager:8765/summary
+        refreshInterval: 60000
+        method: GET
+        mappings:
+        - field: total
+          label: Services
+          format: number
+        - field: healthy
+          label: Healthy
+          format: number
+        - field: unhealthy
+          label: Unhealthy
+          format: number
+  - What's Up Docker:
+      icon: si-docker
+      href: https://wud.luk-homeserver.com.br
+      description: Container update monitor
+      container: whats-up-docker
+      widget:
+        type: whatsupdocker
+        url: http://whats-up-docker:3000
+  - Healthchecks:
+      icon: healthchecks
+      href: https://healthchecks.luk-homeserver.com.br
+      description: Cron job monitoring
+      container: healthchecks
+      widget:
+        type: healthchecks
+        url: http://healthchecks:8000
+        key: '{{HOMEPAGE_VAR_HEALTHCHECKS_KEY}}'
 - Backup:
-    - Kopia:
-        icon: kopia
-        href: https://kopia.luk-homeserver.com.br
-        description: Backup & snapshots
-        container: kopia
-
+  - Kopia:
+      icon: kopia
+      href: https://kopia.luk-homeserver.com.br
+      description: Backup & snapshots
+      container: kopia
+      widget:
+        type: kopia
+        url: http://kopia:51515
+        password: '{{HOMEPAGE_VAR_KOPIA_PASSWORD}}'
 - Infrastructure:
-    - Pi-hole:
-        icon: pi-hole
-        href: https://pihole.luk-homeserver.com.br/admin
-        description: DNS sinkhole & ad blocking
-        container: pihole
-    - Gatus:
-        icon: si-statuspage
-        href: https://status.luk-homeserver.com.br
-        description: Service status & uptime
-        container: gatus
-        widget:
-          type: gatus
-          url: http://gatus:8080
-    - Grafana:
-        icon: grafana
-        href: https://grafana.luk-homeserver.com.br
-        description: Metrics & dashboards
-        container: grafana
-    - Portainer:
-        icon: portainer
-        href: https://portainer.luk-homeserver.com.br
-        description: Container management
-        container: portainer
-        widget:
-          type: portainer
-          url: http://portainer:9000
-          env: 1
-          key: "{{HOMEPAGE_VAR_PORTAINER_KEY}}"
+  - Pi-hole:
+      icon: pi-hole
+      href: https://pihole.luk-homeserver.com.br/admin
+      description: DNS sinkhole & ad blocking
+      container: pihole
+  - Gatus:
+      icon: si-statuspage
+      href: https://status.luk-homeserver.com.br
+      description: Service status & uptime
+      container: gatus
+      widget:
+        type: gatus
+        url: http://gatus:8080
+  - Prometheus:
+      icon: prometheus
+      href: https://grafana.luk-homeserver.com.br
+      description: Time-series metrics
+      container: prometheus
+      widget:
+        type: prometheus
+        url: http://prometheus:9090
+  - Grafana:
+      icon: grafana
+      href: https://grafana.luk-homeserver.com.br
+      description: Metrics & dashboards
+      container: grafana
+      widget:
+        type: grafana
+        url: http://grafana:3000
+        username: admin
+        password: '{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}'
+  - Portainer:
+      icon: portainer
+      href: https://portainer.luk-homeserver.com.br
+      description: Container management
+      container: portainer
+      widget:
+        type: portainer
+        url: http://portainer:9000
+        env: 1
+        key: '{{HOMEPAGE_VAR_PORTAINER_KEY}}'
