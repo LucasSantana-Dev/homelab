@@ -25,7 +25,9 @@ datasources:
     editable: true
     jsonData:
       orgSlug: lucas-santana-gm
-      projectSlug: luk-bot
+      # Sentry project slug is "lucky" (the "luk-bot" project does not exist —
+      # panels returned "No data" because every query hit a missing project).
+      projectSlug: lucky
     secureJsonData:
       # Grafana's reliable env-injection for secure fields is $__env{}, not bare
       # ${VAR} (whose interpolation does not apply to secureJsonData). Requires

@@ -42,7 +42,7 @@
       "title": "Sentry Project",
       "tooltip": "",
       "type": "link",
-      "url": "https://sentry.io/organizations/lucas-santana-gm/projects/luk-bot/"
+      "url": "https://sentry.io/organizations/lucas-santana-gm/projects/lucky/"
     }
   ],
   "liveNow": false,
@@ -371,7 +371,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 4
+        "y": 14
       },
       "id": 5,
       "options": {
@@ -458,7 +458,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 4
+        "y": 14
       },
       "id": 6,
       "options": {
@@ -547,7 +547,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 22
       },
       "id": 7,
       "options": {
@@ -634,7 +634,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 22
       },
       "id": 8,
       "options": {
@@ -733,7 +733,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 30
       },
       "id": 9,
       "options": {
@@ -772,7 +772,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 4
       },
       "options": {
         "dedupStrategy": "none",
@@ -830,6 +830,6 @@
   "timezone": "",
   "title": "Lucky Project Dashboard",
   "uid": "lukbot-project-dashboard",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
