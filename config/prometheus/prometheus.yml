@@ -76,15 +76,20 @@ scrape_configs:
     params:
       module: [http_2xx]
     static_configs:
+      # Probe the INTERNAL endpoints by docker service name. blackbox-exporter is
+      # a bridge container on homelab_default, so it reaches peers by service name
+      # (NOT the public domain URLs, which are tinyauth-gated and would 401 an
+      # unauthenticated prober). The previous targets were the unset
+      # `*.homelab.example.com` placeholder (8 false ServiceDown alerts) and a
+      # retired jellyfin. All targets below verified probe_success=1, http 200.
       - targets:
-          - https://homelab.example.com
-          - https://stremio.homelab.example.com
-          - https://homeassistant.homelab.example.com
-          - https://grafana.homelab.example.com
-          - https://portainer.homelab.example.com
-          - https://jellyfin.homelab.example.com
-          - https://n8n.homelab.example.com
-          - https://cloud.homelab.example.com
+          - http://homepage:3000/
+          - http://grafana:3000/api/health
+          - http://portainer:9000/api/system/status
+          - http://nextcloud:80/status.php
+          - http://stremio-server:11470/settings
+          - http://homeassistant:8123/
+          - http://n8n:5678/healthz
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
