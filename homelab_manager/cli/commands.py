@@ -9,6 +9,7 @@ from typing import Optional
 import typer
 
 from ..core.config import HomelabConfig
+from ..core.log import setup_logging
 from ..models.service import ServiceRegistry
 from ..server import run_server
 from ..services.containers import ContainerManager
@@ -34,6 +35,8 @@ def create_app(
         update_manager: Optional UpdateManager instance for testing
         registry: Optional ServiceRegistry instance for testing
     """
+
+    setup_logging()
 
     app = typer.Typer(
         name="homelab",
