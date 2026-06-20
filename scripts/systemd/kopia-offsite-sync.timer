@@ -1,0 +1,14 @@
+[Unit]
+Description=Kopia offsite mirror timer (daily, after the local snapshot window)
+Documentation=https://github.com/luk-homeserver/homelab
+Requires=kopia-offsite-sync.service
+
+[Timer]
+# Daily at 04:30 — after kopia's own 24h snapshot/maintenance cycle.
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=600
+Persistent=true
+AccuracySec=60
+
+[Install]
+WantedBy=timers.target
