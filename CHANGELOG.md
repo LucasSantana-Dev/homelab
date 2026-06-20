@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.2] - 2026-06-20
+
+### Fixed
+
+- **Blackbox probes target internal endpoints** — were pointed at the unset `*.homelab.example.com` placeholder, firing 8 perpetual false `ServiceDown` alerts; now probe real services by docker service name. Resolves #268. (#274)
+- **Healthchecks memory + CPU alert rule** — bumped healthchecks `mem_limit` 256M→512M (was tripping `HighMemoryUsage` at ~93%); fixed the CPU alert rule to aggregate `sum by (name)` and drop the root cgroup (was firing with a blank container name). (#275)
+
 ## [2.10.1] - 2026-06-20
 
 ### Changed
