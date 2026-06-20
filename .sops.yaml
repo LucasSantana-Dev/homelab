@@ -1,13 +1,11 @@
 # SOPS config for age-encrypted secrets.
 #
-# IMPORTANT: the `age1…` value below is a placeholder. It is NOT a valid
-# age recipient and `sops -e` against it will fail. Before using SOPS in
-# this repo, follow `docs/secrets.md` §Setup to generate a real key and
-# replace the placeholder with the PUBLIC half (the line `# public key:
-# age1…` printed by `age-keygen`). The matching private key must stay
-# local at `~/.config/sops/age/keys.txt` and never be committed.
+# The PUBLIC age recipient below encrypts `.env.enc` (and the config rules).
+# The matching PRIVATE key lives only at `~/.config/sops/age/keys.txt` on the
+# deploy host — it is NEVER committed and MUST be backed up off-host (password
+# manager); it is the sole key that can decrypt `.env.enc`. See docs/secrets.md.
 keys:
-  - &age_key_local 'age1PLACEHOLDER_NOT_A_REAL_KEY_see_docs_secrets_md_for_setup'
+  - &age_key_local 'age19pjf4fw094vcsmrwr8usm3gvqmlvz8elt23zk52ltaavv03y7s8qgg906q'
 
 creation_rules:
   - path_regex: ^\.env\.enc$
