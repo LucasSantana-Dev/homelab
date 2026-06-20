@@ -22,7 +22,7 @@ sudo ufw allow 45000:60000/udp comment "Lucky Discord voice UDP"
 # Docker bridge networks → host port 80 — lets cloudflared (in the
 # `homelab_frontend` network, CIDR 172.28.0.0/24) reach the
 # host-networked caddy-lan at host.docker.internal:80. Without this,
-# the Cloudflare tunnel serves all *.luk-homeserver.com.br hostnames
+# the Cloudflare tunnel serves all public hostnames
 # with "context canceled" origin errors. Range covers the whole
 # RFC1918 172.16.0.0/12 block so all docker project networks work.
 sudo ufw allow from 172.16.0.0/12 to any port 80 proto tcp comment "docker → caddy-lan (PR#34 ingress)"
@@ -30,7 +30,10 @@ sudo ufw allow from 172.16.0.0/12 to any port 80 proto tcp comment "docker → c
 # LAN-scoped services. Edit this list when services change.
 while IFS='|' read -r port proto label; do
   [ -z "$port" ] && continue
-  sudo ufw allow from "$LAN" to any port "$port" proto "$proto" comment "LAN: $label" || true
+  # No `|| true`: ufw allow is idempotent on duplicates, so the only way this
+  # fails is a real error — let set -e abort rather than ship a half-applied
+  # firewall while reporting success. (#201)
+  sudo ufw allow from "$LAN" to any port "$port" proto "$proto" comment "LAN: $label"
 done <<'SPECS'
 53|tcp|pihole DNS
 53|udp|pihole DNS
