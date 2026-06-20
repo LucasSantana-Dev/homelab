@@ -10,7 +10,7 @@ keys:
   - &age_key_local 'age1PLACEHOLDER_NOT_A_REAL_KEY_see_docs_secrets_md_for_setup'
 
 creation_rules:
-  - path_regex: ^\.env\.enc\.yaml$
+  - path_regex: ^\.env\.enc$
     key_groups:
       - age:
           - *age_key_local

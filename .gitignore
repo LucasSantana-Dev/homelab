@@ -64,6 +64,8 @@ appdata/homeassistant/config/.hypothesis/
 .env
 .env.*
 !.env.example
+# SOPS-encrypted secrets file is safe to commit (values are age-encrypted).
+!.env.enc
 *.env
 !*.env.example
 
