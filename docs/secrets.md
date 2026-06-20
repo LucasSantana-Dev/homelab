@@ -42,6 +42,26 @@ Run on the host (where the real `.env` lives):
    `.env` stays gitignored; `.env.enc` is committed (encrypted). `make sops-status`
    shows state.
 
+> **Topology note.** The real `.env` lives on the deploy host, but `.env.enc` must
+> be committed to the canonical repo (the `release` branch you develop from). The
+> host's checkout may lag (different lineage), so the `make sops-*` targets may not
+> exist there yet — use the raw `sops` commands on the host, then bring the
+> *encrypted* file to your local clone to commit it:
+>
+> ```bash
+> # On the host (sops + age installed; .env present):
+> export SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt
+> cd /home/luk-server/homelab
+> sops --encrypt --age '<AGE_PUBLIC_KEY>' --input-type dotenv --output-type dotenv .env > /tmp/.env.enc
+> # round-trip check (must print nothing):
+> diff <(sort .env) <(sops -d --input-type dotenv --output-type dotenv /tmp/.env.enc | sort)
+>
+> # From your local clone (the .enc file is safe to copy — it's encrypted):
+> scp homelab:/tmp/.env.enc ./.env.enc
+> # put <AGE_PUBLIC_KEY> in .sops.yaml, then:
+> git add .sops.yaml .env.enc && git commit -m "chore(secrets): activate SOPS" && git push   # open PR -> release
+> ```
+
 ### Day-to-day after activation
 - Change a secret: `make sops-edit` (or edit `.env`, then `make sops-encrypt`); commit `.env.enc`.
 - Deploy: if `.env` is missing, `make sops-decrypt` first, then your usual `make deploy`.
