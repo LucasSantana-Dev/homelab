@@ -14,6 +14,7 @@ from rich.console import Console
 
 from ..clients.docker_client import get_docker_client
 from ..core.errors import scrub_subprocess_error
+from ..core.log import trace_context
 from ..models.service import ServiceRegistry
 
 # Initialize console
@@ -179,7 +180,10 @@ class HealthMonitor:
             return {}
 
         def _check(service):
-            return service.id, self._check_service_by_policy(service)
+            # Tag every log line emitted while checking this service with its id,
+            # so the interleaved output of the parallel sweep stays traceable.
+            with trace_context(str(service.id)):
+                return service.id, self._check_service_by_policy(service)
 
         results = {}
         with ThreadPoolExecutor(max_workers=min(len(services), 20)) as executor:
