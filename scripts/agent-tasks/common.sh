@@ -7,10 +7,16 @@ NOTIFY="$(dirname "${BASH_SOURCE[0]}")/notify.sh"
 source /etc/profile.d/agent-env.sh 2>/dev/null || true
 
 # Decrypt secrets (AGENT_DISCORD_WEBHOOK, AGENT_GITHUB_TOKEN, etc.)
+# Read KEY=value lines and export each value LITERALLY — no `eval`, so a secret
+# whose value contains $, ;, spaces, or backticks can't break or inject the shell
+# (this also bit benign tokens with special chars before). (#219)
 # || true: task continues even if SOPS is unavailable; webhook warning below covers the gap
-eval "$(SOPS_AGE_KEY_FILE=/home/luk-server/.config/sops/age/keys.txt \
+while IFS='=' read -r _k _v; do
+    [[ $_k == [A-Za-z_]* ]] || continue   # skip blank/comment lines
+    export "$_k=$_v"
+done < <(SOPS_AGE_KEY_FILE=/home/luk-server/.config/sops/age/keys.txt \
     sops --config /dev/null --input-type yaml --output-type dotenv \
-    -d /home/luk-server/homelab/secrets/agent-box.secrets.yaml.age 2>/dev/null)" || true
+    -d /home/luk-server/homelab/secrets/agent-box.secrets.yaml.age 2>/dev/null) || true
 
 export AGENT_DISCORD_WEBHOOK
 

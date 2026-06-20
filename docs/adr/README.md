@@ -18,3 +18,4 @@ file in this directory.
 | [0006](0006-wol-via-shell-endpoint-not-gui-container.md) | Wake-on-LAN: shell endpoint + Homepage customapi, no GUI container | Accepted |
 | [0007](0007-homelab-manager-clients-package.md) | `homelab_manager.clients` package: one owner per external dependency | Accepted |
 | [0008](0008-wave4-compose-hygiene-image-pinning.md) | Wave 4: Compose Hygiene (Dead Anchors + Image Tag Pinning) | Accepted |
+| [0024](0024-complete-k3s-decommission.md) | Complete the k3s decommission (staged, backup-first) | Accepted |

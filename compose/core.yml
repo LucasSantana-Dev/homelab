@@ -21,12 +21,24 @@ services:
     - frontend
     extra_hosts:
     - host.docker.internal:host-gateway
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 32M
+          cpus: '0.05'
     logging:
       driver: json-file
       options:
         max-size: 10m
         max-file: '3'
     healthcheck:
+      # Disabled by necessity (#211): the cloudflare/cloudflared image is
+      # distroless — no shell/wget/curl — so no in-container CMD probe is
+      # possible. Liveness is observable externally via the metrics /ready
+      # endpoint (127.0.0.1:2000/ready) and the Cloudflare tunnel dashboard.
       disable: true
   homepage:
     image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.13.2}

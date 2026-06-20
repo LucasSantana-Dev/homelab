@@ -13,6 +13,11 @@ services:
       - TZ=${TIMEZONE}
       # Repo encryption password — consumed by `repository create/connect` below.
       - KOPIA_PASSWORD=${KOPIA_REPO_PASSWORD}
+      # Server basic-auth — passed via env (kopia reads $KOPIA_SERVER_USERNAME/
+      # $KOPIA_SERVER_PASSWORD natively) NOT as CLI flags, so they don't leak via
+      # `ps aux` / /proc/<pid>/cmdline / `docker ps`. (#269)
+      - KOPIA_SERVER_USERNAME=${KOPIA_SERVER_USERNAME:-admin}
+      - KOPIA_SERVER_PASSWORD=${KOPIA_SERVER_PASSWORD}
     # Connect to the local repo (create it on first run), then serve. Bare
     # `kopia server start` (the old config) never initialised a repository, so
     # it could not work even with valid credentials. KOPIA_PASSWORD supplies the
@@ -37,9 +42,9 @@ services:
         kopia snapshot create /source/docker-volumes /source/appdata /source/config || true
         # --insecure: HTTP-only, safe because the port binds to ${BIND_IP}
         # (default 127.0.0.1) and the host is reachable only via Tailscale.
-        exec kopia server start --insecure --address=0.0.0.0:51515 \
-          --server-username="${KOPIA_SERVER_USERNAME:-admin}" \
-          --server-password="${KOPIA_SERVER_PASSWORD}"
+        # Credentials come from the environment (see above) — keep them OFF the
+        # command line so they don't leak via ps/cmdline. (#269)
+        exec kopia server start --insecure --address=0.0.0.0:51515
     volumes:
       - kopia_config:/app/config
       - kopia_cache:/app/cache

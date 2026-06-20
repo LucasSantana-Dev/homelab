@@ -10,7 +10,7 @@
         schedule-pressure-gate-checkpoints \
         baseline-bundle \
         post-t24-terraform-apply schedule-post-t24-terraform-apply \
-        ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
+        ssl-status sso-register-apps sso-register-dry-run sso-register-status \
         serena-mcp-setup k3s-registry-mirror \
         secret-gate secret-gate-history public-safety-gate public-release-checkpoint rewrite-history \
         forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup \
@@ -339,21 +339,6 @@ power-restore-check: ## Validate host readiness for AC-loss auto-boot recovery
 	@echo "🔌 Power-Restore Readiness"
 	@echo "========================="
 	@./scripts/maintenance/power-restore-check.sh
-
-sso-status: ## Show Cloudflare/Auth SSO runtime status and required config checks
-	@echo "🔐 SSO Edge Status"
-	@echo "=================="
-	@./scripts/maintenance/sso-status.sh
-
-sso-smoke-test: ## Run end-to-end unauthenticated redirect checks for protected domains
-	@echo "🧪 SSO Smoke Test"
-	@echo "================="
-	@./scripts/maintenance/sso-smoke-test.sh
-
-ssl-renew: ## Issue/renew wildcard TLS cert via Cloudflare DNS-01 and reload Caddy
-	@echo "🔐 Renewing Wildcard Certificate"
-	@echo "================================"
-	@./scripts/maintenance/renew-wildcard-cert.sh
 
 ssl-status: ## Show currently served TLS cert details for auth domain
 	@echo "🔎 TLS Certificate Status"
