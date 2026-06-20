@@ -264,6 +264,15 @@ run_refresh() {
         fi
 
         repo_tag="$(strip_digest "$current_ref")"
+        # Fail closed on :latest (#213). Pinning the digest of a moving `:latest`
+        # tag gives no version traceability and silently undermines reproducible
+        # pinning. Require a concrete tag in .env instead.
+        case "$repo_tag" in
+            *:latest)
+                echo "Refusing to pin ${key} at ':latest' (${repo_tag}) — set a concrete version tag in .env (':latest' is a moving target; pinning its digest defeats reproducibility)." >&2
+                exit 1
+                ;;
+        esac
         if ! new_ref="$(resolve_locked_ref "$repo_tag")"; then
             echo "Failed to resolve digest for ${key} (${repo_tag})" >&2
             exit 1
