@@ -97,6 +97,40 @@ class TestGetContainerStatus:
         out = capsys.readouterr().out
         assert "Error getting container status" in out
 
+    def test_one_bad_container_does_not_truncate_rest(self, manager_with_mocked_docker):
+        """#214: a container that fails to process is skipped, not silently
+        dropping every container after it (which would make a partial list look
+        like a complete result)."""
+        m, client = manager_with_mocked_docker
+        m.registry = MagicMock()
+        m.registry.get_service_by_container.return_value = None
+
+        good1 = make_container("good1")
+        good2 = make_container("good2")
+
+        class _BadContainer:
+            name = "boom"
+            status = "running"
+
+            @property
+            def image(self):  # accessed mid-body → raises for this one only
+                raise RuntimeError("unreadable")
+
+        client.containers.list.return_value = [good1, _BadContainer(), good2]
+
+        with patch.object(m, "_is_homelab_container", return_value=True):
+            result = m.get_container_status()
+
+        names = {c["name"] for c in result}
+        assert names == {"good1", "good2"}  # bad skipped, good2 NOT truncated
+
+    def test_none_docker_client_returns_empty_with_error(self, capsys):
+        """No daemon → empty + explicit error, never confused with 'no containers'."""
+        m = StatusManager()
+        m.docker_client = None
+        assert m.get_container_status() == []
+        assert "Docker daemon is unreachable" in capsys.readouterr().out
+
 
 class TestCheckContainerHealth:
     def test_stopped_container_returns_stopped(self, manager_with_mocked_docker):
