@@ -1,7 +1,7 @@
 """Unit tests for homelab_manager HTTP server."""
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from homelab_manager.server.routes import handle_health, handle_status, handle_summary
 
@@ -87,3 +87,64 @@ class TestHandleSummary:
         assert data["total"] == 2
         assert data["healthy"] == 0
         assert data["unhealthy"] == 0
+
+
+class TestRunServer:
+    """#217: run_server port override + graceful shutdown."""
+
+    def _patched(self):
+        # Patch everything run_server touches so nothing binds or serves.
+        return patch.multiple(
+            "homelab_manager.server.app",
+            HTTPServer=MagicMock(),
+            ServiceRegistry=MagicMock(),
+            HealthMonitor=MagicMock(),
+            setup_logging=MagicMock(),
+        )
+
+    def test_env_overrides_port_argument(self, monkeypatch):
+        from homelab_manager.server import app as appmod
+
+        monkeypatch.setenv("HOMELAB_MANAGER_HTTP_PORT", "9999")
+        with self._patched():
+            appmod.run_server(host="127.0.0.1", port=8765)
+            # HTTPServer((host, port), handler) — env port wins over the 8765 arg.
+            (bind_addr, _handler), _ = appmod.HTTPServer.call_args
+        assert bind_addr == ("127.0.0.1", 9999)
+
+    def test_argument_port_used_when_env_absent(self, monkeypatch):
+        from homelab_manager.server import app as appmod
+
+        monkeypatch.delenv("HOMELAB_MANAGER_HTTP_PORT", raising=False)
+        with self._patched():
+            appmod.run_server(host="0.0.0.0", port=8765)
+            (bind_addr, _handler), _ = appmod.HTTPServer.call_args
+        assert bind_addr == ("0.0.0.0", 8765)
+
+    def test_keyboardinterrupt_shuts_down_cleanly(self, monkeypatch):
+        from homelab_manager.server import app as appmod
+
+        monkeypatch.delenv("HOMELAB_MANAGER_HTTP_PORT", raising=False)
+        server = MagicMock()
+        server.serve_forever.side_effect = KeyboardInterrupt
+        with self._patched():
+            appmod.HTTPServer.return_value = server
+            appmod.run_server()  # must NOT raise
+        server.server_close.assert_called_once()  # always closed in finally
+
+
+class TestServeCommand:
+    """#216: the `serve` CLI command wires through to run_server."""
+
+    def test_serve_invokes_run_server(self):
+        from typer.testing import CliRunner
+
+        from homelab_manager.cli import create_app
+
+        with patch("homelab_manager.cli.commands.run_server") as mock_run:
+            app = create_app()
+            result = CliRunner().invoke(
+                app, ["serve", "--host", "0.0.0.0", "--port", "1234"]
+            )
+        assert result.exit_code == 0
+        mock_run.assert_called_once_with(host="0.0.0.0", port=1234)
