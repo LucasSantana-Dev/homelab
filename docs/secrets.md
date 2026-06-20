@@ -53,8 +53,9 @@ Run on the host (where the real `.env` lives):
 > export SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt
 > cd /home/luk-server/homelab
 > sops --encrypt --age '<AGE_PUBLIC_KEY>' --input-type dotenv --output-type dotenv .env > /tmp/.env.enc
-> # round-trip check (must print nothing):
-> diff <(sort .env) <(sops -d --input-type dotenv --output-type dotenv /tmp/.env.enc | sort)
+> # round-trip check — -q so a mismatch never prints decrypted secret values
+> # (prints nothing on success; "Files ... differ" on failure):
+> diff -q <(sort .env) <(sops -d --input-type dotenv --output-type dotenv /tmp/.env.enc | sort)
 >
 > # From your local clone (the .enc file is safe to copy — it's encrypted):
 > scp homelab:/tmp/.env.enc ./.env.enc
