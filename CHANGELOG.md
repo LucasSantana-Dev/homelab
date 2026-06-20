@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.1] - 2026-06-20
+
+### Changed
+
+- **Secrets are now SOPS-activated** — the host `.env` is committed as an age-encrypted `.env.enc` (recoverable with the off-host age key), closing the kopia repo-encryption-password single-point-of-failure. (#272)
+
+### Docs
+
+- Host-aware SOPS activation runbook (raw `sops` on the stale-lineage host + `scp` the encrypted file to the local clone to commit). (#271)
+
 ## [2.10.0] - 2026-06-20
 
 ### Added
