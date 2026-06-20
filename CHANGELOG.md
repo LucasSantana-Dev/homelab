@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-06-20
+
+### Added
+
+- **Concurrency-aware logging** — a `contextvars` trace id is stamped on every log line (and the worker thread name shown), so the parallel health sweep and HTTP requests can be traced through interleaved output: `grep '[grafana]'`. (#263)
+- **SOPS secrets tooling** — `make sops-encrypt/decrypt/verify/edit/status` + an activation runbook (`docs/secrets.md`) to encrypt the host `.env` into a committed, recoverable `.env.enc`, closing the kopia repo-password single-point-of-failure. (#267)
+
+### Changed
+
+- **Security hardening** — removed the dead `HOMEPAGE_VAR_KOPIA_PASSWORD` (leaked the kopia password into the homepage container), disabled Grafana OAuth self-signup (`GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=false`), and closed Healthchecks public registration (`REGISTRATION_OPEN=False`). (#265)
+- **Compose reliability** — `prometheus`/`promtail` `depends_on` now use `service_healthy`/`service_started` conditions. (#265)
+
+### Fixed
+
+- **Healthchecks login CSRF 403** — caddy forwards `X-Forwarded-Proto: https` (it receives plain http from cloudflared), so Django treats the request as secure and login/signup POSTs pass CSRF. (#262)
+- **Grafana Sentry "No data"** — datasource project slug corrected (`luk-bot` → `lucky`, the real Sentry project). (#262)
+- **Lucky dashboard** — Loki logs panel moved to the top (it always had data); Kopia homepage widget made link-only (kopia 0.23's API needs a CSRF token the widget can't send). (#262)
+
+### Docs
+
+- `HEALTHCHECKS_DB_PASSWORD` added to `.env.example`; Kopia snapshot-freshness alert runbook added to `backup.md`. (#265)
+
 ## [2.9.1] - 2026-06-19
 
 ### Added
