@@ -128,12 +128,17 @@ services:
       - OVERWRITEHOST=cloud.${DOMAIN}
       - TZ=${TIMEZONE}
     ports:
-      - "${BIND_IP:-0.0.0.0}:8300:80"
+      # Public access is via caddy on loopback; intended direct access is Tailscale
+      # only. Was 0.0.0.0 (exposed on every interface incl. LAN). (#202)
+      - "127.0.0.1:8300:80"
+      - "${TAILSCALE_IP}:8300:80"
     networks:
       - default
     depends_on:
-      - nextcloud-db
-      - nextcloud-redis
+      nextcloud-db:
+        condition: service_healthy
+      nextcloud-redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/status.php"]
       interval: 30s
@@ -257,8 +262,10 @@ services:
       - frontend
       - database
     depends_on:
-      - paperless-db
-      - paperless-redis
+      paperless-db:
+        condition: service_healthy
+      paperless-redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000"]
       interval: 30s
