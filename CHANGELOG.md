@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.4] - 2026-06-20
+
+### Fixed
+
+- **status: partial container list no longer reported as success** — `get_container_status` split its failure modes: a Docker-daemon/`list()` failure returns `[]` + a visible error, while a per-container processing error skips only that container (so one bad container can't silently truncate the rest). Removed an unreachable "unknown container" branch. (#214)
+- **public-safety-gate scans added lines only** — the pre-commit gate scanned whole files, re-flagging pre-existing identifiers on unrelated edits; now checks only staged added lines (still blocks new additions). (#193)
+
+### Tests
+
+- Coverage for `run_server` port override + graceful shutdown and the `serve` command (#216, #217), and `validate-env.sh`'s missing-`.env` abort + `--strict` failure (#208).
+
 ## [2.10.3] - 2026-06-20
 
 ### Changed
