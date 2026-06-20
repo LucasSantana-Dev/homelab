@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.3] - 2026-06-20
+
+### Changed
+
+- **k3s fully decommissioned** — the abandoned k3s + authentik stack (unrouted since the tinyauth migration) was removed, completing ADR-0004 ([[ADR-0024]]). Freed ~2.5GB RAM + ~11% CPU; authentik DB preserved as a logical dump in the kopia-backed `appdata/`. (#281)
+- **Security hardening** — nextcloud bound off `0.0.0.0` → loopback + Tailscale (#277); kopia server creds moved from CLI flags to env (no longer leak via `ps`/`docker inspect`) and `common.sh` no longer `eval`s decrypted secrets (#278); ufw rule-add no longer swallows failures (#279); cloudflared given resource limits (#282).
+- **Compose reliability** — nextcloud/paperless `depends_on` use `service_healthy` (#277).
+
+### Fixed
+
+- **image-locks fails closed on `:latest`** — refuses to pin a moving-target `:latest` digest instead of silently undermining reproducible pinning. (#283)
+
+### Removed
+
+- **3 obsolete SSO/cert scripts** — `sso-status`, `sso-smoke-test`, `renew-wildcard-cert` maintained retired infra (edge TLS via Cloudflare, SSO via tinyauth). (#280)
+
+### Docs
+
+- Documented cockpit `tls_insecure_skip_verify` (#279) and cloudflared's forced healthcheck-disable (#282) as accepted-by-design; ADR-0024 recorded.
+
 ## [2.10.2] - 2026-06-20
 
 ### Fixed
