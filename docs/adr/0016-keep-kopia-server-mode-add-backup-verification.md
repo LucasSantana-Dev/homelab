@@ -76,3 +76,15 @@ observability covers it (#165 + freshness below), it needs no special treatment.
 - **Restore testing:** a restore reveals a gap, critical data exceeds ~1TB, or a
   second host / failover need appears → add the monthly restore test.
 - **Freshness alert:** if it never fires in 3 months, re-tune or retire.
+
+## Update (2026-06-20) — offsite same-disk gap addressed (#266)
+
+The "offsite → Backblaze B2" target named in this ADR's Context was the *intended*
+design but was **deferred and never wired**, so in practice the repo was
+**same-disk-only**, leaving host-disk-failure uncovered. Rather than keep waiting on
+the B2 tier, an **rsync mirror of the encrypted repo to a second host/disk** now ships:
+`scripts/maintenance/kopia-offsite-sync.sh` + `kopia-offsite-sync.timer` (daily),
+target set via `KOPIA_OFFSITE_TARGET` in `.env` (operator picks a host/disk).
+Recovery depends on `KOPIA_REPO_PASSWORD`, now kept off-host in SOPS (#272). The
+B2/S3 tier (`KOPIA_S3_*`) remains deferred as a future second offsite layer. See
+docs/backup.md §Offsite Disaster Recovery.

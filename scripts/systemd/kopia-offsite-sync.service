@@ -1,0 +1,20 @@
+[Unit]
+Description=Kopia offsite repo mirror (rsync)
+Documentation=https://github.com/luk-homeserver/homelab
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/luk-server/homelab
+# root: read /opt/kopia-repo (owned by the kopia container's root) + ssh/rsync out.
+ExecStart=/home/luk-server/homelab/scripts/maintenance/kopia-offsite-sync.sh
+Environment=HOME=/root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+TimeoutStartSec=3600
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kopia-offsite-sync
+
+[Install]
+WantedBy=multi-user.target
