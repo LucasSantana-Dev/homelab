@@ -13,7 +13,8 @@
         ssl-renew ssl-status sso-register-apps sso-register-dry-run sso-register-status \
         serena-mcp-setup k3s-registry-mirror \
         secret-gate secret-gate-history public-safety-gate public-release-checkpoint rewrite-history \
-        forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup
+        forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup \
+        sops-status sops-encrypt sops-decrypt sops-verify sops-edit
 
 # Default target
 help: ## Show this help message
@@ -615,3 +616,39 @@ quick-backup: ## Quick backup with verification
 	if [ -n "$$latest" ]; then \
 		./scripts/maintenance/automated-backup.sh --verify "$$latest"; \
 	fi
+
+# ---------------------------------------------------------------------------
+# SOPS secrets (age-encrypted). Activate once to get a durable, recoverable,
+# off-host copy of every secret (committed encrypted as .env.enc). This is the
+# fix for the kopia-password single-point-of-failure. See docs/secrets.md.
+# ---------------------------------------------------------------------------
+SOPS_AGE_PUB = $(shell grep -oE 'age1[a-zA-Z0-9]+' .sops.yaml 2>/dev/null | grep -iv placeholder | head -1)
+
+sops-status: ## Show SOPS activation status (age key + encrypted file)
+	@if [ -n "$(SOPS_AGE_PUB)" ]; then echo "age key:  configured ($(SOPS_AGE_PUB))"; \
+	else echo "age key:  NOT set — .sops.yaml still has the placeholder (docs/secrets.md §Activation)"; fi
+	@if [ -f .env.enc ]; then echo ".env.enc: present (committed, encrypted)"; else echo ".env.enc: not created yet"; fi
+
+sops-encrypt: ## Encrypt .env -> .env.enc (commit .env.enc; .env stays gitignored)
+	@command -v sops >/dev/null 2>&1 || { echo "sops not installed: brew install sops age"; exit 1; }
+	@[ -n "$(SOPS_AGE_PUB)" ] || { echo "Set a real age public key in .sops.yaml first (docs/secrets.md §Activation)"; exit 1; }
+	@[ -f .env ] || { echo ".env not found"; exit 1; }
+	sops --encrypt --age '$(SOPS_AGE_PUB)' --input-type dotenv --output-type dotenv .env > .env.enc
+	@echo "Wrote .env.enc — run 'make sops-verify', then commit .env.enc."
+
+sops-decrypt: ## Decrypt .env.enc -> .env (needs SOPS_AGE_KEY_FILE; run on host before deploy)
+	@command -v sops >/dev/null 2>&1 || { echo "sops not installed"; exit 1; }
+	@[ -f .env.enc ] || { echo ".env.enc not found"; exit 1; }
+	sops --decrypt --input-type dotenv --output-type dotenv .env.enc > .env
+	@echo "Wrote .env from .env.enc."
+
+sops-verify: ## Round-trip check: decrypt .env.enc and diff against current .env
+	@sops --decrypt --input-type dotenv --output-type dotenv .env.enc > .env.sops-check 2>/dev/null \
+		|| { echo "decrypt failed — is SOPS_AGE_KEY_FILE exported?"; rm -f .env.sops-check; exit 1; }
+	@sort .env > .env.sops-a; sort .env.sops-check > .env.sops-b; \
+	if diff -q .env.sops-a .env.sops-b >/dev/null; then echo "OK: .env.enc round-trips to .env exactly"; \
+	else echo "MISMATCH (.env vs decrypted .env.enc):"; diff .env.sops-a .env.sops-b | head -20; fi; \
+	rm -f .env.sops-check .env.sops-a .env.sops-b
+
+sops-edit: ## Edit secrets in place (sops decrypts -> $$EDITOR -> re-encrypts)
+	sops --input-type dotenv --output-type dotenv .env.enc
