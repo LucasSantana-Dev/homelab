@@ -191,7 +191,11 @@ http://paperless.luk-homeserver.com.br {
 
 http://healthchecks.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:8092
+	reverse_proxy 127.0.0.1:8092 {
+		# cloudflared->caddy is plain http; force https so healthchecks (Django,
+		# SECURE_PROXY_SSL_HEADER) treats the request as secure -> login/signup CSRF ok.
+		header_up X-Forwarded-Proto https
+	}
 }
 
 http://kopia.luk-homeserver.com.br {

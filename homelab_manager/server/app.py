@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from homelab_manager import __version__
+from homelab_manager.core.log import new_trace_id, setup_logging, trace_context
 from homelab_manager.models.service import ServiceRegistry
 from homelab_manager.services.health import HealthMonitor
 
@@ -135,6 +136,13 @@ def _make_handler(
                 return False, "lines must be an integer between 1 and 10000"
 
         def do_GET(self):
+            # Correlate every log line for this request under one trace id (honor
+            # an upstream X-Request-ID from caddy/cloudflared if present).
+            trace = self.headers.get("X-Request-ID") or new_trace_id("req")
+            with trace_context(trace):
+                self._handle_get()
+
+        def _handle_get(self):
             # Rate-limit BEFORE auth so invalid-key attempts are throttled, not just
             # 401'd without bound (cubic #2: 401 brute-force/flood was unthrottled).
             if not self._check_rate_limit():
@@ -170,6 +178,7 @@ def _make_handler(
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8765) -> None:
+    setup_logging()
     port = int(os.environ.get("HOMELAB_MANAGER_HTTP_PORT", port))
     api_key = os.environ.get("HOMELAB_API_KEY")
     if not api_key:

@@ -91,11 +91,9 @@
         href: https://kopia.luk-homeserver.com.br
         description: Backup & snapshots
         container: kopia
-        widget:
-          type: kopia
-          url: http://kopia:51515
-          username: admin
-          password: '{{HOMEPAGE_VAR_KOPIA_PASSWORD}}'
+        # Link-only: kopia 0.23 API requires a CSRF token (Kopia-Csrf-Token) that
+        # the homepage kopia widget does not send, so the widget always 401s
+        # ("Invalid or missing CSRF token") despite correct basic-auth creds.
 
 - Infrastructure:
     - Pi-hole:

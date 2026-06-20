@@ -2,6 +2,55 @@
 
 This homelab uses **SOPS** (Secrets Operations) with **age** encryption to manage secrets securely.
 
+## Activation (one-time — fixes the secret SPOF)
+
+Until this is done, every secret — including **`KOPIA_REPO_PASSWORD`**, the master
+key for the kopia backup repo — exists only as a **single plaintext copy** in the
+host `.env`. Lose it and the kopia repo is permanently undecryptable. Activation
+stores an **encrypted, git-committed** copy (`.env.enc`) plus a recovery key in
+your password manager, so secrets survive a host loss.
+
+Run on the host (where the real `.env` lives):
+
+1. **Generate the age key** (the one thing you must never lose):
+   ```bash
+   mkdir -p ~/.config/sops/age
+   age-keygen -o ~/.config/sops/age/keys.txt && chmod 600 ~/.config/sops/age/keys.txt
+   ```
+   It prints `# public key: age1...`.
+
+2. **Back up the age PRIVATE key off-host — this is the SPOF fix.** Copy the full
+   contents of `~/.config/sops/age/keys.txt` into your **password manager** (and/or
+   an offline copy). With this key + the committed `.env.enc` you can recover every
+   secret even if the host is gone.
+
+3. **Wire the public key** into `.sops.yaml`: replace the `age1PLACEHOLDER…` value
+   with the `age1...` **public** key from step 1.
+
+4. **Export the key path** so sops can decrypt:
+   ```bash
+   echo 'export SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt' >> ~/.bashrc
+   export SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt
+   ```
+
+5. **Encrypt → verify → commit:**
+   ```bash
+   make sops-encrypt    # .env -> .env.enc (values encrypted; keys stay readable)
+   make sops-verify     # asserts .env.enc round-trips back to .env exactly
+   git add .sops.yaml .env.enc && git commit -m "chore(secrets): activate SOPS"
+   ```
+   `.env` stays gitignored; `.env.enc` is committed (encrypted). `make sops-status`
+   shows state.
+
+### Day-to-day after activation
+- Change a secret: `make sops-edit` (or edit `.env`, then `make sops-encrypt`); commit `.env.enc`.
+- Deploy: if `.env` is missing, `make sops-decrypt` first, then your usual `make deploy`.
+
+### Recovery (host lost)
+1. Restore `~/.config/sops/age/keys.txt` from your password manager; `export SOPS_AGE_KEY_FILE=...`.
+2. `git clone` the repo, then `make sops-decrypt` → regenerates `.env`.
+3. `kopia repository connect filesystem --path=...` with the recovered `KOPIA_REPO_PASSWORD`; restore.
+
 ## Setup (One-time)
 
 ### Install Tools

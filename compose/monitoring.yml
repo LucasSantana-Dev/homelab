@@ -23,7 +23,12 @@ services:
     - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
     - GF_AUTH_GENERIC_OAUTH_ENABLED=${GRAFANA_OAUTH_ENABLED:-true}
     - GF_AUTH_GENERIC_OAUTH_NAME=Google
-    - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
+    # Single-operator instance: do NOT auto-provision new accounts from OAuth.
+    # tinyauth gates the public edge, but grafana also binds the LAN/Tailscale
+    # port directly — sign-up=true there would let any Google account self-create
+    # an Admin (combined with the GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=Admin
+    # below). Pre-existing users still log in via Google.
+    - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=false
     - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${GOOGLE_CLIENT_ID}
     - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     - GF_AUTH_GENERIC_OAUTH_SCOPES=openid profile email
@@ -172,7 +177,8 @@ services:
     # docs/runbooks/lucky-observability.md.
     - lucky-monitoring
     depends_on:
-    - alertmanager
+      alertmanager:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -334,7 +340,9 @@ services:
     networks:
     - default
     depends_on:
-    - loki
+      loki:
+        # loki's healthcheck is disabled, so gate on started (not healthy).
+        condition: service_started
     deploy:
       resources:
         limits:
@@ -458,6 +466,9 @@ services:
       - SITE_NAME=Homelab Healthchecks
       - SUPERUSER_EMAIL=${HEALTHCHECKS_SUPERUSER_EMAIL}
       - SUPERUSER_PASSWORD=${HEALTHCHECKS_SUPERUSER_PASSWORD}
+      # Single-operator instance: close public self-signup. The superuser logs in
+      # with email + password (the magic-link email path needs SMTP, see #264).
+      - REGISTRATION_OPEN=False
       - DEBUG=False
       - TZ=${TIMEZONE}
     volumes:

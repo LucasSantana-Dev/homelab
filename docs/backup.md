@@ -177,6 +177,26 @@ docker exec kopia kopia snapshot list
 
 Use the exact snapshot ID from the output, or use `latest` to restore the most recent.
 
+## Monitoring & Alerts
+
+Two Prometheus alerts watch the backup (defined in `config/prometheus/alerts.yml`):
+
+| Alert | Fires when | Severity | SLO / threshold |
+|-------|-----------|----------|-----------------|
+| `KopiaSnapshotStale` | `time() - kopia_last_snapshot_timestamp_seconds > 172800` for 10m | warning | **A successful snapshot every ≤48h.** Kopia can be "healthy" (container up) yet not actually snapshotting — this catches that. |
+| `KopiaSnapshotListFailed` | `kopia_snapshot_list_ok == 0` for 5m | critical | Snapshot list query failed — container down, repo unreachable, or auth failed. |
+
+**Runbook — `KopiaSnapshotStale`:**
+1. `docker exec kopia kopia snapshot list --max-results 5` — is the newest snapshot really >48h old?
+2. If stale, force one: `docker exec kopia kopia snapshot create /source/docker-volumes /source/appdata /source/config` (see [Daily Operation](#daily-operation)).
+3. Check the scheduler: the server runs `--snapshot-interval=24h`; confirm the policy with `docker exec kopia kopia policy show --global`.
+4. Check disk space (`df -h`) — a full disk silently stops snapshots.
+
+**Runbook — `KopiaSnapshotListFailed`:**
+1. `docker ps | grep kopia` and `docker logs kopia --tail 50`.
+2. Verify the repo is connected: `docker exec kopia kopia repository status`.
+3. If auth failed, confirm `KOPIA_PASSWORD` / `KOPIA_SERVER_PASSWORD` in `.env` are intact (see Caveats — losing `KOPIA_PASSWORD` makes the repo unrecoverable).
+
 ## Cost & Space
 
 Typical homelab (docker volumes ~5.4 GB + appdata ~7.3 GB + config ~45 MB):
