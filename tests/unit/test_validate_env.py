@@ -226,3 +226,41 @@ def test_var_starting_with_number_not_valid(tmp_path):
     # ${2NDVAR} should NOT be extracted (invalid var name format)
     assert result.returncode == 0, result.stdout
     assert "2NDVAR" not in result.stdout
+
+
+def test_missing_env_file_aborts(tmp_path):
+    """#208: the script's first guard — if .env does not exist, abort with a
+    clear error and non-zero exit (a deploy must not proceed without .env)."""
+    missing = tmp_path / "does-not-exist.env"  # deliberately not created
+    _compose(tmp_path / "compose", "services:\n  s:\n    image: alpine\n")
+    result = _run(missing, tmp_path / "compose")
+    assert result.returncode != 0
+    assert "not found" in (result.stdout + result.stderr).lower()
+
+
+def test_strict_mode_fails_on_missing_optional(tmp_path):
+    """#208: --strict turns optional-var warnings into a hard failure (exit 1),
+    while the same env passes without --strict (warnings tolerated)."""
+    env = tmp_path / ".env"
+    # Base env satisfies compose-required vars but leaves the script's optional
+    # vars unconfigured → warnings.
+    env.write_text(_BASE_ENV)
+    _compose(tmp_path / "compose", "services:\n  s:\n    image: alpine\n")
+
+    def run(*args):
+        return subprocess.run(
+            ["bash", str(SCRIPT), *args],
+            env={
+                **os.environ,
+                "HOMELAB_ENV_FILE": str(env),
+                "HOMELAB_COMPOSE_DIR": str(tmp_path / "compose"),
+            },
+            capture_output=True,
+            text=True,
+        )
+
+    non_strict = run()
+    strict = run("--strict")
+    assert non_strict.returncode == 0, non_strict.stdout  # warnings tolerated
+    assert strict.returncode != 0  # same env, --strict makes warnings fatal
+    assert "strict mode" in strict.stdout.lower()
