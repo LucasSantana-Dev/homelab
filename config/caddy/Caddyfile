@@ -44,6 +44,9 @@ http://pihole.home {
 http://cockpit.home {
 	reverse_proxy https://127.0.0.1:9090 {
 		transport http {
+			# tls_insecure_skip_verify is intentional (#215): cockpit serves a
+			# self-signed cert that regenerates, and this hop is loopback with no
+			# MITM surface. Pinning would break on cert rotation for no real gain.
 			tls_insecure_skip_verify
 		}
 	}
