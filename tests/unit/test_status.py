@@ -76,18 +76,15 @@ class TestGetContainerStatus:
         assert item["status"] == "running"
         assert item["health"] == "healthy"
 
-    def test_unknown_homelab_container_falls_back(self, manager_with_mocked_docker):
+    def test_unregistered_container_is_excluded(self, manager_with_mocked_docker):
         m, client = manager_with_mocked_docker
         m.registry = MagicMock()
-        # Service lookup returns None (unknown)
+        # Not in the registry → not reported (registry is the source of truth).
         m.registry.get_service_by_container.return_value = None
 
         container = make_container("rogue-svc")
         client.containers.list.return_value = [container]
-        # _is_homelab_container uses the registry too — returns None -> not a
-        # homelab container, so it should be filtered out.
-        result = m.get_container_status()
-        assert result == []
+        assert m.get_container_status() == []
 
     def test_docker_exception_is_caught(self, manager_with_mocked_docker, capsys):
         m, client = manager_with_mocked_docker
@@ -96,6 +93,41 @@ class TestGetContainerStatus:
         assert result == []
         out = capsys.readouterr().out
         assert "Error getting container status" in out
+
+    def test_one_bad_container_does_not_truncate_rest(self, manager_with_mocked_docker):
+        """#214: a container that fails to process is skipped, not silently
+        dropping every container after it (which would make a partial list look
+        like a complete result)."""
+        m, client = manager_with_mocked_docker
+        m.registry = MagicMock()
+        # All three are registered services (the real reporting path).
+        m.registry.get_service_by_container.side_effect = lambda name: SimpleNamespace(
+            name=name, category="svc", port=None, sensitive=False
+        )
+
+        good1 = make_container("good1")
+        good2 = make_container("good2")
+
+        class _BadContainer:
+            name = "boom"
+            status = "running"
+
+            @property
+            def image(self):  # accessed mid-body → raises for this one only
+                raise RuntimeError("unreadable")
+
+        client.containers.list.return_value = [good1, _BadContainer(), good2]
+
+        result = m.get_container_status()
+        names = {c["name"] for c in result}
+        assert names == {"good1", "good2"}  # bad skipped, good2 NOT truncated
+
+    def test_none_docker_client_returns_empty_with_error(self, capsys):
+        """No daemon → empty + explicit error, never confused with 'no containers'."""
+        m = StatusManager()
+        m.docker_client = None
+        assert m.get_container_status() == []
+        assert "Docker daemon is unreachable" in capsys.readouterr().out
 
 
 class TestCheckContainerHealth:

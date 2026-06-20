@@ -27,12 +27,22 @@ for file in "${tracked_files[@]}"; do
     continue
   fi
 
-  if rg -n --regexp "${DENY_REGEX}" "${ROOT_DIR}/${file}" >/tmp/public-safety-match.txt 2>/dev/null; then
+  # Scan only the STAGED ADDED lines, not the whole file (#193). Whole-file
+  # scanning re-flagged pre-existing identifiers in already-committed files on
+  # every unrelated edit (recurring false-positives). The gate's job is to block
+  # NEW additions of private identifiers; a pre-existing occurrence is already in
+  # history and is handled by the release-scrub flow, not this pre-commit gate.
+  added_lines="$(
+    git -C "${ROOT_DIR}" diff --cached -U0 -- "${file}" \
+      | grep '^+' | grep -v '^+++' | sed 's/^+//'
+  )"
+  if printf '%s\n' "${added_lines}" \
+      | rg -n --regexp "${DENY_REGEX}" >/tmp/public-safety-match.txt 2>/dev/null; then
     if [[ "${violations}" -eq 0 ]]; then
-      echo "Public safety gate failed. Found private identifiers in staged files:"
+      echo "Public safety gate failed. Found private identifiers in newly-added lines:"
     fi
     violations=$((violations + 1))
-    sed "s#^#${file}:#" /tmp/public-safety-match.txt
+    sed "s#^#${file} (added):#" /tmp/public-safety-match.txt
   fi
 done
 

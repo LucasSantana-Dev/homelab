@@ -33,15 +33,43 @@ class StatusManager:
         self._compose = ComposeCLI(registry=self.registry)
 
     def get_container_status(self) -> List[Dict]:
-        """Get status of all homelab containers"""
-        containers = []
+        """Get status of all homelab containers.
+
+        Failure modes are kept distinct (#214): a Docker-daemon/list() failure
+        returns an empty list + a user-visible error (so callers don't mistake it
+        for "no containers"), while a per-container processing error skips only
+        that container — one bad container can't silently truncate the rest and
+        make a partial result look complete.
+        """
+        if self.docker_client is None:
+            console.print(
+                "Error getting container status. Docker daemon is unreachable."
+            )
+            return []
 
         try:
-            assert self.docker_client is not None
-            for container in self.docker_client.containers.list(all=True):
+            all_containers = self.docker_client.containers.list(all=True)
+        except Exception as e:
+            # M1 hardening: do NOT echo exception details — Docker SDK errors
+            # can include auth tokens, env values, or socket paths in stderr.
+            logger.debug("containers.list() failed", exc_info=True)
+            console.print(
+                "Error getting container status. Check Docker connectivity "
+                f"(error type: {type(e).__name__})."
+            )
+            return []
+
+        containers = []
+        for container in all_containers:
+            try:
                 # Try to match container to a known service
                 service = self.registry.get_service_by_container(container.name)
+                image = container.image.tags[0] if container.image.tags else "unknown"
 
+                # Registry is the source of truth — only registered services are
+                # reported. (A prior "unknown container" branch guarded on
+                # `_is_homelab_container`, which was the same registry lookup as
+                # `service` above and so could never fire — dead code, removed.)
                 if service:
                     containers.append(
                         {
@@ -51,48 +79,16 @@ class StatusManager:
                             "status": container.status,
                             "port": service.port,
                             "health": self._check_container_health(container.name),
-                            "image": (
-                                container.image.tags[0]
-                                if container.image.tags
-                                else "unknown"
-                            ),
+                            "image": image,
                             "sensitive": service.sensitive,
                         }
                     )
-                else:
-                    # Include containers that might be part of homelab but not in registry
-                    if self._is_homelab_container(container.name):
-                        containers.append(
-                            {
-                                "name": container.name,
-                                "service_name": container.name,
-                                "category": "unknown",
-                                "status": container.status,
-                                "port": None,
-                                "health": self._check_container_health(container.name),
-                                "image": (
-                                    container.image.tags[0]
-                                    if container.image.tags
-                                    else "unknown"
-                                ),
-                                "sensitive": False,
-                            }
-                        )
-        except Exception as e:
-            # M1 hardening: do NOT echo exception details — Docker SDK errors
-            # can include auth tokens, env values, or socket paths in stderr.
-            # Log full detail at DEBUG only; user sees a generic message.
-            logger.debug("get_container_status failed", exc_info=True)
-            console.print(
-                "Error getting container status. Check Docker connectivity "
-                f"(error type: {type(e).__name__})."
-            )
+            except Exception:
+                # One unreadable container must not drop the rest of the list.
+                logger.debug("skipping container that failed to process", exc_info=True)
+                continue
 
         return containers
-
-    def _is_homelab_container(self, container_name: str) -> bool:
-        """Check if a container belongs to the homelab stack via the service registry"""
-        return self.registry.get_service_by_container(container_name) is not None
 
     def _check_container_health(self, container_name: str) -> str:
         """Check if a container is healthy"""
