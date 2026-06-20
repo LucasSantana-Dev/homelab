@@ -63,7 +63,9 @@ groups:
 
       # High CPU Usage Alerts
       - alert: HighCPUUsage
-        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        # sum by (name) aggregates a container's cgroup series; name!="" drops the
+        # root/system cgroups (which fired this alert with a blank container name).
+        expr: sum by (name) (rate(container_cpu_usage_seconds_total{name!=""}[5m])) > 0.8
         for: 5m
         labels:
           severity: warning
@@ -72,7 +74,7 @@ groups:
           description: "Container {{ $labels.name }} is using more than 80% CPU for more than 5 minutes."
 
       - alert: CriticalCPUUsage
-        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.9
+        expr: sum by (name) (rate(container_cpu_usage_seconds_total{name!=""}[5m])) > 0.9
         for: 2m
         labels:
           severity: critical

@@ -480,10 +480,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          # Django + uWSGI workers + celery sit at ~93% of 256M and trip the
+          # HighMemoryUsage alert; 512M gives headroom (host has ample free mem).
+          memory: 512M
           cpus: '0.25'
         reservations:
-          memory: 64M
+          memory: 128M
           cpus: '0.05'
     logging:
       driver: json-file
