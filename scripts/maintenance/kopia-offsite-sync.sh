@@ -29,7 +29,17 @@ if [[ -z "${TARGET}" ]]; then
   exit 0
 fi
 
-# Sanity guard: never mirror a missing/empty/invalid source over a good offsite
+# Target sanity guard (rsync --delete is destructive). Reject a target that is
+# empty, root, the source itself, or a remote with an empty/root path component —
+# a typo here must never let --delete wipe the wrong tree.
+case "${TARGET%/}" in
+  "" | "/" | "${REPO%/}" | *:/ | *:)
+    log "ERROR: refusing unsafe KOPIA_OFFSITE_TARGET='${TARGET}'."
+    exit 1
+    ;;
+esac
+
+# Source guard: never mirror a missing/empty/invalid source over a good offsite
 # copy (rsync --delete would otherwise wipe it). Require the repo's format marker.
 if [[ ! -s "${REPO}/kopia.repository.f" && ! -s "${REPO}/kopia.repository" ]]; then
   log "ERROR: ${REPO} has no kopia repository marker — refusing to sync (would risk wiping offsite)."
