@@ -66,6 +66,10 @@ class StatusManager:
                 service = self.registry.get_service_by_container(container.name)
                 image = container.image.tags[0] if container.image.tags else "unknown"
 
+                # Registry is the source of truth — only registered services are
+                # reported. (A prior "unknown container" branch guarded on
+                # `_is_homelab_container`, which was the same registry lookup as
+                # `service` above and so could never fire — dead code, removed.)
                 if service:
                     containers.append(
                         {
@@ -79,30 +83,12 @@ class StatusManager:
                             "sensitive": service.sensitive,
                         }
                     )
-                elif self._is_homelab_container(container.name):
-                    # Part of homelab but not in the registry.
-                    containers.append(
-                        {
-                            "name": container.name,
-                            "service_name": container.name,
-                            "category": "unknown",
-                            "status": container.status,
-                            "port": None,
-                            "health": self._check_container_health(container.name),
-                            "image": image,
-                            "sensitive": False,
-                        }
-                    )
             except Exception:
                 # One unreadable container must not drop the rest of the list.
                 logger.debug("skipping container that failed to process", exc_info=True)
                 continue
 
         return containers
-
-    def _is_homelab_container(self, container_name: str) -> bool:
-        """Check if a container belongs to the homelab stack via the service registry"""
-        return self.registry.get_service_by_container(container_name) is not None
 
     def _check_container_health(self, container_name: str) -> str:
         """Check if a container is healthy"""

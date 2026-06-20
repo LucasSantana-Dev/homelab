@@ -76,18 +76,15 @@ class TestGetContainerStatus:
         assert item["status"] == "running"
         assert item["health"] == "healthy"
 
-    def test_unknown_homelab_container_falls_back(self, manager_with_mocked_docker):
+    def test_unregistered_container_is_excluded(self, manager_with_mocked_docker):
         m, client = manager_with_mocked_docker
         m.registry = MagicMock()
-        # Service lookup returns None (unknown)
+        # Not in the registry → not reported (registry is the source of truth).
         m.registry.get_service_by_container.return_value = None
 
         container = make_container("rogue-svc")
         client.containers.list.return_value = [container]
-        # _is_homelab_container uses the registry too — returns None -> not a
-        # homelab container, so it should be filtered out.
-        result = m.get_container_status()
-        assert result == []
+        assert m.get_container_status() == []
 
     def test_docker_exception_is_caught(self, manager_with_mocked_docker, capsys):
         m, client = manager_with_mocked_docker
@@ -103,7 +100,10 @@ class TestGetContainerStatus:
         like a complete result)."""
         m, client = manager_with_mocked_docker
         m.registry = MagicMock()
-        m.registry.get_service_by_container.return_value = None
+        # All three are registered services (the real reporting path).
+        m.registry.get_service_by_container.side_effect = lambda name: SimpleNamespace(
+            name=name, category="svc", port=None, sensitive=False
+        )
 
         good1 = make_container("good1")
         good2 = make_container("good2")
@@ -118,9 +118,7 @@ class TestGetContainerStatus:
 
         client.containers.list.return_value = [good1, _BadContainer(), good2]
 
-        with patch.object(m, "_is_homelab_container", return_value=True):
-            result = m.get_container_status()
-
+        result = m.get_container_status()
         names = {c["name"] for c in result}
         assert names == {"good1", "good2"}  # bad skipped, good2 NOT truncated
 
