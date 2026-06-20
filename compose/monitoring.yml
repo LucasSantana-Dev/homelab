@@ -452,6 +452,14 @@ services:
       - DB_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:?HEALTHCHECKS_DB_PASSWORD must be set}
       - DB_PORT=5432
       - DEFAULT_FROM_EMAIL=healthchecks@${DOMAIN:-home}
+      # SMTP for magic-link login + down-check notification emails (#264). Empty
+      # by default → no behaviour change (signup-via-email still needs creds;
+      # password login is unaffected). Set HEALTHCHECKS_EMAIL_* in .env to enable.
+      - EMAIL_HOST=${HEALTHCHECKS_EMAIL_HOST:-}
+      - EMAIL_PORT=${HEALTHCHECKS_EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${HEALTHCHECKS_EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${HEALTHCHECKS_EMAIL_HOST_PASSWORD:-}
+      - EMAIL_USE_TLS=${HEALTHCHECKS_EMAIL_USE_TLS:-True}
       # ALLOWED_HOSTS — Django host-header allowlist. Restrict to expected
       # access paths: LAN loopback, Tailscale magicDNS, and the public
       # subdomain. `*` would disable the protection entirely.
