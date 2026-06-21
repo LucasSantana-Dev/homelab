@@ -42,11 +42,13 @@ fail_hc() { if [[ -n "${HC_URL}" ]]; then curl -fsS -m 10 "${HC_URL}/fail" >/dev
 size_of() { du -sh "${REPO}" 2>/dev/null | cut -f1; }
 
 if [[ -n "${RCLONE_REMOTE}" ]]; then
-  # rclone remote must be of the form "remote:path" (a configured rclone remote).
+  # rclone remote must be "remote:path" with a NON-EMPTY path. `remote:` (empty
+  # path) is the remote's root — rclone sync there would mirror+delete the whole
+  # drive/bucket. Reject it, same as the rsync-target-root guard.
   case "${RCLONE_REMOTE}" in
-    :*) log "ERROR: invalid KOPIA_OFFSITE_RCLONE_REMOTE='${RCLONE_REMOTE}' (empty remote name)." ; exit 1 ;;
-    *:*) : ;;
-    *)  log "ERROR: KOPIA_OFFSITE_RCLONE_REMOTE must be 'remote:path'; got '${RCLONE_REMOTE}'." ; exit 1 ;;
+    :*)   log "ERROR: invalid KOPIA_OFFSITE_RCLONE_REMOTE='${RCLONE_REMOTE}' (empty remote name)." ; exit 1 ;;
+    *:?*) : ;;                          # remote:<non-empty path> — ok
+    *)    log "ERROR: KOPIA_OFFSITE_RCLONE_REMOTE must be 'remote:path' with a non-empty path (not the remote root); got '${RCLONE_REMOTE}'." ; exit 1 ;;
   esac
   command -v rclone >/dev/null 2>&1 || { log "ERROR: rclone not installed."; exit 1; }
   log "Syncing ${REPO} → rclone:${RCLONE_REMOTE} (encrypted repo)"
