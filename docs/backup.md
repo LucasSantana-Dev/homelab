@@ -144,11 +144,13 @@ instead of (or in addition to) the rsync target. The encrypted repo (~11 GB) fit
 Google Drive's free 15 GB.
 
 1. Install rclone on the host: `sudo apt-get install -y rclone` (or `curl https://rclone.org/install.sh | sudo bash`).
-2. Configure the remote **once** (interactive OAuth — needs a browser). On a headless
-   host, run `rclone config`, choose `drive`, accept defaults, and at the
-   "auto config?" prompt answer **No**, then run `rclone authorize "drive"` on a
-   laptop and paste the token back. Name it e.g. `gdrive`. Store the rclone config
-   securely (it holds the Drive OAuth token).
+2. Configure the remote **once** (interactive OAuth — needs a browser). Run it as
+   the `luk-server` user (no sudo) so the config lands at
+   `~/.config/rclone/rclone.conf` — the systemd service points `RCLONE_CONFIG`
+   there, so the root-run sync reuses it. Run `rclone config`, choose `drive`,
+   accept defaults, and at the "auto config?" prompt answer **No**, then run
+   `rclone authorize "drive"` on a laptop and paste the token back. Name it
+   `gdrive`. The config file holds the Drive OAuth token — keep it 0600.
 3. Point the sync at it:
 
    ```bash
