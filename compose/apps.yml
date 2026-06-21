@@ -19,6 +19,9 @@ services:
       - TZ=${TIMEZONE}
       - PUID=1000
       - PGID=1000
+      # Discord target for the ops-digest workflow (ADR-0025 Phase 2). Empty =
+      # workflow inactive; see docs/runbooks/ops-alert-digest.md. (#266-style: set in .env)
+      - OPS_DIGEST_DISCORD_WEBHOOK=${OPS_DIGEST_DISCORD_WEBHOOK:-}
     ports:
       - "127.0.0.1:5678:5678"
     networks:

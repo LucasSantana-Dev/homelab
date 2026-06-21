@@ -1,0 +1,50 @@
+{
+  "name": "ops-digest",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ops-digest",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1111111-1111-4111-8111-111111111111",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "a1111111-1111-4111-8111-111111111111"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize Sentry / healthchecks / WUD payloads into one shape, then\n// build a single Discord message. Source is inferred from the payload, or\n// passed explicitly as ?source= on the webhook URL.\nconst src = ($json.query && $json.query.source) || $json.source || 'unknown';\nconst b = $json.body || $json;\n\nlet title = 'event';\nlet detail = '';\nlet emoji = '🔵';\n\nif (src === 'sentry' || b.event) {\n  emoji = '🟣';\n  const e = b.event || b;\n  title = `Sentry: ${e.title || e.metadata?.value || b.message || 'issue'}`;\n  detail = `project=${b.project_name || b.project || '?'} level=${e.level || '?'}`;\n} else if (src === 'healthchecks' || b.check) {\n  const status = (b.check && b.check.status) || b.status || '?';\n  emoji = status === 'down' ? '🔴' : '🟢';\n  title = `Healthchecks: ${(b.check && b.check.name) || b.name || 'check'} is ${status}`;\n  detail = `last_ping=${(b.check && b.check.last_ping) || '?'}`;\n} else if (src === 'wud' || b.container) {\n  emoji = '🟠';\n  title = `WUD: update for ${b.container?.name || b.name || 'container'}`;\n  detail = `${b.container?.image?.tag?.value || ''} → ${b.container?.updateKind?.localValue || ''}=>${b.container?.updateKind?.remoteValue || ''}`;\n}\n\nconst content = `${emoji} **[${src}]** ${title}\\n${detail ? '`' + detail + '`' : ''}`;\nreturn [{ json: { content, source: src } }];"
+      },
+      "id": "b2222222-2222-4222-8222-222222222222",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OPS_DIGEST_DISCORD_WEBHOOK }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
+        "options": {}
+      },
+      "id": "c3333333-3333-4333-8333-333333333333",
+      "name": "Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Normalize", "type": "main", "index": 0 }]] },
+    "Normalize": { "main": [[{ "node": "Discord", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}
