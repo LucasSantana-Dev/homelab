@@ -113,17 +113,50 @@ The repository lives on `/opt/kopia-repo`, which is **on the same physical disk*
 - **Does NOT protect against**: Host disk failure, ransomware with root access, simultaneous disk + power loss
 - **Recovery**: Restore to a USB drive or network mount, then assess damage
 
-### Offsite Disaster Recovery (Deferred)
+### Offsite Disaster Recovery — rsync mirror to a second host/disk (#266)
 
-B2 integration is deferred. See **ADR-0016** for context:
-- Timeline: Add once local snapshots are verified (Object Lock + freshness alerts)
-- Cost: ~$6–10/month for ~100 GB
-- Then: Daily incremental snapshots to B2 for true off-site redundancy
+The encrypted kopia repo is mirrored offsite by `scripts/maintenance/kopia-offsite-sync.sh`
+(systemd `kopia-offsite-sync.timer`, daily 04:30). Because the repo is encrypted
+at rest, the offsite copy needs no extra encryption — but recovery requires **both**
+the mirror **and** `KOPIA_REPO_PASSWORD` (kept off-host in SOPS, #272).
 
-For now, **manual periodic B2 backup** is recommended if data loss from total host failure is unacceptable:
+**Enable:**
+1. Set the target in `.env` (a remote host or a mounted disk):
+
+   ```bash
+   KOPIA_OFFSITE_TARGET=luk@pc-do-luk:/srv/kopia-offsite   # or /mnt/usb-backup/kopia-offsite
+   ```
+
+   For a remote host, ensure root on the homelab can ssh to it (`ssh-copy-id` a key).
+2. Install + start the timer:
+
+   ```bash
+   sudo cp scripts/systemd/kopia-offsite-sync.{service,timer} /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl enable --now kopia-offsite-sync.timer
+   sudo systemctl start kopia-offsite-sync.service   # first run now
+   ```
+
+   The script no-ops cleanly while `KOPIA_OFFSITE_TARGET` is empty, so installing
+   the timer before choosing a target is safe.
+
+**Restore from the offsite mirror (host lost):**
+1. Bring the mirror back to a path, e.g. `/opt/kopia-repo` on the new host.
+2. Recover `KOPIA_REPO_PASSWORD` from SOPS (`make sops-decrypt`, see docs/secrets.md).
+3. `kopia repository connect filesystem --path=/opt/kopia-repo` (uses `KOPIA_PASSWORD`),
+   then `kopia snapshot restore <id> <dest>`.
+
+**Safety:** the sync refuses to run if `/opt/kopia-repo` lacks its repository marker,
+so a missing/empty source can't `--delete` a good offsite copy.
+
+#### Cloud object store (B2/S3) — still deferred (ADR-0016)
+
+The `KOPIA_S3_*` vars scaffold a Backblaze B2 / S3 target (~$6–10/mo for 100 GB)
+for a future second offsite tier. Not wired yet; the rsync mirror above already
+covers the immediate same-disk-failure gap at $0. To add B2 later as a second tier:
+
 ```bash
-# Copy repo snapshot bundle to B2 manually (effort required):
-# rclone sync /opt/kopia-repo b2:homelab-backup-b2/
+# The repo is encrypted, so a plain sync of the repo files is safe:
+rclone sync /opt/kopia-repo b2:homelab-backup-b2/
 ```
 
 ### Repository Encryption Password

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.5] - 2026-06-20
+
+### Added
+
+- **Healthchecks SMTP** — wired the `EMAIL_*` env (Gmail/transactional, sourced from `HEALTHCHECKS_EMAIL_*`), enabling magic-link login + down-check notification emails. Non-breaking when unset. (#264, #290)
+- **Kopia offsite mirror** — `kopia-offsite-sync.sh` + a daily systemd timer rsync the encrypted repo to an operator-set host/disk (`KOPIA_OFFSITE_TARGET`), with source+target safety guards and a restore runbook — closing the same-disk-only backup gap. (#266, #291)
+
 ## [2.10.4] - 2026-06-20
 
 ### Fixed
