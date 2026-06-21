@@ -8,6 +8,15 @@ route:
   group_interval: 30m
   repeat_interval: 12h
   routes:
+    # Dead-man-switch (ADR-0026): the always-firing Watchdog alert pings healthchecks
+    # ~every minute. If pings STOP (Prometheus/Alertmanager/routing broken) healthchecks
+    # alarms via email — independent of the Discord path that silently died (#296).
+    - matchers:
+        - alertname="Watchdog"
+      receiver: 'deadmanswitch'
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
     - matchers:
         - severity="critical"
       receiver: 'discord-notifications'
@@ -22,6 +31,12 @@ route:
       repeat_interval: 12h
 
 receivers:
+  # Pings the healthchecks dead-man-switch check (ADR-0026). url_file keeps the
+  # check UUID out of the repo (gitignored, like discord_webhook_url).
+  - name: 'deadmanswitch'
+    webhook_configs:
+      - url_file: '/etc/alertmanager/deadman_ping_url'
+        send_resolved: false
   - name: 'discord-notifications'
     discord_configs:
       - webhook_url_file: '/etc/alertmanager/discord_webhook_url'

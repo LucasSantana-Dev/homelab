@@ -2,6 +2,17 @@ groups:
   - name: homelab_alerts
     interval: 30s
     rules:
+      # Dead-man-switch heartbeat (ADR-0026). ALWAYS firing — vector(1) is constant.
+      # Alertmanager routes it to the healthchecks ping URL ~every minute; if these
+      # pings stop (Prometheus down, Alertmanager down, or routing broken) the
+      # healthchecks check goes down and emails — independent of Discord (#296).
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Alerting pipeline heartbeat (always firing). Its absence at the healthchecks dead-man-switch means the pipeline is broken."
+
       # Container Down Alerts
       - alert: CadvisorDown
         expr: up{job="cadvisor"} == 0
