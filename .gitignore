@@ -238,6 +238,7 @@ config/*/
 !config/caddy/
 !config/k3s/
 !config/netplan/
+!config/n8n/
 config/alertmanager/discord_webhook_url
 
 # But still ignore these nginx subdirectories
