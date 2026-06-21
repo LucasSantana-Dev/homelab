@@ -20,8 +20,8 @@ p = Project.objects.first(); owner = p.owner.email
 chk, _ = Check.objects.get_or_create(name="alert-pipeline-deadman", project=p,
     defaults={"timeout": timedelta(minutes=5), "grace": timedelta(minutes=2)})
 chk.timeout = timedelta(minutes=5); chk.grace = timedelta(minutes=2); chk.save()
-ch = Channel.objects.filter(project=p, kind="email").first()
-if not ch:
+ch = next((c for c in Channel.objects.filter(project=p, kind="email") if c.email.value == owner), None)
+if not ch:                                       # only ever target/verify the OWNERS own address
     ch = Channel(project=p, kind="email"); ch.value = json.dumps({"value": owner, "up": True, "down": True}); ch.save()
 ch.email_verified = True; ch.save()              # owner controls this address
 chk.channel_set.add(ch)
