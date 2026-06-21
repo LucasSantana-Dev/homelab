@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.7] - 2026-06-21
+
+### Added
+
+- **Alert-pipeline dead-man-switch (ADR-0026)** — an always-firing Watchdog alert pings a healthchecks.io check ~every minute via Alertmanager; if the pings stop (Prometheus/Alertmanager/routing broken) the check goes down and **emails**, independent of Discord. Fixes the silent-failure class that hid a dead Alertmanager webhook (608/608 deliveries had failed undetected, #296). Verified live. (#301, #302)
+
 ## [2.10.6] - 2026-06-21
 
 > **Note:** the alert-hub (below) and offsite-backup tooling are **code-complete but
