@@ -136,8 +136,28 @@ the mirror **and** `KOPIA_REPO_PASSWORD` (kept off-host in SOPS, #272).
    sudo systemctl start kopia-offsite-sync.service   # first run now
    ```
 
-   The script no-ops cleanly while `KOPIA_OFFSITE_TARGET` is empty, so installing
-   the timer before choosing a target is safe.
+   The script no-ops cleanly while no target is set, so installing the timer
+   before choosing a target is safe.
+
+**Alternative — cloud via rclone (e.g. Google Drive):** set an rclone remote
+instead of (or in addition to) the rsync target. The encrypted repo (~11 GB) fits
+Google Drive's free 15 GB.
+
+1. Install rclone on the host: `sudo apt-get install -y rclone` (or `curl https://rclone.org/install.sh | sudo bash`).
+2. Configure the remote **once** (interactive OAuth — needs a browser). On a headless
+   host, run `rclone config`, choose `drive`, accept defaults, and at the
+   "auto config?" prompt answer **No**, then run `rclone authorize "drive"` on a
+   laptop and paste the token back. Name it e.g. `gdrive`. Store the rclone config
+   securely (it holds the Drive OAuth token).
+3. Point the sync at it:
+
+   ```bash
+   KOPIA_OFFSITE_RCLONE_REMOTE=gdrive:homelab-kopia
+   ```
+
+   (rclone takes precedence over `KOPIA_OFFSITE_TARGET` if both are set.) Then
+   install/enable the timer as above. `rclone sync` mirrors (propagates deletes),
+   guarded by the same repo-marker source check.
 
 **Restore from the offsite mirror (host lost):**
 1. Bring the mirror back to a path, e.g. `/opt/kopia-repo` on the new host.
