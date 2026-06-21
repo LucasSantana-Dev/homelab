@@ -14,7 +14,9 @@ Alertmanager (ADR-0025 keeps that path direct, no n8n in the critical path).
 1. Create a Discord webhook for a `#digest` channel (Server Settings → Integrations
    → Webhooks → New).
 2. Point each source at it:
-   - **WUD:** set `WUD_DISCORD_WEBHOOK_URL` (already supported) to the `#digest` webhook.
+   - **WUD:** configure a Discord **trigger** — WUD uses `WUD_TRIGGER_DISCORD_{name}_URL`
+     (e.g. `WUD_TRIGGER_DISCORD_digest_URL=<webhook>`), **not** a bare
+     `WUD_DISCORD_WEBHOOK_URL` (that var is ignored by WUD — see the wiring bug noted below).
    - **healthchecks.io:** per-check → Integrations → Discord → that webhook.
    - **Sentry:** Project → Alerts → add a Discord notification action to that channel.
 
@@ -46,6 +48,11 @@ A single n8n webhook receives all three, normalizes them, and posts to Discord
 - **A working Discord webhook is required either way.** As of 2026-06-21 the
   Alertmanager Discord webhook was found dead (404 Unknown Webhook — issue #296);
   mint a fresh one before wiring this, and reuse a valid one here.
+- **WUD Discord wiring bug:** `compose/core.yml` sets `WUD_DISCORD_WEBHOOK_URL` on
+  the WUD container, but WUD does not recognise that variable (it reads
+  `WUD_TRIGGER_DISCORD_{name}_URL`), so WUD's own Discord notifications have not
+  been firing. Fix that wiring (or route WUD through n8n via Option B) — tracked
+  separately.
 - The workflow's `Discord` node is a plain HTTP POST to `OPS_DIGEST_DISCORD_WEBHOOK`
   — no n8n credential needed, just the env var.
 - The Code node's source-detection is best-effort on payload shape; the `?source=`

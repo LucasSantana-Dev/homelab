@@ -31,7 +31,7 @@
         "url": "={{ $env.OPS_DIGEST_DISCORD_WEBHOOK }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"content\": {{ JSON.stringify($json.content) }}\n}",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
         "options": {}
       },
       "id": "c3333333-3333-4333-8333-333333333333",
