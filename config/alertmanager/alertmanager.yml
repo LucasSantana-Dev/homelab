@@ -27,22 +27,26 @@ receivers:
       - webhook_url_file: '/etc/alertmanager/discord_webhook_url'
         send_resolved: true
         title: >-
-          [{{ toUpper .Status }}] {{ .CommonLabels.alertname }} ({{ toUpper .CommonLabels.severity }})
+          {{ if eq .Status "resolved" }}🟢{{ else if eq .CommonLabels.severity "critical" }}🔴{{ else }}🟠{{ end }} [{{ toUpper .Status }}] {{ .CommonLabels.alertname }} ({{ toUpper .CommonLabels.severity }})
         message: >-
-          Alerts in group: {{ len .Alerts }}
-
-          {{- if .CommonLabels.job }}Job: `{{ .CommonLabels.job }}`{{ end }}
+          {{ len .Alerts }} alert(s) in this group.
+          {{- if .CommonLabels.job }} Job: `{{ .CommonLabels.job }}`{{ end }}
           {{- if .CommonLabels.instance }} | Instance: `{{ .CommonLabels.instance }}`{{ end }}
 
           {{- range $idx, $alert := .Alerts }}
           {{- if lt $idx 6 }}
-          • `{{ or $alert.Labels.name $alert.Labels.instance "unknown" }}` - {{ or $alert.Annotations.summary $alert.Annotations.description "No summary" }}
+          • **{{ or $alert.Labels.name $alert.Labels.instance "unknown" }}**{{ if $alert.Labels.mountpoint }} ({{ $alert.Labels.mountpoint }}){{ end }} — {{ or $alert.Annotations.summary $alert.Annotations.description "No summary" }}
+          {{- if $alert.Annotations.runbook }}
+            ↳ Fix: {{ $alert.Annotations.runbook }}
+          {{- end }}
           {{- end }}
           {{- end }}
           {{- if gt (len .Alerts) 6 }}
           • Additional alerts omitted for brevity.
           {{- end }}
 
+          📊 Dashboard: https://grafana.luk-homeserver.com.br/d/homelab-monitoring-working
+          📜 Logs (Loki Explore): https://grafana.luk-homeserver.com.br/explore
           Source: {{ .ExternalURL }}
 
 inhibit_rules:
