@@ -95,7 +95,7 @@ groups:
         annotations:
           summary: "Low disk space on {{ $labels.instance }}"
           description: "Disk space is below 20% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
-          runbook: "`docker system df` then `make docker-prune`; check /opt/kopia-repo growth + old logs under /var/log."
+          runbook: "`docker system df` then `make docker-clean`; check /opt/kopia-repo growth + old logs under /var/log."
 
       - alert: CriticalDiskSpace
         expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
