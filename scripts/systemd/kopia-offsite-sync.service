@@ -1,5 +1,5 @@
 [Unit]
-Description=Kopia offsite repo mirror (rsync)
+Description=Kopia offsite repo mirror (rsync or rclone)
 Documentation=https://github.com/luk-homeserver/homelab
 After=network-online.target
 Wants=network-online.target
@@ -7,10 +7,13 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/home/luk-server/homelab
-# root: read /opt/kopia-repo (owned by the kopia container's root) + ssh/rsync out.
+# root: read /opt/kopia-repo (owned by the kopia container's root) + push out.
 ExecStart=/home/luk-server/homelab/scripts/maintenance/kopia-offsite-sync.sh
 Environment=HOME=/root
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Use the luk-server user's rclone config (set up with a non-sudo `rclone config`)
+# so the root-run sync can reach the cloud remote without a separate root config.
+Environment=RCLONE_CONFIG=/home/luk-server/.config/rclone/rclone.conf
 TimeoutStartSec=3600
 StandardOutput=journal
 StandardError=journal

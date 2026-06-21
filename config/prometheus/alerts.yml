@@ -36,6 +36,7 @@ groups:
         annotations:
           summary: "Container {{ $labels.name }} memory usage > 90%"
           description: "Container {{ $labels.name }} is using more than 90% of its memory limit."
+          runbook: "`docker stats {{ $labels.name }}` — raise its mem_limit in compose or recreate it; a steady climb = leak."
 
       - alert: CriticalMemoryUsage
         expr: |
@@ -60,6 +61,7 @@ groups:
         annotations:
           summary: "Container {{ $labels.name }} memory usage > 95%"
           description: "Container {{ $labels.name }} is using more than 95% of its memory limit."
+          runbook: "`docker stats {{ $labels.name }}` — raise its mem_limit in compose or recreate it now; OOM-kill is imminent."
 
       # High CPU Usage Alerts
       - alert: HighCPUUsage
@@ -72,6 +74,7 @@ groups:
         annotations:
           summary: "Container {{ $labels.name }} CPU usage > 80%"
           description: "Container {{ $labels.name }} is using more than 80% CPU for more than 5 minutes."
+          runbook: "`docker stats {{ $labels.name }}` — find the hot container; check for a runaway loop or stuck job; restart if pegged."
 
       - alert: CriticalCPUUsage
         expr: sum by (name) (rate(container_cpu_usage_seconds_total{name!=""}[5m])) > 0.9
@@ -81,6 +84,7 @@ groups:
         annotations:
           summary: "Container {{ $labels.name }} CPU usage > 90%"
           description: "Container {{ $labels.name }} is using more than 90% CPU for more than 2 minutes."
+          runbook: "`docker stats {{ $labels.name }}` — sustained pegged CPU; check logs for a hot loop; restart the container if needed."
 
       # Disk Space Alerts
       - alert: LowDiskSpace
@@ -91,6 +95,7 @@ groups:
         annotations:
           summary: "Low disk space on {{ $labels.instance }}"
           description: "Disk space is below 20% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
+          runbook: "`docker system df` then `make docker-clean`; check /opt/kopia-repo growth + old logs under /var/log."
 
       - alert: CriticalDiskSpace
         expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
@@ -100,6 +105,7 @@ groups:
         annotations:
           summary: "Critical disk space on {{ $labels.instance }}"
           description: "Disk space is below 10% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
+          runbook: "`docker system df` → `docker image prune -af` + `docker builder prune -f`; the repo can fill fast from unused images."
 
       # Service Response Time Alerts
       - alert: HighResponseTime
@@ -119,6 +125,7 @@ groups:
         annotations:
           summary: "Service {{ $labels.instance }} is down"
           description: "Service {{ $labels.instance }} is not responding to health checks."
+          runbook: "Blackbox probe failed — `docker ps` the target; check its healthcheck + caddy route. NB: probes hit internal service names, not public URLs."
 
       # Docker Container Restart Alerts
       - alert: ContainerRestarting
@@ -178,6 +185,7 @@ groups:
         annotations:
           summary: "High load average on {{ $labels.instance }}"
           description: "Load average on {{ $labels.instance }} is above 4."
+          runbook: "High load + low CPU% = I/O wait — check swap + `iostat`; usually disk pressure or a heavy container, not raw CPU."
 
       # Memory Pressure
       - alert: HighMemoryPressure

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.6] - 2026-06-21
+
+> **Note:** the alert-hub (below) and offsite-backup tooling are **code-complete but
+> not yet operational** — both are gated on operator credentials: a fresh Discord
+> webhook (#296, the existing one is dead) and an offsite target/OAuth (#266).
+
+### Added
+
+- **Ops alert hub (ADR-0025), simplest-first** — research+critique flipped an
+  over-built "n8n+hermes LLM" design to: keep Alertmanager→Discord **direct** with
+  **enriched templates** (severity emoji, per-alert `Fix:` runbook hint, Grafana/Loki
+  links) for the 10 self-diagnosing alert types (#295); plus a **non-critical** n8n
+  cross-source digest workflow for Sentry/healthchecks/WUD (#297). LLM layer deferred. (#294, #295, #297)
+- **Offsite backup — rclone backend** for cloud targets (Google Drive/S3/B2)
+  alongside the rsync host/disk mirror, with destructive-sync guards on both. (#293)
+
+### Fixed
+
+- **WUD Discord notifications** — were wired to `WUD_DISCORD_WEBHOOK_URL`, which WUD
+  ignores; registered the trigger as `WUD_TRIGGER_DISCORD_local_URL`. (#298, #299)
+
 ## [2.10.5] - 2026-06-20
 
 ### Added
