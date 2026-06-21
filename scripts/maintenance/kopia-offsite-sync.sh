@@ -29,12 +29,22 @@ if [[ -z "${TARGET}" ]]; then
   exit 0
 fi
 
-# Target sanity guard (rsync --delete is destructive). Reject a target that is
-# empty, root, the source itself, or a remote with an empty/root path component —
-# a typo here must never let --delete wipe the wrong tree.
-case "${TARGET%/}" in
-  "" | "/" | "${REPO%/}" | *:/ | *:)
-    log "ERROR: refusing unsafe KOPIA_OFFSITE_TARGET='${TARGET}'."
+# Target sanity guard (rsync --delete is destructive). A typo here must never let
+# --delete wipe the wrong tree, so require an ABSOLUTE local path or a remote with
+# an absolute path — and reject root / the source itself. A bare relative path
+# (e.g. `backup`, `./backup`) is rejected: under systemd it would resolve relative
+# to WorkingDirectory and --delete an unintended local tree.
+if [[ "${TARGET%/}" == "${REPO%/}" ]]; then
+  log "ERROR: KOPIA_OFFSITE_TARGET equals the source ${REPO} — refusing."
+  exit 1
+fi
+case "${TARGET}" in
+  /) log "ERROR: refusing KOPIA_OFFSITE_TARGET='/'." ; exit 1 ;;
+  /*) : ;;            # absolute local path with content — ok
+  *:/) log "ERROR: refusing remote root '${TARGET}'." ; exit 1 ;;
+  *:/*) : ;;          # remote host:/absolute-path — ok
+  *)
+    log "ERROR: KOPIA_OFFSITE_TARGET must be an absolute path (/...) or a remote with an absolute path (host:/...); got '${TARGET}'."
     exit 1
     ;;
 esac

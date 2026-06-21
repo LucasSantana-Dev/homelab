@@ -122,16 +122,20 @@ the mirror **and** `KOPIA_REPO_PASSWORD` (kept off-host in SOPS, #272).
 
 **Enable:**
 1. Set the target in `.env` (a remote host or a mounted disk):
+
    ```bash
    KOPIA_OFFSITE_TARGET=luk@pc-do-luk:/srv/kopia-offsite   # or /mnt/usb-backup/kopia-offsite
    ```
+
    For a remote host, ensure root on the homelab can ssh to it (`ssh-copy-id` a key).
 2. Install + start the timer:
+
    ```bash
    sudo cp scripts/systemd/kopia-offsite-sync.{service,timer} /etc/systemd/system/
    sudo systemctl daemon-reload && sudo systemctl enable --now kopia-offsite-sync.timer
    sudo systemctl start kopia-offsite-sync.service   # first run now
    ```
+
    The script no-ops cleanly while `KOPIA_OFFSITE_TARGET` is empty, so installing
    the timer before choosing a target is safe.
 
@@ -145,14 +149,14 @@ the mirror **and** `KOPIA_REPO_PASSWORD` (kept off-host in SOPS, #272).
 so a missing/empty source can't `--delete` a good offsite copy.
 
 #### Cloud object store (B2/S3) — still deferred (ADR-0016)
-The `KOPIA_S3_*` vars scaffold a Backblaze B2 / S3 target (~$6–10/mo for 100 GB)
-for a future second offsite tier. Not wired yet; the rsync mirror above covers the
-immediate same-disk-failure gap at $0.
 
-For now, **manual periodic B2 backup** is recommended if data loss from total host failure is unacceptable:
+The `KOPIA_S3_*` vars scaffold a Backblaze B2 / S3 target (~$6–10/mo for 100 GB)
+for a future second offsite tier. Not wired yet; the rsync mirror above already
+covers the immediate same-disk-failure gap at $0. To add B2 later as a second tier:
+
 ```bash
-# Copy repo snapshot bundle to B2 manually (effort required):
-# rclone sync /opt/kopia-repo b2:homelab-backup-b2/
+# The repo is encrypted, so a plain sync of the repo files is safe:
+rclone sync /opt/kopia-repo b2:homelab-backup-b2/
 ```
 
 ### Repository Encryption Password
