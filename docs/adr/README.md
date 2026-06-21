@@ -20,3 +20,4 @@ file in this directory.
 | [0008](0008-wave4-compose-hygiene-image-pinning.md) | Wave 4: Compose Hygiene (Dead Anchors + Image Tag Pinning) | Accepted |
 | [0024](0024-complete-k3s-decommission.md) | Complete the k3s decommission (staged, backup-first) | Accepted |
 | [0025](0025-ops-alert-hub-simplest-first.md) | Ops alert hub — Alertmanager-direct + n8n aggregation; defer the LLM layer | Accepted |
+| [0026](0026-notification-deadman-switch.md) | Catch silent notification failure with a dead-man-switch, not just a metric | Accepted |

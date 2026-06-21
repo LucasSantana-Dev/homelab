@@ -240,6 +240,7 @@ config/*/
 !config/netplan/
 !config/n8n/
 config/alertmanager/discord_webhook_url
+config/alertmanager/deadman_ping_url
 
 # But still ignore these nginx subdirectories
 config/nginx/ssl/
