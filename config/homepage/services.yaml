@@ -95,6 +95,41 @@
         # the homepage kopia widget does not send, so the widget always 401s
         # ("Invalid or missing CSRF token") despite correct basic-auth creds.
 
+- Agents:
+    - Hermes:
+        icon: si-anthropic
+        href: https://github.com/LucasSantana-Dev/homelab/actions/workflows/hermes-review.yml
+        description: AI agent — PR review, RAG rebuild, memory sync
+        container: agent-box
+        widget:
+          type: customapi
+          url: http://homelab-manager:8765/hermes
+          refreshInterval: 120000
+          method: GET
+          mappings:
+            - field: jobs.pr_review.last_run
+              label: Last Review
+              format: text
+            - field: jobs.pr_review.total
+              label: PR Reviews
+              format: number
+            - field: jobs.pr_review.status
+              label: Status
+              format: text
+    - Hermes Logs:
+        icon: mdi-text-box-search-outline
+        href: https://grafana.luk-homeserver.com.br/d/hermes-agent/hermes-agent
+        description: Job logs & Grafana metrics
+        widget:
+          type: customapi
+          url: http://homelab-manager:8765/hermes/logs?lines=5
+          refreshInterval: 60000
+          method: GET
+          mappings:
+            - field: file
+              label: Latest Log
+              format: text
+
 - Infrastructure:
     - Pi-hole:
         icon: pi-hole
