@@ -145,6 +145,9 @@ services:
     # WUD_DISCORD_WEBHOOK_URL was ignored, so Discord update notifications never
     # fired (#298). Register a Discord trigger named "local". Empty URL = inactive.
     - WUD_TRIGGER_DISCORD_local_URL=${WUD_DISCORD_WEBHOOK_URL:-}
+    # Hermes Phase 4: route WUD updates through n8n ops-digest webhook so hermes
+    # can classify each update before it reaches Discord. Empty = inactive.
+    - WUD_TRIGGER_WEBHOOK_digest_URL=${WUD_N8N_WEBHOOK_URL:-}
     # NOTE: the WUD_SMTP_* vars below are likewise NOT recognized by WUD (it wants
     # WUD_TRIGGER_SMTP_local_HOST/PORT/USER/PASS/FROM/TO). Left as-is — unused
     # (empty in .env) and incomplete (no FROM/TO); fix if email triggers are wanted.
