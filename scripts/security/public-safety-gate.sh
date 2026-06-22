@@ -34,8 +34,9 @@ for file in "${tracked_files[@]}"; do
   # history and is handled by the release-scrub flow, not this pre-commit gate.
   added_lines="$(
     git -C "${ROOT_DIR}" diff --cached -U0 -- "${file}" \
-      | grep '^+' | grep -v '^+++' | sed 's/^+//'
+      | grep '^+' | grep -v '^+++' | sed 's/^+//' || true
   )"
+  [[ -z "${added_lines}" ]] && continue
   if printf '%s\n' "${added_lines}" \
       | rg -n --regexp "${DENY_REGEX}" >/tmp/public-safety-match.txt 2>/dev/null; then
     if [[ "${violations}" -eq 0 ]]; then

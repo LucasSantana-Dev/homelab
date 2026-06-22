@@ -181,8 +181,6 @@ def _make_handler(
             elif route == "hermes":
                 code, body = handle_hermes()
             elif route == "hermes_logs":
-                from urllib.parse import parse_qs, urlparse
-
                 qs = parse_qs(urlparse(self.path).query)
                 lines = int(qs.get("lines", ["50"])[0])
                 code, body = handle_hermes_logs(lines)

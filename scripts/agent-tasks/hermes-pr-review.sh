@@ -16,6 +16,7 @@ exec > >(tee "$LOG_FILE") 2>&1
 
 log() { echo "[$(date '+%Y-%m-%dT%H:%M:%S')] $*"; }
 
+START_TS=$(date +%s)
 log "hermes PR review — PR #$PR_NUMBER base=$BASE_REF repo=$REPO"
 
 # Guard: skip if any human (non-bot) has already commented — CLAUDE.md hard rule
@@ -27,7 +28,7 @@ HUMAN_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
     .author.login != "coderabbitai[bot]" and
     .author.login != "greptile-apps[bot]" and
     (.author.is_bot // false) == false
-  )] | length' 2>/dev/null || echo "0")
+  )] | length' 2>&1) || { log "WARN: gh failed checking comments — skipping review"; exit 0; }
 
 if [ "$HUMAN_COMMENTS" -gt 0 ]; then
     log "Skipping: $HUMAN_COMMENTS human comment(s) already present — CLAUDE.md hard rule"
@@ -38,7 +39,7 @@ fi
 HEAD_SHA=$(git rev-parse HEAD)
 EXISTING_REVIEW=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
   --jq ".comments[] | select(.body | startswith(\"[hermes]\")) | select(.body | contains(\"$HEAD_SHA\"))" \
-  2>/dev/null || echo "")
+  2>&1) || { log "WARN: gh failed checking existing reviews — skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
     log "Already reviewed at $HEAD_SHA — skipping"
     exit 0
@@ -72,14 +73,14 @@ log "Comment posted to PR #$PR_NUMBER"
 
 # Write metrics for node-exporter textfile collector and homelab-manager state
 END_TS=$(date +%s)
-START_TS=$(date -d "@$((END_TS - 120))" +%s 2>/dev/null || echo "$((END_TS - 120))")
 DURATION=$((END_TS - START_TS))
 STATE_DIR="/home/luk-server/agent-logs"
 PROM_DIR="/var/lib/node_exporter/textfile"
 
 # Prometheus textfile metrics
 if [ -d "$PROM_DIR" ]; then
-    PREV_COUNT=$(grep '^hermes_pr_reviews_total ' "$PROM_DIR/hermes.prom" 2>/dev/null | awk '{print $2}' || echo 0)
+    # ponytail: flock guards read-check-write; concurrent reviews on same host rare but possible
+    PREV_COUNT=$(flock "$PROM_DIR/hermes.prom.lock" grep '^hermes_pr_reviews_total ' "$PROM_DIR/hermes.prom" 2>/dev/null | awk '{print $2}' || echo 0)
     NEW_COUNT=$(( ${PREV_COUNT:-0} + 1 ))
     cat > "$PROM_DIR/hermes.prom.tmp" <<PROM
 # HELP hermes_pr_reviews_total Total PR reviews posted by hermes
