@@ -22,6 +22,9 @@ services:
       # Discord target for the ops-digest workflow (ADR-0025 Phase 2). Empty =
       # workflow inactive; see docs/runbooks/ops-alert-digest.md. (#266-style: set in .env)
       - OPS_DIGEST_DISCORD_WEBHOOK=${OPS_DIGEST_DISCORD_WEBHOOK:-}
+      # Allow $env.* expressions in Code/HTTP nodes so the Discord node can read
+      # OPS_DIGEST_DISCORD_WEBHOOK at runtime.
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       # Disable external task runner (Python 3 absent in image; without this n8n
       # spawns a second process that pushes the 512M container over limit on startup)
       - N8N_RUNNERS_ENABLED=false
