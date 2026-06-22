@@ -4,6 +4,10 @@ networks:
     ipam:
       config:
         - subnet: 172.33.0.0/24
+  # Join the shared default network so n8n can reach the WUD classify endpoint (Phase 4)
+  default:
+    external: true
+    name: homelab_default
 
 volumes:
   agent_workspace:
@@ -25,6 +29,7 @@ services:
     restart: unless-stopped
     networks:
       - agent
+      - default
     ports:
       - "127.0.0.1:2222:22"
     volumes:
