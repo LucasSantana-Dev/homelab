@@ -1,0 +1,42 @@
+name: Hermes PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main, develop, release]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  hermes-review:
+    # Runs on the homelab self-hosted runner (luk-server).
+    # Label set during runner registration: ./config.sh --labels homelab
+    runs-on: [self-hosted, homelab]
+    timeout-minutes: 10
+    # Only one review per PR at a time
+    concurrency:
+      group: hermes-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run hermes review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          REPO: ${{ github.repository }}
+        run: |
+          bash scripts/agent-tasks/hermes-pr-review.sh "$PR_NUMBER" "$BASE_REF" "$REPO"

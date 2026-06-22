@@ -14,7 +14,13 @@ from homelab_manager.core.log import new_trace_id, setup_logging, trace_context
 from homelab_manager.models.service import ServiceRegistry
 from homelab_manager.services.health import HealthMonitor
 
-from .routes import handle_health, handle_status, handle_summary
+from .routes import (
+    handle_health,
+    handle_hermes,
+    handle_hermes_logs,
+    handle_status,
+    handle_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +28,8 @@ _ROUTES = {
     "/health": "health",
     "/status": "status",
     "/summary": "summary",
+    "/hermes": "hermes",
+    "/hermes/logs": "hermes_logs",
 }
 
 # Security headers to add to all responses
@@ -162,13 +170,20 @@ def _make_handler(
                 return
 
             # Route dispatch
-            route = _ROUTES.get(self.path.split("?")[0])
+            parsed_path = self.path.split("?")[0]
+            route = _ROUTES.get(parsed_path)
             if route == "health":
                 code, body = handle_health(__version__)
             elif route == "status":
                 code, body = handle_status(health_monitor)
             elif route == "summary":
                 code, body = handle_summary(health_monitor)
+            elif route == "hermes":
+                code, body = handle_hermes()
+            elif route == "hermes_logs":
+                qs = parse_qs(urlparse(self.path).query)
+                lines = int(qs.get("lines", ["50"])[0])
+                code, body = handle_hermes_logs(lines)
             else:
                 code = 404
                 body = json.dumps({"error": "not found"})
