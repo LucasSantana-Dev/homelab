@@ -35,10 +35,19 @@ if [ "$HUMAN_COMMENTS" -gt 0 ]; then
     exit 0
 fi
 
-# Guard: skip if hermes already reviewed this exact commit
-HEAD_SHA=$(git rev-parse HEAD)
+# Guard: skip if hermes already reviewed this exact commit.
+# Use the PR HEAD SHA (what we actually review below), NOT `git rev-parse HEAD` —
+# on pull_request events the checkout is the ephemeral refs/pull/N/merge commit,
+# so its SHA changes with the base and never matches the reviewed head (#310).
+HEAD_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null) \
+  || { log "WARN: gh failed resolving PR head SHA — skipping review"; exit 0; }
+if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; exit 0; fi
+# The posted comment stores only the 8-char short SHA (see printf below), so the
+# dedup check must match that same form — comparing the full 40-char SHA would
+# never hit and duplicates would be posted (#310).
+SHORT_SHA="${HEAD_SHA:0:8}"
 EXISTING_REVIEW=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq ".comments[] | select(.body | startswith(\"[hermes]\")) | select(.body | contains(\"$HEAD_SHA\"))" \
+  --jq ".comments[] | select(.body | startswith(\"[hermes]\")) | select(.body | contains(\"$SHORT_SHA\"))" \
   2>&1) || { log "WARN: gh failed checking existing reviews — skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
     log "Already reviewed at $HEAD_SHA — skipping"
@@ -65,8 +74,8 @@ REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
 log "Review complete (${#REVIEW} chars)"
 
 # Post comment
-BODY="$(printf '[hermes] code review (%.8s)\n\n%s\n\n---\n*Advisory only — not a blocking gate.*' \
-  "$HEAD_SHA" "$REVIEW")"
+BODY="$(printf '[hermes] code review (%s)\n\n%s\n\n---\n*Advisory only — not a blocking gate.*' \
+  "$SHORT_SHA" "$REVIEW")"
 
 gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
 log "Comment posted to PR #$PR_NUMBER"
@@ -79,10 +88,16 @@ PROM_DIR="/var/lib/node_exporter/textfile"
 
 # Prometheus textfile metrics
 if [ -d "$PROM_DIR" ]; then
-    # ponytail: flock guards read-check-write; concurrent reviews on same host rare but possible
-    PREV_COUNT=$(flock "$PROM_DIR/hermes.prom.lock" grep '^hermes_pr_reviews_total ' "$PROM_DIR/hermes.prom" 2>/dev/null | awk '{print $2}' || echo 0)
-    NEW_COUNT=$(( ${PREV_COUNT:-0} + 1 ))
-    cat > "$PROM_DIR/hermes.prom.tmp" <<PROM
+    # Hold the lock across the ENTIRE read-modify-write — the previous version
+    # only locked the read, so concurrent reviews could both read N and write
+    # N+1, losing an increment (#310). fd 9 keeps the lock for the subshell.
+    (
+        flock 9
+        # `|| echo 0`: grep exits non-zero on first run / missing counter line,
+        # which would abort this subshell under `set -o pipefail` (#310).
+        PREV_COUNT=$(grep '^hermes_pr_reviews_total ' "$PROM_DIR/hermes.prom" 2>/dev/null | awk '{print $2}' || echo 0)
+        NEW_COUNT=$(( ${PREV_COUNT:-0} + 1 ))
+        cat > "$PROM_DIR/hermes.prom.tmp" <<PROM
 # HELP hermes_pr_reviews_total Total PR reviews posted by hermes
 # TYPE hermes_pr_reviews_total counter
 hermes_pr_reviews_total $NEW_COUNT
@@ -96,7 +111,8 @@ hermes_pr_review_last_duration_seconds $DURATION
 # TYPE hermes_pr_review_last_pr_number gauge
 hermes_pr_review_last_pr_number $PR_NUMBER
 PROM
-    mv "$PROM_DIR/hermes.prom.tmp" "$PROM_DIR/hermes.prom"
+        mv "$PROM_DIR/hermes.prom.tmp" "$PROM_DIR/hermes.prom"
+    ) 9>"$PROM_DIR/hermes.prom.lock"
     log "Prometheus metrics written to $PROM_DIR/hermes.prom"
 fi
 
