@@ -8,6 +8,10 @@ services:
     labels:
     - wud.watch=true
     - 'wud.tag.include=^\d+\.\d+\.\d+$$'
+    # Host runs the mutable `latest` tag; without this WUD reports an endless
+    # "latest -> latest" digest update. Watch tags only (the semver include
+    # above), not the digest.
+    - wud.watch.digest=false
     container_name: cloudflared
     restart: unless-stopped
     command:
