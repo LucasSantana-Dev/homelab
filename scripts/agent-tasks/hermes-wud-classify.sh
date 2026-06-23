@@ -28,7 +28,9 @@ import json, sys
 d = json.load(sys.stdin)
 c = d.get('container', d)
 uk = c.get('updateKind', {})
-print(uk.get('remoteValue', '?'))
+# WUD's http-trigger payload is flat: new version is in result.tag.
+# Keep updateKind.remoteValue as a fallback for the legacy/Discord shape.
+print(uk.get('remoteValue') or d.get('result', {}).get('tag') or c.get('result', {}).get('tag') or '?')
 " 2>/dev/null || echo "?")
 
 PROMPT="You are a homelab ops assistant. A container image update is available.
