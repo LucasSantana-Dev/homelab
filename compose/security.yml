@@ -1,6 +1,9 @@
 services:
   pihole:
     image: ${IMG_PIHOLE:-pihole/pihole:2026.06.0}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: pihole
     restart: unless-stopped
     volumes:
@@ -44,6 +47,9 @@ services:
 
   crowdsec:
     image: ${IMG_CROWDSEC:-crowdsecurity/crowdsec:v1.7.8}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: crowdsec
     restart: unless-stopped
     environment:

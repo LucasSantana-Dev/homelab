@@ -5,6 +5,9 @@ services:
   # read-only so Kopia can snapshot named volumes from sister stacks.
   kopia:
     image: ${IMG_KOPIA:-kopia/kopia:0.21.1}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: kopia
     restart: unless-stopped
     hostname: homelab-kopia

@@ -1,6 +1,9 @@
 services:
   stremio:
     image: ${IMG_STREMIO:-stremio/server:v4.21.0}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: stremio-server
     restart: unless-stopped
     environment:
