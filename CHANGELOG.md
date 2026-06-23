@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-06-22
+
+### Added
+
+- **Hermes agent — autonomous ops jobs (ADR-0025 scope).** An LLM agent on `agent-box` runs scheduled homelab jobs off the critical path: PR code-review automation, a self-hosted GitHub runner, a Grafana metrics dashboard + homepage widget (#307), weekly knowledge/memory sync, and WUD update contextualization (#308).
+- **Container-update → n8n → hermes → Discord pipeline.** WUD image-update events are routed through the n8n `ops-digest` workflow, where hermes classifies each update (`safe_to_schedule` / `urgency` / reason) before it reaches Discord, with a graceful raw-passthrough fallback if hermes is unreachable.
+- **WUD opt-in watching + per-service tag constraints.** `WUD_WATCHER_LOCAL_WATCHBYDEFAULT=false` plus `wud.watch` / `wud.tag.include` labels on 28 homelab-managed services, so WUD flags only real, same-arch, stable updates instead of ~24 false positives (Windows images, 32-bit RCs, dev/branch/beta tags).
+
+### Fixed
+
+- **WUD update notifications never fired.** The trigger used a non-existent `WEBHOOK` type — WUD's generic webhook trigger is type `http` (`WUD_TRIGGER_HTTP_{name}_URL`), so the mis-typed var was silently ignored (same failure mode as #298). Also pointed the webhook at the internal n8n URL (the public Caddy ingress is forward-auth-walled and rejected WUD's POST).
+- **WUD payload shape mismatch.** The n8n Normalize node and `hermes-wud-classify.sh` read a nested `container.updateKind` shape WUD never sends; corrected to WUD's flat `http`-trigger payload (`name`, `image.tag.value`, `result.tag`).
+- **n8n out-of-memory on startup** — raised the container memory limit to 1G and disabled the Python task runner (absent from the image), which had pushed the container over its limit; also allow `$env.*` access in Code/HTTP nodes so the Discord node can read its webhook at runtime.
+
+### Dependencies
+
+- CI: bump `actions/checkout` 6→7 (#304), `codecov/codecov-action` 6.0.1→7.0.0 (#305), `github/codeql-action` 4.36.1→4.36.2 (#306).
+
 ## [2.10.7] - 2026-06-21
 
 ### Added

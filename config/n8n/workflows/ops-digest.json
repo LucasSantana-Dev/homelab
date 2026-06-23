@@ -17,13 +17,75 @@
     },
     {
       "parameters": {
-        "jsCode": "// Normalize Sentry / healthchecks / WUD payloads into one shape, then\n// build a single Discord message. Source is inferred from the payload, or\n// passed explicitly as ?source= on the webhook URL.\nconst src = ($json.query && $json.query.source) || $json.source || 'unknown';\nconst b = $json.body || $json;\n\nlet title = 'event';\nlet detail = '';\nlet emoji = '🔵';\n\nif (src === 'sentry' || b.event) {\n  emoji = '🟣';\n  const e = b.event || b;\n  title = `Sentry: ${e.title || e.metadata?.value || b.message || 'issue'}`;\n  detail = `project=${b.project_name || b.project || '?'} level=${e.level || '?'}`;\n} else if (src === 'healthchecks' || b.check) {\n  const status = (b.check && b.check.status) || b.status || '?';\n  emoji = status === 'down' ? '🔴' : '🟢';\n  title = `Healthchecks: ${(b.check && b.check.name) || b.name || 'check'} is ${status}`;\n  detail = `last_ping=${(b.check && b.check.last_ping) || '?'}`;\n} else if (src === 'wud' || b.container) {\n  emoji = '🟠';\n  title = `WUD: update for ${b.container?.name || b.name || 'container'}`;\n  detail = `${b.container?.image?.tag?.value || ''} → ${b.container?.updateKind?.localValue || ''}=>${b.container?.updateKind?.remoteValue || ''}`;\n}\n\nconst content = `${emoji} **[${src}]** ${title}\\n${detail ? '`' + detail + '`' : ''}`;\nreturn [{ json: { content, source: src } }];"
+        "jsCode": "// Normalize Sentry / healthchecks / WUD payloads into one shape.\n// Pass raw body through for WUD (hermes enrichment reads it downstream).\nlet src = ($json.query && $json.query.source) || $json.source || 'unknown';\nconst b = $json.body || $json;\n\nlet title = 'event';\nlet detail = '';\nlet emoji = '🔵';\n\nif (src === 'sentry' || b.event) {\n  emoji = '🟣';\n  const e = b.event || b;\n  title = `Sentry: ${e.title || e.metadata?.value || b.message || 'issue'}`;\n  detail = `project=${b.project_name || b.project || '?'} level=${e.level || '?'}`;\n} else if (src === 'healthchecks' || b.check) {\n  const status = (b.check && b.check.status) || b.status || '?';\n  emoji = status === 'down' ? '🔴' : '🟢';\n  title = `Healthchecks: ${(b.check && b.check.name) || b.name || 'check'} is ${status}`;\n  detail = `last_ping=${(b.check && b.check.last_ping) || '?'}`;\n} else if (src === 'wud' || b.updateAvailable !== undefined || b.result) {\n  // WUD's http trigger posts a FLAT payload: { name, image:{ tag:{value} }, result:{ tag } }.\n  // It does not append ?source=wud, so detect by shape and set src for IsWUD routing.\n  src = 'wud';\n  emoji = '🟠';\n  const cur = (b.image && b.image.tag && b.image.tag.value) || '?';\n  const next = (b.result && b.result.tag) || '?';\n  title = `WUD: update for ${b.name || 'container'}`;\n  detail = `${cur} → ${next}`;\n}\n\nconst content = `${emoji} **[${src}]** ${title}\\n${detail ? '`' + detail + '`' : ''}`;\nreturn [{ json: { content, source: src, raw: b } }];"
       },
       "id": "b2222222-2222-4222-8222-222222222222",
       "name": "Normalize",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "wud-check",
+              "leftValue": "={{ $json.source }}",
+              "rightValue": "wud",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4444444-4444-4444-8444-444444444444",
+      "name": "IsWUD",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent-box:8080/wud-classify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.raw) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "e5555555-5555-4555-8555-555555555555",
+      "name": "HermesClassify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [960, 160],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge hermes classification into the WUD Discord message.\nconst base = $('Normalize').first().json;\nlet classification = '';\ntry {\n  const h = $json;\n  if (h && h.urgency && h.reason) {\n    const emo = { high: '🔴', medium: '🟠', low: '🟡' }[h.urgency] || '⚪';\n    const safe = h.safe_to_schedule === false ? ' ⚠️ hold' : '';\n    classification = `\\n${emo} **hermes:** ${h.reason}${safe}`;\n  }\n} catch (e) {}\nreturn [{ json: { content: base.content + classification, source: base.source } }];"
+      },
+      "id": "f6666666-6666-4666-8666-666666666666",
+      "name": "EnrichWUD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 160]
     },
     {
       "parameters": {
@@ -38,12 +100,28 @@
       "name": "Discord",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [720, 300]
+      "position": [1440, 300]
     }
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Normalize", "type": "main", "index": 0 }]] },
-    "Normalize": { "main": [[{ "node": "Discord", "type": "main", "index": 0 }]] }
+    "Webhook": {
+      "main": [[{ "node": "Normalize", "type": "main", "index": 0 }]]
+    },
+    "Normalize": {
+      "main": [[{ "node": "IsWUD", "type": "main", "index": 0 }]]
+    },
+    "IsWUD": {
+      "main": [
+        [{ "node": "HermesClassify", "type": "main", "index": 0 }],
+        [{ "node": "Discord", "type": "main", "index": 0 }]
+      ]
+    },
+    "HermesClassify": {
+      "main": [[{ "node": "EnrichWUD", "type": "main", "index": 0 }]]
+    },
+    "EnrichWUD": {
+      "main": [[{ "node": "Discord", "type": "main", "index": 0 }]]
+    }
   },
   "settings": { "executionOrder": "v1" },
   "active": false

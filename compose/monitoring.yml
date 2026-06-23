@@ -1,6 +1,9 @@
 services:
   grafana:
     image: ${IMG_GRAFANA:-grafana/grafana-oss:11.4.6}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: grafana
     restart: unless-stopped
     volumes:
@@ -73,6 +76,9 @@ services:
       start_period: 30s
   alertmanager:
     image: ${IMG_ALERTMANAGER:-prom/alertmanager:v0.28.1}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: alertmanager
     restart: unless-stopped
     environment:
@@ -116,6 +122,9 @@ services:
         max-file: '3'
   blackbox-exporter:
     image: ${IMG_BLACKBOX:-prom/blackbox-exporter:v0.28.0}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: blackbox-exporter
     restart: unless-stopped
     volumes:
@@ -153,6 +162,9 @@ services:
         max-file: '3'
   prometheus:
     image: ${IMG_PROMETHEUS:-prom/prometheus:v2.54.1}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: prometheus
     restart: unless-stopped
     volumes:
@@ -206,6 +218,9 @@ services:
       retries: 3
   node-exporter:
     image: ${IMG_NODE_EXPORTER:-prom/node-exporter:v1.9.1}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: node-exporter
     restart: unless-stopped
     volumes:
@@ -249,6 +264,9 @@ services:
       retries: 3
   cadvisor:
     image: ${IMG_CADVISOR:-gcr.io/cadvisor/cadvisor:v0.49.1}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: cadvisor
     restart: unless-stopped
     # H3 hardening: replaced 'privileged: true' with explicit capabilities + devices.
@@ -300,6 +318,9 @@ services:
         max-file: '3'
   loki:
     image: ${IMG_LOKI:-grafana/loki:3.7.2}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: loki
     restart: unless-stopped
     volumes:
@@ -330,6 +351,9 @@ services:
         max-file: '3'
   promtail:
     image: ${IMG_PROMTAIL:-grafana/promtail:3.6.11}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: promtail
     restart: unless-stopped
     volumes:
@@ -365,6 +389,9 @@ services:
       disable: true
   gatus:
     image: ${IMG_GATUS:-twinproduction/gatus:v5.36.0}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: gatus
     restart: unless-stopped
     volumes:
@@ -402,6 +429,9 @@ services:
 
   healthchecks-db:
     image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+-alpine$$'
     container_name: healthchecks-db
     restart: unless-stopped
     volumes:
@@ -435,6 +465,9 @@ services:
 
   healthchecks:
     image: ${IMG_HEALTHCHECKS:-healthchecks/healthchecks:v4.2}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+(\.\d+)?$$'
     container_name: healthchecks
     restart: unless-stopped
     depends_on:

@@ -4,6 +4,9 @@
 services:
   caddy-lan:
     image: ${IMG_CADDY:-caddy:2.10.2-alpine}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+\.\d+\.\d+-alpine$$'
     container_name: caddy-lan
     restart: unless-stopped
     network_mode: host

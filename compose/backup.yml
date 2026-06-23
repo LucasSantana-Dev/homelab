@@ -5,6 +5,11 @@ services:
   # read-only so Kopia can snapshot named volumes from sister stacks.
   kopia:
     image: ${IMG_KOPIA:-kopia/kopia:0.21.1}
+    labels:
+      - wud.watch=true
+      # kopia is pre-1.0; pin major to 0 so date-stamped nightly builds
+      # (e.g. 20260623.0.3052) don't match the generic semver pattern.
+      - 'wud.tag.include=^0\.\d+\.\d+$$'
     container_name: kopia
     restart: unless-stopped
     hostname: homelab-kopia

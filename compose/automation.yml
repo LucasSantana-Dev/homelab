@@ -2,6 +2,9 @@ services:
   homeassistant:
     # H4 hardening: was ':stable' (floating). Pinned to a monthly minor; override via IMG_HOMEASSISTANT.
     image: ${IMG_HOMEASSISTANT:-ghcr.io/home-assistant/home-assistant:2025.5}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+(\.\d+)?$$'
     container_name: homeassistant
     restart: unless-stopped
     # Home Assistant requires root for USB device access (Zigbee/Z-Wave dongles via /dev/tty*)

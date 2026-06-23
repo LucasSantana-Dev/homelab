@@ -5,6 +5,13 @@ services:
   # Closes audit-deep v2 C2.
   cloudflared:
     image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:2025.4.0}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
+    # Host runs the mutable `latest` tag; without this WUD reports an endless
+    # "latest -> latest" digest update. Watch tags only (the semver include
+    # above), not the digest.
+    - wud.watch.digest=false
     container_name: cloudflared
     restart: unless-stopped
     command:
@@ -42,6 +49,9 @@ services:
       disable: true
   homepage:
     image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.13.2}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
     container_name: homepage
     restart: unless-stopped
     volumes:
@@ -99,6 +109,9 @@ services:
       retries: 3
   portainer:
     image: ${IMG_PORTAINER:-portainer/portainer-ce:2.42.0}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: portainer
     restart: unless-stopped
     volumes:
@@ -133,18 +146,33 @@ services:
       disable: true
   whats-up-docker:
     image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
+    labels:
+    - wud.watch=true
+    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock:ro
     - whats_up_docker_data:/app/data
     environment:
+    # Opt-in watching: only containers labelled `wud.watch=true` are monitored.
+    # Without this, WUD watches ALL containers on the host (incl. external Lucky/
+    # nextcloud/registry stacks) with loose tag matching, producing ~24 false-
+    # positive "updates" (Windows images, 32-bit RCs, dev/branch tags). Each
+    # watched service additionally pins `wud.tag.include` to its real tag scheme.
+    - WUD_WATCHER_LOCAL_WATCHBYDEFAULT=false
     - WUD_UPDATER_DOCKER_HUB_TOKEN=${DOCKER_HUB_TOKEN:-}
     - WUD_UPDATER_GITHUB_TOKEN=${GITHUB_TOKEN:-}
     # WUD reads triggers as WUD_TRIGGER_{TYPE}_{name}_{prop}. The bare
     # WUD_DISCORD_WEBHOOK_URL was ignored, so Discord update notifications never
     # fired (#298). Register a Discord trigger named "local". Empty URL = inactive.
     - WUD_TRIGGER_DISCORD_local_URL=${WUD_DISCORD_WEBHOOK_URL:-}
+    # Hermes Phase 4: route WUD updates through n8n ops-digest webhook so hermes
+    # can classify each update before it reaches Discord. Empty = inactive.
+    # WUD's generic webhook trigger TYPE is "HTTP" (there is no "WEBHOOK" type),
+    # so the var must be WUD_TRIGGER_HTTP_{name}_URL — otherwise it is silently
+    # ignored and updates never reach n8n (same failure mode as #298).
+    - WUD_TRIGGER_HTTP_digest_URL=${WUD_N8N_WEBHOOK_URL:-}
     # NOTE: the WUD_SMTP_* vars below are likewise NOT recognized by WUD (it wants
     # WUD_TRIGGER_SMTP_local_HOST/PORT/USER/PASS/FROM/TO). Left as-is — unused
     # (empty in .env) and incomplete (no FROM/TO); fix if email triggers are wanted.

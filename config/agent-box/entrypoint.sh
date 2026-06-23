@@ -140,6 +140,48 @@ if [[ -S /var/run/docker.sock ]]; then
     log "Docker socket GID: $DOCKER_GID"
 fi
 
+# --- WUD classify HTTP endpoint (port 8080) ---
+# n8n calls POST /wud-classify with WUD payload; hermes returns classification JSON.
+cat > /tmp/wud-server.py << 'PYEOF'
+import http.server, json, subprocess
+
+CLASSIFY_CMD = [
+    'su', '-s', '/bin/bash', 'agent', '-c',
+    'source /etc/profile.d/agent-env.sh 2>/dev/null; exec bash /workspace/homelab/scripts/agent-tasks/hermes-wud-classify.sh'
+]
+FALLBACK = json.dumps({'safe_to_schedule': True, 'urgency': 'low', 'reason': 'hermes unavailable'}).encode()
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args): pass
+    def do_GET(self):
+        ok = self.path == '/healthz'
+        self.send_response(200 if ok else 404)
+        self.send_header('Content-Type', 'text/plain')
+        self.end_headers()
+        if ok:
+            self.wfile.write(b'ok')
+    def do_POST(self):
+        if self.path != '/wud-classify':
+            self.send_response(404)
+            self.end_headers()
+            return
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length)
+        try:
+            r = subprocess.run(CLASSIFY_CMD, input=body, capture_output=True, timeout=120)
+            out = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else FALLBACK
+        except Exception:
+            out = FALLBACK
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(out)
+
+http.server.HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
+PYEOF
+python3 /tmp/wud-server.py &
+log "WUD classify endpoint started on :8080"
+
 # --- Start SSH ---
 log "Starting SSH daemon..."
 exec /usr/sbin/sshd -D -e

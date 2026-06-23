@@ -34,6 +34,20 @@ validate-env: ## Validate required env vars (compose-derived) before deploy
 	@bash scripts/security/validate-env.sh
 
 deploy: validate-env ## Deploy all homelab services
+	@if ! git diff --quiet HEAD -- '*.yml' '*.yaml' '*.toml' 'homelab_manager/' 'config/' 'compose/' 2>/dev/null; then \
+		if [ "$(DEPLOY_FORCE)" = "1" ]; then \
+			echo "⚠️  DEPLOY_FORCE=1: bypassing dirty-file gate" ; \
+			printf '[%s] DEPLOY_FORCE=1 by %s\nModified tracked files:\n' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$(whoami)" >> /var/log/homelab-deploy-overrides.log 2>/dev/null || true ; \
+			git diff --name-only HEAD -- '*.yml' '*.yaml' '*.toml' 'homelab_manager/' 'config/' 'compose/' >> /var/log/homelab-deploy-overrides.log 2>/dev/null || true ; \
+		else \
+			echo "❌ Host has local modifications to tracked files:" ; \
+			git diff --name-only HEAD -- '*.yml' '*.yaml' '*.toml' 'homelab_manager/' 'config/' 'compose/' ; \
+			echo "" ; \
+			echo "Commit them or stash them, then re-run make deploy." ; \
+			echo "Emergency override: DEPLOY_FORCE=1 make deploy  (audited to /var/log/homelab-deploy-overrides.log)" ; \
+			exit 1 ; \
+		fi \
+	fi
 	@echo "🚀 Deploying homelab services..."
 	docker compose up -d --build
 	@bash scripts/deployment/record-deploy-health.sh

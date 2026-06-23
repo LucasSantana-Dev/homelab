@@ -41,6 +41,9 @@ layout:
   Backup:
     style: row
     columns: 4
+  Agents:
+    style: row
+    columns: 4
   Infrastructure:
     style: row
     columns: 6

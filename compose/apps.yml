@@ -5,6 +5,9 @@ services:
   # n8n Workflow Automation - Tailscale Only
   n8n:
     image: ${IMG_N8N:-n8nio/n8n:2.27.1}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: n8n
     restart: unless-stopped
     # H2 hardening: dropped explicit user:root. Image's default 'node' user is UID 1000.
@@ -22,6 +25,12 @@ services:
       # Discord target for the ops-digest workflow (ADR-0025 Phase 2). Empty =
       # workflow inactive; see docs/runbooks/ops-alert-digest.md. (#266-style: set in .env)
       - OPS_DIGEST_DISCORD_WEBHOOK=${OPS_DIGEST_DISCORD_WEBHOOK:-}
+      # Allow $env.* expressions in Code/HTTP nodes so the Discord node can read
+      # OPS_DIGEST_DISCORD_WEBHOOK at runtime.
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      # Disable external task runner (Python 3 absent in image; without this n8n
+      # spawns a second process that pushes the 512M container over limit on startup)
+      - N8N_RUNNERS_ENABLED=false
     ports:
       - "127.0.0.1:5678:5678"
     networks:
@@ -34,10 +43,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
           cpus: '0.5'
         reservations:
-          memory: 256M
+          memory: 384M
           cpus: '0.25'
     logging:
       driver: "json-file"
@@ -48,6 +57,9 @@ services:
   # Nextcloud Database - MariaDB
   nextcloud-db:
     image: ${IMG_MARIADB:-mariadb:11.4.10}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: nextcloud-db
     restart: unless-stopped
     volumes:
@@ -83,6 +95,9 @@ services:
   # Nextcloud Redis Cache
   nextcloud-redis:
     image: ${IMG_REDIS_ALPINE:-redis:7.4-alpine}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+\.\d+-alpine$$'
     container_name: nextcloud-redis
     restart: unless-stopped
     volumes:
@@ -112,6 +127,9 @@ services:
   # Nextcloud Cloud Storage - Tailscale Only
   nextcloud:
     image: ${IMG_NEXTCLOUD:-nextcloud:29-apache}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+-apache$$'
     container_name: nextcloud
     restart: unless-stopped
     volumes:
@@ -165,6 +183,9 @@ services:
   # Paperless PostgreSQL Database
   paperless-db:
     image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+\.\d+-alpine$$'
     container_name: paperless-db
     restart: unless-stopped
     volumes:
@@ -199,6 +220,9 @@ services:
   # Paperless Redis Broker
   paperless-redis:
     image: ${IMG_REDIS_ALPINE:-redis:7.4-alpine}
+    labels:
+      - wud.watch=true
+      - 'wud.tag.include=^\d+\.\d+-alpine$$'
     container_name: paperless-redis
     restart: unless-stopped
     volumes:
