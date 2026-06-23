@@ -150,6 +150,7 @@ CLASSIFY_CMD = [
     'source /etc/profile.d/agent-env.sh 2>/dev/null; exec bash /workspace/homelab/scripts/agent-tasks/hermes-wud-classify.sh'
 ]
 FALLBACK = json.dumps({'safe_to_schedule': True, 'urgency': 'low', 'reason': 'hermes unavailable'}).encode()
+MAX_BODY = 64 * 1024  # WUD payloads are ~1-2KB; cap to avoid resource exhaustion (#310)
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
@@ -165,7 +166,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
-        length = int(self.headers.get('Content-Length', 0))
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+        except (TypeError, ValueError):
+            length = -1
+        if length < 0 or length > MAX_BODY:
+            self.send_response(413)
+            self.end_headers()
+            return
         body = self.rfile.read(length)
         try:
             r = subprocess.run(CLASSIFY_CMD, input=body, capture_output=True, timeout=120)
