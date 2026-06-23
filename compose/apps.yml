@@ -195,6 +195,9 @@ services:
       - POSTGRES_USER=paperless
       - POSTGRES_PASSWORD=${PAPERLESS_DB_PASSWORD}
       - TZ=${TIMEZONE}
+      # postgres:18+ images default to a major-version-specific data subdir under
+      # /var/lib/postgresql; pin the flat path so the existing bind mount keeps working.
+      - PGDATA=/var/lib/postgresql/data
     networks:
       - database
     healthcheck:

@@ -441,6 +441,9 @@ services:
       - POSTGRES_USER=healthchecks
       - POSTGRES_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:?HEALTHCHECKS_DB_PASSWORD must be set}
       - TZ=${TIMEZONE}
+      # postgres:18+ images default to a major-version-specific data subdir under
+      # /var/lib/postgresql; pin the flat path so the existing volume keeps working.
+      - PGDATA=/var/lib/postgresql/data
     networks:
       - default
     healthcheck:
