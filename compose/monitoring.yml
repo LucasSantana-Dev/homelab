@@ -177,6 +177,8 @@ services:
     - --web.console.templates=/etc/prometheus/consoles
     - --storage.tsdb.retention.time=200h
     - --web.enable-lifecycle
+    environment:
+    - GOMEMLIMIT=700MiB
     ports:
     - 127.0.0.1:${PROMETHEUS_PORT:-9091}:9090
     - ${TAILSCALE_IP}:${PROMETHEUS_PORT:-9091}:9090
