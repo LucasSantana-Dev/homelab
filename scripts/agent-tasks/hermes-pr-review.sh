@@ -9,7 +9,10 @@ set -euo pipefail
 PR_NUMBER="${1:?PR_NUMBER required}"
 [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "PR_NUMBER must be numeric, got: $PR_NUMBER" >&2; exit 2; }
 BASE_REF="${2:?BASE_REF required}"
+[[ "$BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "BASE_REF contains invalid characters, got: $BASE_REF" >&2; exit 2; }
+[[ "$BASE_REF" != *".."* ]] || { echo "BASE_REF must not contain '..', got: $BASE_REF" >&2; exit 2; }
 REPO="${3:?REPO required}"
+[[ "$REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "REPO must be in owner/repo format, got: $REPO" >&2; exit 2; }
 
 LOG_FILE="/home/luk-server/agent-logs/hermes-pr-review-${PR_NUMBER}-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -64,7 +67,7 @@ REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
      cd /workspace/homelab
      git fetch origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER' 2>&1
      git checkout hermes-pr-$PR_NUMBER 2>&1
-     REVIEW_OUT=\$(claude --print \
+     REVIEW_OUT=\$(timeout 600 claude --print \
        'Review the current branch (hermes-pr-$PR_NUMBER) against $BASE_REF. What are the top 3-5 issues, bugs, or improvements? Format as markdown bullets. Include [severity: high|medium|low] for each. If nothing notable, say so in one line.' \
        2>&1 | tail -n +1)
      git checkout main 2>&1
