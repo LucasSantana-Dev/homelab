@@ -39,7 +39,8 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
         echo "export LANG=en_US.UTF-8"
         echo "export LC_ALL=en_US.UTF-8"
     } > /etc/profile.d/agent-env.sh
-    chmod 644 /etc/profile.d/agent-env.sh
+    chmod 600 /etc/profile.d/agent-env.sh
+    chown agent:agent /etc/profile.d/agent-env.sh
     log "Secrets loaded."
 else
     log "WARNING: Secrets file not found."
