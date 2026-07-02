@@ -9,7 +9,25 @@ SECRETS_FILE=/run/secrets/agent-box.secrets.yaml
 AGE_KEY_FILE=/run/secrets/age.key
 if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
     log "Decrypting secrets..."
-    eval "$(SOPS_AGE_KEY_FILE=$AGE_KEY_FILE sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE")"
+    # Load secrets from dotenv output without eval (security hardening #338)
+    # sops dotenv emits raw KEY=VALUE (no quotes, no escaping)
+    # Use temp file to preserve sops exit code (process substitution doesn't propagate it)
+    SOPS_TEMP=$(mktemp)
+    # shellcheck disable=SC2064
+    trap "rm -f '$SOPS_TEMP'" EXIT
+    if ! SOPS_AGE_KEY_FILE="$AGE_KEY_FILE" sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE" > "$SOPS_TEMP"; then
+        log "ERROR: SOPS decryption failed"
+        exit 1
+    fi
+    while IFS='=' read -r _sk _sv; do
+      # skip blank lines and sops comment lines
+      [ -z "$_sk" ] && continue
+      case "$_sk" in \#*) continue ;; esac
+      # only accept valid shell identifier keys
+      [[ "$_sk" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      # raw literal assignment (no eval, no quote stripping)
+      export "$_sk=$_sv"
+    done < "$SOPS_TEMP"
     {
         echo "export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export AGENT_DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"
@@ -21,7 +39,8 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
         echo "export LANG=en_US.UTF-8"
         echo "export LC_ALL=en_US.UTF-8"
     } > /etc/profile.d/agent-env.sh
-    chmod 644 /etc/profile.d/agent-env.sh
+    chmod 600 /etc/profile.d/agent-env.sh
+    chown agent:agent /etc/profile.d/agent-env.sh
     log "Secrets loaded."
 else
     log "WARNING: Secrets file not found."
