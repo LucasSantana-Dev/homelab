@@ -10,17 +10,24 @@ AGE_KEY_FILE=/run/secrets/age.key
 if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
     log "Decrypting secrets..."
     # Load secrets from dotenv output without eval (security hardening #338)
-    # Validate each KEY name and strip surrounding quotes from VALUES
+    # sops dotenv emits raw KEY=VALUE (no quotes, no escaping)
+    # Use temp file to preserve sops exit code (process substitution doesn't propagate it)
+    SOPS_TEMP=$(mktemp)
+    # shellcheck disable=SC2064
+    trap "rm -f '$SOPS_TEMP'" EXIT
+    if ! SOPS_AGE_KEY_FILE="$AGE_KEY_FILE" sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE" > "$SOPS_TEMP"; then
+        log "ERROR: SOPS decryption failed"
+        exit 1
+    fi
     while IFS='=' read -r _sk _sv; do
+      # skip blank lines and sops comment lines
+      [ -z "$_sk" ] && continue
+      case "$_sk" in \#*) continue ;; esac
+      # only accept valid shell identifier keys
       [[ "$_sk" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-      # Strip surrounding quotes if present (handles "value" or 'value')
-      if [[ "$_sv" == \"* && "$_sv" == *\" ]]; then
-        _sv="${_sv:1:-1}"
-      elif [[ "$_sv" == \'* && "$_sv" == *\' ]]; then
-        _sv="${_sv:1:-1}"
-      fi
+      # raw literal assignment (no eval, no quote stripping)
       export "$_sk=$_sv"
-    done < <(SOPS_AGE_KEY_FILE="$AGE_KEY_FILE" sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE")
+    done < "$SOPS_TEMP"
     {
         echo "export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export AGENT_DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"
