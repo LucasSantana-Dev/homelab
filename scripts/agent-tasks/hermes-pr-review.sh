@@ -7,6 +7,7 @@
 set -euo pipefail
 
 PR_NUMBER="${1:?PR_NUMBER required}"
+[[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "PR_NUMBER must be numeric, got: $PR_NUMBER" >&2; exit 2; }
 BASE_REF="${2:?BASE_REF required}"
 REPO="${3:?REPO required}"
 
