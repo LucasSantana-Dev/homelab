@@ -53,6 +53,27 @@ PR because v1.x has a different widget schema.
 **Fix:** `docker compose pull homepage && docker compose up -d homepage`
 on the server. Verify with `docker exec homepage cat /app/package.json`.
 
+## Stremio server configuration directory (PR #319)
+
+**Symptom if skipped:** No functional issue in normal operation — Docker
+auto-creates missing bind-mount sources as `root:root`. However, this is a
+fragility and documentation gap.
+
+**Why:** The stremio service in `compose/media.yml` bind-mounts
+`../config/stremio:/root/.stremio-server` for persistent server settings.
+The `config/stremio/` directory should exist in the repo so fresh clones
+and deployments have it available before the container starts. The
+`server-settings.json` file is auto-generated on first run and remains
+git-ignored.
+
+**Fix:** Ensure `config/stremio/` directory exists on the server. In a fresh
+clone, this happens automatically. If the directory was manually deleted,
+recreate it:
+
+```bash
+mkdir -p config/stremio
+```
+
 ## When to update this doc
 
 Add an entry when a PR introduces a host-side step that fresh-deploy

@@ -224,6 +224,9 @@ config/whats-up-docker/wud-config.json
 config/*/
 
 # Keep monitoring, proxy, and tunnel configurations
+!config/stremio/
+!config/stremio/*
+!config/stremio/.gitkeep
 !config/agent-box/
 !config/cloudflared/
 !config/nginx/
