@@ -21,3 +21,5 @@ file in this directory.
 | [0024](0024-complete-k3s-decommission.md) | Complete the k3s decommission (staged, backup-first) | Accepted |
 | [0025](0025-ops-alert-hub-simplest-first.md) | Ops alert hub — Alertmanager-direct + n8n aggregation; defer the LLM layer | Accepted |
 | [0026](0026-notification-deadman-switch.md) | Catch silent notification failure with a dead-man-switch, not just a metric | Accepted |
+| [0036](0036-host-config-management.md) | Host config git-first flow with dirty-file gate on `make deploy` | Accepted |
+| [0037](0037-agent-box-resilient-boot-and-deploy-runbook.md) | Agent-box: non-fatal repo clones + SOPS/compose/deploy runbook (post-incident) | Accepted |
