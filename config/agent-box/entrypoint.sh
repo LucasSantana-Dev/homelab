@@ -47,7 +47,8 @@ CLAUDE_ENV_DIR="/home/agent/.claude-env"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     if [[ ! -d "$CLAUDE_ENV_DIR/.git" ]]; then
         log "Cloning claude-env..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent
+        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
+            || log "WARN: claude-env clone failed (token access or network) — continuing without it"
     else
         log "Pulling claude-env updates..."
         su -c "cd $CLAUDE_ENV_DIR && git pull --ff-only 2>&1 || true" agent
@@ -126,7 +127,8 @@ clone_repo() {
     local repo="$1" dir="$2"
     if [[ ! -d "/workspace/$dir/.git" && -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
         log "Cloning $repo..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/${repo}.git /workspace/$dir 2>&1" agent
+        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/${repo}.git /workspace/$dir 2>&1" agent \
+            || log "WARN: $repo clone failed (token access or network) — continuing without it"
     fi
 }
 clone_repo "LucasSantana-Dev/Lucky"     "Lucky"
