@@ -28,5 +28,5 @@ fi
 # Usage: run_on_agent "gh pr list --repo Org/Repo --json number"
 run_on_agent() {
     # shellcheck disable=SC2029
-    ssh agent-box "source /etc/profile.d/agent-env.sh && $1" 2>/dev/null
+    ssh agent-box "source /etc/profile.d/agent-env.sh && $(printf '%q' "$1")" 2>/dev/null
 }
