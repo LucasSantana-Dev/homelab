@@ -9,7 +9,18 @@ SECRETS_FILE=/run/secrets/agent-box.secrets.yaml
 AGE_KEY_FILE=/run/secrets/age.key
 if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
     log "Decrypting secrets..."
-    eval "$(SOPS_AGE_KEY_FILE=$AGE_KEY_FILE sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE")"
+    # Load secrets from dotenv output without eval (security hardening #338)
+    # Validate each KEY name and strip surrounding quotes from VALUES
+    while IFS='=' read -r _sk _sv; do
+      [[ "$_sk" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      # Strip surrounding quotes if present (handles "value" or 'value')
+      if [[ "$_sv" == \"* && "$_sv" == *\" ]]; then
+        _sv="${_sv:1:-1}"
+      elif [[ "$_sv" == \'* && "$_sv" == *\' ]]; then
+        _sv="${_sv:1:-1}"
+      fi
+      export "$_sk=$_sv"
+    done < <(SOPS_AGE_KEY_FILE="$AGE_KEY_FILE" sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE")
     {
         echo "export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export AGENT_DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"
