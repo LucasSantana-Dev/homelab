@@ -28,7 +28,7 @@ groups:
         expr: |
           (
             max by (name, image, instance, job) (
-              container_memory_usage_bytes{name!="", image!=""}
+              container_memory_working_set_bytes{name!="", image!=""}
             )
             /
             max by (name, image, instance, job) (
@@ -53,7 +53,7 @@ groups:
         expr: |
           (
             max by (name, image, instance, job) (
-              container_memory_usage_bytes{name!="", image!=""}
+              container_memory_working_set_bytes{name!="", image!=""}
             )
             /
             max by (name, image, instance, job) (
@@ -368,16 +368,17 @@ groups:
       - alert: LuckyBotHeapHigh
         expr: |
           (
-            nodejs_heap_size_used_bytes{service="lucky-bot"}
-            / nodejs_heap_size_total_bytes{service="lucky-bot"}
+            max by (name) (container_memory_working_set_bytes{name="lucky-bot"})
+            /
+            max by (name) (container_spec_memory_limit_bytes{name="lucky-bot"} > 0)
           ) > 0.9
         for: 10m
         labels:
           severity: warning
           service: lucky-bot
         annotations:
-          summary: "Lucky bot heap >90% used"
-          description: "V8 heap {{ $value | humanizePercentage }} full for 10m — risk of OOMKilled."
+          summary: "Lucky bot memory >90% of container limit"
+          description: "Working set {{ $value | humanizePercentage }} of the 1G mem_limit for 10m — risk of OOMKilled. (Was V8 used/heap_total — broken by design, V8 idles at 92-96%; see Lucky ADR 2026-07-02 resource-hygiene.)"
           runbook: "docs/runbooks/lucky-observability.md#luckybotheaphigh"
 
   # Deploy drift + deploy-health observability (ADR-0023).
