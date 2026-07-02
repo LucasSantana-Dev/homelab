@@ -89,7 +89,7 @@
   "schemaVersion": 38,
   "tags": ["hermes", "agents"],
   "templating": { "list": [] },
-  "time": { "from": "now-7d", "to": "now" },
+  "time": { "from": "now-3d", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "title": "Hermes Agent",
