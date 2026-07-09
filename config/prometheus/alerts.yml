@@ -418,3 +418,47 @@ groups:
           summary: "Homelab version-drift exporter is stale"
           description: "No version-drift export in >7h — the exporter (systemd timer) may be dead; drift detection is blind."
           runbook: "docs/adr/0023-deploy-drift-observability.md"
+
+  # Lucky growth-gate metrics + alerts (ADR-0038, k8s-deferral decision).
+  # Recording rules for growth-readiness monitoring; alerts trigger for escalation review.
+  - name: lucky_growth_gate
+    interval: 30s
+    rules:
+      # Recording rule: Host RAM utilization ratio (0–1).
+      # Dividing available by total to get utilization; subtract from 1 for user-friendly "utilization %".
+      - record: host:mem_util:ratio
+        expr: 1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+
+      # Recording rule: Lucky's total container memory (all lucky-* containers).
+      # Sums memory usage across bot, backend, postgres, and any other lucky-* services.
+      - record: lucky:mem_bytes:sum
+        expr: sum(container_memory_usage_bytes{name=~"lucky-.*"})
+
+      # Recording rule: Lucky Postgres container memory alone.
+      # Baseline measure for "what we'd free if Postgres moved to a second node or cloud DB".
+      - record: lucky:postgres_mem_bytes
+        expr: max(container_memory_usage_bytes{name="lucky-postgres"})
+
+      # Alert: Host memory pressure early-warning (escalation trigger for k8s decision review).
+      # Sustained >85% memory for 30m signals growth approaching capacity without emergency.
+      - alert: HostMemPressureEarlyWarning
+        expr: avg_over_time(host:mem_util:ratio[6h]) > 0.85
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory sustained >85% over 6h window"
+          description: "avg_over_time(host:mem_util:ratio[6h]) = {{ $value | humanizePercentage }}. Sustained high utilization is the escalation signal from ADR-0038 (k8s deferral decision review)."
+          runbook: "docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
+
+      # Alert: Lucky growth-gate review trigger (decision gate).
+      # When 7-day average mem utilization >70%, documented decision point to revisit k8s vs scale-out.
+      - alert: LuckyGrowthGateReview
+        expr: avg_over_time(host:mem_util:ratio[7d]) > 0.70
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Lucky growth gate: 7d avg memory >70% — revisit k8s/scale decision"
+          description: "7d average memory utilization = {{ $value | humanizePercentage }} (threshold 70%). This is the documented trigger to re-evaluate k8s migration vs second-node / cloud-DB scale-out. See ADR-0038 Phase 3."
+          runbook: "docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
