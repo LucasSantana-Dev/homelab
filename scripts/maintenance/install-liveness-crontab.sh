@@ -17,7 +17,7 @@ ASSUME_YES=0
 JOBS=$(cat <<'MAP'
 containers-weekly-update	update-containers-cron.sh
 lucky-db-backup	recover-lucky-db.sh
-docker-weekly-cleanup	docker-weekly-cleanup.sh
+docker-weekly-cleanup	docker-prune.sh
 MAP
 )
 
