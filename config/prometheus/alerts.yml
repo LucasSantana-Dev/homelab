@@ -118,6 +118,34 @@ groups:
           description: "Disk space is below 10% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
           runbook: "`docker system df` → `docker image prune -af` + `docker builder prune -f`; the repo can fill fast from unused images."
 
+      # Disk inodes — space can be fine while inodes exhaust (many small files:
+      # logs, kopia chunks). node-exporter exports the counts; nothing alerted.
+      - alert: LowDiskInodes
+        expr: (node_filesystem_files_free / node_filesystem_files) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk inodes on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          description: "Free inodes below 10% — writes will fail even with free space."
+          runbook: "Find the offender: `sudo du --inodes -x -d3 / | sort -rn | head`; usually many small files under /var/log or a container."
+
+      # ponytail: skipped a TLS-cert-expiry alert — probe_ssl_earliest_cert_expiry
+      # returns no data (blackbox targets are internal HTTP; public TLS terminates
+      # at Cloudflare). Add if/when blackbox probes an HTTPS endpoint we own.
+
+      # Per-container OOM kills — cAdvisor exports the counter; only its own OOM
+      # was alerted. Catches the silent memory-pressure failure mode on the N100.
+      - alert: ContainerOOMKilled
+        expr: increase(container_oom_events_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} was OOM-killed"
+          description: "{{ $labels.name }} hit its memory limit and was OOM-killed in the last 15m."
+          runbook: "`docker stats --no-stream` for the current picture; raise the service's `deploy.resources.limits.memory` or reduce what runs (see plan observability-resource-hardening)."
+
       # Service Response Time Alerts
       - alert: HighResponseTime
         expr: probe_duration_seconds > 5
