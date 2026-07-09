@@ -459,13 +459,16 @@ groups:
 
       # Recording rule: Lucky's total container memory (all lucky-* containers).
       # Sums memory usage across bot, backend, postgres, and any other lucky-* services.
+      # working_set (not usage) — usage includes reclaimable page cache and
+      # inflates the number; this PR switched the memory ALERTS to working_set for
+      # the same reason, and these rules feed the ADR-0038 growth-gate decision.
       - record: lucky:mem_bytes:sum
-        expr: sum(container_memory_usage_bytes{name=~"lucky-.*"})
+        expr: sum(container_memory_working_set_bytes{name=~"lucky-.*"})
 
       # Recording rule: Lucky Postgres container memory alone.
       # Baseline measure for "what we'd free if Postgres moved to a second node or cloud DB".
       - record: lucky:postgres_mem_bytes
-        expr: max(container_memory_usage_bytes{name="lucky-postgres"})
+        expr: max(container_memory_working_set_bytes{name="lucky-postgres"})
 
       # Alert: Host memory pressure early-warning (escalation trigger for k8s decision review).
       # Sustained >85% memory for 30m signals growth approaching capacity without emergency.
