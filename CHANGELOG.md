@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-07-09
+
+Resilience & observability release: the homelab now catches its own silent failures.
+
+### Added
+
+- **Generalized job-liveness dead-man (#360, #364).** Every cron and systemd unit reports to self-hosted Healthchecks (`hc-run.sh` wraps commands; `systemd-failed-check.sh` watches all units at once). Silent job death now self-reports via email, independent of Discord. Generalizes the ADR-0026 pattern.
+- **Healthchecks dead-man-switch (ADR-0026, #302)** and **Alertmanager → n8n `ops-digest` pipeline (ADR-0025, #295, #297)** — hermes classifies each container-update event before it reaches Discord, with raw-passthrough fallback.
+- **Hermes agent ops (ADR-0025, #308).** LLM agent on `agent-box` runs off-critical-path jobs: PR review automation, self-hosted runner, metrics dashboard/widget, weekly memory sync, WUD contextualization.
+- **Offsite backup for the Kopia repo** — rsync mirror (#291) + rclone/cloud backend (#293), SOPS-managed repo password (#267), snapshot-freshness metric + alert (ADR-0016, #184).
+- **Lucky growth gate (ADR-0038).** Prometheus `lucky_growth_gate` rules + Grafana panels track host/Lucky memory + guild trend; documents the k8s-revisit trigger.
+- **Deploy drift + deploy-health observability (ADR-0023, #232)**, Grafana scrape job (#241), Loki/Promtail 3.7.2 (#237), Nextcloud v4.2 + Postgres (#235).
+
+### Fixed
+
+- **Lucky prod DB backup was silently dead for weeks** — nightly cron failed on a missing `LUCKY_DB_PASSWORD`, producing zero dumps; the resilience watchdog meant to catch it had itself crashed on a Python `SyntaxError` (#363). Backup fixed + restore-tested; dump dir brought into Kopia scope (#362); watchdog and offsite mirror revived (#363).
+- **Monitoring signal quality (#355)** — memory alerts on working-set not cache-inflated usage; heap alert on container limit.
+- **Agent-box crash-loop** on a clone 403 → non-fatal repo clones (#354); multiple hermes hardening fixes (#311, #342, #352); WUD notification wiring (#298/#299) and opt-in watching.
+- **Partial container list no longer reported as success (#285)**; public-safety-gate scans added lines only (#288); image-locks fail closed on `:latest` (#283).
+
+### Changed
+
+- Reaffirmed Docker Compose over Kubernetes (ADR-0038) after a 5-lens review; k3s migration deferred with a documented dual trigger. `release` branch now CI-protected.
+
 ## [2.11.0] - 2026-06-22
 
 ### Added

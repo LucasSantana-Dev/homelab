@@ -6,7 +6,7 @@
   "version": 1,
   "timezone": "browser",
   "refresh": "30s",
-  "time": { "from": "now-7d", "to": "now" },
+  "time": { "from": "now-48h", "to": "now" },
   "templating": {
     "list": [
       {
@@ -90,7 +90,7 @@
     },
     {
       "id": 103,
-      "title": "Host Memory Utilization Trend (7d avg)",
+      "title": "Host Memory Utilization Trend (48h avg)",
       "type": "timeseries",
       "gridPos": { "x": 12, "y": 4, "w": 4, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -112,8 +112,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "avg_over_time(host:mem_util:ratio[7d])",
-          "legendFormat": "7d avg"
+          "expr": "avg_over_time(host:mem_util:ratio[48h])",
+          "legendFormat": "48h avg"
         }
       ]
     },
@@ -237,7 +237,7 @@
       "type": "text",
       "gridPos": { "x": 0, "y": 16, "w": 16, "h": 2 },
       "options": {
-        "content": "**ADR-0038 Decision Gate**: When 7d-avg host memory > 70% (sustained 1h), revisit k8s vs second-node / cloud-DB scale. Early warning at >85% (6h avg). See docs/adr/0037-k8s-decision-deferral-growth-gate.md"
+        "content": "**ADR-0038 Decision Gate**: When 48h-avg host memory > 70% (sustained 1h), revisit k8s vs second-node / cloud-DB scale. Early warning at >85% (6h avg). 48h window = within-retention proxy (TSDB 72h); check the real 30d trend manually. See docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
       }
     }
   ]

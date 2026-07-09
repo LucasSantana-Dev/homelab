@@ -5,7 +5,7 @@
 - **Deciders:** Lucas (solo operator)
 - **Supersedes:** —
 - **Superseded by:** —
-- **Related:** [ADR-0001](./0001-compose-vs-k3s-boundary.md) (Compose vs K3s boundary, 90-day experiment), [ADR-0004](./0004-drop-k3s.md) (Drop K3s), [ADR-0002](./0002-storage-boundary.md) (storage boundary), [ADR-0003](./0003-ingress-boundary-compose-edge.md) (ingress boundary)
+- **Related:** [ADR-0001](./0001-compose-vs-k3s-boundary.md) (Compose vs K3s boundary, 90-day experiment), [ADR-0004](./0004-drop-k3s.md) (Drop K3s), [ADR-0002](./0002-storage-boundary-local-path.md) (storage boundary), [ADR-0003](./0003-ingress-boundary-compose-edge.md) (ingress boundary)
 
 ---
 
@@ -45,12 +45,12 @@ Single-node k3s remains explicitly unjustified (etcd-starvation cascades to all 
 
 1. **Migrate to k3s now (single node):** Rejected. Overhead unsafe at 461 MB free; no HA; blast radius covers prod. Contradicts ADR-0004's still-valid revisit bar.
 2. **Podman Quadlet / Docker Swarm / Nomad:** Deferred/rejected. Quadlet is the strongest *modern* single-node option but offers no benefit worth a 45-service rewrite today; Swarm is stagnant/compat-broken on Docker v29; Nomad is multi-node overkill.
-3. **Managed Postgres offload + measure (chosen path):** Directly targets the growth bottleneck (state), frees headroom, and produces the data any future architecture decision needs.
+3. **Managed Postgres offload + measure (DEFERRED — see Correction above):** First drafted as the chosen path on the assumption it frees 0.5–1 GB; direct measurement refuted that (~28 MB), so it is deferred, not chosen. What was actually adopted is the trajectory instrumentation below.
 4. **k3s learning sandbox on separate hardware (Pi/spare box):** Legitimate and prod-safe; gated on an explicit upskilling goal or a climbing trajectory. Never on the prod N100.
 
 ## Consequences
 
-- **Positive:** No prod risk; complexity budget preserved; the real growth lever (managed DB) is pulled; a measurable, non-ideological trigger replaces "it feels like time."
+- **Positive:** No prod risk; complexity budget preserved; trajectory instrumentation (growth-gate metrics + alerts) is pulled so a measurable, non-ideological trigger replaces "it feels like time." (The managed-DB offload was NOT pulled — measurement showed it frees ~28 MB, not headroom; deferred per the Correction.)
 - **Negative:** No k8s learning on prod (mitigated by the sandbox option); if a genuine multi-node need arrives, migration is a new-architecture effort, not intra-cluster growth.
 - **Neutral:** Lucky's app metrics (guild count, latency, heap) are already instrumented; this ADR adds a resource-utilization growth gate (Prometheus rules + Grafana panels).
 

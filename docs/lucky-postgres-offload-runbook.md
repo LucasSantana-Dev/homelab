@@ -1,8 +1,11 @@
 # Runbook: Offload Lucky Postgres to managed (growth-readiness Phase 1)
 
-Part of the decision to defer Kubernetes ([ADR-0037](./adr/0037-reaffirm-compose-over-kubernetes-2026.md)).
-Goal: move Lucky's Postgres off the N100 to a managed provider → free ~0.5–1 GB
-host headroom and decouple Lucky's growth from the single box. This is the
+Part of the decision to defer Kubernetes ([ADR-0038](./adr/0038-reaffirm-compose-over-kubernetes-2026.md)).
+Note: ADR-0038's Correction **deferred** this offload — measurement showed Lucky's
+Postgres is ~28 MiB RAM, so offloading frees ~28 MB, not headroom. This runbook is
+retained for if/when the offload-revisit trigger fires (Lucky DB > 1 GB, sustained
+PG pressure, or > 500 guilds). Goal (when triggered): move Lucky's Postgres off the
+N100 to a managed provider and decouple Lucky's growth from the single box. This is the
 highest-leverage answer to "Lucky is growing" — it targets **state**, not
 orchestration.
 

@@ -51,7 +51,7 @@ if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; e
 # never hit and duplicates would be posted (#310).
 SHORT_SHA="${HEAD_SHA:0:8}"
 EXISTING_REVIEW=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq ".comments[] | select(.body | startswith(\"[hermes]\")) | select(.body | contains(\"$SHORT_SHA\"))" \
+  --jq ".comments[] | select(.body | startswith(\"[hermes] code review ($SHORT_SHA)\"))" \
   2>&1) || { log "WARN: gh failed checking existing reviews — skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
     log "Already reviewed at $HEAD_SHA — skipping"
@@ -64,6 +64,7 @@ REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
+     set -o pipefail   # else the timeout-claude-tail pipeline masks a timed-out review as success
      cd /workspace/homelab
      git fetch origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER' 2>&1
      git checkout hermes-pr-$PR_NUMBER 2>&1

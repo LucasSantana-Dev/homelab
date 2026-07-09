@@ -227,7 +227,8 @@ services:
     healthcheck:
       # No curl/wget in the image, but python3 is the base — use urllib. /health
       # returns 200 when the server is up, so the dead-man can see it die.
-      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8765/health').status==200 else 1)"]
+      # 127.0.0.1 (not localhost): app binds IPv4 only; localhost hits ::1 first → refused → IPv4 retry latency.
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=8).status==200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
