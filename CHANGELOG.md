@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-07-09
+
+### Fixed
+
+- **8 cubic review findings on v2.12.0 (#372).** `run_on_agent` now wraps multi-word remote commands in `bash -c` so quoting survives; `systemd-failed-check` fails closed on a `systemctl` query error instead of silently reporting OK; `hc-run` sources `.env` so cron jobs actually ping Healthchecks; liveness-crontab now wraps the real `docker-prune.sh` job; Lucky growth-gate window fixed to fit 72h TSDB retention; ADR-0038/runbook doc fixes; hermes dedup matches the review-comment header instead of a loose SHA fragment.
+- **paperless-{db,redis,ngx} + Home Assistant revived on every deploy/reboot (#374, ADR-0040).** Marked `profiles: ["optional"]` so `make deploy` no longer restarts manually-stopped containers; removed the now-permanently-failing Home Assistant blackbox probe.
+
 ## [2.12.0] - 2026-07-09
 
 Resilience & observability release: the homelab now catches its own silent failures.
