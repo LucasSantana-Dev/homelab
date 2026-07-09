@@ -51,7 +51,7 @@ if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; e
 # never hit and duplicates would be posted (#310).
 SHORT_SHA="${HEAD_SHA:0:8}"
 EXISTING_REVIEW=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq ".comments[] | select(.body | startswith(\"[hermes]\")) | select(.body | contains(\"$SHORT_SHA\"))" \
+  --jq ".comments[] | select(.body | startswith(\"[hermes] code review ($SHORT_SHA)\"))" \
   2>&1) || { log "WARN: gh failed checking existing reviews — skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
     log "Already reviewed at $HEAD_SHA — skipping"

@@ -26,6 +26,16 @@ if [[ $# -lt 3 || "${2}" != "--" ]]; then
 fi
 slug="$1"; shift 2
 
+# Cron runs with a minimal environment, so HEALTHCHECKS_PING_KEY (a ~/homelab/.env
+# secret) is unset there and every wrapped job would run but silently never ping.
+# Source .env here — the single choke point all wrapped jobs pass through — so the
+# ping key is available regardless of the caller's environment.
+env_file="${HOMELAB_DIR:-$HOME/homelab}/.env"
+if [[ -z "${HEALTHCHECKS_PING_KEY:-}" && -r "$env_file" ]]; then
+  set -a; # shellcheck disable=SC1090
+  source "$env_file"; set +a
+fi
+
 : "${HEALTHCHECKS_URL:=http://localhost:${HEALTHCHECKS_PORT:-8092}}"
 key="${HEALTHCHECKS_PING_KEY:-}"
 base="${HEALTHCHECKS_URL%/}"

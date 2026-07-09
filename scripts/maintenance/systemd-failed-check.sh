@@ -23,18 +23,30 @@ key="${HEALTHCHECKS_PING_KEY:-}"
 base="${HEALTHCHECKS_URL%/}"
 scope_flag=""; [[ "${SYSTEMD_SCOPE:-system}" == "user" ]] && scope_flag="--user"
 
+# Query systemd in its own step so we can distinguish "no failed units" from
+# "couldn't query systemd at all". A masked pipeline error would report OK and
+# ping success — hiding the exact silent-failure class this dead-man catches.
+# `|| rc=$?` keeps `set -e` from aborting on a systemctl failure so we can
+# handle it (fail closed) instead of dying silently.
+rc=0
 # shellcheck disable=SC2086
-failed="$(systemctl $scope_flag list-units --state=failed --no-legend --plain 2>/dev/null | awk '{print $1}' | grep -v '^$' || true)"
-count="$(printf '%s' "$failed" | grep -c . || true)"
-
-if [[ "$count" -eq 0 ]]; then
-  body="OK: no failed units"
-  suffix=""
+raw="$(systemctl $scope_flag list-units --state=failed --no-legend --plain 2>&1)" || rc=$?
+if [[ $rc -ne 0 ]]; then
+  body="ERROR: systemctl query failed — cannot determine unit state:"$'\n'"$raw"
+  suffix="/fail"                       # fail closed: unknown state != healthy
+  echo "$body"
 else
-  body="FAILED units ($count):"$'\n'"$failed"
-  suffix="/fail"
+  failed="$(printf '%s\n' "$raw" | awk '{print $1}' | grep -v '^$' || true)"
+  count="$(printf '%s' "$failed" | grep -c . || true)"
+  if [[ "$count" -eq 0 ]]; then
+    body="OK: no failed units"
+    suffix=""
+  else
+    body="FAILED units ($count):"$'\n'"$failed"
+    suffix="/fail"
+  fi
+  echo "$body"
 fi
-echo "$body"
 
 if [[ -n "$key" ]]; then
   printf '%s' "$body" | curl -fsS -m 10 --retry 3 -o /dev/null \
