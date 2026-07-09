@@ -302,7 +302,12 @@ services:
     networks:
     - default
     healthcheck:
-      disable: true
+      # cadvisor ships busybox wget + exposes /healthz — so the dead-man
+      # (docker-unhealthy-check.sh) can see it die, unlike distroless loki/promtail.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     mem_limit: 768M
     memswap_limit: 1536M
     deploy:

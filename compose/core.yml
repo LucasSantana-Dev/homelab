@@ -224,6 +224,13 @@ services:
     - 127.0.0.1:${HOMELAB_MANAGER_PORT:-8765}:8765
     networks:
     - default
+    healthcheck:
+      # No curl/wget in the image, but python3 is the base — use urllib. /health
+      # returns 200 when the server is up, so the dead-man can see it die.
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8765/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     deploy:
       resources:
         limits:

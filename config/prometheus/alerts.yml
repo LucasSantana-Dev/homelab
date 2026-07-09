@@ -118,6 +118,34 @@ groups:
           description: "Disk space is below 10% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
           runbook: "`docker system df` → `docker image prune -af` + `docker builder prune -f`; the repo can fill fast from unused images."
 
+      # Disk inodes — space can be fine while inodes exhaust (many small files:
+      # logs, kopia chunks). node-exporter exports the counts; nothing alerted.
+      - alert: LowDiskInodes
+        expr: (node_filesystem_files_free / node_filesystem_files) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk inodes on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          description: "Free inodes below 10% — writes will fail even with free space."
+          runbook: "Find the offender: `sudo du --inodes -x -d3 / | sort -rn | head`; usually many small files under /var/log or a container."
+
+      # ponytail: skipped a TLS-cert-expiry alert — probe_ssl_earliest_cert_expiry
+      # returns no data (blackbox targets are internal HTTP; public TLS terminates
+      # at Cloudflare). Add if/when blackbox probes an HTTPS endpoint we own.
+
+      # Per-container OOM kills — cAdvisor exports the counter; only its own OOM
+      # was alerted. Catches the silent memory-pressure failure mode on the N100.
+      - alert: ContainerOOMKilled
+        expr: increase(container_oom_events_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} was OOM-killed"
+          description: "{{ $labels.name }} hit its memory limit and was OOM-killed in the last 15m."
+          runbook: "`docker stats --no-stream` for the current picture; raise the service's `deploy.resources.limits.memory` or reduce what runs (see plan observability-resource-hardening)."
+
       # Service Response Time Alerts
       - alert: HighResponseTime
         expr: probe_duration_seconds > 5
@@ -452,13 +480,16 @@ groups:
           runbook: "docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
 
       # Alert: Lucky growth-gate review trigger (decision gate).
-      # When 7-day average mem utilization >70%, documented decision point to revisit k8s vs scale-out.
+      # ADR-0038's gate is ">70% sustained 30 consecutive days" — NOT expressible
+      # here: TSDB retention is 72h (see monitoring.yml), so any window >3d reads
+      # partial data. This is a within-retention 48h PROXY: when it fires, manually
+      # check the true 30d trajectory (longer-term store / Grafana) before acting.
       - alert: LuckyGrowthGateReview
-        expr: avg_over_time(host:mem_util:ratio[7d]) > 0.70
+        expr: avg_over_time(host:mem_util:ratio[48h]) > 0.70
         for: 1h
         labels:
           severity: info
         annotations:
-          summary: "Lucky growth gate: 7d avg memory >70% — revisit k8s/scale decision"
-          description: "7d average memory utilization = {{ $value | humanizePercentage }} (threshold 70%). This is the documented trigger to re-evaluate k8s migration vs second-node / cloud-DB scale-out. See ADR-0038 Phase 3."
+          summary: "Lucky growth gate PROXY: 48h avg memory >70% — manually check 30d trend"
+          description: "48h average memory utilization = {{ $value | humanizePercentage }} (threshold 70%). Within-retention proxy (TSDB=72h) for the ADR-0038 gate of >70% sustained 30d. On fire, verify the real 30d trend before re-evaluating k8s vs second-node / cloud-DB scale-out. See ADR-0038 Phase 3."
           runbook: "docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
