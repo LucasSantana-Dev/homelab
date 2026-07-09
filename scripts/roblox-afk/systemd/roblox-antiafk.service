@@ -1,0 +1,15 @@
+[Unit]
+Description=Roblox anti-AFK pointer jiggle
+After=sober.service
+BindsTo=sober.service
+
+[Service]
+Type=simple
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=%h/roblox-afk/roblox-antiafk.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=wayvnc (127.0.0.1 only) for Roblox AFK rig
+After=labwc.service
+BindsTo=labwc.service
+
+[Service]
+Type=simple
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStartPre=/bin/sh -c 'until [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; do sleep 0.5; done'
+# SECURITY: bind loopback only — reach it via SSH tunnel, never expose on LAN/Tailscale.
+ExecStart=/usr/bin/wayvnc 127.0.0.1 5900
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

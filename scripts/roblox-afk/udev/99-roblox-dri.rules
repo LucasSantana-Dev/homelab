@@ -1,0 +1,8 @@
+# Persist iGPU render-node access for the Roblox AFK rig user (luk-server).
+# The DRM nodes come up owned by an odd group (NFS-mapped nfsnobody) with no
+# access for luk-server, so Sober's Flatpak sandbox can't reach the GPU and
+# Roblox aborts ("couldn't find a supported graphics device"). Force group +
+# mode so members of the `render` group (luk-server, added via install.sh) can
+# use the iGPU. Replaces the volatile `setfacl` applied during first setup.
+SUBSYSTEM=="drm", KERNEL=="card0", GROUP="render", MODE="0660"
+SUBSYSTEM=="drm", KERNEL=="renderD128", GROUP="render", MODE="0660"
