@@ -5,7 +5,7 @@
 - **Deciders:** Lucas (solo operator)
 - **Supersedes:** —
 - **Superseded by:** —
-- **Related:** [ADR-0037](./0037-agent-box-resilient-boot-and-deploy-runbook.md) (hermes review automation), [ADR-0022 release workflow]
+- **Related:** [ADR-0037](./0037-agent-box-resilient-boot-and-deploy-runbook.md) (hermes review automation), [ADR-0022](./0022-keep-tag-driven-release-branch-model.md)
 
 ---
 

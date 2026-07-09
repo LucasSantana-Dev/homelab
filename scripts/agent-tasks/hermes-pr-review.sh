@@ -64,6 +64,7 @@ REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
+     set -o pipefail   # else the timeout-claude-tail pipeline masks a timed-out review as success
      cd /workspace/homelab
      git fetch origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER' 2>&1
      git checkout hermes-pr-$PR_NUMBER 2>&1

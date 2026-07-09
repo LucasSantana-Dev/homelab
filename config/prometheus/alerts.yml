@@ -137,7 +137,9 @@ groups:
       # Per-container OOM kills — cAdvisor exports the counter; only its own OOM
       # was alerted. Catches the silent memory-pressure failure mode on the N100.
       - alert: ContainerOOMKilled
-        expr: increase(container_oom_events_total[15m]) > 0
+        # name!="" drops root/system cgroup samples that would page with an empty
+        # container name (matches the per-container CPU alerts).
+        expr: increase(container_oom_events_total{name!=""}[15m]) > 0
         for: 0m
         labels:
           severity: critical

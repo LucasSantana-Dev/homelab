@@ -38,18 +38,24 @@ while IFS=$'\t' read -r slug needle; do
   if printf '%s\n' "$new" | grep -qE "hc-run\.sh ${slug} "; then
     echo "  already wrapped: $slug"; continue
   fi
-  # wrap the command portion (everything after the 5 cron fields) for the
-  # matching line, leaving redirects in place after the wrapped command.
+  # wrap the command portion (everything after the schedule) for the matching
+  # line, leaving redirects in place after the wrapped command. Handles both
+  # 5-field schedules and `@macro` schedules (@daily/@weekly/@reboot/…).
+  prev="$new"
   new="$(printf '%s\n' "$new" | awk -v n="$needle" -v hc="$HC_RUN" -v slug="$slug" '
     index($0,n) && $0 !~ /^#/ && $0 !~ /hc-run\.sh/ {
-      # split schedule (first 5 fields) from command
-      cmd=""; for(i=6;i<=NF;i++) cmd=cmd (i>6?" ":"") $i
-      sched=$1" "$2" "$3" "$4" "$5
+      if ($1 ~ /^@/) { start=2; sched=$1 }
+      else           { start=6; sched=$1" "$2" "$3" "$4" "$5 }
+      cmd=""; for(i=start;i<=NF;i++) cmd=cmd (i>start?" ":"") $i
       print sched" "hc" "slug" -- "cmd; next
     }
     { print }
   ')"
-  echo "  wrapped: $slug"
+  if [[ "$new" == "$prev" ]]; then
+    echo "  WARN: no crontab line matched needle '$needle' for '$slug' — job NOT wrapped (no liveness coverage)" >&2
+  else
+    echo "  wrapped: $slug"
+  fi
 done <<< "$JOBS"
 
 echo "----- proposed crontab -----"

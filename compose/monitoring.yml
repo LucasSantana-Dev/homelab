@@ -438,7 +438,9 @@ services:
     image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
     labels:
     - wud.watch=true
-    - 'wud.tag.include=^\d+\.\d+-alpine$$'
+    # Pinned to major 15: PostgreSQL majors aren't data-compatible, so an auto-bump
+    # to 16/17/18-alpine would corrupt healthchecks_db. Bump major deliberately + migrate.
+    - 'wud.tag.include=^15\.\d+-alpine$$'
     container_name: healthchecks-db
     restart: unless-stopped
     volumes:

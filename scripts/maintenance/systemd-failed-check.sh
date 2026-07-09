@@ -34,6 +34,7 @@ raw="$(systemctl $scope_flag list-units --state=failed --no-legend --plain 2>&1)
 if [[ $rc -ne 0 ]]; then
   body="ERROR: systemctl query failed — cannot determine unit state:"$'\n'"$raw"
   suffix="/fail"                       # fail closed: unknown state != healthy
+  count=1                              # nonzero → final `exit "$count"` isn't unbound
   echo "$body"
 else
   failed="$(printf '%s\n' "$raw" | awk '{print $1}' | grep -v '^$' || true)"

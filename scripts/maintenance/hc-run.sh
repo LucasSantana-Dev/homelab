@@ -32,8 +32,14 @@ slug="$1"; shift 2
 # ping key is available regardless of the caller's environment.
 env_file="${HOMELAB_DIR:-$HOME/homelab}/.env"
 if [[ -z "${HEALTHCHECKS_PING_KEY:-}" && -r "$env_file" ]]; then
-  set -a; # shellcheck disable=SC1090
-  source "$env_file"; set +a
+  # Extract ONLY the HEALTHCHECKS_* keys — do NOT `source` the whole file: .env
+  # holds Compose-valid but shell-invalid values that would abort this wrapper
+  # (set -e) and take the wrapped job down with it. Literal k=v, no interpolation.
+  while IFS='=' read -r k v; do
+    case "$k" in
+      HEALTHCHECKS_*) v="${v%\"}"; v="${v#\"}"; export "$k=$v" ;;
+    esac
+  done < "$env_file"
 fi
 
 : "${HEALTHCHECKS_URL:=http://localhost:${HEALTHCHECKS_PORT:-8092}}"
@@ -61,8 +67,10 @@ set +e
 rc=$?
 set -e
 
-# Body capped so a chatty job can't POST megabytes.
-{ tail -c 10000 "$log" | hc_ping "$( [[ $rc -eq 0 ]] && echo "" || echo "/fail" )"; } || true
+# Body capped so a chatty job can't POST megabytes. On failure prepend the exit
+# code so an empty-output failure still gives operators something to triage.
+{ { [[ $rc -ne 0 ]] && printf 'exit=%s\n' "$rc"; tail -c 10000 "$log"; } \
+    | hc_ping "$( [[ $rc -eq 0 ]] && echo "" || echo "/fail" )"; } || true
 
 cat "$log"
 exit "$rc"

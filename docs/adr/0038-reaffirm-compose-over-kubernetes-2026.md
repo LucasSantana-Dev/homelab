@@ -5,7 +5,7 @@
 - **Deciders:** Lucas (solo operator)
 - **Supersedes:** —
 - **Superseded by:** —
-- **Related:** [ADR-0001](./0001-compose-vs-k3s-boundary.md) (Compose vs K3s boundary, 90-day experiment), [ADR-0004](./0004-drop-k3s.md) (Drop K3s), [ADR-0002](./0002-storage-boundary.md) (storage boundary), [ADR-0003](./0003-ingress-boundary-compose-edge.md) (ingress boundary)
+- **Related:** [ADR-0001](./0001-compose-vs-k3s-boundary.md) (Compose vs K3s boundary, 90-day experiment), [ADR-0004](./0004-drop-k3s.md) (Drop K3s), [ADR-0002](./0002-storage-boundary-local-path.md) (storage boundary), [ADR-0003](./0003-ingress-boundary-compose-edge.md) (ingress boundary)
 
 ---
 
