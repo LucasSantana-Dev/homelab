@@ -23,6 +23,12 @@ if [[ -z "$TOKEN" ]]; then
     exit 1
 fi
 
+# Hard dependency: the registration-token step below parses JSON with jq.
+if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: jq is required but not installed. Install it (e.g. 'sudo apt-get install -y jq') and re-run."
+    exit 1
+fi
+
 echo "--- [1/5] Creating runner directory ---"
 mkdir -p "$RUNNER_DIR"
 cd "$RUNNER_DIR"
@@ -64,4 +70,4 @@ sudo ./svc.sh start
 echo ""
 echo "Runner installed and running. Verify:"
 echo "  systemctl status actions.runner.LucasSantana-Dev-homelab.homelab-runner.service"
-echo "  gh api repos/LucasSantana-Dev/homelab/actions/runners --jq '.[].name'"
+echo "  gh api repos/LucasSantana-Dev/homelab/actions/runners --jq '.runners[].name'"

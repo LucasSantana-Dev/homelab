@@ -27,6 +27,9 @@ fi
 # Run a command on agent-box via SSH, sourcing the container env first.
 # Usage: run_on_agent "gh pr list --repo Org/Repo --json number"
 run_on_agent() {
+    # %q the whole command as ONE arg to a remote `bash -c`, which re-parses it
+    # after sourcing the env. Without the `bash -c` wrapper, %q escapes the inner
+    # spaces so the remote shell treats a multi-word command as a single word.
     # shellcheck disable=SC2029
-    ssh agent-box "source /etc/profile.d/agent-env.sh && $1" 2>/dev/null
+    ssh agent-box "source /etc/profile.d/agent-env.sh && bash -c $(printf '%q' "$1")" 2>/dev/null
 }
