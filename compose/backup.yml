@@ -44,7 +44,7 @@ services:
         # scheduling). Space-bounded: docker volumes (~5.4G) + homelab appdata
         # (~7.3G); the ~183G bulk of /home is intentionally left for a future
         # offsite target, not this same-disk interim repo.
-        kopia snapshot create /source/docker-volumes /source/appdata /source/config || true
+        kopia snapshot create /source/docker-volumes /source/appdata /source/config /source/backups || true
         # --insecure: HTTP-only, safe because the port binds to ${BIND_IP}
         # (default 127.0.0.1) and the host is reachable only via Tailscale.
         # Credentials come from the environment (see above) — keep them OFF the
@@ -67,6 +67,11 @@ services:
       # 2026-06-19 after an HA config loss revealed config/ was OUTSIDE Kopia's
       # backup scope (it's a bind mount, not a named volume or appdata).
       - /home/luk-server/homelab/config:/source/config:ro
+      # DB dumps (Lucky nightly pg_dump via recover-lucky-db.sh cron). Added
+      # 2026-07-08 after the dump dir was found OUTSIDE Kopia's scope — and the
+      # nightly dump itself had been failing silently (missing LUCKY_DB_PASSWORD),
+      # leaving Lucky prod data with no working backup at all.
+      - /home/luk-server/homelab/backups:/source/backups:ro
     ports:
       - ${BIND_IP:-127.0.0.1}:${KOPIA_PORT:-51515}:51515
     networks:
