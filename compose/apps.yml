@@ -187,6 +187,7 @@ services:
       - wud.watch=true
       - 'wud.tag.include=^\d+\.\d+-alpine$$'
     container_name: paperless-db
+    profiles: ["optional"]   # off by default (RAM); `docker compose --profile optional up -d`
     restart: unless-stopped
     volumes:
       - ../appdata/paperless/db:/var/lib/postgresql/data
@@ -227,6 +228,7 @@ services:
       - wud.watch=true
       - 'wud.tag.include=^\d+\.\d+-alpine$$'
     container_name: paperless-redis
+    profiles: ["optional"]   # off by default (RAM); `docker compose --profile optional up -d`
     restart: unless-stopped
     volumes:
       - ../appdata/paperless/redis:/data
@@ -262,6 +264,7 @@ services:
         PAPERLESS_BASE_IMAGE: ${IMG_PAPERLESS_BASE:-ghcr.io/paperless-ngx/paperless-ngx:2.13}
     image: paperless-ngx:custom
     container_name: paperless-ngx
+    profiles: ["optional"]   # off by default (RAM); `docker compose --profile optional up -d`
     restart: unless-stopped
     volumes:
       - ../appdata/paperless/data:/usr/src/paperless/data

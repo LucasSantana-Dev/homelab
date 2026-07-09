@@ -88,7 +88,9 @@ scrape_configs:
           - http://portainer:9000/api/system/status
           - http://nextcloud:80/status.php
           - http://stremio-server:11470/settings
-          - http://homeassistant:8123/
+          # homeassistant removed: now `profiles: [optional]` (off by default for RAM);
+          # probing an intentionally-stopped service = permanent probe_success==0 alert.
+          # Re-add this target if HA is promoted back to default-on.
           - http://n8n:5678/healthz
     relabel_configs:
       - source_labels: [__address__]
