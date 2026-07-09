@@ -66,7 +66,7 @@ send_discord() {
 
     payload=$(LUCKY_MSG="${msg}" LUCKY_CHAN="${LUCKY_NOTIFY_CHANNEL_ID}" python3 -c '
 import json, os, socket
-content = f"[{socket.gethostname()}] {os.environ[\"LUCKY_MSG\"]}"
+content = "[{}] {}".format(socket.gethostname(), os.environ["LUCKY_MSG"])
 print(json.dumps({"channelId": os.environ["LUCKY_CHAN"], "content": content[:1900]}))
 ')
 
