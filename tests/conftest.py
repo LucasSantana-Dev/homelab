@@ -25,8 +25,7 @@ def temp_homelab_dir():
 
         # Create .env file
         env_file = homelab_dir / ".env"
-        env_file.write_text(
-            """
+        env_file.write_text("""
 # Test environment variables
 DOMAIN=test.example.com
 TIMEZONE=UTC
@@ -45,8 +44,7 @@ LUKBOT_SENTRY_PROJECT_SLUG=test-project
 LUKBOT_SENTRY_AUTH_TOKEN=test_token_123
 WUD_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/REDACTED/REDACTED
 WUD_SMTP_PASS=test_password_123
-"""
-        )
+""")
 
         yield homelab_dir
 
