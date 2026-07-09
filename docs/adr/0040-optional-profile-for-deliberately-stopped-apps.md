@@ -1,6 +1,6 @@
 # ADR 0040: Compose `profiles: [optional]` for deliberately-stopped apps
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-09
 - **Deciders:** Lucas (solo operator)
 - **Supersedes:** —
@@ -40,8 +40,9 @@ that removed retired/placeholder targets to kill 8 false ServiceDown alerts.)
 
 ## Alternatives considered
 
-1. **Status quo — manual `docker stop` after every deploy/reboot.** Rejected: the
-   recurring friction being removed; easy to forget → silent RAM regression.
+1. **Status quo — manual `docker stop` after every deploy/reboot.** Rejected:
+   reintroduces the exact friction this ADR removes (manual stop after each
+   deploy); easy to forget → silent RAM regression.
 2. **Delete the four service blocks from Compose.** Rejected: loses the config,
    detaches named volumes from the Compose graph, and re-adding = restoring YAML.
    Profiles keep the definition inert-but-present.
