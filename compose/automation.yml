@@ -6,6 +6,7 @@ services:
     - wud.watch=true
     - 'wud.tag.include=^\d+\.\d+(\.\d+)?$$'
     container_name: homeassistant
+    profiles: ["optional"]   # off by default (RAM); `docker compose --profile optional up -d homeassistant`
     restart: unless-stopped
     # Home Assistant requires root for USB device access (Zigbee/Z-Wave dongles via /dev/tty*)
     # and the supervisor's /config/deps install step. Bridge-networked, not host-networked.
