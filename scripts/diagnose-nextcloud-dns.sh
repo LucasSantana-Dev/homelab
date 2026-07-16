@@ -91,6 +91,9 @@ if command -v curl &> /dev/null; then
     echo "HTTP (port 8300): $HTTP_RESULT"
 
     # Test HTTPS on port 443 (via nginx)
+    # ACCEPTANCE: -k (skip cert verify) is intentional here — this is a LAN
+    # diagnostic probing a self-signed cert on the Tailscale IP; there is no CA
+    # to pin and no secret is sent, so cert validation adds nothing.
     HTTPS_RESULT=$(curl -I -k -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "https://${TAILSCALE_IP}:443" 2>&1 || echo "FAILED")
     echo "HTTPS (port 443): $HTTPS_RESULT"
     echo ""

@@ -76,7 +76,7 @@ services:
     - HOMEPAGE_VAR_GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
     - HOMEPAGE_VAR_PAPERLESS_PASSWORD=${PAPERLESS_ADMIN_PASSWORD}
     ports:
-    - ${BIND_IP:-0.0.0.0}:${HOMEPAGE_PORT:-3000}:3000
+    - ${BIND_IP:-127.0.0.1}:${HOMEPAGE_PORT:-3000}:3000
     networks:
     - default
     extra_hosts:
@@ -121,7 +121,7 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock
     - portainer_data:/data
     ports:
-    - ${BIND_IP:-0.0.0.0}:${PORTAINER_PORT:-9000}:9000
+    - ${BIND_IP:-127.0.0.1}:${PORTAINER_PORT:-9000}:9000
     networks:
     - default
     deploy:
