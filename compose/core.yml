@@ -3,6 +3,12 @@ services:
     image: tecnativa/docker-socket-proxy:v0.4.2
     container_name: docker-socket-proxy
     restart: unless-stopped
+    # read_only rootfs (set below) needs writable tmpfs: the HAProxy entrypoint
+    # generates /tmp/haproxy.cfg at startup and writes its pidfile/socket to /run.
+    # Without these the container crash-loops on "Read-only file system".
+    tmpfs:
+      - /tmp
+      - /run
     environment:
       CONTAINERS: 1
       IMAGES: 1
