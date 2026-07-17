@@ -290,7 +290,7 @@ services:
       - USERMAP_UID=${PUID}
       - USERMAP_GID=${PGID}
     ports:
-      - "${BIND_IP:-0.0.0.0}:8400:8000"
+      - "${BIND_IP:-127.0.0.1}:8400:8000"
     networks:
       - frontend
       - database

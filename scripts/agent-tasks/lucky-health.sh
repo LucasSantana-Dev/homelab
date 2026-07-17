@@ -8,13 +8,16 @@ echo "[$(date)] Starting Lucky health check..."
 source "$(dirname "$0")/common.sh"
 
 HEALTH_URL="https://lucky-api.lucassantana.tech/api/health"
-HTTP_CODE=$(curl -s -o /tmp/lucky-health-response.json -w "%{http_code}" \
+# Use a private temp file (not a predictable /tmp path) to avoid a symlink/TOCTOU
+# race where another local user pre-creates the target before curl writes it.
+RESPONSE_FILE=$(mktemp)
+trap 'rm -f "$RESPONSE_FILE"' EXIT
+HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w "%{http_code}" \
     --max-time 15 --retry 2 --retry-delay 3 \
     -H "Accept: application/json" \
     "$HEALTH_URL" 2>/dev/null) || HTTP_CODE="000"
 
-RESPONSE=$(cat /tmp/lucky-health-response.json 2>/dev/null || echo "{}")
-rm -f /tmp/lucky-health-response.json
+RESPONSE=$(cat "$RESPONSE_FILE" 2>/dev/null || echo "{}")
 
 echo "[$(date)] Health check: HTTP $HTTP_CODE"
 echo "Response: $RESPONSE"
