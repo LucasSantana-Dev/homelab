@@ -66,7 +66,7 @@ send_discord() {
 
     payload=$(LUCKY_MSG="${msg}" LUCKY_CHAN="${LUCKY_NOTIFY_CHANNEL_ID}" python3 -c '
 import json, os, socket
-content = f"[{socket.gethostname()}] {os.environ[\"LUCKY_MSG\"]}"
+content = "[{}] {}".format(socket.gethostname(), os.environ["LUCKY_MSG"])
 print(json.dumps({"channelId": os.environ["LUCKY_CHAN"], "content": content[:1900]}))
 ')
 
@@ -160,17 +160,23 @@ load_state() {
     eval "$(python3 - "${STATE_FILE}" <<'PY'
 import json
 import pathlib
+import re
 import sys
 
 path = pathlib.Path(sys.argv[1])
 state = json.loads(path.read_text())
 steps = state.get("steps", {})
 
+# The shell eval's this output; every numeric field is int()-coerced. last_status
+# is the only free-form string, so strip it to a safe charset before emitting it
+# inside single quotes — a tampered state file must not be able to inject shell.
+last_status = re.sub(r"[^A-Za-z0-9_-]", "", str(state.get("last_status", "unknown"))) or "unknown"
+
 print(f"incident_active={1 if state.get('incident_active', False) else 0}")
 print(f"incident_start_epoch={int(state.get('incident_start_epoch', 0) or 0)}")
 print(f"last_reboot_epoch={int(state.get('last_reboot_epoch', 0) or 0)}")
 print(f"last_check_epoch={int(state.get('last_check_epoch', 0) or 0)}")
-print(f"last_status='{state.get('last_status', 'unknown')}'")
+print(f"last_status='{last_status}'")
 print(f"step_restart_containers_epoch={int(steps.get('restart_containers_epoch', 0) or 0)}")
 print(f"step_restart_docker_epoch={int(steps.get('restart_docker_epoch', 0) or 0)}")
 print(f"step_compose_up_epoch={int(steps.get('compose_up_epoch', 0) or 0)}")

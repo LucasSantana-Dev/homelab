@@ -100,7 +100,7 @@
   "style": "dark",
   "tags": ["homelab", "deploy", "release", "adr-0023"],
   "templating": { "list": [] },
-  "time": { "from": "now-7d", "to": "now" },
+  "time": { "from": "now-3d", "to": "now" },
   "timepicker": {},
   "timezone": "",
   "title": "Homelab Deploy & Version Observability",

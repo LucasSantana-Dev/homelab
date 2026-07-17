@@ -1,9 +1,12 @@
 """Route handlers for homelab_manager HTTP API."""
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def _json_response(data: Any) -> Tuple[int, str]:
@@ -38,7 +41,8 @@ def handle_hermes() -> Tuple[int, str]:
             state = json.load(f)
     except FileNotFoundError:
         state = {}
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as e:
+        logger.error("Failed to read hermes state file: %s", e, exc_info=True)
         return 500, json.dumps({"error": "state file unreadable"})
 
     now = datetime.now(timezone.utc).isoformat()
@@ -59,7 +63,8 @@ def handle_hermes_logs(lines: int = 50) -> Tuple[int, str]:
         with open(latest) as f:
             all_lines = f.readlines()
         tail = [line.rstrip() for line in all_lines[-lines:]]
-    except OSError:
+    except OSError as e:
+        logger.error("Failed to read hermes log file %s: %s", latest, e, exc_info=True)
         return 500, json.dumps({"error": "log unreadable"})
 
     return _json_response({"lines": tail, "file": os.path.basename(latest)})

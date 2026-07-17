@@ -1,0 +1,244 @@
+{
+  "uid": "lucky-growth-gate",
+  "title": "Lucky — Growth Gate",
+  "tags": ["lucky", "growth", "k8s-decision", "scaling"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-48h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "label": "Prometheus"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 101,
+      "title": "Host RAM Headroom",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_memory_MemAvailable_bytes",
+          "legendFormat": "Available"
+        },
+        {
+          "refId": "B",
+          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "legendFormat": "Used"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "title": "Host Memory Utilization %",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.70 },
+              { "color": "red", "value": 0.85 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "host:mem_util:ratio"
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "title": "Host Memory Utilization Trend (48h avg)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg_over_time(host:mem_util:ratio[48h])",
+          "legendFormat": "48h avg"
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "title": "Lucky Total Container Memory",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean", "max"],
+          "displayMode": "table",
+          "placement": "right"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "lucky:mem_bytes:sum",
+          "legendFormat": "Lucky total (all containers)"
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "title": "Lucky Postgres Memory (Offload Reference)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 8, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "fixed", "fixedColor": "orange" }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "lucky:postgres_mem_bytes",
+          "legendFormat": "Postgres memory"
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "title": "Lucky Postgres Memory Trend",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 12, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "lucky:postgres_mem_bytes",
+          "legendFormat": "Postgres"
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "title": "Active Guilds Trend",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 4, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "calcs": ["last", "mean"],
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "lucky_bot_guilds_total{state=\"active\"}",
+          "legendFormat": "Active guilds"
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "title": "Decision Gate: Growth Metrics (Phase 3 Trigger)",
+      "type": "text",
+      "gridPos": { "x": 0, "y": 16, "w": 16, "h": 2 },
+      "options": {
+        "content": "**ADR-0038 Decision Gate**: When 48h-avg host memory > 70% (sustained 1h), revisit k8s vs second-node / cloud-DB scale. Early warning at >85% (6h avg). 48h window = within-retention proxy (TSDB 72h); check the real 30d trend manually. See docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
+      }
+    }
+  ]
+}

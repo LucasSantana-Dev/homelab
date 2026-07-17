@@ -28,7 +28,7 @@ groups:
         expr: |
           (
             max by (name, image, instance, job) (
-              container_memory_usage_bytes{name!="", image!=""}
+              container_memory_working_set_bytes{name!="", image!=""}
             )
             /
             max by (name, image, instance, job) (
@@ -53,7 +53,7 @@ groups:
         expr: |
           (
             max by (name, image, instance, job) (
-              container_memory_usage_bytes{name!="", image!=""}
+              container_memory_working_set_bytes{name!="", image!=""}
             )
             /
             max by (name, image, instance, job) (
@@ -117,6 +117,36 @@ groups:
           summary: "Critical disk space on {{ $labels.instance }}"
           description: "Disk space is below 10% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
           runbook: "`docker system df` → `docker image prune -af` + `docker builder prune -f`; the repo can fill fast from unused images."
+
+      # Disk inodes — space can be fine while inodes exhaust (many small files:
+      # logs, kopia chunks). node-exporter exports the counts; nothing alerted.
+      - alert: LowDiskInodes
+        expr: (node_filesystem_files_free / node_filesystem_files) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk inodes on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          description: "Free inodes below 10% — writes will fail even with free space."
+          runbook: "Find the offender: `sudo du --inodes -x -d3 / | sort -rn | head`; usually many small files under /var/log or a container."
+
+      # ponytail: skipped a TLS-cert-expiry alert — probe_ssl_earliest_cert_expiry
+      # returns no data (blackbox targets are internal HTTP; public TLS terminates
+      # at Cloudflare). Add if/when blackbox probes an HTTPS endpoint we own.
+
+      # Per-container OOM kills — cAdvisor exports the counter; only its own OOM
+      # was alerted. Catches the silent memory-pressure failure mode on the N100.
+      - alert: ContainerOOMKilled
+        # name!="" drops root/system cgroup samples that would page with an empty
+        # container name (matches the per-container CPU alerts).
+        expr: increase(container_oom_events_total{name!=""}[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} was OOM-killed"
+          description: "{{ $labels.name }} hit its memory limit and was OOM-killed in the last 15m."
+          runbook: "`docker stats --no-stream` for the current picture; raise the service's `deploy.resources.limits.memory` or reduce what runs (see plan observability-resource-hardening)."
 
       # Service Response Time Alerts
       - alert: HighResponseTime
@@ -368,16 +398,17 @@ groups:
       - alert: LuckyBotHeapHigh
         expr: |
           (
-            nodejs_heap_size_used_bytes{service="lucky-bot"}
-            / nodejs_heap_size_total_bytes{service="lucky-bot"}
+            max by (name) (container_memory_working_set_bytes{name="lucky-bot"})
+            /
+            max by (name) (container_spec_memory_limit_bytes{name="lucky-bot"} > 0)
           ) > 0.9
         for: 10m
         labels:
           severity: warning
           service: lucky-bot
         annotations:
-          summary: "Lucky bot heap >90% used"
-          description: "V8 heap {{ $value | humanizePercentage }} full for 10m — risk of OOMKilled."
+          summary: "Lucky bot memory >90% of container limit"
+          description: "Working set {{ $value | humanizePercentage }} of the 1G mem_limit for 10m — risk of OOMKilled. (Was V8 used/heap_total — broken by design, V8 idles at 92-96%; see Lucky ADR 2026-07-02 resource-hygiene.)"
           runbook: "docs/runbooks/lucky-observability.md#luckybotheaphigh"
 
   # Deploy drift + deploy-health observability (ADR-0023).
@@ -417,3 +448,53 @@ groups:
           summary: "Homelab version-drift exporter is stale"
           description: "No version-drift export in >7h — the exporter (systemd timer) may be dead; drift detection is blind."
           runbook: "docs/adr/0023-deploy-drift-observability.md"
+
+  # Lucky growth-gate metrics + alerts (ADR-0038, k8s-deferral decision).
+  # Recording rules for growth-readiness monitoring; alerts trigger for escalation review.
+  - name: lucky_growth_gate
+    interval: 30s
+    rules:
+      # Recording rule: Host RAM utilization ratio (0–1).
+      # Dividing available by total to get utilization; subtract from 1 for user-friendly "utilization %".
+      - record: host:mem_util:ratio
+        expr: 1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+
+      # Recording rule: Lucky's total container memory (all lucky-* containers).
+      # Sums memory usage across bot, backend, postgres, and any other lucky-* services.
+      # working_set (not usage) — usage includes reclaimable page cache and
+      # inflates the number; this PR switched the memory ALERTS to working_set for
+      # the same reason, and these rules feed the ADR-0038 growth-gate decision.
+      - record: lucky:mem_bytes:sum
+        expr: sum(container_memory_working_set_bytes{name=~"lucky-.*"})
+
+      # Recording rule: Lucky Postgres container memory alone.
+      # Baseline measure for "what we'd free if Postgres moved to a second node or cloud DB".
+      - record: lucky:postgres_mem_bytes
+        expr: max(container_memory_working_set_bytes{name="lucky-postgres"})
+
+      # Alert: Host memory pressure early-warning (escalation trigger for k8s decision review).
+      # Sustained >85% memory for 30m signals growth approaching capacity without emergency.
+      - alert: HostMemPressureEarlyWarning
+        expr: avg_over_time(host:mem_util:ratio[6h]) > 0.85
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory sustained >85% over 6h window"
+          description: "avg_over_time(host:mem_util:ratio[6h]) = {{ $value | humanizePercentage }}. Sustained high utilization is the escalation signal from ADR-0038 (k8s deferral decision review)."
+          runbook: "docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
+
+      # Alert: Lucky growth-gate review trigger (decision gate).
+      # ADR-0038's gate is ">70% sustained 30 consecutive days" — NOT expressible
+      # here: TSDB retention is 72h (see monitoring.yml), so any window >3d reads
+      # partial data. This is a within-retention 48h PROXY: when it fires, manually
+      # check the true 30d trajectory (longer-term store / Grafana) before acting.
+      - alert: LuckyGrowthGateReview
+        expr: avg_over_time(host:mem_util:ratio[48h]) > 0.70
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Lucky growth gate PROXY: 48h avg memory >70% — manually check 30d trend"
+          description: "48h average memory utilization = {{ $value | humanizePercentage }} (threshold 70%). Within-retention proxy (TSDB=72h) for the ADR-0038 gate of >70% sustained 30d. On fire, verify the real 30d trend before re-evaluating k8s vs second-node / cloud-DB scale-out. See ADR-0038 Phase 3."
+          runbook: "docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"

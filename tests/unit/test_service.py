@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Unit tests for Service and ServiceCategory dataclasses"""
 
-
 from homelab_manager.models.service import Service, ServiceCategory, ServiceRegistry
 
 

@@ -62,7 +62,7 @@ echo ""
 
 # 5. Test HTTPS access
 echo "5️⃣  Testing HTTPS access..."
-HTTPS_RESPONSE=$(curl -k -sI http://stremio.home 2>&1 | head -1)
+HTTPS_RESPONSE=$(curl -sI http://stremio.home 2>&1 | head -1)
 if echo "$HTTPS_RESPONSE" | grep -q "HTTP"; then
     echo -e "${GREEN}✅ HTTPS endpoint is accessible${NC}"
     echo "  Response: $HTTPS_RESPONSE"

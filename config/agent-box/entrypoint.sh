@@ -9,7 +9,25 @@ SECRETS_FILE=/run/secrets/agent-box.secrets.yaml
 AGE_KEY_FILE=/run/secrets/age.key
 if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
     log "Decrypting secrets..."
-    eval "$(SOPS_AGE_KEY_FILE=$AGE_KEY_FILE sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE")"
+    # Load secrets from dotenv output without eval (security hardening #338)
+    # sops dotenv emits raw KEY=VALUE (no quotes, no escaping)
+    # Use temp file to preserve sops exit code (process substitution doesn't propagate it)
+    SOPS_TEMP=$(mktemp)
+    # shellcheck disable=SC2064
+    trap "rm -f '$SOPS_TEMP'" EXIT
+    if ! SOPS_AGE_KEY_FILE="$AGE_KEY_FILE" sops --config /dev/null --output-type dotenv -d "$SECRETS_FILE" > "$SOPS_TEMP"; then
+        log "ERROR: SOPS decryption failed"
+        exit 1
+    fi
+    while IFS='=' read -r _sk _sv; do
+      # skip blank lines and sops comment lines
+      [ -z "$_sk" ] && continue
+      case "$_sk" in \#*) continue ;; esac
+      # only accept valid shell identifier keys
+      [[ "$_sk" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      # raw literal assignment (no eval, no quote stripping)
+      export "$_sk=$_sv"
+    done < "$SOPS_TEMP"
     {
         echo "export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export AGENT_DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"
@@ -21,7 +39,8 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
         echo "export LANG=en_US.UTF-8"
         echo "export LC_ALL=en_US.UTF-8"
     } > /etc/profile.d/agent-env.sh
-    chmod 644 /etc/profile.d/agent-env.sh
+    chmod 600 /etc/profile.d/agent-env.sh
+    chown agent:agent /etc/profile.d/agent-env.sh
     log "Secrets loaded."
 else
     log "WARNING: Secrets file not found."
@@ -47,7 +66,8 @@ CLAUDE_ENV_DIR="/home/agent/.claude-env"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     if [[ ! -d "$CLAUDE_ENV_DIR/.git" ]]; then
         log "Cloning claude-env..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent
+        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
+            || log "WARN: claude-env clone failed (token access or network) — continuing without it"
     else
         log "Pulling claude-env updates..."
         su -c "cd $CLAUDE_ENV_DIR && git pull --ff-only 2>&1 || true" agent
@@ -126,7 +146,8 @@ clone_repo() {
     local repo="$1" dir="$2"
     if [[ ! -d "/workspace/$dir/.git" && -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
         log "Cloning $repo..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/${repo}.git /workspace/$dir 2>&1" agent
+        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/${repo}.git /workspace/$dir 2>&1" agent \
+            || log "WARN: $repo clone failed (token access or network) — continuing without it"
     fi
 }
 clone_repo "LucasSantana-Dev/Lucky"     "Lucky"
@@ -150,6 +171,7 @@ CLASSIFY_CMD = [
     'source /etc/profile.d/agent-env.sh 2>/dev/null; exec bash /workspace/homelab/scripts/agent-tasks/hermes-wud-classify.sh'
 ]
 FALLBACK = json.dumps({'safe_to_schedule': True, 'urgency': 'low', 'reason': 'hermes unavailable'}).encode()
+MAX_BODY = 64 * 1024  # WUD payloads are ~1-2KB; cap to avoid resource exhaustion (#310)
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
@@ -165,7 +187,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
-        length = int(self.headers.get('Content-Length', 0))
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+        except (TypeError, ValueError):
+            length = -1
+        if length < 0 or length > MAX_BODY:
+            self.send_response(413)
+            self.end_headers()
+            return
         body = self.rfile.read(length)
         try:
             r = subprocess.run(CLASSIFY_CMD, input=body, capture_output=True, timeout=120)

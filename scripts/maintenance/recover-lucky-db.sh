@@ -50,24 +50,45 @@ backup_db() {
 }
 
 apply_schema() {
+    # Keep DATABASE_URL (contains the DB password) out of BOTH the host command
+    # line (`ps`/cmdline) AND the container's env metadata. `--env-file` fixed the
+    # former but the value still showed in `docker inspect` (Config.Env). Instead
+    # write the URL to a 0600 host file, mount it read-only, and read it into the
+    # command's process env at runtime (`DATABASE_URL="$(cat ...)"`) so it never
+    # lands in container metadata. `$(cat)` (no shell eval) is safe for any
+    # password chars.
+    local env_file
+    env_file=$(mktemp)
+    chmod 600 "$env_file"
+    # RETURN alone misses the failure path: under `set -e` a failing docker/prisma
+    # command exits the shell without the function returning, so also trap EXIT to
+    # guarantee the 0600 password file is removed even on error. Use ${env_file:-}
+    # so the EXIT trap is a safe no-op after normal RETURN (env_file is local and
+    # out of scope by then) instead of tripping `set -u`.
+    trap 'rm -f "${env_file:-}"' RETURN EXIT
+    printf 'postgresql://%s:%s@postgres:5432/%s\n' \
+        "$DB_USER" "$DB_PASSWORD" "$DB_NAME" > "$env_file"
+
     echo "Applying Prisma schema via db push..."
     docker run --rm \
         --network lucky_lucky-network \
         -v "$LUCKY_DIR:/app" \
         -w /app \
-        -e DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@postgres:5432/$DB_NAME" \
+        -v "$env_file":/run/db.env:ro \
         node:22-alpine \
-        sh -c 'node_modules/.bin/prisma db push --config prisma/prisma.config.ts' 2>&1
+        sh -c 'DATABASE_URL="$(cat /run/db.env)" node_modules/.bin/prisma db push --config prisma/prisma.config.ts' 2>&1
 
     echo "Baselining all existing migrations..."
     while IFS= read -r migration; do
+        # Pass $migration as a positional arg ("$1"), NOT interpolated into the
+        # sh -c string, so a migration dir name can never break out of quoting.
         docker run --rm \
             --network lucky_lucky-network \
             -v "$LUCKY_DIR:/app" \
             -w /app \
-            -e DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@postgres:5432/$DB_NAME" \
+            -v "$env_file":/run/db.env:ro \
             node:22-alpine \
-            sh -c "node_modules/.bin/prisma migrate resolve --applied $migration --config prisma/prisma.config.ts" 2>&1 | grep -v "^$"
+            sh -c 'DATABASE_URL="$(cat /run/db.env)" node_modules/.bin/prisma migrate resolve --applied "$1" --config prisma/prisma.config.ts' _ "$migration" 2>&1 | grep -v "^$"
     done < <(find "$LUCKY_DIR/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
 }
 

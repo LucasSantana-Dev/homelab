@@ -48,7 +48,7 @@ services:
     # Keep form enabled — fallback if Google is unreachable (ADR-0020)
     - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_DISABLE_LOGIN_FORM:-false}
     ports:
-    - ${BIND_IP:-0.0.0.0}:${GRAFANA_PORT:-3002}:3000
+    - ${BIND_IP:-127.0.0.1}:${GRAFANA_PORT:-3002}:3000
     networks:
     - default
     deploy:
@@ -175,8 +175,10 @@ services:
     - --storage.tsdb.path=/prometheus
     - --web.console.libraries=/etc/prometheus/console_libraries
     - --web.console.templates=/etc/prometheus/consoles
-    - --storage.tsdb.retention.time=200h
+    - --storage.tsdb.retention.time=72h
     - --web.enable-lifecycle
+    environment:
+    - GOMEMLIMIT=700MiB
     ports:
     - 127.0.0.1:${PROMETHEUS_PORT:-9091}:9090
     - ${TAILSCALE_IP}:${PROMETHEUS_PORT:-9091}:9090
@@ -300,7 +302,12 @@ services:
     networks:
     - default
     healthcheck:
-      disable: true
+      # cadvisor ships busybox wget + exposes /healthz — so the dead-man
+      # (docker-unhealthy-check.sh) can see it die, unlike distroless loki/promtail.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     mem_limit: 768M
     memswap_limit: 1536M
     deploy:
@@ -431,7 +438,9 @@ services:
     image: ${IMG_POSTGRES_15_ALPINE:-postgres:15.17-alpine}
     labels:
     - wud.watch=true
-    - 'wud.tag.include=^\d+\.\d+-alpine$$'
+    # Pinned to major 15: PostgreSQL majors aren't data-compatible, so an auto-bump
+    # to 16/17/18-alpine would corrupt healthchecks_db. Bump major deliberately + migrate.
+    - 'wud.tag.include=^15\.\d+-alpine$$'
     container_name: healthchecks-db
     restart: unless-stopped
     volumes:
@@ -441,6 +450,9 @@ services:
       - POSTGRES_USER=healthchecks
       - POSTGRES_PASSWORD=${HEALTHCHECKS_DB_PASSWORD:?HEALTHCHECKS_DB_PASSWORD must be set}
       - TZ=${TIMEZONE}
+      # postgres:18+ images default to a major-version-specific data subdir under
+      # /var/lib/postgresql; pin the flat path so the existing volume keeps working.
+      - PGDATA=/var/lib/postgresql/data
     networks:
       - default
     healthcheck:
@@ -515,7 +527,7 @@ services:
     volumes:
       - healthchecks_data:/data
     ports:
-      - ${BIND_IP:-0.0.0.0}:${HEALTHCHECKS_PORT:-8092}:8000
+      - ${BIND_IP:-127.0.0.1}:${HEALTHCHECKS_PORT:-8092}:8000
     networks:
       - default
     deploy:
@@ -523,7 +535,7 @@ services:
         limits:
           # Django + uWSGI workers + celery sit at ~93% of 256M and trip the
           # HighMemoryUsage alert; 512M gives headroom (host has ample free mem).
-          memory: 512M
+          memory: 1G
           cpus: '0.25'
         reservations:
           memory: 128M
