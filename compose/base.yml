@@ -18,6 +18,16 @@ networks:
     ipam:
       config:
         - subnet: 172.31.0.0/24
+  # M2: docker-socket-proxy filtering network (internal, no external access)
+  # Read-only docker.sock consumers (agent-box, homepage, whats-up-docker)
+  # connect here instead of mounting the socket directly. The proxy allowlists
+  # safe endpoints (CONTAINERS, IMAGES, INFO, VERSION, PING) and denies writes.
+  socketproxy:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.32.0.0/24
 
 volumes:
   portainer_data:
