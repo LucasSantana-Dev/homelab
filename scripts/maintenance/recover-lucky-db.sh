@@ -56,7 +56,12 @@ apply_schema() {
     local env_file
     env_file=$(mktemp)
     chmod 600 "$env_file"
-    trap 'rm -f "$env_file"' RETURN
+    # RETURN alone misses the failure path: under `set -e` a failing docker/prisma
+    # command exits the shell without the function returning, so also trap EXIT to
+    # guarantee the 0600 password file is removed even on error. Use ${env_file:-}
+    # so the EXIT trap is a safe no-op after normal RETURN (env_file is local and
+    # out of scope by then) instead of tripping `set -u`.
+    trap 'rm -f "${env_file:-}"' RETURN EXIT
     printf 'DATABASE_URL=postgresql://%s:%s@postgres:5432/%s\n' \
         "$DB_USER" "$DB_PASSWORD" "$DB_NAME" > "$env_file"
 
