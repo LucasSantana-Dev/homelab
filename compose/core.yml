@@ -14,6 +14,12 @@ services:
     - wud.watch.digest=false
     container_name: cloudflared
     restart: unless-stopped
+    # Hardening: cloudflared is stateless (no bind/named volumes, logs go to the
+    # json-file driver, not the rootfs), so lock the root filesystem read-only and
+    # give it a small tmpfs for any scratch. Limits post-compromise persistence.
+    read_only: true
+    tmpfs:
+    - /tmp
     command:
     - tunnel
     - --no-autoupdate

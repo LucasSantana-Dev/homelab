@@ -50,7 +50,12 @@ services:
       - ../config/agent-box/CLAUDE.md:/opt/agent-config/CLAUDE.md:ro
       - ../secrets/agent-box.secrets.yaml.age:/run/secrets/agent-box.secrets.yaml:ro
       - /home/luk-server/.config/sops/age/keys.txt:/run/secrets/age.key:ro
-      # Docker socket mounted read-only — agent-box reads container state but must not control the daemon (H1 hardening).
+      # WARNING: `:ro` only makes the socket FILE read-only — it does NOT restrict
+      # the Docker API. A compromised agent-box can still POST /containers/create,
+      # exec, and mount the host root => full host takeover. The real fix is a
+      # filtering docker-socket-proxy (read-only endpoint allowlist); tracked
+      # separately. Highest-priority consumer to migrate since this box runs
+      # autonomous agents.
       - /var/run/docker.sock:/var/run/docker.sock:ro
     deploy:
       resources:
