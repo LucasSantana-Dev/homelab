@@ -18,7 +18,7 @@ services:
     - TZ=${TIMEZONE}
     - PYTHONUSERBASE=/config/deps
     ports:
-    - ${BIND_IP:-0.0.0.0}:${HOMEASSISTANT_PORT:-8123}:8123
+    - ${BIND_IP:-127.0.0.1}:${HOMEASSISTANT_PORT:-8123}:8123
     networks:
     - default
     deploy:

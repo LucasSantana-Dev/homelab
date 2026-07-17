@@ -20,6 +20,13 @@ jobs:
     # Runs on the homelab self-hosted runner (luk-server).
     # Label set during runner registration: ./config.sh --labels homelab
     runs-on: [self-hosted, homelab]
+    # SECURITY: this job runs on a self-hosted runner on a PUBLIC repo and checks
+    # out the PR merge ref, so a fork PR could otherwise run attacker-modified
+    # code on the homelab host. Only run for same-repo (internal) PRs and manual
+    # dispatch; never for forks.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 10
     # Only one review per PR at a time
     concurrency:

@@ -16,7 +16,7 @@ echo ""
 
 echo "2️⃣  Testing HTTPS via domain:"
 echo "   http://stremio.home"
-curl -k -sI http://stremio.home/ 2>&1 | head -5
+curl -sI http://stremio.home/ 2>&1 | head -5
 echo ""
 
 echo "3️⃣  Testing direct container access:"
@@ -24,7 +24,7 @@ docker exec stremio-server curl -sI http://localhost:11470/ 2>&1 | head -5
 echo ""
 
 echo "4️⃣  Testing EngineFS endpoint:"
-curl -k -s http://stremio.home/stremio/v1 2>&1 | head -10
+curl -s http://stremio.home/stremio/v1 2>&1 | head -10
 echo ""
 
 echo "5️⃣  Checking recent Stremio server logs:"

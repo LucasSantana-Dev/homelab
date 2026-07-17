@@ -48,7 +48,7 @@ services:
     # Keep form enabled — fallback if Google is unreachable (ADR-0020)
     - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_DISABLE_LOGIN_FORM:-false}
     ports:
-    - ${BIND_IP:-0.0.0.0}:${GRAFANA_PORT:-3002}:3000
+    - ${BIND_IP:-127.0.0.1}:${GRAFANA_PORT:-3002}:3000
     networks:
     - default
     deploy:
@@ -527,7 +527,7 @@ services:
     volumes:
       - healthchecks_data:/data
     ports:
-      - ${BIND_IP:-0.0.0.0}:${HEALTHCHECKS_PORT:-8092}:8000
+      - ${BIND_IP:-127.0.0.1}:${HEALTHCHECKS_PORT:-8092}:8000
     networks:
       - default
     deploy:
