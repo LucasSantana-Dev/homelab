@@ -1,9 +1,11 @@
 # CoJam deploy runbook
 
 CoJam's Go server + its own Postgres, added as `compose/cojam.yml`. The server
-persists room state (queue, now-playing, radio) and exposes an API + WebSocket
-backend behind Caddy at `cojam-api.${DOMAIN}` (and `cojam-api.home` on the LAN).
-The Next.js web frontend is deployed separately.
+persists room state (queue, now-playing, radio). Three services: `cojam-db`
+(Postgres), `cojam-server` (Go API + WebSocket at `cojam-api.${DOMAIN}` /
+`cojam-api.home`), and `cojam-web` (the Next.js frontend at `cojam.${DOMAIN}` /
+`cojam.home`). The web image is environment-agnostic; it reads the WebSocket URL
+at runtime from `COJAM_WS_URL` (set in compose to `wss://cojam-api.${DOMAIN}/...`).
 
 ## Prerequisites
 
@@ -50,7 +52,11 @@ change on the host first so the tracked files are clean. It then runs
 
 ```bash
 # containers up and healthy
-docker compose ps cojam-db cojam-server
+docker compose ps cojam-db cojam-server cojam-web
+
+# web serves and points at the API (runtime config, not baked)
+curl -s http://127.0.0.1:8092/env.js       # window.__COJAM_ENV__ = {"wsUrl":"wss://cojam-api...."}
+curl -sI http://cojam.home/ | head -1      # 200 via Caddy
 
 # server reports persistence enabled + migration applied
 docker compose logs cojam-server | grep -E "persistence_enabled|Starting server"

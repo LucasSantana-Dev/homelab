@@ -85,3 +85,41 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  cojam-web:
+    image: ${IMG_COJAM_WEB:-ghcr.io/lucassantana-dev/cojam-web:latest}
+    labels:
+      - wud.watch=true
+    container_name: cojam-web
+    restart: unless-stopped
+    environment:
+      # Runtime config (the image is environment-agnostic; served via /env.js).
+      # ${DOMAIN} keeps the literal host out of the repo (public-safety gate).
+      COJAM_WS_URL: wss://cojam-api.${DOMAIN}/connection/websocket
+      COJAM_SPOTIFY_CLIENT_ID: ${COJAM_SPOTIFY_CLIENT_ID:-}
+      TZ: ${TIMEZONE:-UTC}
+    ports:
+      - "${BIND_IP:-127.0.0.1}:8092:3000"
+    networks:
+      - frontend
+    depends_on:
+      - cojam-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
