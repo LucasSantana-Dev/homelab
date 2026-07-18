@@ -32,6 +32,26 @@ http://lucky.home {
 	reverse_proxy 127.0.0.1:8090
 }
 
+# CoJam API + WebSocket backend (cojam-server on :8091).
+# No `import protected`: browser WebSocket clients cannot pass the Tinyauth
+# forward-auth, and the room API is meant to be openly reachable.
+http://cojam-api.luk-homeserver.com.br {
+	reverse_proxy 127.0.0.1:8091
+}
+
+http://cojam-api.home {
+	reverse_proxy 127.0.0.1:8091
+}
+
+# CoJam web frontend (cojam-web on :8092). Public app, no auth gate.
+http://cojam.luk-homeserver.com.br {
+	reverse_proxy 127.0.0.1:8092
+}
+
+http://cojam.home {
+	reverse_proxy 127.0.0.1:8092
+}
+
 http://registry.home {
 	reverse_proxy 127.0.0.1:5000
 }
