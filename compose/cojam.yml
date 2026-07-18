@@ -15,7 +15,7 @@ services:
     environment:
       POSTGRES_DB: cojam
       POSTGRES_USER: cojam
-      POSTGRES_PASSWORD: ${COJAM_DB_PASSWORD?COJAM_DB_PASSWORD_required}
+      POSTGRES_PASSWORD: ${COJAM_DB_PASSWORD}
       PGDATA: /var/lib/postgresql/data
       TZ: ${TIMEZONE:-UTC}
     volumes:
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
     environment:
       # Runtime pool uses the local Postgres; migrations run on boot.
-      DATABASE_URL: postgres://cojam:${COJAM_DB_PASSWORD?COJAM_DB_PASSWORD_required}@cojam-db:5432/cojam
+      DATABASE_URL: postgres://cojam:${COJAM_DB_PASSWORD}@cojam-db:5432/cojam
       # Origins allowed to connect (the separately-deployed web frontend). Set
       # COJAM_CORS_ORIGINS in .env to the web origin; empty falls back to
       # localhost dev origins in the server.
