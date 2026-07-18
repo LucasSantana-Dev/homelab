@@ -91,8 +91,12 @@ DURATION=$((END_TS - START_TS))
 STATE_DIR="/home/luk-server/agent-logs"
 PROM_DIR="/var/lib/node_exporter/textfile"
 
-# Prometheus textfile metrics
-if [ -d "$PROM_DIR" ]; then
+# Prometheus textfile metrics (best-effort telemetry). Guard on writability, not
+# just existence: the collector dir can exist but be unwritable by the runner
+# user, which made the `9>lock` redirect fail with "Permission denied" and — under
+# `set -e` — failed the whole review job AFTER the review had already posted (#382).
+# A non-writable dir is now a logged skip, never a job failure.
+if [ -d "$PROM_DIR" ] && [ -w "$PROM_DIR" ]; then
     # Hold the lock across the ENTIRE read-modify-write — the previous version
     # only locked the read, so concurrent reviews could both read N and write
     # N+1, losing an increment (#310). fd 9 keeps the lock for the subshell.
@@ -119,6 +123,8 @@ PROM
         mv "$PROM_DIR/hermes.prom.tmp" "$PROM_DIR/hermes.prom"
     ) 9>"$PROM_DIR/hermes.prom.lock"
     log "Prometheus metrics written to $PROM_DIR/hermes.prom"
+else
+    log "Skipping Prometheus metrics: $PROM_DIR missing or not writable by $(id -un) (#382)"
 fi
 
 # JSON state for homelab-manager /hermes endpoint

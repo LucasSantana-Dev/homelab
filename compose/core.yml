@@ -1,19 +1,73 @@
 services:
-  # nginx-proxy service removed: Caddy + Cloudflared own all ingress now.
-  # PR #78 deleted config/nginx/ but accidentally left this service block,
-  # which referenced 5 non-existent bind mounts and broke fresh deploys.
-  # Closes audit-deep v2 C2.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    # read_only rootfs (set below) needs writable tmpfs: the HAProxy entrypoint
+    # generates /tmp/haproxy.cfg at startup and writes its pidfile/socket to /run.
+    # Without these the container crash-loops on "Read-only file system".
+    tmpfs:
+      - /tmp
+      - /run
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      INFO: 1
+      VERSION: 1
+      PING: 1
+      POST: 0
+      GET: 0
+      PUT: 0
+      DELETE: 0
+      PATCH: 0
+      HEAD: 0
+      OPTIONS: 0
+      VOLUMES: 0
+      EXEC: 0
+      NETWORKS: 0
+      SERVICES: 0
+      TASKS: 0
+      SECRETS: 0
+      CONFIGS: 0
+      PLUGINS: 0
+      SWARM: 0
+      NODES: 0
+      DISTRIBUTION: 0
+      GRPC: 0
+      LIBPOD: 0
+      STREAM: 0
+      SESSION: 0
+      BUILDING: 0
+      BUILD: 0
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    networks:
+    - socketproxy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+        reservations:
+          memory: 32M
+          cpus: '0.05'
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '3'
   cloudflared:
     image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:2025.4.0}
     labels:
     - wud.watch=true
-    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
-    # Host runs the mutable `latest` tag; without this WUD reports an endless
-    # "latest -> latest" digest update. Watch tags only (the semver include
-    # above), not the digest.
+    - wud.tag.include=^\d+\.\d+\.\d+$$
     - wud.watch.digest=false
     container_name: cloudflared
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+    - /tmp
     command:
     - tunnel
     - --no-autoupdate
@@ -42,28 +96,19 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      # Disabled by necessity (#211): the cloudflare/cloudflared image is
-      # distroless — no shell/wget/curl — so no in-container CMD probe is
-      # possible. Liveness is observable externally via the metrics /ready
-      # endpoint (127.0.0.1:2000/ready) and the Cloudflare tunnel dashboard.
       disable: true
   homepage:
     image: ${IMG_HOMEPAGE:-ghcr.io/gethomepage/homepage:v1.13.2}
     labels:
     - wud.watch=true
-    - 'wud.tag.include=^v\d+\.\d+\.\d+$$'
+    - wud.tag.include=^v\d+\.\d+\.\d+$$
     container_name: homepage
     restart: unless-stopped
     volumes:
     - ../config/homepage:/app/config
     - ../config/homepage/icons:/app/public/icons:ro
-    - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
     - PUID=${PUID}
-    # PGID must be 983 (host docker group GID) so that su-exec runs next-server
-    # with GID 983, granting read access to /var/run/docker.sock (srw-rw---- root:docker).
-    # group_add alone is insufficient — it adds to PID 1 (root) but su-exec resets
-    # supplemental groups when dropping to the node user.
     - PGID=983
     - TZ=${TIMEZONE}
     - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
@@ -79,6 +124,7 @@ services:
     - ${BIND_IP:-127.0.0.1}:${HOMEPAGE_PORT:-3000}:3000
     networks:
     - default
+    - socketproxy
     extra_hosts:
     - host.docker.internal:host-gateway
     deploy:
@@ -95,9 +141,6 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      # homepage (node/alpine) ships wget, not curl. Also "localhost" resolves to
-      # ::1 (IPv6) but the app binds IPv4 only → must use 127.0.0.1. The old curl
-      # probe failed on both counts → perpetual "unhealthy".
       test:
       - CMD
       - wget
@@ -111,13 +154,10 @@ services:
     image: ${IMG_PORTAINER:-portainer/portainer-ce:2.42.0}
     labels:
     - wud.watch=true
-    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
+    - wud.tag.include=^\d+\.\d+\.\d+$$
     container_name: portainer
     restart: unless-stopped
     volumes:
-    # Read-WRITE docker.sock is REQUIRED — Portainer manages containers
-    # (create/start/stop/remove/deploy); `:ro` would break it. Accepted risk
-    # (Tailscale-only, solo operator); socket-proxy is theater here. See ADR-0017.
     - /var/run/docker.sock:/var/run/docker.sock
     - portainer_data:/data
     ports:
@@ -138,53 +178,34 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      # portainer-ce is a scratch image (no shell, no curl/wget) — no
-      # in-container probe is possible. The old curl probe could never exec →
-      # perpetual "unhealthy". Disabled here; probe the UI port externally via
-      # blackbox-exporter instead (TODO: add the target). Also: container only
-      # publishes :9000, so the old :9443 target was wrong regardless.
       disable: true
   whats-up-docker:
     image: ${IMG_WUD:-fmartinou/whats-up-docker:6.6.1}
     labels:
     - wud.watch=true
-    - 'wud.tag.include=^\d+\.\d+\.\d+$$'
+    - wud.tag.include=^\d+\.\d+\.\d+$$
     container_name: whats-up-docker
     restart: unless-stopped
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
     - whats_up_docker_data:/app/data
     environment:
-    # Opt-in watching: only containers labelled `wud.watch=true` are monitored.
-    # Without this, WUD watches ALL containers on the host (incl. external Lucky/
-    # nextcloud/registry stacks) with loose tag matching, producing ~24 false-
-    # positive "updates" (Windows images, 32-bit RCs, dev/branch tags). Each
-    # watched service additionally pins `wud.tag.include` to its real tag scheme.
     - WUD_WATCHER_LOCAL_WATCHBYDEFAULT=false
     - WUD_UPDATER_DOCKER_HUB_TOKEN=${DOCKER_HUB_TOKEN:-}
     - WUD_UPDATER_GITHUB_TOKEN=${GITHUB_TOKEN:-}
-    # WUD reads triggers as WUD_TRIGGER_{TYPE}_{name}_{prop}. The bare
-    # WUD_DISCORD_WEBHOOK_URL was ignored, so Discord update notifications never
-    # fired (#298). Register a Discord trigger named "local". Empty URL = inactive.
     - WUD_TRIGGER_DISCORD_local_URL=${WUD_DISCORD_WEBHOOK_URL:-}
-    # Hermes Phase 4: route WUD updates through n8n ops-digest webhook so hermes
-    # can classify each update before it reaches Discord. Empty = inactive.
-    # WUD's generic webhook trigger TYPE is "HTTP" (there is no "WEBHOOK" type),
-    # so the var must be WUD_TRIGGER_HTTP_{name}_URL — otherwise it is silently
-    # ignored and updates never reach n8n (same failure mode as #298).
     - WUD_TRIGGER_HTTP_digest_URL=${WUD_N8N_WEBHOOK_URL:-}
-    # NOTE: the WUD_SMTP_* vars below are likewise NOT recognized by WUD (it wants
-    # WUD_TRIGGER_SMTP_local_HOST/PORT/USER/PASS/FROM/TO). Left as-is — unused
-    # (empty in .env) and incomplete (no FROM/TO); fix if email triggers are wanted.
     - WUD_SMTP_HOST=${WUD_SMTP_HOST}
     - WUD_SMTP_PORT=${WUD_SMTP_PORT}
     - WUD_SMTP_USER=${WUD_SMTP_USER}
     - WUD_SMTP_PASS=${WUD_SMTP_PASS}
+    - WUD_WATCHER_LOCAL_HOST=docker-socket-proxy
+    - WUD_WATCHER_LOCAL_PORT=2375
     ports:
     - 127.0.0.1:${WUD_PORT:-3003}:3000
     - ${TAILSCALE_IP}:${WUD_PORT:-3003}:3000
     networks:
     - default
+    - socketproxy
     deploy:
       resources:
         limits:
@@ -199,8 +220,6 @@ services:
         max-size: 10m
         max-file: '3'
     healthcheck:
-      # whats-up-docker (node/alpine) ships wget, not curl. The old curl probe
-      # could never exec → perpetual "unhealthy".
       test:
       - CMD
       - wget
@@ -225,10 +244,12 @@ services:
     networks:
     - default
     healthcheck:
-      # No curl/wget in the image, but python3 is the base — use urllib. /health
-      # returns 200 when the server is up, so the dead-man can see it die.
-      # 127.0.0.1 (not localhost): app binds IPv4 only; localhost hits ::1 first → refused → IPv4 retry latency.
-      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=8).status==200 else 1)"]
+      test:
+      - CMD
+      - python3
+      - -c
+      - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/health',
+        timeout=8).status==200 else 1)
       interval: 30s
       timeout: 10s
       retries: 3

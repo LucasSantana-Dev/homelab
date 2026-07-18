@@ -26,6 +26,7 @@ include:
   - path: compose/monitoring.yml
   - path: compose/media.yml
   - path: compose/apps.yml
+  - path: compose/cojam.yml
   - path: compose/security.yml
   - path: compose/automation.yml
   - path: compose/auth.yml
