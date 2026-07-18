@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-07-18
+
+Release cut of the `release` branch (141 commits since v2.12.1). No breaking changes.
+
+### Added
+
+- **CoJam full stack** (Postgres + Go server + Next.js web) as `compose/cojam.yml`, served publicly on a single subdomain `cojam.lucassantana.tech` (Caddy path-routes `/connection` + `/api` to the server, everything else to the web). Own `COJAM_DOMAIN` override so it does not move other services off the shared domain.
+- **Resilience dead-man switches**: container-health dead-man (catches crash-loops), generalized job-liveness dead-man, and inode + OOM alerts with cadvisor/homelab-manager healthchecks.
+- **Hermes automation** (Phases 2–4): PR review automation + runner + homepage widget + metrics, weekly memory sync, and WUD update contextualization.
+- **Monitoring**: n8n ops-digest workflow and Healthchecks dead-man-switch (ADR-0025/0026); WUD updates routed through the ops-digest webhook.
+- Optional `profiles` for paperless + Home Assistant so `make deploy` no longer restarts manually-stopped containers (ADR-0040).
+
+### Changed
+
+- Dependency updates (10) and assorted chores/CI hardening.
+
+### Fixed
+
+- 52 fixes across the stack, including deploy false-gates, port and healthcheck corrections, and review-finding remediations.
+
+### Security
+
+- Routed docker.sock consumers through a read-only socket-proxy; hardened the self-hosted CI runner, bind defaults, and scripts.
+
 ## [2.12.1] - 2026-07-09
 
 ### Fixed
