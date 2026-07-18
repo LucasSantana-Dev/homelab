@@ -102,7 +102,7 @@ services:
       COJAM_SPOTIFY_CLIENT_ID: ${COJAM_SPOTIFY_CLIENT_ID:-}
       TZ: ${TIMEZONE:-UTC}
     ports:
-      - "${BIND_IP:-127.0.0.1}:8092:3000"
+      - "${BIND_IP:-127.0.0.1}:8096:3000"
     networks:
       - frontend
     depends_on:
