@@ -94,8 +94,11 @@ services:
     restart: unless-stopped
     environment:
       # Runtime config (the image is environment-agnostic; served via /env.js).
-      # ${DOMAIN} keeps the literal host out of the repo (public-safety gate).
-      COJAM_WS_URL: wss://cojam-api.${DOMAIN}/connection/websocket
+      # Single-subdomain: the WS lives under /connection on the same host as the
+      # web app; Caddy path-routes /connection/* to the Go server. COJAM_DOMAIN
+      # lets cojam use its own domain (lucassantana.tech) without moving other
+      # services off the shared ${DOMAIN}; it falls back to ${DOMAIN} if unset.
+      COJAM_WS_URL: wss://cojam.${COJAM_DOMAIN:-${DOMAIN}}/connection/websocket
       COJAM_SPOTIFY_CLIENT_ID: ${COJAM_SPOTIFY_CLIENT_ID:-}
       TZ: ${TIMEZONE:-UTC}
     ports:

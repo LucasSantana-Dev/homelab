@@ -2,10 +2,20 @@
 
 CoJam's Go server + its own Postgres, added as `compose/cojam.yml`. The server
 persists room state (queue, now-playing, radio). Three services: `cojam-db`
-(Postgres), `cojam-server` (Go API + WebSocket at `cojam-api.${DOMAIN}` /
-`cojam-api.home`), and `cojam-web` (the Next.js frontend at `cojam.${DOMAIN}` /
-`cojam.home`). The web image is environment-agnostic; it reads the WebSocket URL
-at runtime from `COJAM_WS_URL` (set in compose to `wss://cojam-api.${DOMAIN}/...`).
+(Postgres), `cojam-server` (Go API + WebSocket on `:8091`), and `cojam-web`
+(the Next.js frontend on `:8092`).
+
+**Public domain: a single subdomain `cojam.${COJAM_DOMAIN}`** (e.g.
+`cojam.lucassantana.tech`). Caddy path-routes on that one host: `/connection/*`
+(the centrifuge WebSocket) and `/api/*` (connection-token + apple dev-token) go
+to the Go server; everything else (the Next app, `/env.js`, `/callback`,
+`/room`) goes to the web frontend. The web app defines no `/api/*` routes, so the
+split is collision-free. `COJAM_DOMAIN` lets CoJam use its own domain without
+moving other homelab services off the shared `${DOMAIN}`; it falls back to
+`${DOMAIN}` when unset. The web image is environment-agnostic and reads the
+WebSocket URL at runtime from `COJAM_WS_URL`
+(`wss://cojam.${COJAM_DOMAIN}/connection/websocket`). LAN access keeps the
+two-subdomain split (`cojam.home` / `cojam-api.home`) for local testing.
 
 ## Prerequisites
 
@@ -23,12 +33,34 @@ at runtime from `COJAM_WS_URL` (set in compose to `wss://cojam-api.${DOMAIN}/...
    echo "COJAM_DB_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-   Optional overrides (defaults shown):
+   Domain + origin (set for the lucassantana.tech cutover):
 
    ```bash
-   # COJAM_CORS_ORIGINS=https://cojam.<your-domain>   # the web frontend origin
-   # IMG_COJAM_SERVER=ghcr.io/lucassantana-dev/cojam-server:latest
+   # cojam's own public domain (falls back to ${DOMAIN} if unset)
+   echo "COJAM_DOMAIN=lucassantana.tech" >> .env
+   # the browser origin allowed to open the WebSocket (same host now)
+   echo "COJAM_CORS_ORIGINS=https://cojam.lucassantana.tech" >> .env
+   # IMG_COJAM_SERVER=ghcr.io/lucassantana-dev/cojam-server:latest   # (default)
    ```
+
+## Cloudflare (operator, one-time): expose cojam.lucassantana.tech
+
+The homelab is reached through the Cloudflare Tunnel, so cojam needs one public
+hostname on the tunnel (Cloudflare auto-creates the DNS record):
+
+1. Cloudflare Zero Trust -> Networks -> Tunnels -> the homelab tunnel -> Public
+   Hostnames -> Add a public hostname:
+   - Subdomain `cojam`, domain `lucassantana.tech`
+   - Service: the internal Caddy that serves this Caddyfile (the same
+     `http://<caddy-lan>` target the other public hostnames use).
+2. That entry auto-creates a proxied `CNAME cojam -> <tunnel-id>.cfargotunnel.com`
+   in the `lucassantana.tech` DNS. No manual A record (per the tunnel doc, do not
+   also publish a direct A record for tunnelled hostnames).
+3. Because it is a single subdomain, no `cojam-api` hostname is needed - the WS
+   and API travel under `/connection` and `/api` on `cojam.lucassantana.tech`.
+
+If Spotify is later enabled (`FEATURE_SPOTIFY`), register the redirect URI
+`https://cojam.lucassantana.tech/callback/spotify` in the Spotify app.
 
 2. Encrypt and verify the secret, then commit the encrypted file:
 
@@ -55,8 +87,12 @@ change on the host first so the tracked files are clean. It then runs
 docker compose ps cojam-db cojam-server cojam-web
 
 # web serves and points at the API (runtime config, not baked)
-curl -s http://127.0.0.1:8092/env.js       # window.__COJAM_ENV__ = {"wsUrl":"wss://cojam-api...."}
-curl -sI http://cojam.home/ | head -1      # 200 via Caddy
+curl -s http://127.0.0.1:8092/env.js       # {"wsUrl":"wss://cojam.lucassantana.tech/connection/websocket"}
+curl -sI http://cojam.home/ | head -1      # 200 via Caddy (LAN)
+
+# public: single subdomain path-routes correctly through the tunnel + Caddy
+curl -sI https://cojam.lucassantana.tech/ | head -1                      # 200 (web)
+curl -s  https://cojam.lucassantana.tech/api/connection-token | head -c 60 # 501 when FEATURE_ROOM_AUTH off, else a token (server, proves /api -> :8091)
 
 # server reports persistence enabled + migration applied
 docker compose logs cojam-server | grep -E "persistence_enabled|Starting server"
