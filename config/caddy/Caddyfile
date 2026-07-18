@@ -34,7 +34,7 @@ http://lucky.home {
 
 # CoJam public app on cojam.lucassantana.tech (single subdomain, path-routed).
 # /connection/* (centrifuge WebSocket) and /api/* (connection-token + apple
-# dev-token) go to the Go server on :8091; everything else (Next app, /env.js,
+# dev-token) go to the Go server on :8094; everything else (Next app, /env.js,
 # /callback, /room) goes to the web frontend on :8092. The web app defines no
 # /api/* routes, so this split is collision-free. No `import protected`: browser
 # WebSocket clients cannot pass the Tinyauth forward-auth and the room app is
@@ -42,7 +42,7 @@ http://lucky.home {
 http://cojam.lucassantana.tech {
 	@backend path /connection/* /api/*
 	handle @backend {
-		reverse_proxy 127.0.0.1:8091
+		reverse_proxy 127.0.0.1:8094
 	}
 	handle {
 		reverse_proxy 127.0.0.1:8092
@@ -51,7 +51,7 @@ http://cojam.lucassantana.tech {
 
 # LAN access (*.home) keeps the two-subdomain split for local testing.
 http://cojam-api.home {
-	reverse_proxy 127.0.0.1:8091
+	reverse_proxy 127.0.0.1:8094
 }
 
 http://cojam.home {

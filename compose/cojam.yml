@@ -58,7 +58,7 @@ services:
       TZ: ${TIMEZONE:-UTC}
     ports:
       # Caddy (host network) reverse-proxies to this local port.
-      - "${BIND_IP:-127.0.0.1}:8091:8080"
+      - "${BIND_IP:-127.0.0.1}:8094:8080"
     networks:
       - frontend
       - database
