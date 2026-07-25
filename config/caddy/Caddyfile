@@ -50,6 +50,27 @@ http://cojam.lucassantana.tech {
 }
 
 # LAN access (*.home) keeps the two-subdomain split for local testing.
+# GitHub Stats Extended — reached only by the profile repo's card workflow.
+# The upstream app has no auth of its own and our PAT can read private repos,
+# so anything without the shared key is refused here rather than at the app.
+# The key rides inside the Cloudflare tunnel, so Cloudflare terminates the TLS
+# it travels under; that is the same trust boundary every other public service
+# on this host already accepts.
+http://stats.luk-homeserver.com.br {
+	@authorized header X-Stats-Key {$GITHUB_STATS_KEY}
+	handle @authorized {
+		reverse_proxy 127.0.0.1:8097
+	}
+	handle {
+		respond "forbidden" 403
+	}
+}
+
+# LAN access needs no key: reaching *.home already means being on the network.
+http://stats.home {
+	reverse_proxy 127.0.0.1:8097
+}
+
 http://cojam-api.home {
 	reverse_proxy 127.0.0.1:8094
 }
