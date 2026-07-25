@@ -18,6 +18,7 @@
 #   - auth.yml:        Tinyauth OAuth middleware
 #   - agent-box.yml:  Claude Code agent-box
 #   - backup.yml:     Kopia (encrypted snapshot backups → S3-compatible offsite)
+#   - stats.yml:      GitHub Stats Extended (self-hosted README stats cards)
 
 include:
   - path: compose/base.yml
@@ -27,6 +28,7 @@ include:
   - path: compose/media.yml
   - path: compose/apps.yml
   - path: compose/cojam.yml
+  - path: compose/stats.yml
   - path: compose/security.yml
   - path: compose/automation.yml
   - path: compose/auth.yml
