@@ -56,7 +56,12 @@ http://cojam.lucassantana.tech {
 # The key rides inside the Cloudflare tunnel, so Cloudflare terminates the TLS
 # it travels under; that is the same trust boundary every other public service
 # on this host already accepts.
-http://stats.luk-homeserver.com.br {
+#
+# On lucassantana.tech rather than the shared domain, same as cojam: that zone
+# is the one our cloudflared cert can write DNS for. Pointing it at the other
+# domain made `cloudflared tunnel route dns` silently create the literal name
+# as a label inside this zone instead.
+http://stats.lucassantana.tech {
 	@authorized header X-Stats-Key {$GITHUB_STATS_KEY}
 	handle @authorized {
 		reverse_proxy 127.0.0.1:8097
