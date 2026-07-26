@@ -55,6 +55,13 @@ services:
       # COJAM_CORS_ORIGINS in .env to the web origin; empty falls back to
       # localhost dev origins in the server.
       CORS_ORIGINS: ${COJAM_CORS_ORIGINS:-}
+      # Anonymous room identity tokens (proof-of-ownership reissue). Secret is
+      # host-only in .env; required when the feature is on.
+      FEATURE_ROOM_AUTH: "true"
+      ROOM_AUTH_SECRET: ${COJAM_ROOM_AUTH_SECRET:?set COJAM_ROOM_AUTH_SECRET in .env}
+      # Supabase account tokens (JWKS validation against the project).
+      FEATURE_SUPABASE_AUTH: "true"
+      SUPABASE_URL: ${COJAM_SUPABASE_URL:?set COJAM_SUPABASE_URL in .env}
       TZ: ${TIMEZONE:-UTC}
     ports:
       # Caddy (host network) reverse-proxies to this local port.
@@ -101,6 +108,10 @@ services:
       COJAM_WS_URL: wss://cojam.${COJAM_DOMAIN:-${DOMAIN}}/connection/websocket
       COJAM_SPOTIFY_CLIENT_ID: ${COJAM_SPOTIFY_CLIENT_ID:-}
       COJAM_FEATURE_SPOTIFY: ${COJAM_FEATURE_SPOTIFY:-}
+      # Room auth + Supabase accounts, served to the client via /env.js.
+      COJAM_FEATURE_ROOM_AUTH: ${COJAM_FEATURE_ROOM_AUTH:-}
+      COJAM_SUPABASE_URL: ${COJAM_SUPABASE_URL:?set COJAM_SUPABASE_URL in .env}
+      COJAM_SUPABASE_ANON_KEY: ${COJAM_SUPABASE_ANON_KEY:?set COJAM_SUPABASE_ANON_KEY in .env}
       TZ: ${TIMEZONE:-UTC}
     ports:
       - "${BIND_IP:-127.0.0.1}:8096:3000"
