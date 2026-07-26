@@ -113,10 +113,10 @@ ingress:
 
   # Reached only by the profile repo's card workflow; Caddy refuses requests
   # that do not carry the matching X-Stats-Key header.
-  - hostname: stats.luk-homeserver.com.br
+  - hostname: stats.lucassantana.tech
     service: http://host.docker.internal:80
     originRequest:
-      httpHostHeader: stats.luk-homeserver.com.br
+      httpHostHeader: stats.lucassantana.tech
 
   # Final catch-all — cloudflared returns 404 for any hostname not listed above.
   - service: http_status:404
