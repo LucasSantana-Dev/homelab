@@ -632,7 +632,11 @@ sops-encrypt: ## Encrypt .env -> .env.enc (commit .env.enc; .env stays gitignore
 	@command -v sops >/dev/null 2>&1 || { echo "sops not installed: brew install sops age"; exit 1; }
 	@[ -n "$(SOPS_AGE_PUB)" ] || { echo "Set a real age public key in .sops.yaml first (docs/secrets.md §Activation)"; exit 1; }
 	@[ -f .env ] || { echo ".env not found"; exit 1; }
-	sops --encrypt --age '$(SOPS_AGE_PUB)' --input-type dotenv --output-type dotenv .env > .env.enc
+	# --filename-override: sops matches creation_rules against the INPUT path,
+	# which is `.env`, but .sops.yaml only has a rule for `^\.env\.enc$` — the
+	# output name. Without this the encrypt dies on "no matching creation rules
+	# found". Verified on sops 3.9.4: exit 1 without the flag, exit 0 with it.
+	sops --encrypt --age '$(SOPS_AGE_PUB)' --input-type dotenv --output-type dotenv --filename-override .env.enc .env > .env.enc
 	@echo "Wrote .env.enc — run 'make sops-verify', then commit .env.enc."
 
 sops-decrypt: ## Decrypt .env.enc -> .env (needs SOPS_AGE_KEY_FILE; run on host before deploy)
