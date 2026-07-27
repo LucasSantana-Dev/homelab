@@ -76,6 +76,28 @@ http://stats.home {
 	reverse_proxy 127.0.0.1:8097
 }
 
+# Knowledge-brain MCP server, consumed by claude.ai custom connectors.
+# On lucassantana.tech for the same reason as stats/cojam above (that is the
+# zone our cloudflared cert can write DNS for).
+#
+# No `import protected` by design: claude.ai's connector is a server-to-server
+# client that cannot complete a tinyauth browser login. The gate is instead a
+# shared token checked inside the app, accepted either as an Authorization
+# bearer or as the first path segment (/<token>/mcp) - the path form is what
+# works while Claude's request-header auth is still a gated beta. Do not add a
+# Caddy-level header check: it would break the capability-URL form.
+#
+# No auth is enforced here on purpose, so keep this hostname off any wildcard
+# that would expose other backends.
+http://brain.lucassantana.tech {
+	reverse_proxy 127.0.0.1:8098
+}
+
+# LAN access for testing without the public hop (token still required).
+http://brain.home {
+	reverse_proxy 127.0.0.1:8098
+}
+
 http://cojam-api.home {
 	reverse_proxy 127.0.0.1:8094
 }

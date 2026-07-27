@@ -14,6 +14,7 @@
         serena-mcp-setup k3s-registry-mirror \
         secret-gate secret-gate-history public-safety-gate public-release-checkpoint rewrite-history \
         forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup \
+        brain-mcp-up brain-mcp-down brain-mcp-logs brain-mcp-status \
         sops-status sops-encrypt sops-decrypt sops-verify sops-edit
 
 # Default target
@@ -71,6 +72,23 @@ forge-space-status: ## Show Forge Space MCP Gateway status
 
 forge-space-mcp-setup: ## Register Forge Space MCP client in Codex (requires FORGE_MCP_SERVER_URL and FORGE_MCP_JWT)
 	@./scripts/deployment/setup-forge-space-mcp.sh
+
+brain-mcp-up: ## Deploy the knowledge-brain MCP server (build context must be synced first)
+	@echo "🧠 Starting knowledge-brain MCP..."
+	@docker compose --profile brain-mcp up -d --build brain-mcp
+	@echo "✅ brain-mcp started (readiness takes ~60s: make brain-mcp-status)"
+
+brain-mcp-down: ## Stop the knowledge-brain MCP server
+	@echo "🛑 Stopping knowledge-brain MCP..."
+	@docker compose --profile brain-mcp stop brain-mcp
+	@echo "✅ brain-mcp stopped"
+
+brain-mcp-logs: ## Tail knowledge-brain MCP logs
+	@docker compose --profile brain-mcp logs -f --tail=100 brain-mcp
+
+brain-mcp-status: ## Show knowledge-brain MCP status and readiness
+	@docker compose --profile brain-mcp ps brain-mcp
+	@printf 'readyz: '; curl -fsS localhost:8098/readyz || echo 'unreachable'
 
 status: ## Show status of all services
 	@echo "📊 Homelab Status"
