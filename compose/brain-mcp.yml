@@ -25,8 +25,13 @@ services:
     container_name: brain-mcp
     restart: unless-stopped
     environment:
-      # Fails fast at boot if unset or shorter than 32 chars.
-      BRAIN_MCP_TOKEN: ${BRAIN_MCP_TOKEN:?set BRAIN_MCP_TOKEN in .env}
+      # Deliberately `:-` and not `:?`. Compose interpolates every included file
+      # before profiles are applied (verified), so a `:?` here would fail
+      # `docker compose up -d` for the WHOLE stack whenever the token is unset -
+      # the exact coupling the profile exists to prevent. The check still exists,
+      # it just lives in the app: server.py refuses to boot on a token under 32
+      # chars, so a missing value fails this container loudly and nothing else.
+      BRAIN_MCP_TOKEN: ${BRAIN_MCP_TOKEN:-}
       BRAIN_MCP_ALLOWED_HOSTS: ${BRAIN_MCP_ALLOWED_HOSTS:-*}
       TZ: ${TIMEZONE:-UTC}
     volumes:
