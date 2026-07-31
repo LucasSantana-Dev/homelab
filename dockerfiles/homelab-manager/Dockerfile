@@ -17,6 +17,6 @@ EXPOSE 8765
 
 # Health check using stdlib urllib (curl not available in slim base)
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=60s \
-  CMD python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8765/health', timeout=5).status == 200 else 1)"
+  CMD ["python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8765/health', timeout=5).status == 200 else 1)"]
 
 CMD ["python", "-m", "homelab_manager", "serve", "--host", "0.0.0.0", "--port", "8765"]
