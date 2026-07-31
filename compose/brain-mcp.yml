@@ -73,3 +73,57 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Browser chat over the same corpus, built on the brainchat gem. Behind
+  # Tinyauth in Caddy (the MCP paths bypass it - claude.ai cannot log in).
+  #
+  # Carries no Python, torch or embedding model: retrieval stays in brain-mcp and
+  # this talks to it over HTTP on the frontend network, so there is exactly one
+  # copy of the index and one place it can go stale.
+  #
+  # Secret required in .env (host-only, then `make sops-encrypt`):
+  #   ANTHROPIC_API_KEY=<key>   (only when BRAINCHAT_PROVIDER is anthropic)
+  brainchat-web:
+    profiles: ["brain-mcp"]
+    build:
+      context: ${BRAIN_MCP_SRC:-/home/luk-server/homelab/appdata/brain-mcp/src}/remote/web
+    image: brainchat-web:local
+    container_name: brainchat-web
+    restart: unless-stopped
+    environment:
+      BRAIN_MCP_TOKEN: ${BRAIN_MCP_TOKEN:-}
+      BRAIN_MCP_URL: http://brain-mcp:8098
+      # Anthropic by default: the value here is citations that hold up, and the
+      # box has no RAM headroom for a model that would manage them.
+      BRAINCHAT_PROVIDER: ${BRAINCHAT_PROVIDER:-anthropic}
+      BRAINCHAT_MODEL: ${BRAINCHAT_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Spend ceiling that does not depend on remembering to close the tab.
+      BRAINCHAT_MAX_ASKS_PER_HOUR: ${BRAINCHAT_MAX_ASKS_PER_HOUR:-60}
+      TZ: ${TIMEZONE:-UTC}
+    ports:
+      - "${BIND_IP:-127.0.0.1}:8099:8099"
+    networks:
+      - frontend
+    depends_on:
+      brain-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ruby -e \"require 'net/http'; Net::HTTP.get(URI('http://127.0.0.1:8099/healthz'))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
