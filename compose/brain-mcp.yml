@@ -19,7 +19,7 @@ services:
   brain-mcp:
     profiles: ["brain-mcp"]
     build:
-      context: ${BRAIN_MCP_SRC:-/home/luk-server/appdata/brain-mcp/src}
+      context: ${BRAIN_MCP_SRC:-/home/luk-server/homelab/appdata/brain-mcp/src}
       dockerfile: remote/Dockerfile
     image: brain-mcp:local
     container_name: brain-mcp
@@ -36,6 +36,14 @@ services:
       TZ: ${TIMEZONE:-UTC}
     volumes:
       # Read-only: nothing on this host may mutate the corpus.
+      #
+      # `../` resolves against THIS file's directory (compose/), not the project
+      # directory - so this is <repo>/appdata/..., same as cojam. Getting that
+      # backwards points the mount at a path where the file does not exist, and
+      # Docker then silently creates a DIRECTORY with that name; the container
+      # boots, /healthz says 200, and only /readyz stays red. Keep the corpus
+      # under <repo>/appdata (gitignored) and keep sync-to-homelab.sh's DEST in
+      # sync with this path.
       - ../appdata/brain-mcp/knowledge.sqlite:/data/knowledge.sqlite:ro
     ports:
       # Caddy (host network) reverse-proxies to this local port. Never bind 0.0.0.0:
