@@ -82,12 +82,7 @@ repos:
         language: docker_image
         types: ["dockerfile"]
         entry: ghcr.io/hadolint/hadolint@sha256:78cefa24d67e95cac4cdc388652068d0be545bd2926fcbec6f95c1a751d5da32 hadolint
-        # DL3025 (homelab-manager HEALTHCHECK CMD should use JSON notation) and
-        # DL3066 (serena-mcp `USER root` is non-numeric) are new in 2.15.0 and
-        # are real, if minor. Suppressed so pinning stays behaviour-neutral
-        # rather than smuggling in Dockerfile edits; fix them and drop these two
-        # ignores as a follow-up.
-        args: [--ignore, DL3008, --ignore, DL3009, --ignore, DL3025, --ignore, DL3066]
+        args: [--ignore, DL3008, --ignore, DL3009]
 
   # Shell scripts
   - repo: https://github.com/shellcheck-py/shellcheck-py
