@@ -95,9 +95,20 @@ services:
       BRAIN_MCP_URL: http://brain-mcp:8098
       # Anthropic by default: the value here is citations that hold up, and the
       # box has no RAM headroom for a model that would manage them.
+      # anthropic | openai | kimi | ollama. Only the selected one's key is
+      # required; the app refuses to boot if it is missing or a placeholder.
       BRAINCHAT_PROVIDER: ${BRAINCHAT_PROVIDER:-anthropic}
       BRAINCHAT_MODEL: ${BRAINCHAT_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-}
+      # Kimi speaks the OpenAI wire format; the app points RubyLLM's openai
+      # provider at Moonshot's base URL.
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      MOONSHOT_API_BASE: ${MOONSHOT_API_BASE:-}
+      # Local models. Must be reachable FROM this container - localhost is the
+      # container itself, so point this at the host or another box on the tailnet.
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-}
       # Spend ceiling that does not depend on remembering to close the tab.
       BRAINCHAT_MAX_ASKS_PER_HOUR: ${BRAINCHAT_MAX_ASKS_PER_HOUR:-60}
       TZ: ${TIMEZONE:-UTC}
