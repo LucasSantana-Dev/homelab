@@ -120,7 +120,9 @@ services:
       brain-mcp:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "ruby -e \"require 'net/http'; Net::HTTP.get(URI('http://127.0.0.1:8099/healthz'))\""]
+      # get_response, not get: Net::HTTP.get returns the body and raises nothing on
+      # 404/503, so the container would report healthy while the app was degraded.
+      test: ["CMD-SHELL", "ruby -e \"require 'net/http'; exit 1 unless Net::HTTP.get_response(URI('http://127.0.0.1:8099/healthz')).code.to_i == 200\""]
       interval: 30s
       timeout: 5s
       retries: 3
