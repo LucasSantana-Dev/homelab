@@ -165,7 +165,12 @@ or fix that host if a second (LAN) offsite tier is wanted later.
    source check as the rsync path.
 
 **Restore from the offsite mirror (host lost):**
-1. Bring the mirror back to a path, e.g. `/opt/kopia-repo` on the new host.
+1. Bring the mirror back to a path, e.g. `/opt/kopia-repo` on the new host:
+   - **From Drive:** install rclone, recover `~/.config/rclone/rclone.conf` (not
+     covered by SOPS today — keep a copy alongside the age key, see docs/secrets.md),
+     then `rclone copy gdrive:homelab-kopia /opt/kopia-repo`.
+   - **From a rsync/disk target (if that tier is ever revived):** `rsync -aH
+     <target>/ /opt/kopia-repo/`.
 2. Recover `KOPIA_REPO_PASSWORD` from SOPS (`make sops-decrypt`, see docs/secrets.md).
 3. `kopia repository connect filesystem --path=/opt/kopia-repo` (uses `KOPIA_PASSWORD`),
    then `kopia snapshot restore <id> <dest>`.
@@ -176,8 +181,8 @@ so a missing/empty source can't `--delete` a good offsite copy.
 #### Cloud object store (B2/S3) — still deferred (ADR-0016)
 
 The `KOPIA_S3_*` vars scaffold a Backblaze B2 / S3 target (~$6–10/mo for 100 GB)
-for a future second offsite tier. Not wired yet; the rsync mirror above already
-covers the immediate same-disk-failure gap at $0. To add B2 later as a second tier:
+for a future second offsite tier. Not wired yet; the rclone/Drive mirror above
+already covers the immediate same-disk-failure gap. To add B2 later as a second tier:
 
 ```bash
 # The repo is encrypted, so a plain sync of the repo files is safe:
@@ -259,10 +264,12 @@ Two Prometheus alerts watch the backup (defined in `config/prometheus/alerts.yml
 
 Typical homelab (docker volumes ~5.4 GB + appdata ~7.3 GB + config ~45 MB):
 - **Local repo size**: ~5–15 GB (depends on deduplication and retention count)
-- **Offsite cost** (B2, future): ~$6–10/month for 100 GB
+- **Offsite (Drive)**: ~28 GB, within most paid Drive plans but over the 15GB free
+  tier — check your quota
+- **Offsite cost** (B2, future second tier): ~$6–10/month for 100 GB
 - **Network egress** (B2, future): Minimal after initial sync; incremental
 
-Current: **$0** (local only).
+Current: **$0 local + whatever your Drive plan already costs** (no B2/S3 spend).
 
 ## References
 
