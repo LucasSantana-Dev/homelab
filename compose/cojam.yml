@@ -59,9 +59,17 @@ services:
       # host-only in .env; required when the feature is on.
       FEATURE_ROOM_AUTH: "true"
       ROOM_AUTH_SECRET: ${COJAM_ROOM_AUTH_SECRET:?set COJAM_ROOM_AUTH_SECRET in .env}
-      # Supabase account tokens (JWKS validation against the project).
-      FEATURE_SUPABASE_AUTH: "true"
-      SUPABASE_URL: ${COJAM_SUPABASE_URL:?set COJAM_SUPABASE_URL in .env}
+      # Supabase account tokens (JWKS validation against the project). OFF:
+      # the configured project (neuthlwwqucjohvruqde.supabase.co) was deleted
+      # (NXDOMAIN) and this was leftover scaffolding, not an active feature —
+      # CoJam's primary auth already runs off the local Postgres. Re-enable
+      # only alongside a real, live Supabase project.
+      FEATURE_SUPABASE_AUTH: "false"
+      SUPABASE_URL: ${COJAM_SUPABASE_URL:-}
+      # Dark-feature flags (2026-08-03 rollout, #173): default off, enabled per-flag in .env.
+      FEATURE_PUBLIC_ROOMS: ${FEATURE_PUBLIC_ROOMS:-false}
+      FEATURE_QUEUE_VOTING: ${FEATURE_QUEUE_VOTING:-false}
+      FEATURE_ROOM_CHAT: ${FEATURE_ROOM_CHAT:-false}
       TZ: ${TIMEZONE:-UTC}
     ports:
       # Caddy (host network) reverse-proxies to this local port.
@@ -110,8 +118,14 @@ services:
       COJAM_FEATURE_SPOTIFY: ${COJAM_FEATURE_SPOTIFY:-}
       # Room auth + Supabase accounts, served to the client via /env.js.
       COJAM_FEATURE_ROOM_AUTH: ${COJAM_FEATURE_ROOM_AUTH:-}
-      COJAM_SUPABASE_URL: ${COJAM_SUPABASE_URL:?set COJAM_SUPABASE_URL in .env}
-      COJAM_SUPABASE_ANON_KEY: ${COJAM_SUPABASE_ANON_KEY:?set COJAM_SUPABASE_ANON_KEY in .env}
+      COJAM_FEATURE_PUBLIC_ROOMS: ${COJAM_FEATURE_PUBLIC_ROOMS:-}
+      COJAM_FEATURE_QUEUE_VOTING: ${COJAM_FEATURE_QUEUE_VOTING:-}
+      COJAM_FEATURE_ROOM_CHAT: ${COJAM_FEATURE_ROOM_CHAT:-}
+      # Supabase accounts OFF (see cojam-server FEATURE_SUPABASE_AUTH above) —
+      # not required; the /env.js route already omits both fields unless BOTH
+      # are set (apps/web/app/env.js/route.ts), so leaving these unset is safe.
+      COJAM_SUPABASE_URL: ${COJAM_SUPABASE_URL:-}
+      COJAM_SUPABASE_ANON_KEY: ${COJAM_SUPABASE_ANON_KEY:-}
       TZ: ${TIMEZONE:-UTC}
     ports:
       - "${BIND_IP:-127.0.0.1}:8096:3000"
