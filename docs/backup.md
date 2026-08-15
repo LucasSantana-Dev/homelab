@@ -9,7 +9,11 @@ Homelab uses **kopia** with a **local filesystem repository** for automated encr
 - **Frequency**: Daily at configurable intervals (default 24 hours)
 - **Retention**: 10 latest snapshots, 7 daily, 4 weekly, 3 monthly (auto-managed)
 - **Compression**: zstd
-- **Status**: Interim local-only; offsite B2 target deferred (see ADR-0016)
+- **Status**: Local + offsite (Google Drive via rclone), active since 2026-08-11.
+  Initial 27GB catch-up is trickling over several nightly runs (each 1hr
+  `TimeoutStartSec` window resumes where the last left off — rclone repo blobs
+  are immutable, so this is safe); daily incrementals will be fast once caught up.
+  B2/S3 second tier still deferred (see ADR-0016).
 
 ## Scope
 
@@ -113,56 +117,60 @@ The repository lives on `/opt/kopia-repo`, which is **on the same physical disk*
 - **Does NOT protect against**: Host disk failure, ransomware with root access, simultaneous disk + power loss
 - **Recovery**: Restore to a USB drive or network mount, then assess damage
 
-### Offsite Disaster Recovery — rsync mirror to a second host/disk (#266)
+### Offsite Disaster Recovery — Google Drive via rclone (#266)
 
 The encrypted kopia repo is mirrored offsite by `scripts/maintenance/kopia-offsite-sync.sh`
 (systemd `kopia-offsite-sync.timer`, daily 04:30). Because the repo is encrypted
 at rest, the offsite copy needs no extra encryption — but recovery requires **both**
 the mirror **and** `KOPIA_REPO_PASSWORD` (kept off-host in SOPS, #272).
 
-**Enable:**
-1. Set the target in `.env` (a remote host or a mounted disk):
+**Current config (active since 2026-08-11):**
+```bash
+KOPIA_OFFSITE_RCLONE_REMOTE=gdrive:homelab-kopia
+```
+rclone config lives at `/home/luk-server/.config/rclone/rclone.conf` (0600,
+`luk-server`-owned, non-sudo OAuth setup). The systemd service points
+`RCLONE_CONFIG` there so the root-run sync reuses it without a separate root
+config. The encrypted repo (~28 GB) fits comfortably under most paid/free
+Drive quotas but exceeds the 15GB free tier — plan storage accordingly.
 
-   ```bash
-   KOPIA_OFFSITE_TARGET=luk@pc-do-luk:/srv/kopia-offsite   # or /mnt/usb-backup/kopia-offsite
-   ```
+Initial sync is a ~27GB upload; each nightly run is capped at
+`TimeoutStartSec=3600` (1hr) and gets killed mid-transfer if not done — safe,
+since rclone repo blobs are content-addressed/immutable and the next run just
+resumes. Expect several nights to fully catch up, then daily incrementals are
+small and fast.
 
-   For a remote host, ensure root on the homelab can ssh to it (`ssh-copy-id` a key).
-2. Install + start the timer:
+**Stale fallback (do not rely on):** `KOPIA_OFFSITE_TARGET` in `.env` still
+points at a LAN rsync target (`luk@192.168.0.3`) that has been unreachable
+since at least 2026-08-08. It's harmless to leave — rclone takes precedence
+when both vars are set — but it isn't actually backing up anything. Clear it
+or fix that host if a second (LAN) offsite tier is wanted later.
 
+**Re-running setup from scratch (e.g. new host, new remote):**
+1. Install rclone: `curl https://rclone.org/install.sh | sudo bash`.
+2. Configure the remote **once** (interactive OAuth — needs a browser). Run it
+   as the `luk-server` user (no sudo). Run `rclone config`, choose `drive`,
+   accept defaults, and at the "auto config?" prompt answer **No**, then run
+   `rclone authorize "drive"` on a machine with a browser and paste the token
+   back. Name it `gdrive`.
+3. Set `KOPIA_OFFSITE_RCLONE_REMOTE=gdrive:<bucket-path>` in `.env`, re-encrypt
+   with `make sops-encrypt && make sops-verify` if SOPS is active.
+4. Install/enable the timer:
    ```bash
    sudo cp scripts/systemd/kopia-offsite-sync.{service,timer} /etc/systemd/system/
    sudo systemctl daemon-reload && sudo systemctl enable --now kopia-offsite-sync.timer
    sudo systemctl start kopia-offsite-sync.service   # first run now
    ```
-
-   The script no-ops cleanly while no target is set, so installing the timer
-   before choosing a target is safe.
-
-**Alternative — cloud via rclone (e.g. Google Drive):** set an rclone remote
-instead of (or in addition to) the rsync target. The encrypted repo (~11 GB) fits
-Google Drive's free 15 GB.
-
-1. Install rclone on the host: `sudo apt-get install -y rclone` (or `curl https://rclone.org/install.sh | sudo bash`).
-2. Configure the remote **once** (interactive OAuth — needs a browser). Run it as
-   the `luk-server` user (no sudo) so the config lands at
-   `~/.config/rclone/rclone.conf` — the systemd service points `RCLONE_CONFIG`
-   there, so the root-run sync reuses it. Run `rclone config`, choose `drive`,
-   accept defaults, and at the "auto config?" prompt answer **No**, then run
-   `rclone authorize "drive"` on a laptop and paste the token back. Name it
-   `gdrive`. The config file holds the Drive OAuth token — keep it 0600.
-3. Point the sync at it:
-
-   ```bash
-   KOPIA_OFFSITE_RCLONE_REMOTE=gdrive:homelab-kopia
-   ```
-
-   (rclone takes precedence over `KOPIA_OFFSITE_TARGET` if both are set.) Then
-   install/enable the timer as above. `rclone sync` mirrors (propagates deletes),
-   guarded by the same repo-marker source check.
+   `rclone sync` mirrors (propagates deletes), guarded by the same repo-marker
+   source check as the rsync path.
 
 **Restore from the offsite mirror (host lost):**
-1. Bring the mirror back to a path, e.g. `/opt/kopia-repo` on the new host.
+1. Bring the mirror back to a path, e.g. `/opt/kopia-repo` on the new host:
+   - **From Drive:** install rclone, recover `~/.config/rclone/rclone.conf` (not
+     covered by SOPS today — keep a copy alongside the age key, see docs/secrets.md),
+     then `rclone copy gdrive:homelab-kopia /opt/kopia-repo`.
+   - **From a rsync/disk target (if that tier is ever revived):** `rsync -aH
+     <target>/ /opt/kopia-repo/`.
 2. Recover `KOPIA_REPO_PASSWORD` from SOPS (`make sops-decrypt`, see docs/secrets.md).
 3. `kopia repository connect filesystem --path=/opt/kopia-repo` (uses `KOPIA_PASSWORD`),
    then `kopia snapshot restore <id> <dest>`.
@@ -173,8 +181,8 @@ so a missing/empty source can't `--delete` a good offsite copy.
 #### Cloud object store (B2/S3) — still deferred (ADR-0016)
 
 The `KOPIA_S3_*` vars scaffold a Backblaze B2 / S3 target (~$6–10/mo for 100 GB)
-for a future second offsite tier. Not wired yet; the rsync mirror above already
-covers the immediate same-disk-failure gap at $0. To add B2 later as a second tier:
+for a future second offsite tier. Not wired yet; the rclone/Drive mirror above
+already covers the immediate same-disk-failure gap. To add B2 later as a second tier:
 
 ```bash
 # The repo is encrypted, so a plain sync of the repo files is safe:
@@ -256,10 +264,12 @@ Two Prometheus alerts watch the backup (defined in `config/prometheus/alerts.yml
 
 Typical homelab (docker volumes ~5.4 GB + appdata ~7.3 GB + config ~45 MB):
 - **Local repo size**: ~5–15 GB (depends on deduplication and retention count)
-- **Offsite cost** (B2, future): ~$6–10/month for 100 GB
+- **Offsite (Drive)**: ~28 GB, within most paid Drive plans but over the 15GB free
+  tier — check your quota
+- **Offsite cost** (B2, future second tier): ~$6–10/month for 100 GB
 - **Network egress** (B2, future): Minimal after initial sync; incremental
 
-Current: **$0** (local only).
+Current: **$0 local + whatever your Drive plan already costs** (no B2/S3 spend).
 
 ## References
 
