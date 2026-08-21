@@ -108,6 +108,53 @@ ping auth.homelab.example.com
 - Conflicts with Tailscale-only network design
 - Your services are already restricted to Tailscale IPs
 
+## Option 4: Structurally Isolated Public App (Tailscale Funnel)
+
+**Use case:** a public-facing app that must NOT share the operator's Cloudflare account,
+tunnel, or domain — so a compromise/suspension of that Cloudflare account can't take the
+app down with it. This is distinct from Option 3 above (DuckDNS, rejected for
+Tailscale-only *private* services) and distinct from the existing pattern of routing
+public apps as subdomains of `lucassantana.tech` via the shared Cloudflare Tunnel (e.g.
+CoJam).
+
+**Decision (2026-08-20, via `/debate`, 5 lenses + synthesis):** when the isolation goal is
+*structural* (no shared credential/account/blast-radius with the main Cloudflare Tunnel),
+use **Tailscale Funnel**, not a second Cloudflare Tunnel on the same account and not free
+DDNS.
+
+**Why not the alternatives:**
+
+- **A second Cloudflare Tunnel, same account** (new domain via Porkbun + independent
+  `cloudflared` process) — technically clean and cheap (~$9-11/yr), but still shares the
+  Cloudflare account, 2FA, and Zero Trust org with the main tunnel. Fine for *namespace*
+  isolation (branding, a project that might be spun off/sold), **not** for structural
+  isolation.
+- **Free DDNS (DuckDNS/FreeDNS/No-IP)** — same objection as Option 3: requires exposing
+  a port directly (or CNAME-ing to a tunnel, which re-adds the Cloudflare dependency
+  anyway), and silently breaks in 12-24 months (expired token, rotated IP, no SLA).
+- **ngrok/Pinggy/LocalXpose free tier** — rotating URL on the free tier; fine for a
+  session-length demo, not for anything that needs to stay up.
+- **is-a.dev** — legitimate, Cloudflare-sponsored, but manual PR approval (hours-days)
+  and no SLA; use only for a personal/OSS showcase, not production.
+
+**Setup:** Funnel is already enabled and in production on this tailnet — Stremio Web is
+served through it (see `docs/` + `STREMIO_PUBLIC_URL` in `.env`, PR #26), so there is no
+tailnet-level enablement step left to do. To expose an additional app:
+
+```bash
+sudo tailscale funnel --bg --https=443 http://127.0.0.1:<local-port>
+```
+
+Public URL is `https://<hostname>.<tailnet>.ts.net` — no domain to buy or renew, no
+Cloudflare Tunnel config. Note that one Funnel node serves one `:443` target; exposing a
+second app on the same host means either a different Funnel port (`--https=8443`) or
+path-based routing behind a local reverse proxy.
+
+**Trade-off accepted:** the public hostname carries the tailnet name (`*.ts.net`), no
+custom branding. If custom branding is needed later without giving up structural
+isolation, CNAME a purchased domain to the Funnel hostname — but that reintroduces an
+external domain dependency (just not a Cloudflare-account dependency).
+
 ## Verification
 
 After configuring DNS, verify each service:

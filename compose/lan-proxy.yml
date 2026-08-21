@@ -11,10 +11,16 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      # Upstreams for BIND_IP-published services are written as
-      # {$BIND_IP:127.0.0.1} in the Caddyfile, so Caddy follows the same host
-      # interface the containers publish on. Without this they cannot drift.
+      # Consumed by the public stats.lucassantana.tech site block, which refuses
+      # requests whose X-Stats-Key header does not match. Caddy substitutes
+      # {$VAR} at config-load time, so changing this needs a recreate, not a
+      # reload.
+      # Upstreams for BIND_IP-published services read {$BIND_IP:127.0.0.1},
+      # so Caddy follows the same interface the containers publish on.
       BIND_IP: ${BIND_IP:-127.0.0.1}
+      # Consumed by the public stats site block, which refuses requests whose
+      # X-Stats-Key header does not match.
+      GITHUB_STATS_KEY: ${GITHUB_STATS_KEY}
     deploy:
       resources:
         limits:
