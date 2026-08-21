@@ -70,6 +70,11 @@ services:
       FEATURE_PUBLIC_ROOMS: ${FEATURE_PUBLIC_ROOMS:-false}
       FEATURE_QUEUE_VOTING: ${FEATURE_QUEUE_VOTING:-false}
       FEATURE_ROOM_CHAT: ${FEATURE_ROOM_CHAT:-false}
+      # Prometheus metrics on a dedicated listener, never the public port
+      # (ADR-0004). 0.0.0.0 is the CONTAINER's interface, not the host's: the
+      # port is never published, so this is reachable only from the frontend
+      # network, which is how Prometheus scrapes it by service DNS.
+      METRICS_ADDR: 0.0.0.0:9100
       TZ: ${TIMEZONE:-UTC}
     ports:
       # Pinned to loopback, deliberately NOT ${BIND_IP}. CoJam is a public app
