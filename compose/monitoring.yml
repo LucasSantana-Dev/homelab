@@ -190,6 +190,9 @@ services:
     # targets defined in config/prometheus/prometheus.yml. See
     # docs/runbooks/lucky-observability.md.
     - lucky-monitoring
+    # Same reason for cojam-server, which exposes metrics on 9100 inside the
+    # container and never publishes the port (ADR-0004).
+    - frontend
     depends_on:
       alertmanager:
         condition: service_healthy
