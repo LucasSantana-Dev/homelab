@@ -85,7 +85,7 @@ services:
       SPOTIFY_CLIENT_ID: ${COJAM_SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${COJAM_SPOTIFY_CLIENT_SECRET:-}
       # Feeds radio refill. Stays unset until the Last.fm commercial LOI
-      # exists, per docs/runbooks/launch-readiness.md.
+      # exists (see docs/runbooks/launch-readiness.md in the cojam repo).
       LASTFM_API_KEY: ${LASTFM_API_KEY:-}
       TZ: ${TIMEZONE:-UTC}
     ports:
