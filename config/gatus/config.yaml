@@ -8,8 +8,46 @@ ui:
   header: Luk's Homelab
   description: Live health of self-hosted services
 
+# Alerts ride the Alertmanager receiver that already exists, rather than a
+# second Discord webhook: the webhook URL stays in the gitignored
+# /etc/alertmanager/discord_webhook_url and Gatus never sees it. Both containers
+# are on the `default` network, so the service name resolves.
+#
+# `custom: {}` was empty before, and no endpoint declared `alerts:`, so Gatus
+# watched six services and told nobody when one failed. That is the "zero
+# signal" in cojam#268: the monitor existed and was mute.
 alerting:
-  custom: {}
+  custom:
+    url: "http://alertmanager:9093/api/v2/alerts"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    # Alertmanager v2 resolves an alert when it stops being re-sent, so the
+    # RESOLVED case needs no separate body: [ALERT_TRIGGERED_OR_RESOLVED] is
+    # carried as a label for readability in the Discord message.
+    body: |
+      [{
+        "labels": {
+          "alertname": "GatusEndpointDown",
+          "severity": "critical",
+          "service": "[ENDPOINT_NAME]",
+          "group": "[ENDPOINT_GROUP]",
+          "state": "[ALERT_TRIGGERED_OR_RESOLVED]"
+        },
+        "annotations": {
+          "summary": "[ENDPOINT_NAME] is [ALERT_TRIGGERED_OR_RESOLVED]",
+          "description": "[ALERT_DESCRIPTION]",
+          "url": "[ENDPOINT_URL]"
+        }
+      }]
+    # Applies to every endpoint, so a new one is alerting by default instead of
+    # silently unwatched.
+    default-alert:
+      enabled: true
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+      description: "health check failed"
 
 endpoints:
   - name: Homepage
@@ -73,3 +111,24 @@ endpoints:
     interval: 30s
     conditions:
       - "[CONNECTED] == true"
+
+  # CoJam, checked from OUTSIDE the tunnel on purpose. The #264 outage was a
+  # 502 at Caddy while the containers were healthy, so any in-network probe
+  # stayed green for eight hours. Only the public path catches that class.
+  - name: CoJam Web
+    group: cojam
+    url: https://cojam.lucassantana.tech/
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 3000"
+
+  # /api/* is the only prefix Caddy routes to the Go server, so this is the
+  # public health path; /readyz is not reachable from outside.
+  - name: CoJam API
+    group: cojam
+    url: https://cojam.lucassantana.tech/api/healthz
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 3000"
