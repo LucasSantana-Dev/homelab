@@ -45,7 +45,7 @@ alerting:
           "group": "[ENDPOINT_GROUP]"
         },
         "annotations": {
-          "summary": "[ENDPOINT_NAME] health check failed",
+          "summary": "[ENDPOINT_NAME] health status changed",
           "description": "[ALERT_DESCRIPTION]",
           "url": "[ENDPOINT_URL]"
         },
@@ -55,8 +55,10 @@ alerting:
       ALERT_TRIGGERED_OR_RESOLVED:
         TRIGGERED: "2099-12-31T23:59:59Z"
         RESOLVED: "1970-01-01T00:00:00Z"
-    # Applies to every endpoint, so a new one is alerting by default instead of
-    # silently unwatched.
+    # Supplies the DEFAULTS for an endpoint's `alerts:` entry. It does not turn
+    # the provider on by itself: an endpoint with no `alerts:` sends nothing.
+    # Measured, not assumed - a failing endpoint without it produced 0 POSTs,
+    # and 1 with it.
     default-alert:
       enabled: true
       failure-threshold: 3
@@ -72,6 +74,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 1500"
+    alerts:
+      - type: custom
 
   - name: Nextcloud
     group: storage
@@ -80,6 +84,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[BODY].installed == true"
+    alerts:
+      - type: custom
 
   - name: Stremio
     group: media
@@ -87,6 +93,8 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == any(200, 307)"
+    alerts:
+      - type: custom
 
   - name: Lucky Web
     group: apps
@@ -94,6 +102,8 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == any(200, 301, 302)"
+    alerts:
+      - type: custom
 
   # Pi-hole DNS & Web checks disabled — Pi-hole runs on host network, not reachable from gatus container
   # - name: Pi-hole DNS
@@ -119,6 +129,8 @@ endpoints:
     interval: 60s
     conditions:
       - "[STATUS] == 200"
+    alerts:
+      - type: custom
 
   - name: Internet (Cloudflare 1.1.1.1)
     group: external
@@ -126,6 +138,8 @@ endpoints:
     interval: 30s
     conditions:
       - "[CONNECTED] == true"
+    alerts:
+      - type: custom
 
   # CoJam, checked from OUTSIDE the tunnel on purpose. The #264 outage was a
   # 502 at Caddy while the containers were healthy, so any in-network probe
@@ -137,6 +151,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 3000"
+    alerts:
+      - type: custom
 
   # /api/* is the only prefix Caddy routes to the Go server, so this is the
   # public health path; /readyz is not reachable from outside.
@@ -147,3 +163,5 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 3000"
+    alerts:
+      - type: custom
