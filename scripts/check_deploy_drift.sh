@@ -17,7 +17,10 @@ set -uo pipefail
 
 SSH_HOST="${1:-homelab}"
 REMOTE_DIR="${2:-/home/luk-server/homelab}"
-FILES="compose/cojam.yml config/caddy/Caddyfile compose/lan-proxy.yml"
+# Every deployable file, not a hardcoded few. The three-file list this started
+# with reported "in sync" while compose/brain-mcp.yml had gained a whole
+# service the host never received (#269).
+FILES=$(ls compose/*.yml docker-compose.yml config/caddy/Caddyfile 2>/dev/null)
 
 # Redact values, keep shape. Also drops comments and blank lines so a reworded
 # comment is not reported as drift.
@@ -31,6 +34,11 @@ redact() {
 
 command -v ssh >/dev/null 2>&1 || { echo "ssh not found"; exit 2; }
 
+if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" true 2>/dev/null; then
+  echo "ERROR could not reach $SSH_HOST"
+  exit 2
+fi
+
 drifted=0
 for f in $FILES; do
   if [ ! -f "$f" ]; then
@@ -38,10 +46,14 @@ for f in $FILES; do
     continue
   fi
 
-  remote=$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" "cat '$REMOTE_DIR/$f'" 2>/dev/null)
-  if [ -z "$remote" ]; then
-    echo "ERROR could not read $f from $SSH_HOST:$REMOTE_DIR"
-    exit 2
+  # A file the host does not have is drift, not an error: the repo ships config
+  # production never received, which is exactly what this script looks for.
+  # Reachability was already proven above, so a failure here means absent.
+  if ! remote=$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
+        "test -f '$REMOTE_DIR/$f' && cat '$REMOTE_DIR/$f'" 2>/dev/null); then
+    drifted=1
+    echo "ABSENT $f (never deployed to $SSH_HOST)"
+    continue
   fi
 
   if diff -q <(printf '%s\n' "$remote" | redact) <(redact < "$f") >/dev/null; then
