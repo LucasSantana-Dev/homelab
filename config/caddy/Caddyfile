@@ -90,12 +90,35 @@ http://stats.home {
 # No auth is enforced here on purpose, so keep this hostname off any wildcard
 # that would expose other backends.
 http://brain.lucassantana.tech {
-	reverse_proxy 127.0.0.1:8098
+	# Path-split, same shape as cojam above. The MCP paths and the health probes
+	# stay on brain-mcp with no forward-auth: claude.ai's connector is a
+	# server-to-server client that cannot complete a tinyauth browser login, and
+	# its own token gate is what authorizes those requests. `/*/mcp` covers the
+	# capability-URL form (/<token>/mcp) used while Claude's request-header auth
+	# is still a gated beta.
+	@direct path /mcp /mcp/* /*/mcp /*/mcp/* /healthz /readyz
+	handle @direct {
+		reverse_proxy 127.0.0.1:8098
+	}
+
+	# Everything else is the browser chat UI, which is a human surface and does
+	# get tinyauth in front of it.
+	handle {
+		import protected
+		reverse_proxy 127.0.0.1:8099
+	}
 }
 
-# LAN access for testing without the public hop (token still required).
+# LAN access for testing without the public hop. Same split, minus tinyauth:
+# reaching *.home already means being on the network.
 http://brain.home {
-	reverse_proxy 127.0.0.1:8098
+	@direct path /mcp /mcp/* /*/mcp /*/mcp/* /healthz /readyz
+	handle @direct {
+		reverse_proxy 127.0.0.1:8098
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8099
+	}
 }
 
 http://cojam-api.home {

@@ -75,20 +75,21 @@ forge-space-mcp-setup: ## Register Forge Space MCP client in Codex (requires FOR
 
 brain-mcp-up: ## Deploy the knowledge-brain MCP server (build context must be synced first)
 	@echo "🧠 Starting knowledge-brain MCP..."
-	@docker compose --profile brain-mcp up -d --build brain-mcp
-	@echo "✅ brain-mcp started (readiness takes ~60s: make brain-mcp-status)"
+	@docker compose --profile brain-mcp up -d --build brain-mcp brainchat-web
+	@echo "✅ brain-mcp + brainchat-web started (readiness takes ~60s: make brain-mcp-status)"
 
 brain-mcp-down: ## Stop the knowledge-brain MCP server
 	@echo "🛑 Stopping knowledge-brain MCP..."
-	@docker compose --profile brain-mcp stop brain-mcp
+	@docker compose --profile brain-mcp stop brain-mcp brainchat-web
 	@echo "✅ brain-mcp stopped"
 
 brain-mcp-logs: ## Tail knowledge-brain MCP logs
-	@docker compose --profile brain-mcp logs -f --tail=100 brain-mcp
+	@docker compose --profile brain-mcp logs -f --tail=100 brain-mcp brainchat-web
 
 brain-mcp-status: ## Show knowledge-brain MCP status and readiness
-	@docker compose --profile brain-mcp ps brain-mcp
-	@printf 'readyz: '; curl -fsS localhost:8098/readyz || echo 'unreachable'
+	@docker compose --profile brain-mcp ps brain-mcp brainchat-web
+	@printf 'brain-mcp readyz: '; curl -fsS localhost:8098/readyz || echo 'unreachable'
+	@printf 'brainchat-web:    '; curl -fsS localhost:8099/healthz || echo 'unreachable'
 
 status: ## Show status of all services
 	@echo "📊 Homelab Status"

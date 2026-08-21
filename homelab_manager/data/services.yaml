@@ -355,6 +355,20 @@ services:
     sensitive: true
     localhost_only: true
 
+  brainchat-web:
+    name: "Brainchat Web"
+    category: knowledge
+    container_name: brainchat-web
+    port: 8099
+    internal_port: 8099
+    health_endpoint: "/healthz"
+    health_mode: "http"
+    health_host: "127.0.0.1"
+    expected_statuses: [200]
+    description: "Browser chat over the knowledge brain, behind tinyauth (profile: brain-mcp)"
+    sensitive: true
+    localhost_only: true
+
   # Automation Services
   homeassistant:
     name: "Home Assistant"
