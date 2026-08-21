@@ -22,24 +22,39 @@ alerting:
     method: "POST"
     headers:
       Content-Type: "application/json"
-    # Alertmanager v2 resolves an alert when it stops being re-sent, so the
-    # RESOLVED case needs no separate body: [ALERT_TRIGGERED_OR_RESOLVED] is
-    # carried as a label for readability in the Discord message.
+    # Alertmanager identifies an alert by its FULL label set, so `state` must not
+    # be a label: TRIGGERED and RESOLVED would be two different alerts and the
+    # resolve POST would open a second firing one instead of closing the first.
+    # The Discord title already renders .Status (alertmanager.yml).
+    #
+    # `name` is the label the existing Discord template reads
+    # (`or $alert.Labels.name $alert.Labels.instance "unknown"`). Any other key
+    # delivers the alert with the service shown as "unknown".
+    #
+    # endsAt is what actually drives resolution here. Gatus is edge-triggered: it
+    # posts once when the threshold trips and never re-sends, while Alertmanager
+    # expects continuous re-sending and applies resolve_timeout (5m) otherwise.
+    # Without this the alert would self-resolve five minutes into an outage that
+    # is still going. Far-future on trigger, epoch on resolve.
     body: |
       [{
         "labels": {
           "alertname": "GatusEndpointDown",
           "severity": "critical",
-          "service": "[ENDPOINT_NAME]",
-          "group": "[ENDPOINT_GROUP]",
-          "state": "[ALERT_TRIGGERED_OR_RESOLVED]"
+          "name": "[ENDPOINT_NAME]",
+          "group": "[ENDPOINT_GROUP]"
         },
         "annotations": {
-          "summary": "[ENDPOINT_NAME] is [ALERT_TRIGGERED_OR_RESOLVED]",
+          "summary": "[ENDPOINT_NAME] health check failed",
           "description": "[ALERT_DESCRIPTION]",
           "url": "[ENDPOINT_URL]"
-        }
+        },
+        "endsAt": "[ALERT_TRIGGERED_OR_RESOLVED]"
       }]
+    placeholders:
+      ALERT_TRIGGERED_OR_RESOLVED:
+        TRIGGERED: "2099-12-31T23:59:59Z"
+        RESOLVED: "1970-01-01T00:00:00Z"
     # Applies to every endpoint, so a new one is alerting by default instead of
     # silently unwatched.
     default-alert:
