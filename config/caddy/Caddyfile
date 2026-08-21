@@ -16,7 +16,7 @@
 # ---------- LAN (*.home) ----------
 
 http://ai.home {
-	reverse_proxy 127.0.0.1:3000
+	reverse_proxy {$BIND_IP:127.0.0.1}:3000
 }
 
 http://craftvaria.home {
@@ -25,11 +25,11 @@ http://craftvaria.home {
 
 http://lucky.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:8090
+	reverse_proxy {$BIND_IP:127.0.0.1}:8090
 }
 
 http://lucky.home {
-	reverse_proxy 127.0.0.1:8090
+	reverse_proxy {$BIND_IP:127.0.0.1}:8090
 }
 
 # CoJam public app on cojam.lucassantana.tech (single subdomain, path-routed).
@@ -120,7 +120,7 @@ http://luk-homeserver.com.br, http://www.luk-homeserver.com.br, http://home.luk-
 # forward-auth gate would block. Public exposure relies on HA's own auth — intentional
 # (audit-deep 2026-06-19 reconciliation; do not "fix" without breaking the HA app).
 http://homeassistant.luk-homeserver.com.br {
-	reverse_proxy 127.0.0.1:8123
+	reverse_proxy {$BIND_IP:127.0.0.1}:8123
 }
 
 # No `import protected` by design: Nextcloud has its own login; desktop/mobile sync
@@ -169,7 +169,7 @@ http://n8n.luk-homeserver.com.br {
 
 http://grafana.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:3002
+	reverse_proxy {$BIND_IP:127.0.0.1}:3002
 }
 
 http://prometheus.luk-homeserver.com.br {
@@ -194,7 +194,7 @@ http://status.luk-homeserver.com.br {
 
 http://portainer.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:9000
+	reverse_proxy {$BIND_IP:127.0.0.1}:9000
 }
 
 http://pihole.luk-homeserver.com.br {
@@ -215,12 +215,12 @@ http://wud.luk-homeserver.com.br {
 
 http://paperless.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:8400
+	reverse_proxy {$BIND_IP:127.0.0.1}:8400
 }
 
 http://healthchecks.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:8092 {
+	reverse_proxy {$BIND_IP:127.0.0.1}:8092 {
 		# cloudflared->caddy is plain http; force https so healthchecks (Django,
 		# SECURE_PROXY_SSL_HEADER) treats the request as secure -> login/signup CSRF ok.
 		header_up X-Forwarded-Proto https
@@ -230,7 +230,7 @@ http://healthchecks.luk-homeserver.com.br {
 http://kopia.luk-homeserver.com.br {
 	# tinyauth SSO gate (PR #240) — kopia UI is NOT unauthenticated
 	import protected
-	reverse_proxy 127.0.0.1:51515
+	reverse_proxy {$BIND_IP:127.0.0.1}:51515
 }
 
 # ---------- Catch-all ----------

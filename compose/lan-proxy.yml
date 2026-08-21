@@ -10,6 +10,11 @@ services:
     container_name: caddy-lan
     restart: unless-stopped
     network_mode: host
+    environment:
+      # Upstreams for BIND_IP-published services are written as
+      # {$BIND_IP:127.0.0.1} in the Caddyfile, so Caddy follows the same host
+      # interface the containers publish on. Without this they cannot drift.
+      BIND_IP: ${BIND_IP:-127.0.0.1}
     deploy:
       resources:
         limits:
