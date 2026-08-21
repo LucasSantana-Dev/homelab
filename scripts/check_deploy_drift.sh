@@ -70,21 +70,46 @@ redact() {
     | grep -vE '^[[:space:]]*(#|$)'
 }
 
-# That redaction only understands key/value shapes. Deriving the file list
-# pulled in authorized_keys, shell scripts and JSON, where a secret does not sit
-# on the right of a colon and would survive into the diff. Those files are still
-# COMPARED; only the diff body is withheld.
+# That redaction only understands `KEY: value` on one line, so the diff body is
+# printed only where that shape is the whole file. Two things break it:
+#
+#   - Files we do not author: authorized_keys, shell scripts, JSON. A secret
+#     there does not sit to the right of a colon.
+#   - YAML block scalars (`key: |`). The value lives on the FOLLOWING lines,
+#     which the regex never sees. config/alertmanager/alertmanager.yml and
+#     config/prometheus/alerts.yml both use them today, and an alertmanager
+#     config is exactly where a webhook URL or token lives.
+#
+# Both are still COMPARED. Only the body is withheld.
 diff_is_safe_to_print() {
   case "$1" in
-    *.yml|*.yaml|*/Caddyfile) return 0 ;;
+    compose/*.yml|docker-compose.yml|*/Caddyfile) ;;
     *) return 1 ;;
   esac
+  ! grep -qE ':[[:space:]]*[|>][-+0-9]*[[:space:]]*$' "$1"
+}
+
+# Bash command substitution strips NUL bytes and trailing newlines, so a binary
+# mount read through `$(ssh ... cat)` arrives corrupted and reports drift on
+# every run. Two are mounted today (a .png and a .gz). base64 survives the
+# round trip intact.
+fetch_remote() {
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
+    "base64 < '$REMOTE_DIR/$1'" 2>/dev/null | base64 -d 2>/dev/null
+}
+
+is_binary() {
+  LC_ALL=C grep -qI . "$1" 2>/dev/null && return 1
+  return 0
 }
 
 if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" true 2>/dev/null; then
   echo "ERROR could not reach $SSH_HOST"
   exit 2
 fi
+
+TMP_REMOTE=$(mktemp); TMP_A=$(mktemp); TMP_B=$(mktemp)
+trap 'rm -f "$TMP_REMOTE" "$TMP_A" "$TMP_B"' EXIT
 
 FILES=$(list_deployable_files)
 [ -n "$FILES" ] || { echo "ERROR no deployable files found; run from the repo root"; exit 2; }
@@ -107,14 +132,28 @@ for f in $FILES; do
     continue
   fi
 
-  if ! remote=$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
-        "cat '$REMOTE_DIR/$f'" 2>/dev/null); then
+  if ! fetch_remote "$f" > "$TMP_REMOTE"; then
     unreadable=1
     echo "ERROR $f exists on $SSH_HOST but could not be read (permissions?)"
     continue
   fi
 
-  if diff -q <(printf '%s\n' "$remote" | redact) <(redact < "$f") >/dev/null; then
+  # Binary mounts carry no key/value shape to redact and no readable diff, so
+  # they are compared byte for byte and reported without a body.
+  if is_binary "$f" || is_binary "$TMP_REMOTE"; then
+    if cmp -s "$TMP_REMOTE" "$f"; then
+      echo "OK     $f"
+    else
+      drifted=1
+      echo "DRIFT  $f (binary differs)"
+    fi
+    continue
+  fi
+
+  redact < "$TMP_REMOTE" > "$TMP_A"
+  redact < "$f" > "$TMP_B"
+
+  if cmp -s "$TMP_A" "$TMP_B"; then
     echo "OK     $f"
     continue
   fi
@@ -123,10 +162,10 @@ for f in $FILES; do
   if diff_is_safe_to_print "$f"; then
     echo "DRIFT  $f"
     echo "       < deployed on $SSH_HOST   > this repo"
-    diff <(printf '%s\n' "$remote" | redact) <(redact < "$f") | sed 's/^/       /'
+    diff "$TMP_A" "$TMP_B" | sed 's/^/       /'
   else
-    lines=$(diff <(printf '%s\n' "$remote" | redact) <(redact < "$f") | grep -cE '^[<>]')
-    echo "DRIFT  $f ($lines lines differ; body withheld, redaction is unreliable for this type)"
+    lines=$(diff "$TMP_A" "$TMP_B" | grep -cE '^[<>]')
+    echo "DRIFT  $f ($lines lines differ; body withheld, redaction is unreliable for this file)"
   fi
 done
 
