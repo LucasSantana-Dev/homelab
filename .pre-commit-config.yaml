@@ -60,10 +60,28 @@ repos:
         additional_dependencies: ['bandit[toml]', 'pbr']
 
   # Docker
-  - repo: https://github.com/hadolint/hadolint
-    rev: v2.12.0
+  #
+  # Local hook rather than the upstream repo: hadolint's own `hadolint-docker`
+  # hook hardcodes `ghcr.io/hadolint/hadolint:latest` in its entry, and
+  # pre-commit does not allow overriding `entry` for a remote hook. So `rev:
+  # v2.12.0` pinned the hook *definition* while the actual linter floated -
+  # :latest rolled to 2.15.0, which added two rules that fail Dockerfiles nobody
+  # had touched, and every PR went red at once.
+  #
+  # Pinned by digest (= 2.15.0, the build CI was already running) so the linter
+  # only changes when we change it. Note this is not simply "the old version":
+  # 2.12.0 is clean on the two files below but flags DL3006 and SC2015 on two
+  # others, so rolling back trades one red for another.
+  #
+  # To bump: docker pull ghcr.io/hadolint/hadolint:<tag> && docker inspect
+  # ghcr.io/hadolint/hadolint:<tag> --format '{{index .RepoDigests 0}}'
+  - repo: local
     hooks:
       - id: hadolint-docker
+        name: Lint Dockerfiles
+        language: docker_image
+        types: ["dockerfile"]
+        entry: ghcr.io/hadolint/hadolint@sha256:78cefa24d67e95cac4cdc388652068d0be545bd2926fcbec6f95c1a751d5da32 hadolint
         args: [--ignore, DL3008, --ignore, DL3009]
 
   # Shell scripts

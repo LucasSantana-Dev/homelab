@@ -14,6 +14,7 @@
         serena-mcp-setup k3s-registry-mirror \
         secret-gate secret-gate-history public-safety-gate public-release-checkpoint rewrite-history \
         forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup \
+        brain-mcp-up brain-mcp-down brain-mcp-logs brain-mcp-status \
         sops-status sops-encrypt sops-decrypt sops-verify sops-edit
 
 # Default target
@@ -71,6 +72,24 @@ forge-space-status: ## Show Forge Space MCP Gateway status
 
 forge-space-mcp-setup: ## Register Forge Space MCP client in Codex (requires FORGE_MCP_SERVER_URL and FORGE_MCP_JWT)
 	@./scripts/deployment/setup-forge-space-mcp.sh
+
+brain-mcp-up: ## Deploy the knowledge-brain MCP server (build context must be synced first)
+	@echo "🧠 Starting knowledge-brain MCP..."
+	@docker compose --profile brain-mcp up -d --build brain-mcp brainchat-web
+	@echo "✅ brain-mcp + brainchat-web started (readiness takes ~60s: make brain-mcp-status)"
+
+brain-mcp-down: ## Stop the knowledge-brain MCP server
+	@echo "🛑 Stopping knowledge-brain MCP..."
+	@docker compose --profile brain-mcp stop brain-mcp brainchat-web
+	@echo "✅ brain-mcp stopped"
+
+brain-mcp-logs: ## Tail knowledge-brain MCP logs
+	@docker compose --profile brain-mcp logs -f --tail=100 brain-mcp brainchat-web
+
+brain-mcp-status: ## Show knowledge-brain MCP status and readiness
+	@docker compose --profile brain-mcp ps brain-mcp brainchat-web
+	@printf 'brain-mcp readyz: '; curl -fsS localhost:8098/readyz || echo 'unreachable'
+	@printf 'brainchat-web:    '; curl -fsS localhost:8099/healthz || echo 'unreachable'
 
 status: ## Show status of all services
 	@echo "📊 Homelab Status"
@@ -632,7 +651,11 @@ sops-encrypt: ## Encrypt .env -> .env.enc (commit .env.enc; .env stays gitignore
 	@command -v sops >/dev/null 2>&1 || { echo "sops not installed: brew install sops age"; exit 1; }
 	@[ -n "$(SOPS_AGE_PUB)" ] || { echo "Set a real age public key in .sops.yaml first (docs/secrets.md §Activation)"; exit 1; }
 	@[ -f .env ] || { echo ".env not found"; exit 1; }
-	sops --encrypt --age '$(SOPS_AGE_PUB)' --input-type dotenv --output-type dotenv .env > .env.enc
+	# --filename-override: sops matches creation_rules against the INPUT path,
+	# which is `.env`, but .sops.yaml only has a rule for `^\.env\.enc$` — the
+	# output name. Without this the encrypt dies on "no matching creation rules
+	# found". Verified on sops 3.9.4: exit 1 without the flag, exit 0 with it.
+	sops --encrypt --age '$(SOPS_AGE_PUB)' --input-type dotenv --output-type dotenv --filename-override .env.enc .env > .env.enc
 	@echo "Wrote .env.enc — run 'make sops-verify', then commit .env.enc."
 
 sops-decrypt: ## Decrypt .env.enc -> .env (needs SOPS_AGE_KEY_FILE; run on host before deploy)

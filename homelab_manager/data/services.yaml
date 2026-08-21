@@ -21,6 +21,9 @@ categories:
   automation:
     description: "Home automation services"
     compose_file: "compose/automation.yml"
+  knowledge:
+    description: "Knowledge and retrieval services"
+    compose_file: "compose/brain-mcp.yml"
 
 services:
   # Core Infrastructure
@@ -334,6 +337,37 @@ services:
     description: "Redis cache for Authentik"
     sensitive: true
     has_port: false
+
+  # Knowledge Services
+  brain-mcp:
+    name: "Knowledge Brain MCP"
+    category: knowledge
+    container_name: brain-mcp
+    port: 8098
+    internal_port: 8098
+    # /readyz, not /healthz: the process answers long before the embedder and
+    # corpus are loaded, and a query against a half-warm server just blocks.
+    health_endpoint: "/readyz"
+    health_mode: "http"
+    health_host: "127.0.0.1"
+    expected_statuses: [200]
+    description: "Knowledge-brain MCP server for claude.ai custom connectors (profile: brain-mcp)"
+    sensitive: true
+    localhost_only: true
+
+  brainchat-web:
+    name: "Brainchat Web"
+    category: knowledge
+    container_name: brainchat-web
+    port: 8099
+    internal_port: 8099
+    health_endpoint: "/healthz"
+    health_mode: "http"
+    health_host: "127.0.0.1"
+    expected_statuses: [200]
+    description: "Browser chat over the knowledge brain, behind tinyauth (profile: brain-mcp)"
+    sensitive: true
+    localhost_only: true
 
   # Automation Services
   homeassistant:

@@ -1,0 +1,142 @@
+# brain-mcp: remote MCP server exposing the knowledge brain to claude.ai
+# custom connectors (Settings > Connectors > Add custom connector).
+#
+# Read-only, knowledge-only. The corpus bind-mounted here is a filtered export
+# (memory/standards/plans/handoffs/adrs) produced on the Mac by
+# rag-index/remote/export_knowledge_index.py - source code, git commits and
+# session transcripts are never copied to this host.
+#
+# Behind a `brain-mcp` profile on purpose: the build context lives outside the
+# repo (synced by rag-index/remote/sync-to-homelab.sh), so a missing source dir
+# must not be able to break `make deploy` for the whole stack.
+#
+# Deploy / update:  rag-index/remote/sync-to-homelab.sh --code
+# Corpus refresh:   rag-index/remote/sync-to-homelab.sh
+#
+# Secret required in .env (host-only, then `make sops-encrypt`):
+#   BRAIN_MCP_TOKEN=<openssl rand -hex 32>
+services:
+  brain-mcp:
+    profiles: ["brain-mcp"]
+    build:
+      context: ${BRAIN_MCP_SRC:-/home/luk-server/homelab/appdata/brain-mcp/src}
+      dockerfile: remote/Dockerfile
+    image: brain-mcp:local
+    container_name: brain-mcp
+    restart: unless-stopped
+    environment:
+      # Deliberately `:-` and not `:?`. Compose interpolates every included file
+      # before profiles are applied (verified), so a `:?` here would fail
+      # `docker compose up -d` for the WHOLE stack whenever the token is unset -
+      # the exact coupling the profile exists to prevent. The check still exists,
+      # it just lives in the app: server.py refuses to boot on a token under 32
+      # chars, so a missing value fails this container loudly and nothing else.
+      BRAIN_MCP_TOKEN: ${BRAIN_MCP_TOKEN:-}
+      BRAIN_MCP_ALLOWED_HOSTS: ${BRAIN_MCP_ALLOWED_HOSTS:-*}
+      TZ: ${TIMEZONE:-UTC}
+    volumes:
+      # Read-only: nothing on this host may mutate the corpus.
+      #
+      # `../` resolves against THIS file's directory (compose/), not the project
+      # directory - so this is <repo>/appdata/..., same as cojam. Getting that
+      # backwards points the mount at a path where the file does not exist, and
+      # Docker then silently creates a DIRECTORY with that name; the container
+      # boots, /healthz says 200, and only /readyz stays red. Keep the corpus
+      # under <repo>/appdata (gitignored) and keep sync-to-homelab.sh's DEST in
+      # sync with this path.
+      - ../appdata/brain-mcp/knowledge.sqlite:/data/knowledge.sqlite:ro
+    ports:
+      # Caddy (host network) reverse-proxies to this local port. Never bind 0.0.0.0:
+      # the token check is the only thing between this port and the whole brain.
+      - "${BIND_IP:-127.0.0.1}:8098:8098"
+    networks:
+      - frontend
+    healthcheck:
+      # /readyz is 200 only after the embedder and corpus are loaded, so a
+      # restart shows as "starting" for the ~60s of prewarm instead of flapping.
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8098/readyz')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+    deploy:
+      resources:
+        limits:
+          # torch + e5-small + 5.5k float32 embeddings resident: ~1.2GB observed.
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Browser chat over the same corpus, built on the brainchat gem. Behind
+  # Tinyauth in Caddy (the MCP paths bypass it - claude.ai cannot log in).
+  #
+  # Carries no Python, torch or embedding model: retrieval stays in brain-mcp and
+  # this talks to it over HTTP on the frontend network, so there is exactly one
+  # copy of the index and one place it can go stale.
+  #
+  # Secret required in .env (host-only, then `make sops-encrypt`):
+  #   ANTHROPIC_API_KEY=<key>   (only when BRAINCHAT_PROVIDER is anthropic)
+  brainchat-web:
+    profiles: ["brain-mcp"]
+    build:
+      context: ${BRAIN_MCP_SRC:-/home/luk-server/homelab/appdata/brain-mcp/src}/remote/web
+    image: brainchat-web:local
+    container_name: brainchat-web
+    restart: unless-stopped
+    environment:
+      BRAIN_MCP_TOKEN: ${BRAIN_MCP_TOKEN:-}
+      BRAIN_MCP_URL: http://brain-mcp:8098
+      # Anthropic by default: the value here is citations that hold up, and the
+      # box has no RAM headroom for a model that would manage them.
+      # anthropic | openai | kimi | ollama. Only the selected one's key is
+      # required; the app refuses to boot if it is missing or a placeholder.
+      BRAINCHAT_PROVIDER: ${BRAINCHAT_PROVIDER:-anthropic}
+      BRAINCHAT_MODEL: ${BRAINCHAT_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-}
+      # Kimi speaks the OpenAI wire format; the app points RubyLLM's openai
+      # provider at Moonshot's base URL.
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      MOONSHOT_API_BASE: ${MOONSHOT_API_BASE:-}
+      # Local models. Must be reachable FROM this container - localhost is the
+      # container itself, so point this at the host or another box on the tailnet.
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-}
+      # Spend ceiling that does not depend on remembering to close the tab.
+      BRAINCHAT_MAX_ASKS_PER_HOUR: ${BRAINCHAT_MAX_ASKS_PER_HOUR:-60}
+      TZ: ${TIMEZONE:-UTC}
+    ports:
+      - "${BIND_IP:-127.0.0.1}:8099:8099"
+    networks:
+      - frontend
+    depends_on:
+      brain-mcp:
+        condition: service_healthy
+    healthcheck:
+      # get_response, not get: Net::HTTP.get returns the body and raises nothing on
+      # 404/503, so the container would report healthy while the app was degraded.
+      test: ["CMD-SHELL", "ruby -e \"require 'net/http'; exit 1 unless Net::HTTP.get_response(URI('http://127.0.0.1:8099/healthz')).code.to_i == 200\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

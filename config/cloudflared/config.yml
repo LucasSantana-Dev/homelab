@@ -1,3 +1,26 @@
+# ============================================================================
+# REFERENCE ONLY - THIS FILE DOES NOT ROUTE ANY TRAFFIC.
+#
+# The cloudflared container runs a REMOTELY MANAGED tunnel: compose/core.yml
+# passes TUNNEL_TOKEN and the command is `tunnel --no-autoupdate --metrics ...
+# run` with no --config, and this file is not mounted into the container. The
+# live ingress comes from Cloudflare (Zero Trust > Networks > Tunnels >
+# homelab > Public Hostnames); the logs show it as
+# "Updated to new configuration ... version=N".
+#
+# Consequences, learned the slow way:
+#   - Adding a hostname here does nothing. Add it in the dashboard.
+#   - Restarting cloudflared re-pulls the same remote version; it does not
+#     pick up edits made here.
+#   - This file has already drifted: credentials-file below does not exist in
+#     the container, and the extra_hosts note describes a compose setting the
+#     service no longer declares.
+#
+# Kept because it documents the intended routing shape (everything to
+# host-networked caddy-lan on :80, which does the per-hostname routing). Treat
+# it as a diagram, not as configuration.
+# ============================================================================
+
 tunnel: 5cefde7a-6cd0-4d56-a1e2-67f922433682
 credentials-file: /etc/cloudflared/creds.json
 
@@ -110,6 +133,13 @@ ingress:
     service: http://host.docker.internal:80
     originRequest:
       httpHostHeader: wud.luk-homeserver.com.br
+
+  # Reached only by the profile repo's card workflow; Caddy refuses requests
+  # that do not carry the matching X-Stats-Key header.
+  - hostname: stats.lucassantana.tech
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: stats.lucassantana.tech
 
   # Final catch-all — cloudflared returns 404 for any hostname not listed above.
   - service: http_status:404
