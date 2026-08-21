@@ -76,6 +76,8 @@ endpoints:
       - "[RESPONSE_TIME] < 1500"
     alerts:
       - type: custom
+        # 5 x 60s = 5min; passa pelo tunel publico
+        failure-threshold: 5
 
   - name: Nextcloud
     group: storage
@@ -140,6 +142,8 @@ endpoints:
       - "[CONNECTED] == true"
     alerts:
       - type: custom
+        # 10 x 30s = 5min sustentado; ICMP a cada 30s pisca em qualquer blip de ISP
+        failure-threshold: 10
 
   # CoJam, checked from OUTSIDE the tunnel on purpose. The #264 outage was a
   # 502 at Caddy while the containers were healthy, so any in-network probe
@@ -153,6 +157,8 @@ endpoints:
       - "[RESPONSE_TIME] < 3000"
     alerts:
       - type: custom
+        # 5 x 60s = 5min; passa pelo tunel publico
+        failure-threshold: 5
 
   # /api/* is the only prefix Caddy routes to the Go server, so this is the
   # public health path; /readyz is not reachable from outside.
@@ -165,3 +171,5 @@ endpoints:
       - "[RESPONSE_TIME] < 3000"
     alerts:
       - type: custom
+        # 5 x 60s = 5min; passa pelo tunel publico
+        failure-threshold: 5
