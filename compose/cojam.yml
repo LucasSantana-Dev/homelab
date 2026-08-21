@@ -57,8 +57,11 @@ services:
       CORS_ORIGINS: ${COJAM_CORS_ORIGINS:-}
       TZ: ${TIMEZONE:-UTC}
     ports:
-      # Caddy (host network) reverse-proxies to this local port.
-      - "${BIND_IP:-127.0.0.1}:8094:8080"
+      # Pinned to loopback, deliberately NOT ${BIND_IP}. CoJam is a public app
+      # whose only ingress is caddy-lan, which runs on the host network and
+      # proxies 127.0.0.1:8094 (config/caddy/Caddyfile). Following BIND_IP
+      # moves the listener off loopback and 502s the public site.
+      - "127.0.0.1:8094:8080"
     networks:
       - frontend
       - database
@@ -102,7 +105,8 @@ services:
       COJAM_SPOTIFY_CLIENT_ID: ${COJAM_SPOTIFY_CLIENT_ID:-}
       TZ: ${TIMEZONE:-UTC}
     ports:
-      - "${BIND_IP:-127.0.0.1}:8096:3000"
+      # Loopback-pinned for the same reason as cojam-server above.
+      - "127.0.0.1:8096:3000"
     networks:
       - frontend
     depends_on:
