@@ -127,7 +127,11 @@ endpoints:
 
   - name: Portainer
     group: infrastructure
-    url: http://host.docker.internal:9000/api/system/status
+    # Docker DNS, not host.docker.internal: portainer publishes only on the
+    # Tailscale IP, so the host-gateway address cannot reach it and this check
+    # failed on every run. It was invisible until alerting started working.
+    # Same shape as the nextcloud and stremio entries above.
+    url: http://portainer:9000/api/system/status
     interval: 60s
     conditions:
       - "[STATUS] == 200"
