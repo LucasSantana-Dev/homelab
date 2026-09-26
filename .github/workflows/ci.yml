@@ -111,6 +111,17 @@ jobs:
       with:
         persist-credentials: false
 
+    - name: Validate Caddyfile
+      # PR #427 merged a Caddyfile that caddy rejects (`handle` takes one inline path);
+      # every check was green. A reload on the host keeps the old config, but a restart
+      # of caddy-lan with that file takes down every public host. The image is the
+      # compose default; GITHUB_STATS_KEY is the only {$VAR} without a default.
+      run: |
+        img=$(grep -m1 -oE 'caddy:[0-9][^}"[:space:]]*' compose/lan-proxy.yml)
+        docker run --rm -e GITHUB_STATS_KEY=ci-placeholder \
+          -v "$PWD/config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+          "$img" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
     - name: Set up environment variables
       run: |
         cat > .env << EOF
