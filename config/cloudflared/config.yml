@@ -141,5 +141,11 @@ ingress:
     originRequest:
       httpHostHeader: stats.lucassantana.tech
 
+  # Static home + privacy pages for the operator's rclone Google OAuth client.
+  - hostname: rclone.luk-homeserver.com.br
+    service: http://host.docker.internal:80
+    originRequest:
+      httpHostHeader: rclone.luk-homeserver.com.br
+
   # Final catch-all — cloudflared returns 404 for any hostname not listed above.
   - service: http_status:404
