@@ -14,14 +14,13 @@ Usage (on the host, from the repo root):
 
 The file is replaced only after every request succeeded, so a network or token
 error leaves the previous snapshot in place. Reads CLOUDFLARE_API_TOKEN from the
-environment, else from ./.env. The account and tunnel come from
-infra/terraform/terraform.tfvars (account_id, tunnel_id), or the CF_ACCOUNT_ID /
-CF_TUNNEL_ID environment variables.
+environment, else from ./.env. The account is the one that owns the zones the
+token can read (override: CF_ACCOUNT_ID); the tunnel is looked up by name
+(CF_TUNNEL_NAME, default "homelab").
 """
 
 import json
 import os
-import re
 import sys
 import tempfile
 import urllib.error
@@ -29,17 +28,6 @@ import urllib.request
 
 API = "https://api.cloudflare.com/client/v4/"
 KEEP_CONTENT_TYPES = {"CNAME"}
-
-
-def setting(name, env_key, pattern):
-    if os.environ.get(env_key):
-        return os.environ[env_key]
-    path = "infra/terraform/terraform.tfvars"
-    if os.path.exists(path):
-        m = re.search(pattern, open(path).read(), re.M)
-        if m:
-            return m.group(1)
-    sys.exit(f"missing {name}: set {env_key} or add it to {path}")
 
 
 def token():
@@ -83,13 +71,22 @@ def main():
         sys.exit(f"usage: {sys.argv[0]} <output.json>")
     out_path = sys.argv[1]
     tok = token()
-    account = setting("account_id", "CF_ACCOUNT_ID", r'^account_id\s*=\s*"([^"]+)"')
-    tunnel_id = setting("tunnel_id", "CF_TUNNEL_ID", r'^tunnel_id\s*=\s*"([^"]+)"')
+    all_zones = get(tok, "zones")
+    accounts = {z["account"]["id"] for z in all_zones}
+    account = os.environ.get("CF_ACCOUNT_ID") or (
+        accounts.pop() if len(accounts) == 1 else None
+    )
+    if not account:
+        sys.exit(f"token reads {len(accounts)} accounts: set CF_ACCOUNT_ID")
 
     tunnels = {
         t["id"]: t["name"]
         for t in get(tok, f"accounts/{account}/cfd_tunnel?is_deleted=false")
     }
+    name = os.environ.get("CF_TUNNEL_NAME", "homelab")
+    tunnel_id = next((tid for tid, n in tunnels.items() if n == name), None)
+    if not tunnel_id:
+        sys.exit(f"no tunnel named {name!r} in account")
 
     def tunnel_label(value):
         for tid, name in tunnels.items():
@@ -117,14 +114,21 @@ def main():
     # projects), and their records do not belong in the homelab's public repo.
     hosts = [r["hostname"] for r in ingress if "hostname" in r]
     zones = {}
-    for zone in sorted(get(tok, "zones"), key=lambda z: z["name"]):
+    for zone in sorted(all_zones, key=lambda z: z["name"]):
         if not any(h == zone["name"] or h.endswith("." + zone["name"]) for h in hosts):
             continue
         records = []
         for rec in get(tok, f"zones/{zone['id']}/dns_records"):
+            ours = tunnel_id in rec["content"]
+            # Only this tunnel's records: the zones also hold other projects'
+            # hostnames, and a full list in a public repo is a recon map.
+            if rec["name"] not in hosts and not ours:
+                continue
+            # A CNAME at an ingress host that targets something else is drift
+            # worth seeing, but its target (maybe another tunnel) stays out.
             content = (
                 tunnel_label(rec["content"])
-                if rec["type"] in KEEP_CONTENT_TYPES
+                if rec["type"] in KEEP_CONTENT_TYPES and ours
                 else "<redacted>"
             )
             records.append(
