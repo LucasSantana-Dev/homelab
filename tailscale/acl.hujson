@@ -106,7 +106,7 @@
 		{
 			"src":    "group:friends",
 			"accept": ["tag:homelab-friends-exposed:8096", "tag:homelab-friends-exposed:11470"],
-			"deny":   ["tag:homelab-friends-exposed:22", "tag:homelab:3000", "tag:homelab-friends-exposed:9091"],
+			"deny":   ["tag:homelab-friends-exposed:22", "tag:homelab:3000", "tag:homelab-friends-exposed:9091", "tag:homelab-friends-exposed:25565"],
 		},
 		{
 			"src":    "tag:laptop",
