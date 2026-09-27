@@ -158,6 +158,10 @@
       }
     },
     {
+      "hostname": "*.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
       "service": "http_status:404"
     }
   ],
@@ -183,6 +187,12 @@
       }
     ],
     "luk-homeserver.com.br": [
+      {
+        "name": "*.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
       {
         "name": "auth.luk-homeserver.com.br",
         "type": "CNAME",
