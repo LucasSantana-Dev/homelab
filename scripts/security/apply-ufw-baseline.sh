@@ -39,7 +39,6 @@ done <<'SPECS'
 53|udp|pihole DNS
 80|tcp|nginx/caddy http
 443|tcp|nginx/caddy https
-3000|tcp|open-webui
 5000|tcp|docker-registry
 5353|udp|mDNS (avahi)
 8054|tcp|pihole admin
