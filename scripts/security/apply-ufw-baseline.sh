@@ -16,6 +16,11 @@ sudo ufw allow 22/tcp comment "SSH"
 sudo ufw delete allow 3389/tcp 2>/dev/null || true
 sudo ufw allow from "$LAN" to any port 3389 proto tcp comment "LAN: RDP"
 
+# Retired services: delete their LAN rules so a re-run converges.
+for spec in 3000/tcp 3333/tcp 24454/udp 25565/tcp; do
+    sudo ufw delete allow from "$LAN" to any port "${spec%/*}" proto "${spec#*/}" 2>/dev/null || true
+done
+
 # Lucky Discord voice — WAN (inbound UDP needed for Discord voice).
 sudo ufw allow 45000:60000/udp comment "Lucky Discord voice UDP"
 
