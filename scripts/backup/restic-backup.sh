@@ -10,11 +10,10 @@ set -euo pipefail
 # - RESTIC_PASSWORD_FILE env var: Path to file containing restic repo password
 # - RESTIC_PASSWORD or prompt if missing
 #
-# Backs up: postgres, redis, craftvaria world, caddy config, pihole config, compose files
+# Backs up: postgres, redis, caddy config, pihole config, compose files
 
 BACKUP_DIR="${BACKUP_DIR:-.}"
 COMPOSE_DIR="${COMPOSE_DIR:-.}"
-CRAFTVARIA_WORLD_DIR="${CRAFTVARIA_WORLD_DIR:-appdata/craftvaria/world}"
 CADDY_CONFIG_DIR="${CADDY_CONFIG_DIR:-config/caddy}"
 PIHOLE_CONFIG_DIR="${PIHOLE_CONFIG_DIR:-appdata/pihole}"
 HOMEASSISTANT_CONFIG_DIR="${HOMEASSISTANT_CONFIG_DIR:-config/homeassistant/config}"
@@ -45,7 +44,7 @@ echo "[$(date)] Starting homelab backup..."
 
 # 1. Postgres dumps (all databases)
 echo "[$(date)] Backing up Postgres databases..."
-for db in postgres craftvaria lucky; do
+for db in postgres lucky; do
   docker exec homelab-postgres-1 pg_dump -U postgres "$db" > "$TEMP_DIR/$db.sql" 2>/dev/null || echo "Warning: Could not dump database $db"
 done
 
@@ -53,14 +52,6 @@ done
 echo "[$(date)] Backing up Redis..."
 docker exec homelab-redis-1 redis-cli BGSAVE > /dev/null 2>&1 || echo "Warning: Redis BGSAVE failed"
 docker cp homelab-redis-1:/data/dump.rdb "$TEMP_DIR/redis-dump.rdb" 2>/dev/null || echo "Warning: Could not copy Redis dump"
-
-# 3. Craftvaria world directory
-if [ -d "$CRAFTVARIA_WORLD_DIR" ]; then
-  echo "[$(date)] Backing up Craftvaria world..."
-  cp -r "$CRAFTVARIA_WORLD_DIR" "$TEMP_DIR/craftvaria-world"
-else
-  echo "Warning: Craftvaria world dir not found at $CRAFTVARIA_WORLD_DIR"
-fi
 
 # 4. Caddy config
 if [ -d "$CADDY_CONFIG_DIR" ]; then

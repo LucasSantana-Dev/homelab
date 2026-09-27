@@ -40,13 +40,10 @@ done <<'SPECS'
 80|tcp|nginx/caddy http
 443|tcp|nginx/caddy https
 3000|tcp|open-webui
-3333|tcp|craftvaria-admin
 5000|tcp|docker-registry
 5353|udp|mDNS (avahi)
 8054|tcp|pihole admin
 8090|tcp|lucky-nginx
-24454|udp|minecraft-voicechat
-25565|tcp|minecraft-java
 SPECS
 
 sudo ufw reload

@@ -47,7 +47,6 @@
 				"tag:homelab-friends-exposed:8920",   // Jellyfin (HTTPS)
 				"tag:homelab-friends-exposed:11470",  // Stremio server
 				"tag:homelab-friends-exposed:12470",  // Stremio alt
-				"tag:homelab-friends-exposed:25565",  // Craftvaria Minecraft
 			],
 		},
 
@@ -61,7 +60,6 @@
 				"tag:homelab-friends-exposed:8920",
 				"tag:homelab-friends-exposed:11470",
 				"tag:homelab-friends-exposed:12470",
-				"tag:homelab-friends-exposed:25565",
 			],
 		},
 
@@ -107,7 +105,7 @@
 		},
 		{
 			"src":    "group:friends",
-			"accept": ["tag:homelab-friends-exposed:8096", "tag:homelab-friends-exposed:25565"],
+			"accept": ["tag:homelab-friends-exposed:8096", "tag:homelab-friends-exposed:11470"],
 			"deny":   ["tag:homelab-friends-exposed:22", "tag:homelab:3000", "tag:homelab-friends-exposed:9091"],
 		},
 		{

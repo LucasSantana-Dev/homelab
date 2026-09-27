@@ -32,7 +32,6 @@ Access, and hit TLS-cert mismatch errors.
 | Home Assistant | — | `ha.homelab.example.com` | `homeassistant.luk-homeserver.com.br` | CF Access policy required |
 | Jellyfin | — | Tailscale direct :8096 | — | Friends path; see `tailscale-friends-sharing.md` |
 | Stremio | `stremio.home` | Tailscale direct :11470 | — | Friends path |
-| Craftvaria (Minecraft) | — | Tailscale direct :25565 | — | TCP, not HTTPS — CF Tunnel can't help |
 | Grafana | — | via `tailscale serve` | `grafana.luk-homeserver.com.br` | CF Access gated |
 | Portainer | — | via `tailscale serve` | `portainer.luk-homeserver.com.br` | CF Access gated (critical) |
 | n8n | — | via `tailscale serve` | `n8n.luk-homeserver.com.br` | CF Access gated |
@@ -57,7 +56,7 @@ the phase-1 doc for the full allow-list.
 ## Layer-choice rules
 
 - **Needs browser access from anywhere** → CF Tunnel + Access policy.
-- **Needs raw-TCP access** (Minecraft, SSH) → Tailscale.
+- **Needs raw-TCP access** (SSH) → Tailscale.
 - **Needs zero-config guest access** (close friends) → Tailscale node sharing.
 - **Only used inside the house** → LAN `*.home`.
 - **Admin-only** → Tailscale (never CF Tunnel, even gated).
