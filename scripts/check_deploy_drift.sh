@@ -40,8 +40,8 @@ for manifest in manifests:
     base = os.path.dirname(manifest) or '.'
     try:
         doc = yaml.safe_load(open(manifest)) or {}
-    except yaml.YAMLError:
-        continue  # a malformed manifest is the yaml linter's problem, not ours
+    except (yaml.YAMLError, OSError, UnicodeDecodeError):
+        continue  # a malformed or unreadable manifest is not ours to fix
     for service in (doc.get('services') or {}).values():
         for volume in (service.get('volumes') or []):
             source = volume.split(':')[0] if isinstance(volume, str) else (volume.get('source') or '')
@@ -81,12 +81,25 @@ redact() {
 #     config is exactly where a webhook URL or token lives.
 #
 # Both are still COMPARED. Only the body is withheld.
+#
+# Checked against BOTH sides: the repo file alone is not enough. A block
+# scalar the host copy grew (drift the repo has never seen, so it cannot
+# appear in the repo file) would otherwise slip past this gate unredacted,
+# since redact() cannot touch a value that lives on the following lines.
 diff_is_safe_to_print() {
   case "$1" in
     compose/*.yml|docker-compose.yml|*/Caddyfile) ;;
     *) return 1 ;;
   esac
-  ! grep -qE ':[[:space:]]*[|>][-+0-9]*[[:space:]]*$' "$1"
+  ! grep -qE ':[[:space:]]*[|>][-+0-9]*[[:space:]]*$' "$1" "$2"
+}
+
+# A remote path built from REMOTE_DIR and a repo-relative filename, quoted
+# for the remote shell with printf %q so an apostrophe (or any other shell
+# metacharacter) in either piece cannot break out of the intended command and
+# run something else on the host.
+remote_quote() {
+  printf '%q' "$REMOTE_DIR/$1"
 }
 
 # Bash command substitution strips NUL bytes and trailing newlines, so a binary
@@ -94,8 +107,10 @@ diff_is_safe_to_print() {
 # every run. Two are mounted today (a .png and a .gz). base64 survives the
 # round trip intact.
 fetch_remote() {
+  local quoted
+  quoted=$(remote_quote "$1")
   ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
-    "base64 < '$REMOTE_DIR/$1'" 2>/dev/null | base64 -d 2>/dev/null
+    "base64 < $quoted" 2>/dev/null | base64 -d 2>/dev/null
 }
 
 is_binary() {
@@ -125,10 +140,22 @@ for f in $FILES; do
   # a file the host never received is drift (the repo ships config production
   # does not have), while a file that exists but cannot be read is a broken
   # comparison and must not be reported as either in sync or drifted.
-  if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
-        "test -f '$REMOTE_DIR/$f'" 2>/dev/null; then
+  #
+  # The remote `test -f`'s own exit code distinguishes ABSENT (exit 1: the
+  # command ran and the file is not there) from an SSH/connection failure
+  # (any other nonzero exit, e.g. 255): the latter proves nothing about
+  # whether the file exists and must not be reported as drift.
+  quoted_f=$(remote_quote "$f")
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
+        "test -f $quoted_f" 2>/dev/null
+  rc=$?
+  if [ "$rc" -eq 1 ]; then
     drifted=1
     echo "ABSENT $f (never deployed to $SSH_HOST)"
+    continue
+  elif [ "$rc" -ne 0 ]; then
+    unreadable=1
+    echo "ERROR $f: could not check existence on $SSH_HOST (ssh exit $rc)"
     continue
   fi
 
@@ -159,7 +186,7 @@ for f in $FILES; do
   fi
 
   drifted=1
-  if diff_is_safe_to_print "$f"; then
+  if diff_is_safe_to_print "$f" "$TMP_REMOTE"; then
     echo "DRIFT  $f"
     echo "       < deployed on $SSH_HOST   > this repo"
     diff "$TMP_A" "$TMP_B" | sed 's/^/       /'
