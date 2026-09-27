@@ -59,13 +59,6 @@
       }
     },
     {
-      "hostname": "docs.luk-homeserver.com.br",
-      "service": "http://host.docker.internal:80",
-      "originRequest": {
-        "httpHostHeader": "docs.luk-homeserver.com.br"
-      }
-    },
-    {
       "hostname": "auth.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
       "originRequest": {
@@ -183,55 +176,7 @@
         "proxied": true
       },
       {
-        "name": "dev.luk-homeserver.com.br.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "healthchecks.luk-homeserver.com.br.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "kopia.luk-homeserver.com.br.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "manager.luk-homeserver.com.br.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "paperless.luk-homeserver.com.br.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "pihole.luk-homeserver.com.br.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "portainer.luk-homeserver.com.br.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
         "name": "stats.lucassantana.tech",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "wud.luk-homeserver.com.br.lucassantana.tech",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
         "proxied": true
@@ -252,24 +197,6 @@
       },
       {
         "name": "cloud.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "dev.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "docs.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "files.luk-homeserver.com.br",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
         "proxied": true
@@ -396,12 +323,6 @@
       },
       {
         "name": "stremio.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "vault.luk-homeserver.com.br",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
         "proxied": true
