@@ -1,6 +1,5 @@
 [Unit]
 Description=Homelab compose services exporter (every 15 minutes)
-Requires=compose-services-exporter.service
 
 [Timer]
 OnBootSec=10min

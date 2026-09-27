@@ -355,7 +355,13 @@ groups:
           description: "lynis is missing or failed; see /var/log/homelab/security/lynis.log."
 
       - alert: HostHardeningIndexDropped
-        expr: host_lynis_hardening_index < (host_lynis_hardening_index offset 7d) - 2
+        # Retention is 72h (compose/monitoring.yml), so offset 7d would never
+        # match. The gauge changes once a week: for two days after a run,
+        # offset 2d still holds last week's value. Both sides need a good run.
+        expr: >
+          host_lynis_hardening_index < (host_lynis_hardening_index offset 2d) - 2
+          and on() host_lynis_ok == 1
+          and on() (host_lynis_ok offset 2d) == 1
         for: 1h
         labels:
           severity: warning

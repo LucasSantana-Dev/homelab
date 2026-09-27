@@ -19,10 +19,13 @@ set -uo pipefail
 REPO_DIR="${REPO_DIR:-/home/luk-server/homelab}"
 TEXTFILE_DIR="${TEXTFILE_DIR:-/var/lib/node_exporter/textfile}"
 METRIC_FILE="${TEXTFILE_DIR}/homelab-compose-services.prom"
-TEMP_FILE="$(mktemp "${TEXTFILE_DIR}/.homelab-compose-services.XXXXXX")"
+
+die() { echo "compose-services-exporter: $*" >&2; exit 1; }
+mkdir -p "$TEXTFILE_DIR" || die "cannot create $TEXTFILE_DIR"
+TEMP_FILE="$(mktemp "${TEXTFILE_DIR}/.homelab-compose-services.XXXXXX")" || die "mktemp failed"
 trap 'rm -f "$TEMP_FILE"' EXIT
 
-cd "$REPO_DIR" || exit 1
+cd "$REPO_DIR" || die "cannot cd to $REPO_DIR"
 ok=1
 expected=$(docker compose config --services 2>/dev/null) || ok=0
 running=$(docker compose ps --status running --format '{{.Service}}' 2>/dev/null) || ok=0
@@ -53,7 +56,8 @@ running=$(docker compose ps --status running --format '{{.Service}}' 2>/dev/null
   echo "homelab_compose_exporter_last_run_timestamp_seconds $(date +%s)"
 } > "$TEMP_FILE"
 
-chmod 644 "$TEMP_FILE"
-mv "$TEMP_FILE" "$METRIC_FILE"
+chmod 644 "$TEMP_FILE" || die "chmod failed"
+mv "$TEMP_FILE" "$METRIC_FILE" || die "could not publish $METRIC_FILE"
 trap - EXIT
 echo "ok=$ok not_running=$missing"
+[ "$ok" = 1 ] || exit 1
