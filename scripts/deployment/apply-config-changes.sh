@@ -141,14 +141,22 @@ reload_via_hup() {
 
 if $caddy_changed; then
     echo "🔁 config/caddy/Caddyfile changed, validating before restarting caddy-lan (file bind-mount; compose up -d won't recreate it)..."
-    # The bind mount is live, so the container already sees the new file even
-    # before a restart: validate it in place first. An invalid Caddyfile must
-    # never take the proxy down, so a failed validation skips the restart
-    # entirely and leaves caddy-lan serving the last-known-good config.
-    if ! docker exec caddy-lan caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    # The single-file bind mount is pinned to the inode the container started
+    # with; git replaces the file with a new inode, so until the restart
+    # /etc/caddy/Caddyfile inside the container is still the OLD file.
+    # Validating it in place would check the old config. Copy the new host
+    # file in and validate that copy (the container has the env the
+    # Caddyfile placeholders need). An invalid Caddyfile must never take the
+    # proxy down, so a failed validation skips the restart and leaves
+    # caddy-lan serving the last-known-good config.
+    pending=/tmp/Caddyfile.pending
+    if ! { docker cp config/caddy/Caddyfile "caddy-lan:${pending}" >/dev/null 2>&1 \
+            && docker exec caddy-lan caddy validate --config "$pending" --adapter caddyfile >/dev/null 2>&1; }; then
+        docker exec caddy-lan rm -f "$pending" >/dev/null 2>&1 || true
         echo "❌ new Caddyfile fails \`caddy validate\`, refusing to restart caddy-lan (left running on the old, valid config)" >&2
         errors=$((errors + 1))
     else
+        docker exec caddy-lan rm -f "$pending" >/dev/null 2>&1 || true
         restart_count_before="$(docker inspect -f '{{.RestartCount}}' caddy-lan 2>/dev/null || echo 0)"
         if ! docker restart caddy-lan >/dev/null 2>&1; then
             echo "❌ failed to restart caddy-lan" >&2

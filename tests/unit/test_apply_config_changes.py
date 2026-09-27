@@ -59,6 +59,10 @@ case "$1" in
         fi
         exit 0
         ;;
+    cp)
+        [[ "${FAKE_DOCKER_CP_FAIL:-0}" == "1" ]] && exit 1
+        exit 0
+        ;;
     restart)
         [[ "${FAKE_DOCKER_RESTART_FAIL:-0}" == "1" ]] && exit 1
         exit 0
@@ -206,7 +210,10 @@ def test_caddyfile_change_restarts_and_verifies_caddy_lan(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     log_text = log.read_text()
-    assert "exec caddy-lan caddy validate" in log_text
+    # the NEW host file is copied in and validated, not the stale in-container
+    # bind-mount inode
+    assert "cp config/caddy/Caddyfile caddy-lan:/tmp/Caddyfile.pending" in log_text
+    assert "exec caddy-lan caddy validate --config /tmp/Caddyfile.pending" in log_text
     assert "restart caddy-lan" in log_text
     assert "exec caddy-lan cat /etc/caddy/Caddyfile" in log_text
     assert "kill -s HUP prometheus" not in log_text
