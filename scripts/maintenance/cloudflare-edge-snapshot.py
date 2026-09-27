@@ -5,26 +5,30 @@ The live tunnel ingress is remotely managed (Zero Trust dashboard), so git has n
 record of which hostnames are public. This writes one, for disaster recovery and
 drift checks against config/caddy/Caddyfile. It only issues GET requests.
 
-The output is committed to a public repo, so it keeps structure and drops values
-that should not be public: A/AAAA/TXT/MX contents are redacted and tunnel UUIDs are
-replaced by tunnel names.
+The output is committed to a public repo, so record contents are an allowlist:
+only CNAME targets are kept (tunnel UUIDs replaced by tunnel names); every other
+record type, including ones added to Cloudflare later, is written as <redacted>.
 
 Usage (on the host, from the repo root):
-    python3 scripts/maintenance/cloudflare-edge-snapshot.py > config/cloudflared/edge-snapshot.json
+    python3 scripts/maintenance/cloudflare-edge-snapshot.py config/cloudflared/edge-snapshot.json
 
-Reads CLOUDFLARE_API_TOKEN from the environment, else from ./.env. The account and
-tunnel come from infra/terraform/terraform.tfvars (account_id, tunnel_id), or the
-CF_ACCOUNT_ID / CF_TUNNEL_ID environment variables.
+The file is replaced only after every request succeeded, so a network or token
+error leaves the previous snapshot in place. Reads CLOUDFLARE_API_TOKEN from the
+environment, else from ./.env. The account and tunnel come from
+infra/terraform/terraform.tfvars (account_id, tunnel_id), or the CF_ACCOUNT_ID /
+CF_TUNNEL_ID environment variables.
 """
 
 import json
 import os
 import re
 import sys
+import tempfile
+import urllib.error
 import urllib.request
 
 API = "https://api.cloudflare.com/client/v4/"
-REDACT_TYPES = {"A", "AAAA", "TXT", "MX", "SRV", "CAA"}
+KEEP_CONTENT_TYPES = {"CNAME"}
 
 
 def setting(name, env_key, pattern):
@@ -56,8 +60,12 @@ def get(tok, path):
             f"{API}{path}{sep}per_page=100&page={page}",
             headers={"Authorization": f"Bearer {tok}"},
         )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            body = json.load(r)
+        try:
+            # The URL always starts with the constant https API base above.
+            with urllib.request.urlopen(req, timeout=30) as r:  # nosec B310
+                body = json.load(r)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            sys.exit(f"GET {path} failed: {e}")
         if not body.get("success"):
             sys.exit(f"GET {path} failed: {body.get('errors')}")
         result = body["result"]
@@ -71,6 +79,9 @@ def get(tok, path):
 
 
 def main():
+    if len(sys.argv) != 2:
+        sys.exit(f"usage: {sys.argv[0]} <output.json>")
+    out_path = sys.argv[1]
     tok = token()
     account = setting("account_id", "CF_ACCOUNT_ID", r'^account_id\s*=\s*"([^"]+)"')
     tunnel_id = setting("tunnel_id", "CF_TUNNEL_ID", r'^tunnel_id\s*=\s*"([^"]+)"')
@@ -85,7 +96,9 @@ def main():
             value = value.replace(tid, f"<tunnel:{name}>")
         return value
 
-    cfg = get(tok, f"accounts/{account}/cfd_tunnel/{tunnel_id}/configurations")
+    cfg = (
+        get(tok, f"accounts/{account}/cfd_tunnel/{tunnel_id}/configurations") or {}
+    ).get("config") or {}
     ingress = [
         {
             k: v
@@ -93,13 +106,11 @@ def main():
                 "hostname": rule.get("hostname"),
                 "path": rule.get("path"),
                 "service": rule.get("service"),
-                "httpHostHeader": (rule.get("originRequest") or {}).get(
-                    "httpHostHeader"
-                ),
+                "originRequest": rule.get("originRequest"),
             }.items()
             if v
         }
-        for rule in ((cfg or {}).get("config") or {}).get("ingress", [])
+        for rule in cfg.get("ingress", [])
     ]
 
     # Only zones this tunnel serves: the token also reads unrelated zones (other
@@ -112,9 +123,9 @@ def main():
         records = []
         for rec in get(tok, f"zones/{zone['id']}/dns_records"):
             content = (
-                "<redacted>"
-                if rec["type"] in REDACT_TYPES
-                else tunnel_label(rec["content"])
+                tunnel_label(rec["content"])
+                if rec["type"] in KEEP_CONTENT_TYPES
+                else "<redacted>"
             )
             records.append(
                 {
@@ -126,16 +137,19 @@ def main():
             )
         zones[zone["name"]] = sorted(records, key=lambda r: (r["name"], r["type"]))
 
-    json.dump(
-        {
-            "tunnel": tunnels.get(tunnel_id, "<unknown>"),
-            "ingress": ingress,
-            "dns": zones,
-        },
-        sys.stdout,
-        indent=2,
-    )
-    sys.stdout.write("\n")
+    snapshot = {
+        "tunnel": tunnels.get(tunnel_id, "<unknown>"),
+        "originRequest": cfg.get("originRequest") or {},
+        "ingress": ingress,
+        "dns": zones,
+    }
+    out_dir = os.path.dirname(os.path.abspath(out_path))
+    with tempfile.NamedTemporaryFile(
+        "w", dir=out_dir, delete=False, suffix=".tmp"
+    ) as f:
+        json.dump(snapshot, f, indent=2)
+        f.write("\n")
+    os.replace(f.name, out_path)
     print(
         f"ingress rules: {len(ingress)}; zones: "
         + ", ".join(f"{z} ({len(r)} records)" for z, r in zones.items()),

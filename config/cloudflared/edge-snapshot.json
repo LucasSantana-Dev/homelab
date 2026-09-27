@@ -1,90 +1,125 @@
 {
   "tunnel": "homelab",
+  "originRequest": {},
   "ingress": [
     {
       "hostname": "luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "www.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "www.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "www.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "home.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "home.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "home.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "homeassistant.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "homeassistant.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "homeassistant.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "grafana.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "grafana.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "grafana.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "prometheus.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "prometheus.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "prometheus.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "n8n.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "n8n.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "n8n.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "cloud.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "cloud.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "cloud.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "docs.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "docs.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "docs.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "auth.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "auth.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "auth.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "blackbox.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "blackbox.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "blackbox.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "stremio.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "stremio.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "stremio.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "linkding.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "linkding.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "linkding.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "miniflux.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "miniflux.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "miniflux.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "forgejo.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "forgejo.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "forgejo.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "status.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "status.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "status.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "portainer.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
-      "httpHostHeader": "portainer.luk-homeserver.com.br"
+      "originRequest": {
+        "httpHostHeader": "portainer.luk-homeserver.com.br"
+      }
     },
     {
       "hostname": "manager.luk-homeserver.com.br",
@@ -121,6 +156,13 @@
     {
       "hostname": "brain.lucassantana.tech",
       "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "rclone.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "rclone.luk-homeserver.com.br"
+      }
     },
     {
       "service": "http_status:404"
@@ -498,6 +540,12 @@
       },
       {
         "name": "prometheus.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "rclone.luk-homeserver.com.br",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
         "proxied": true
