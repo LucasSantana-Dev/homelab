@@ -1,7 +1,7 @@
 # Homelab Management Makefile
 # Provides convenient targets for homelab operations
 
-.PHONY: help install validate-env deploy status logs health backup restore security-scan monitor clean test \
+.PHONY: help install validate-env deploy pull-deploy status logs health backup restore security-scan monitor clean test \
         update update-safe update-timer-install update-timer-status update-timer-enable update-timer-disable \
         image-lock-status image-lock-refresh image-lock-refresh-dry-run \
         watchdog-install watchdog-status watchdog-run-now watchdog-disable automation-reconcile \
@@ -50,8 +50,21 @@ deploy: validate-env ## Deploy all homelab services
 	fi
 	@echo "🚀 Deploying homelab services..."
 	docker compose up -d --build
-	@bash scripts/deployment/record-deploy-health.sh
+	@old_sha="$$(bash scripts/deployment/deployed-sha.sh read)"; \
+	apply_status=0; \
+	bash scripts/deployment/apply-config-changes.sh "$$old_sha" || apply_status=$$?; \
+	bash scripts/deployment/record-deploy-health.sh; health_status=$$?; \
+	if [ "$$apply_status" -ne 0 ] || [ "$$health_status" -ne 0 ]; then \
+		echo "❌ make deploy: config-apply or health-check failed (apply=$$apply_status health=$$health_status)"; \
+		exit 1; \
+	fi; \
+	bash scripts/deployment/deployed-sha.sh write || echo "⚠️  deployed-sha: failed to persist deployed SHA (non-fatal, see above)"
 	@echo "✅ Deployment complete"
+
+pull-deploy: ## Preflight tracked-file ownership, git pull --ff-only, then deploy (config reload/restart included)
+	@bash scripts/deployment/preflight-pull.sh
+	git pull --ff-only
+	@$(MAKE) deploy
 
 forge-space-up: ## Deploy Forge Space MCP Gateway profile
 	@echo "🧠 Starting Forge Space MCP Gateway..."
