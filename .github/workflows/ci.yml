@@ -118,8 +118,8 @@ jobs:
       # one compose resolves for caddy-lan (IMG_CADDY or its default);
       # GITHUB_STATS_KEY is the only {$VAR} without a default.
       run: |
-        img=$(docker compose -f compose/lan-proxy.yml config --images 2>/dev/null | grep -m1 '^caddy:' || true)
-        [ -n "$img" ] || { echo "::error::no caddy image resolved from compose/lan-proxy.yml"; exit 1; }
+        img=$(docker compose -f compose/lan-proxy.yml config --format json | jq -r '.services["caddy-lan"].image // empty')
+        [ -n "$img" ] || { echo "::error::no image resolved for caddy-lan in compose/lan-proxy.yml"; exit 1; }
         docker run --rm -e GITHUB_STATS_KEY=ci-placeholder \
           -v "$PWD/config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
           "$img" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
