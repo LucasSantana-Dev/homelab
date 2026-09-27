@@ -32,6 +32,9 @@ docker image prune -af --filter "until=720h" 2>&1 | tail -3 | tee -a "$LOG_FILE"
 # images went too; both stayed down for 6 days with the data intact but no container.
 log "pruning stopped non-compose containers older than 30d..."
 docker container prune -f --filter "until=720h" --filter "label!=com.docker.compose.project" 2>&1 | tail -3 | tee -a "$LOG_FILE"
+# Filters AND together, so compose one-off containers (`docker compose run`) get
+# their own pass; they are disposable, unlike a stopped service container.
+docker container prune -f --filter "until=720h" --filter "label=com.docker.compose.oneoff=True" 2>&1 | tail -3 | tee -a "$LOG_FILE"
 
 log "after:  $(docker system df --format '{{.Type}}:{{.Size}}/{{.Reclaimable}}' | tr '\n' ' ')"
 log "=== docker-prune done ==="
