@@ -108,9 +108,10 @@ remote_quote() {
 # `test -f` alone cannot tell ENOENT (the file is genuinely not there) from
 # a stat error (e.g. the remote user cannot search a parent directory): both
 # return exit 1. Ask the remote shell to distinguish them itself: PRESENT
-# when the path exists, ABSENT only when its parent is a searchable
+# when the path is a regular file, ABSENT only when its parent is a searchable
 # directory that plainly does not contain it, UNREADABLE for everything
-# else (a stat error, a missing parent, or the ssh call itself failing).
+# else (a stat error, a missing parent, a FIFO/socket/directory at the
+# path, or the ssh call itself failing).
 remote_status() {
   local full parent full_q parent_q
   full="$REMOTE_DIR/$1"
