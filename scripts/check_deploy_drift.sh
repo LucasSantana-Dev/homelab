@@ -91,7 +91,10 @@ diff_is_safe_to_print() {
     compose/*.yml|docker-compose.yml|*/Caddyfile) ;;
     *) return 1 ;;
   esac
-  ! grep -qE ':[[:space:]]*[|>][-+0-9]*[[:space:]]*$' "$1" "$2"
+  # A valid block-scalar header may carry a trailing YAML comment after the
+  # chomping/indentation indicator (`key: | # note`, `key: >- # x`); missing
+  # that would let the diff below print the secret on the following lines.
+  ! grep -qE ':[[:space:]]*[|>][-+0-9]*[[:space:]]*(#.*)?$' "$1" "$2"
 }
 
 # A remote path built from REMOTE_DIR and a repo-relative filename, quoted
@@ -100,6 +103,24 @@ diff_is_safe_to_print() {
 # run something else on the host.
 remote_quote() {
   printf '%q' "$REMOTE_DIR/$1"
+}
+
+# `test -f` alone cannot tell ENOENT (the file is genuinely not there) from
+# a stat error (e.g. the remote user cannot search a parent directory): both
+# return exit 1. Ask the remote shell to distinguish them itself: PRESENT
+# when the path exists, ABSENT only when its parent is a searchable
+# directory that plainly does not contain it, UNREADABLE for everything
+# else (a stat error, a missing parent, or the ssh call itself failing).
+remote_status() {
+  local full parent full_q parent_q
+  full="$REMOTE_DIR/$1"
+  parent="${full%/*}"
+  full_q=$(printf '%q' "$full")
+  parent_q=$(printf '%q' "$parent")
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
+    "if [ -e $full_q ]; then echo PRESENT; \
+     elif [ -d $parent_q ] && [ -x $parent_q ]; then echo ABSENT; \
+     else echo UNREADABLE; fi" 2>/dev/null
 }
 
 # Bash command substitution strips NUL bytes and trailing newlines, so a binary
@@ -136,28 +157,27 @@ checked=0
 for f in $FILES; do
   checked=$((checked + 1))
 
-  # `test -f` is asked separately from `cat` so the two failures stay distinct:
-  # a file the host never received is drift (the repo ships config production
-  # does not have), while a file that exists but cannot be read is a broken
-  # comparison and must not be reported as either in sync or drifted.
-  #
-  # The remote `test -f`'s own exit code distinguishes ABSENT (exit 1: the
-  # command ran and the file is not there) from an SSH/connection failure
-  # (any other nonzero exit, e.g. 255): the latter proves nothing about
-  # whether the file exists and must not be reported as drift.
-  quoted_f=$(remote_quote "$f")
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
-        "test -f $quoted_f" 2>/dev/null
-  rc=$?
-  if [ "$rc" -eq 1 ]; then
-    drifted=1
-    echo "ABSENT $f (never deployed to $SSH_HOST)"
-    continue
-  elif [ "$rc" -ne 0 ]; then
-    unreadable=1
-    echo "ERROR $f: could not check existence on $SSH_HOST (ssh exit $rc)"
-    continue
-  fi
+  # Existence is checked separately from `cat` so the two failures stay
+  # distinct: a file the host never received is drift (the repo ships config
+  # production does not have), while a file that exists but cannot be read
+  # is a broken comparison and must not be reported as either in sync or
+  # drifted. `remote_status` also tells a genuine ABSENT apart from a stat
+  # error (unsearchable parent dir, or the ssh call itself failing): both
+  # would otherwise return the same `test -f` exit code (1).
+  status=$(remote_status "$f")
+  case "$status" in
+    PRESENT) ;;
+    ABSENT)
+      drifted=1
+      echo "ABSENT $f (never deployed to $SSH_HOST)"
+      continue
+      ;;
+    *)
+      unreadable=1
+      echo "ERROR $f: could not determine existence on $SSH_HOST (stat error or ssh failure)"
+      continue
+      ;;
+  esac
 
   if ! fetch_remote "$f" > "$TMP_REMOTE"; then
     unreadable=1

@@ -34,7 +34,7 @@ def _install_fake_ssh(bin_dir: Path) -> None:
     ssh.chmod(ssh.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _run(repo_dir: Path, remote_dir, bin_dir_extra=None, extra_env=None):
+def _run(repo_dir: Path, remote_dir, extra_env=None):
     bin_dir = repo_dir / ".fakebin"
     _install_fake_ssh(bin_dir)
     env = {
@@ -100,6 +100,53 @@ def test_host_only_block_scalar_secret_is_withheld_from_the_diff(tmp_path):
     assert result.returncode == 1
 
 
+def test_unsearchable_parent_dir_is_not_reported_as_absent(tmp_path):
+    """`test -f` returns exit 1 both when a file is genuinely absent and when
+    a parent directory cannot even be searched (permission denied on
+    traversal). remote_status must tell these apart: only a plainly missing
+    file under a searchable parent is ABSENT; a stat error is UNREADABLE."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _compose(repo_dir, "locked.yml", "services:\n  a:\n    image: nginx\n")
+
+    remote_dir = tmp_path / "remote"
+    locked_parent = remote_dir / "compose"
+    locked_parent.mkdir(parents=True)
+    locked_parent.chmod(0o000)  # not searchable: stat(2) on the child fails
+    try:
+        result = _run(repo_dir, remote_dir)
+    finally:
+        locked_parent.chmod(0o755)  # restore so tmp_path cleanup can recurse into it
+
+    assert "ABSENT compose/locked.yml" not in result.stdout
+    assert "ERROR compose/locked.yml" in result.stdout
+    assert result.returncode == 2
+
+
+def test_block_scalar_header_with_inline_comment_is_still_detected(tmp_path):
+    """`key: | # note` and `key: >- # x` are valid YAML block-scalar headers;
+    missing the trailing comment would let the secret body below them print
+    in the diff."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _compose(
+        repo_dir, "svc.yml", "services:\n  a:\n    environment:\n      TOKEN: set\n"
+    )
+
+    remote_dir = tmp_path / "remote"
+    (remote_dir / "compose").mkdir(parents=True)
+    (remote_dir / "compose" / "svc.yml").write_text(
+        "services:\n  a:\n    environment:\n      TOKEN: |- # webhook secret\n"
+        "        supersecret456\n"
+    )
+
+    result = _run(repo_dir, remote_dir)
+
+    assert "supersecret456" not in result.stdout
+    assert "body withheld" in result.stdout
+    assert result.returncode == 1
+
+
 def test_ssh_failure_on_existence_check_is_distinct_from_absent(tmp_path):
     """A `test -f` that fails to even run (dropped connection, exit 255) must
     not be reported as ABSENT: that misreports "we don't know" as drift."""
@@ -132,7 +179,9 @@ def test_absent_file_still_reported_when_ssh_succeeds(tmp_path):
     _compose(repo_dir, "svc.yml", "services:\n  a:\n    image: nginx\n")
 
     remote_dir = tmp_path / "remote"
-    remote_dir.mkdir()
+    # The parent dir exists and is searchable (as it would after a real
+    # partial deploy); only the file itself is genuinely missing.
+    (remote_dir / "compose").mkdir(parents=True)
 
     result = _run(repo_dir, remote_dir)
 
@@ -149,7 +198,7 @@ def test_unreadable_manifest_does_not_abort_discovery_of_other_files(tmp_path):
     (repo_dir / "compose" / "bad.yml").write_bytes(b"\xff\xfe\x00bad-utf8")
 
     remote_dir = tmp_path / "remote"
-    remote_dir.mkdir()
+    (remote_dir / "compose").mkdir(parents=True)
 
     result = _run(repo_dir, remote_dir)
 

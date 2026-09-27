@@ -297,6 +297,33 @@ def test_snapshot_with_non_list_ingress_fails_closed(monkeypatch, tmp_path):
     assert "failing closed" in errors[0]
 
 
+def test_snapshot_with_non_object_root_fails_closed_without_crashing(
+    monkeypatch, tmp_path
+):
+    """A root that is a list or null has no `.get()`; the fail-closed check
+    must catch this before it crashes with an AttributeError."""
+    allowlist = write_allowlist(tmp_path, "")
+    for root in ("[]", "null", '"just a string"'):
+        path = tmp_path / "edge-snapshot.json"
+        path.write_text(root)
+        errors, _ = mod.check(str(path), str(allowlist))
+        assert len(errors) == 1
+        assert "failing closed" in errors[0]
+
+
+def test_snapshot_with_non_object_ingress_rule_fails_closed(monkeypatch, tmp_path):
+    """A malformed rule like `null` must not be silently treated as the
+    harmless hostless catch-all: that would let a snapshot pass coverage
+    with zero probes."""
+    path = tmp_path / "edge-snapshot.json"
+    path.write_text(json.dumps({"tunnel": "homelab", "ingress": [None]}))
+    allowlist = write_allowlist(tmp_path, "")
+    errors, _ = mod.check(str(path), str(allowlist))
+    assert len(errors) == 1
+    assert "non-object rule" in errors[0]
+    assert "failing closed" in errors[0]
+
+
 def test_snapshot_with_empty_ingress_fails_closed(monkeypatch, tmp_path):
     path = tmp_path / "edge-snapshot.json"
     path.write_text(json.dumps({"tunnel": "homelab", "ingress": []}))

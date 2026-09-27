@@ -117,12 +117,19 @@ def test_scans_by_immutable_image_id_not_mutable_tag(tmp_path):
 
 def test_summary_write_failure_dies_instead_of_continuing_silently(tmp_path):
     """No errexit in this script: a printf/out failure must be checked and
-    routed through `die`, not ignored."""
+    routed through `die`, not ignored.
+
+    chmod(0o444) would not make this fail for root or for any process with
+    CAP_DAC_OVERRIDE (the default in a Docker container, and this script
+    runs as root in production), so the write could succeed anyway and this
+    test would pass without ever exercising the die() path. A directory at
+    the summary's path fails the truncating write with EISDIR regardless of
+    privilege level.
+    """
     report_dir = tmp_path / "report"
     report_dir.mkdir()
     unwritable = report_dir / "trivy-summary.txt"
-    unwritable.write_text("")
-    unwritable.chmod(0o444)  # `: > "$summary"` must fail to truncate this
+    unwritable.mkdir()  # `: > "$summary"` must fail: can't open a dir for writing
 
     result, _, _, _ = _run(tmp_path, extra_env={"REPORT_DIR": str(report_dir)})
 

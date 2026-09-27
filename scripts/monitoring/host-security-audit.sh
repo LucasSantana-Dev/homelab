@@ -77,7 +77,7 @@ if [ -z "${IMAGES:-}" ]; then
   container_ids=$(docker ps -q) || die "docker ps failed; no image was scanned"
   IMAGE_PAIRS=""
   for cid in $container_ids; do
-    pair=$(docker inspect --format '{{.Image}}|{{.Config.Image}}' "$cid" 2>/dev/null) || continue
+    pair=$(docker inspect --format '{{.Image}}|{{.Config.Image}}' "$cid" 2>/dev/null) || die "docker inspect failed for container $cid; no image was scanned"
     IMAGE_PAIRS="${IMAGE_PAIRS}${pair}"$'\n'
   done
   IMAGE_PAIRS=$(sort -u <<< "$IMAGE_PAIRS")

@@ -110,7 +110,11 @@ def load_snapshot(path, errors):
     """
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    ingress = data.get("ingress")
+    # A root that isn't an object (`[]`, `null`, a bare string...) has no
+    # `.get()`; guard it before the fail-closed check below runs, or a
+    # malformed snapshot crashes with a traceback instead of reporting the
+    # coverage error it should.
+    ingress = data.get("ingress") if isinstance(data, dict) else None
     if not isinstance(ingress, list) or not ingress:
         errors.append(
             f"{path}: 'ingress' is missing, not a list, or empty; "
@@ -119,7 +123,13 @@ def load_snapshot(path, errors):
         return [], []
     hosts, wildcards = [], []
     for rule in ingress:
-        hostname = rule.get("hostname") if isinstance(rule, dict) else None
+        if not isinstance(rule, dict):
+            # A non-object rule (e.g. `null`) has no `hostname` to be
+            # missing; treating it like the harmless hostless catch-all
+            # would let a malformed snapshot pass coverage with zero probes.
+            errors.append(f"{path}: ingress contains a non-object rule; failing closed")
+            return [], []
+        hostname = rule.get("hostname")
         if not hostname:
             continue  # the hostless catch-all rule
         if hostname.startswith("*."):
