@@ -40,8 +40,9 @@ correlate it with a leaked credentials.json.
 2. Copy the new credentials.json to `~/homelab/config/cloudflared/credentials.json`
    (server-side, NOT tracked in repo).
 3. Add `CF_TUNNEL_ID=<new-uuid>` to `~/homelab/.env`.
-4. Update `config/cloudflared/config.yml` in the repo to reference
-   `${CF_TUNNEL_ID}` instead of the hardcoded UUID.
+4. Nothing to change in the repo: `config/cloudflared/config.yml` already
+   uses `${CF_TUNNEL_ID}` and is a reference only (ADR 0041). Refresh
+   `config/cloudflared/edge-snapshot.json` afterwards.
 5. `docker compose restart cloudflared`.
 
 ## Homepage server-side version (in flight)

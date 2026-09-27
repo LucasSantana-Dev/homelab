@@ -278,3 +278,10 @@ config/caddy/config/
 .claude/
 graphify-out/
 .playwright-mcp/
+
+# Terraform was retired (ADR 0041) but hosts may still hold old state/vars:
+# never let them reach this public repo.
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/

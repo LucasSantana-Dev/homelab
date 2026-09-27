@@ -49,7 +49,7 @@ Access, and hit TLS-cert mismatch errors.
 | Lucky bot dashboard | `lucky.home` | `lucky.homelab.example.com` | — | Internal |
 | forge-mcp-gateway | — | Tailscale direct | — | Profile-gated; dev-only |
 
-Services in CF Tunnel config (`config/cloudflared/config.yml`) but
+Services in the CF Tunnel ingress (recorded in `config/cloudflared/edge-snapshot.json`; the live config is in the dashboard, ADR 0041) but
 *not* in the phase-1 "included" list (e.g. `blackbox`, `pihole`,
 `prometheus`) are **ingressed but blocked by CF Access policy**. See
 the phase-1 doc for the full allow-list.
@@ -75,7 +75,7 @@ the phase-1 doc for the full allow-list.
       conflict with CF because the domain is different.
 - [ ] Enforce the invariant in CI: a lint script that fails if a
       hostname appears in both `tailscale/dns-records.json` and
-      `config/cloudflared/config.yml`.
+      `config/cloudflared/edge-snapshot.json` (the tunnel ingress record).
 
 ## Related docs
 

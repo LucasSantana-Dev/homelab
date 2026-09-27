@@ -124,6 +124,10 @@ def main():
                 if rec["type"] in KEEP_CONTENT_TYPES
                 else "<redacted>"
             )
+            # Only this tunnel's records: the zones also hold other projects'
+            # hostnames, and a full list in a public repo is a recon map.
+            if rec["name"] not in hosts and f"<tunnel:{name}>" not in content:
+                continue
             records.append(
                 {
                     "name": rec["name"],

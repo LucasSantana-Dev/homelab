@@ -15,8 +15,8 @@ This rollout exposes only the selected phase-1 set through `cloudflared`.
 - `vault.luk-homeserver.com.br`
 - `auth.luk-homeserver.com.br`
 
-These are defined in:
-- `config/cloudflared/config.yml`
+These are defined in the Cloudflare dashboard (remotely managed tunnel) and
+recorded in `config/cloudflared/edge-snapshot.json` (ADR 0041).
 
 ## Explicitly Not Exposed in Phase 1
 

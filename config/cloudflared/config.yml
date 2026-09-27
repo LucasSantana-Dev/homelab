@@ -25,7 +25,7 @@
 #     Bypass policy (rclone.luk-homeserver.com.br has one).
 # ============================================================================
 
-tunnel: 5cefde7a-6cd0-4d56-a1e2-67f922433682
+tunnel: ${CF_TUNNEL_ID}   # not hardcoded: the UUID is not published (audit C1)
 
 # Every live rule has this shape: the tunnel only forwards to the
 # host-networked caddy-lan on :80, which does the per-hostname routing.
