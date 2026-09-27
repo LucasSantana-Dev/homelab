@@ -1,12 +1,14 @@
 """Tests for scripts/security/access-coverage-check.py.
 
-The HTTP layer (`probe`) is mocked throughout: no test makes a real network
-call. `probe` is monkeypatched on the loaded module so `check()` exercises its
-real allowlist/mismatch logic against canned ProbeResults.
+`check()` tests monkeypatch `probe` with canned ProbeResults. `probe` itself
+is exercised against a local http.server on 127.0.0.1, so the no-redirect
+handler and the Location parsing run for real without touching the internet.
 """
 
+import http.server
 import importlib.util
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -144,16 +146,104 @@ def test_stale_allowlist_entry_not_in_snapshot_fails(monkeypatch, tmp_path):
     assert any("is not in" in e and e.split()[1] == "gone.example.org" for e in errors)
 
 
-def test_wildcard_ingress_entry_is_skipped_and_noted(monkeypatch, tmp_path):
-    errors, notes = run(
-        monkeypatch,
-        tmp_path,
-        ["grafana.example.org", "*.example.org"],
-        "",
-        {"grafana.example.org": gated()},
-    )
+def run_wildcard(monkeypatch, tmp_path, sample_result):
+    snapshot = write_snapshot(tmp_path, ["grafana.example.org", "*.example.org"])
+    allowlist = write_allowlist(tmp_path, "")
+    seen = []
+
+    def fake_probe(h, timeout=mod.TIMEOUT):
+        seen.append(h)
+        return gated() if h == "grafana.example.org" else sample_result
+
+    monkeypatch.setattr(mod, "probe", fake_probe)
+    errors, notes = mod.check(str(snapshot), str(allowlist))
+    samples = [h for h in seen if h != "grafana.example.org"]
+    return errors, notes, samples
+
+
+def test_wildcard_probes_a_random_subdomain_that_must_be_gated(monkeypatch, tmp_path):
+    errors, notes, samples = run_wildcard(monkeypatch, tmp_path, gated())
     assert errors == []
-    assert any("*.example.org" in n and "skipping wildcard" in n for n in notes)
+    assert len(samples) == 1
+    assert samples[0].startswith("access-check-")
+    assert samples[0].endswith(".example.org")
+    assert any(
+        "*.example.org" in n and "redirects to Cloudflare Access" in n for n in notes
+    )
+
+
+def test_wildcard_with_public_random_subdomain_fails(monkeypatch, tmp_path):
+    errors, _, _ = run_wildcard(monkeypatch, tmp_path, plain())
+    assert len(errors) == 1
+    assert errors[0].startswith("*.example.org: unlisted subdomain")
+
+
+def test_wildcard_network_error_is_a_failure(monkeypatch, tmp_path):
+    errors, _, _ = run_wildcard(monkeypatch, tmp_path, errored())
+    assert len(errors) == 1
+    assert "network error" in errors[0]
+
+
+class _Handler(http.server.BaseHTTPRequestHandler):
+    routes = {}
+
+    def do_GET(self):
+        status, location = self.routes[self.path]
+        self.send_response(status)
+        if location:
+            self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture
+def local_server(monkeypatch):
+    server = http.server.HTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setattr(mod, "SCHEME", "http")
+    yield f"127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+def test_probe_does_not_follow_the_access_redirect(local_server):
+    _Handler.routes = {
+        "/": (302, "https://team.cloudflareaccess.com/cdn-cgi/access/login/x?kid=1")
+    }
+    result = mod.probe(local_server, timeout=5)
+    assert result.error is None
+    assert result.status == 302
+    assert result.location_host == "team.cloudflareaccess.com"
+    assert result.gated
+
+
+def test_probe_redirect_to_lookalike_host_is_not_gated(local_server):
+    _Handler.routes = {"/": (302, "https://cloudflareaccess.com.evil.example/login")}
+    result = mod.probe(local_server, timeout=5)
+    assert result.status == 302
+    assert not result.gated
+
+
+def test_probe_plain_200_is_not_gated(local_server):
+    _Handler.routes = {"/": (200, None)}
+    result = mod.probe(local_server, timeout=5)
+    assert result.error is None
+    assert result.status == 200
+    assert not result.gated
+
+
+def test_probe_connection_refused_is_an_error(monkeypatch):
+    monkeypatch.setattr(mod, "SCHEME", "http")
+    sock_server = http.server.HTTPServer(("127.0.0.1", 0), _Handler)
+    port = sock_server.server_address[1]
+    sock_server.server_close()  # nothing listens on this port now
+    result = mod.probe(f"127.0.0.1:{port}", timeout=5)
+    assert result.error is not None
+    assert not result.gated
 
 
 def test_hostless_catch_all_rule_is_never_probed(monkeypatch, tmp_path):

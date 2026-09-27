@@ -13,10 +13,9 @@ for why it is intentionally public.
 
 Only entries carrying a real "hostname" are probed. The trailing hostless rule
 (the tunnel's 404 catch-all) is not a hostname and is skipped. A wildcard entry
-(hostname starting with "*.") is skipped too and reported as informational: it
-is a routing rule for names with no explicit ingress entry, not a probeable
-literal host, and every host actually served through it already has its own
-entry above (config/cloudflared/config.yml documents this). DNS-only records
+(hostname starting with "*.") routes every undeclared name in its zone to the
+origin, so the check probes one random subdomain under it and requires that to
+be gated too; a wildcard cannot be allowlisted. DNS-only records
 (MX, TXT, and similar at the zone apex) never appear in `ingress` and carry no
 HTTP traffic through the tunnel, so they are out of scope by construction.
 
@@ -39,11 +38,13 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 
 SNAPSHOT = "config/cloudflared/edge-snapshot.json"
 ALLOWLIST = "config/cloudflared/access-allowlist.txt"
 ACCESS_SUFFIX = ".cloudflareaccess.com"
 TIMEOUT = 10
+SCHEME = "https"  # tests point this at a local http server
 USER_AGENT = "homelab-access-coverage-check/1.0"
 
 
@@ -76,7 +77,7 @@ _OPENER = urllib.request.build_opener(_NoRedirect)
 def probe(hostname, timeout=TIMEOUT):
     """Make one unauthenticated HTTPS GET to hostname, no redirects followed."""
     req = urllib.request.Request(
-        f"https://{hostname}/", headers={"User-Agent": USER_AGENT}
+        f"{SCHEME}://{hostname}/", headers={"User-Agent": USER_AGENT}
     )
     try:
         # hostname always comes from our own edge-snapshot.json, not user input.
@@ -125,11 +126,25 @@ def load_allowlist(path, errors):
 def check(snapshot_path, allowlist_path):
     errors, notes = [], []
     hosts, wildcards = load_snapshot(snapshot_path)
-    for hostname in wildcards:
-        notes.append(
-            f"{snapshot_path}: skipping wildcard ingress rule {hostname} "
-            "(not a probeable literal hostname; its real hosts have their own entries)"
-        )
+    # A wildcard rule routes every unlisted name in the zone to the origin, so
+    # a subdomain nobody declared is reachable. Probe a random one: it must be
+    # gated. Wildcards cannot be allowlisted.
+    for wildcard in wildcards:
+        sample = f"access-check-{uuid.uuid4().hex[:12]}.{wildcard[2:]}"
+        result = probe(sample)
+        if result.error is not None:
+            errors.append(
+                f"{wildcard}: network error probing {sample}, treated as a failure: {result.error}"
+            )
+        elif not result.gated:
+            errors.append(
+                f"{wildcard}: unlisted subdomain {sample} is public (HTTP {result.status}); "
+                "the wildcard exposes every undeclared name, gate the zone in Cloudflare Access"
+            )
+        else:
+            notes.append(
+                f"{wildcard}: random subdomain {sample} redirects to Cloudflare Access"
+            )
     allowed = load_allowlist(allowlist_path, errors)
     host_set = set(hosts)
 
