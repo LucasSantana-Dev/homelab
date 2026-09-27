@@ -369,14 +369,31 @@ groups:
           summary: "Lynis hardening index dropped"
           description: "Hardening index is {{ $value }}, more than 2 points below last week."
 
-      - alert: HostImageCriticalVulns
-        expr: host_image_vulnerabilities{severity="CRITICAL"} > 0
+      # Alerts on change, not on the baseline: the first scan (2026-09-27)
+      # found 113 CRITICAL CVEs across 25 upstream images, which would page
+      # every 12h forever. Fires when an image gains CRITICALs since the last
+      # weekly scan, or when a new image arrives with any (only once a
+      # previous scan exists, so the first deploy stays quiet; an image whose
+      # previous scan failed is not treated as new).
+      - alert: HostImageNewCriticalVulns
+        expr: |
+          (
+            host_image_vulnerabilities{severity="CRITICAL"}
+              > on(image) (host_image_vulnerabilities{severity="CRITICAL"} offset 2d)
+          )
+          or
+          (
+            host_image_vulnerabilities{severity="CRITICAL"} > 0
+              unless on(image) (host_image_vulnerabilities{severity="CRITICAL"} offset 2d)
+              unless on(image) ((host_image_scan_ok offset 2d) == 0)
+              and on() (host_security_audit_last_run_timestamp_seconds offset 2d)
+          )
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Running image has CRITICAL CVEs: {{ $labels.image }}"
-          description: "{{ $value }} CRITICAL CVEs; see /var/log/homelab/security/trivy-summary.txt."
+          summary: "New CRITICAL CVEs in running image: {{ $labels.image }}"
+          description: "{{ $value }} CRITICAL CVEs detected (count rose or image is new); see /var/log/homelab/security/trivy-summary.txt."
 
       - alert: HostImageScanFailed
         expr: host_image_scan_ok == 0
