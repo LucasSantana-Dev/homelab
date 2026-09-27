@@ -629,10 +629,14 @@ sops-decrypt: ## Decrypt .env.enc -> .env (needs SOPS_AGE_KEY_FILE; run on host 
 sops-verify: ## Round-trip check: decrypt .env.enc and diff against current .env
 	@sops --decrypt --input-type dotenv --output-type dotenv .env.enc > .env.sops-check 2>/dev/null \
 		|| { echo "decrypt failed — is SOPS_AGE_KEY_FILE exported?"; rm -f .env.sops-check; exit 1; }
-	@sort .env > .env.sops-a; sort .env.sops-check > .env.sops-b; \
-	if diff -q .env.sops-a .env.sops-b >/dev/null; then echo "OK: .env.enc round-trips to .env exactly"; \
-	else echo "MISMATCH (.env vs decrypted .env.enc):"; diff .env.sops-a .env.sops-b | head -20; fi; \
-	rm -f .env.sops-check .env.sops-a .env.sops-b
+	@# KEY=value lines only (sops drops comments and blank lines), and a mismatch
+	@# names keys, never values: this output lands in terminals and agent logs.
+	@grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env | sort > .env.sops-a; \
+	grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env.sops-check | sort > .env.sops-b; \
+	rm -f .env.sops-check; \
+	if cmp -s .env.sops-a .env.sops-b; then echo "OK: .env.enc round-trips to .env ($$(wc -l < .env.sops-a | tr -d ' ') keys)"; rc=0; \
+	else echo "MISMATCH, keys that differ:"; diff .env.sops-a .env.sops-b | sed -n 's/^[<>] \([^=]*\)=.*/  \1/p' | sort -u | head -20; rc=1; fi; \
+	rm -f .env.sops-a .env.sops-b; exit $$rc
 
 sops-edit: ## Edit secrets in place (sops decrypts -> $$EDITOR -> re-encrypts)
 	sops --input-type dotenv --output-type dotenv .env.enc
