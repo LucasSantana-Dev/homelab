@@ -23,48 +23,40 @@ TINYAUTH = "127.0.0.1:3030"
 HEREDOC = re.compile(r"<<([A-Za-z_][A-Za-z0-9_]*)\s*$")
 
 
-def strip_heredocs(text):
-    """Blank heredoc bodies; the closing line keeps what follows the marker."""
-    lines, marker = text.split("\n"), None
-    for n, line in enumerate(lines):
+def strip_code(text):
+    """Blank out comments, quoted/backtick strings and heredocs, keeping lines.
+
+    One pass, so a heredoc opener is only recognized in real code: `# <<END`
+    in a comment or `<<END` inside a string opens nothing.
+    """
+    out, quote, marker = [], None, None
+    for line in text.split("\n"):
         if marker:
             first, _, rest = line.strip().partition(" ")
-            if first == marker:
-                lines[n], marker = " " + rest, None
+            if first != marker:
+                out.append("")
+                continue
+            marker, line = None, " " + rest  # args after the closing marker
+        buf = []
+        for i, ch in enumerate(line):
+            if quote:
+                if ch == quote and line[i - 1 : i] != "\\":
+                    quote = None
+                buf.append(" ")
+            elif ch in '`"':
+                quote = ch
+                buf.append(" ")
+            elif ch == "#" and (i == 0 or line[i - 1] in " \t"):
+                break  # comment runs to end of line
+            elif ch == "<" and (m := HEREDOC.match(line, i)):
+                marker = m.group(1)
+                break
             else:
-                lines[n] = ""
-            continue
-        m = HEREDOC.search(line)
-        if m:
-            marker, lines[n] = m.group(1), line[: m.start()]
-    return "\n".join(lines)
-
-
-def strip_code(text):
-    """Blank out comments, quoted/backtick strings and heredocs, keeping lines."""
-    out, quote, comment = [], None, False
-    text = strip_heredocs(text)
-    for i, ch in enumerate(text):
-        if ch == "\n":
-            comment = False
-            if quote == '"':
-                quote = None
-            out.append(ch)
-        elif comment:
-            out.append(" ")
-        elif quote:
-            if ch == quote and text[i - 1] != "\\":
-                quote = None
-            out.append(" ")
-        elif ch in '`"':
-            quote = ch
-            out.append(" ")
-        elif ch == "#" and (i == 0 or text[i - 1] in " \t\n"):
-            comment = True
-            out.append(" ")
-        else:
-            out.append(ch)
-    return "".join(out)
+                buf.append(ch)
+        if quote == '"':
+            quote = None  # double quotes do not span lines; backticks do
+        out.append("".join(buf))
+    return "\n".join(out)
 
 
 def site_blocks(text):

@@ -99,6 +99,23 @@ def test_partial_or_fake_gates_do_not_count(tmp_path, block):
     }
 
 
+@pytest.mark.parametrize(
+    "opener",
+    ["# see <<END\n", 'header X-Note "<<END"\n', "respond `<<END` 200\n"],
+    ids=["comment", "quoted", "backtick"],
+)
+def test_heredoc_marker_outside_code_hides_nothing(tmp_path, opener):
+    caddy = (
+        "http://a.example.org {\n\timport protected\n\t"
+        + opener
+        + "}\n"
+        + OPEN
+        + "END\n"
+        + CATCH_ALL
+    )
+    assert open_hosts(run(tmp_path, SNIPPET + caddy)) == {"open.example.org"}
+
+
 def test_every_address_of_a_multiline_block_is_checked(tmp_path):
     caddy = (
         "http://open.example.org,\nhttp://ok.example.org {\n\treverse_proxy 127.0.0.1:1\n}\n"
