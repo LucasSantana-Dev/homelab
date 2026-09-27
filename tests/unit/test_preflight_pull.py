@@ -4,8 +4,14 @@ On 2026-09-27, `git pull` stopped halfway through a manual deploy: some
 tracked dirs (observability/, tailscale/, a few files) were root-owned, git
 hit "unable to unlink old ... Permission denied", and HEAD stayed on the old
 commit while ~22 files were already overwritten. This script is meant to
-catch that class of failure (unwritable tracked file/dir, or a dirty tracked
-file) before `git pull` ever runs.
+catch that class of failure (unwritable tracked directory, or a dirty
+tracked file) before `git pull` ever runs.
+
+The chmod-based "unwritable" simulations below only work when the test
+process is a real, non-privileged user: root (and anything with
+CAP_DAC_OVERRIDE) ignores the write-permission bit entirely, so `-w` in the
+script would report "writable" regardless of mode. Skipped in that case
+rather than producing a false pass/fail.
 """
 
 import os
@@ -13,8 +19,15 @@ import stat
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "deployment" / "preflight-pull.sh"
+
+requires_non_root = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="chmod-based unwritable simulation is meaningless as root",
+)
 
 
 def _init_repo(repo: Path) -> None:
@@ -63,6 +76,7 @@ def test_fails_on_dirty_tracked_file(tmp_path):
     assert "config.yml" in result.stdout
 
 
+@requires_non_root
 def test_fails_on_unwritable_tracked_dir(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -79,14 +93,41 @@ def test_fails_on_unwritable_tracked_dir(tmp_path):
         result = _run(repo)
         assert result.returncode == 1, result.stdout
         assert "observability" in result.stdout
-        assert "sudo chown -R" in result.stdout
+        # Owned by the current user in this simulation (chmod, not chown), so
+        # the mode-only fix is suggested, not a chown (that path needs a real
+        # ownership mismatch, which requires root to simulate and is not
+        # exercised here).
+        assert "chmod -R u+w" in result.stdout
+        assert "sudo chown -R" not in result.stdout
         # Never runs sudo itself: ownership must be unchanged.
         assert os.stat(sub).st_uid == os.getuid()
     finally:
         os.chmod(sub, stat.S_IRWXU)
 
 
-def test_fails_on_unwritable_tracked_file(tmp_path):
+@requires_non_root
+def test_fails_on_unwritable_repo_root(tmp_path):
+    """A root-owned checkout root (`.`) blocks writing top-level tracked files."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    (repo / "top-level.yml").write_text("a: 1\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
+
+    os.chmod(repo, stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        result = _run(repo)
+        assert result.returncode == 1, result.stdout
+        assert "dir: ." in result.stdout
+    finally:
+        os.chmod(repo, stat.S_IRWXU)
+
+
+def test_unwritable_file_in_writable_dir_does_not_block_pull(tmp_path):
+    """A read-only tracked FILE inside a writable directory is not a real
+    blocker: git unlinks and recreates the file, which only needs write on
+    the parent directory. Only directory permissions are checked."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -98,8 +139,6 @@ def test_fails_on_unwritable_tracked_file(tmp_path):
     os.chmod(f, stat.S_IRUSR)
     try:
         result = _run(repo)
-        assert result.returncode == 1, result.stdout
-        assert "tailscale-state.json" in result.stdout
-        assert "sudo chown -R" in result.stdout
+        assert result.returncode == 0, result.stdout + result.stderr
     finally:
         os.chmod(f, stat.S_IRUSR | stat.S_IWUSR)

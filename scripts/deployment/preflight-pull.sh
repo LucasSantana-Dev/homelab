@@ -10,8 +10,12 @@
 # a half-updated state.
 #
 # Fails (and never runs sudo itself) if:
-#   - any tracked file is not writable by the current user
-#   - any directory directly containing a tracked file is not writable
+#   - any directory containing a tracked file (including the repo root, `.`,
+#     for top-level tracked files) is not writable by the current user. A
+#     pull replacing a file is an unlink+create in its *parent directory*,
+#     which is the actual permission git needs, so a read-only file inside a
+#     writable directory is not a real blocker and is intentionally not
+#     checked (git unlinks and recreates it).
 #   - the working tree has local modifications to tracked files (a dirty pull
 #     is a separate, already-handled case (see ADR-0036), but we check it
 #     here too since it also blocks a clean --ff-only pull)
@@ -29,7 +33,7 @@ errors=0
 current_user="$(id -un)"
 current_group="$(id -gn)"
 
-echo "🔎 preflight-pull: checking tracked-file ownership and working-tree state..."
+echo "🔎 preflight-pull: checking tracked-directory ownership and working-tree state..."
 
 # 1. Local modifications to tracked files block a clean --ff-only pull anyway,
 #    but surface them here with the same class of fix-it guidance.
@@ -41,44 +45,59 @@ if [[ -n "$dirty_files" ]]; then
     errors=$((errors + 1))
 fi
 
-# 2. Every tracked file, and the directory that directly contains it, must be
-#    writable by the current user. `git pull` replacing a file is an
-#    unlink+create in its parent directory, so a root-owned directory (not
-#    just a root-owned file) is enough to abort the pull halfway through.
-unwritable_files=()
+# Portable owner lookup: GNU stat first (Linux hosts), BSD stat as fallback
+# (macOS dev machines).
+owner_of() {
+    stat -c '%U' "$1" 2>/dev/null || stat -f '%Su' "$1" 2>/dev/null
+}
+
+# 2. Every directory that directly contains a tracked file (the repo root
+#    included, for top-level tracked files) must be writable by the current
+#    user.
 unwritable_dirs=()
 declare -A seen_dirs=()
 
 while IFS= read -r f; do
     [[ -z "$f" ]] && continue
-    if [[ -e "$f" && ! -w "$f" ]]; then
-        unwritable_files+=("$f")
-    fi
     dir="$(dirname "$f")"
-    if [[ "$dir" != "." && -e "$dir" && ! -w "$dir" && -z "${seen_dirs[$dir]:-}" ]]; then
+    if [[ -z "${seen_dirs[$dir]:-}" ]]; then
         seen_dirs["$dir"]=1
-        unwritable_dirs+=("$dir")
+        if [[ -e "$dir" && ! -w "$dir" ]]; then
+            unwritable_dirs+=("$dir")
+        fi
     fi
 done < <(git ls-files)
 
-if [[ ${#unwritable_files[@]} -gt 0 || ${#unwritable_dirs[@]} -gt 0 ]]; then
-    echo "❌ Found tracked paths not writable by ${current_user}:"
-    fix_paths=()
-    for f in "${unwritable_files[@]}"; do
-        echo "   file: $f"
-        fix_paths+=("$f")
-    done
+if [[ ${#unwritable_dirs[@]} -gt 0 ]]; then
+    echo "❌ Found tracked directories not writable by ${current_user}:"
+    chown_paths=()
+    chmod_paths=()
     for d in "${unwritable_dirs[@]}"; do
-        echo "   dir:  $d"
-        fix_paths+=("$d")
+        owner="$(owner_of "$d")"
+        echo "   dir: $d (owner: ${owner:-unknown})"
+        if [[ "$owner" == "$current_user" ]]; then
+            chmod_paths+=("$d")
+        else
+            chown_paths+=("$d")
+        fi
     done
     echo ""
-    echo "   Fix on the host (this script never runs sudo itself):"
-    printf '   sudo chown -R %s:%s' "$current_user" "$current_group"
-    for p in "${fix_paths[@]}"; do
-        printf ' %q' "$p"
-    done
-    printf '\n'
+    if [[ ${#chown_paths[@]} -gt 0 ]]; then
+        echo "   Fix (owned by someone else; this script never runs sudo itself):"
+        printf '   sudo chown -R %s:%s' "$current_user" "$current_group"
+        for p in "${chown_paths[@]}"; do
+            printf ' %q' "$p"
+        done
+        printf '\n'
+    fi
+    if [[ ${#chmod_paths[@]} -gt 0 ]]; then
+        echo "   Fix (already owned by you, just missing the write bit):"
+        printf '   chmod -R u+w'
+        for p in "${chmod_paths[@]}"; do
+            printf ' %q' "$p"
+        done
+        printf '\n'
+    fi
     errors=$((errors + 1))
 fi
 
@@ -88,5 +107,5 @@ if [[ $errors -gt 0 ]]; then
     exit 1
 fi
 
-echo "✅ preflight-pull: tracked files clean and writable."
+echo "✅ preflight-pull: tracked directories clean and writable."
 exit 0

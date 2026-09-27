@@ -42,10 +42,17 @@ elif ! git cat-file -e "${OLD_SHA}^{commit}" 2>/dev/null; then
 fi
 
 if $changed_all; then
-    changed_files="$(git ls-files -- "${MANAGED_PATHS[@]}")"
+    committed_changed="$(git ls-files -- "${MANAGED_PATHS[@]}")"
 else
-    changed_files="$(git diff --name-only "${OLD_SHA}" HEAD -- "${MANAGED_PATHS[@]}")"
+    committed_changed="$(git diff --name-only "${OLD_SHA}" HEAD -- "${MANAGED_PATHS[@]}")"
 fi
+# DEPLOY_FORCE=1 (Makefile dirty-file gate override) lets `make deploy` run
+# with uncommitted edits to tracked config still sitting in the worktree.
+# Those never show up in old-sha..HEAD, so diff the worktree against HEAD too
+# or a DEPLOY_FORCE=1 Caddy/Prometheus/Alertmanager edit would silently never
+# get restarted/reloaded.
+worktree_changed="$(git diff --name-only HEAD -- "${MANAGED_PATHS[@]}" 2>/dev/null || true)"
+changed_files="$(printf '%s\n%s\n' "$committed_changed" "$worktree_changed")"
 
 caddy_changed=false
 prometheus_changed=false
@@ -73,6 +80,10 @@ sha256_of() {
     fi
 }
 
+log_line_count() {
+    docker logs "$1" 2>&1 | wc -l | tr -d ' '
+}
+
 # Prometheus and Alertmanager both use the same config-reload machinery and
 # log "Completed loading of configuration file" on success, whether triggered
 # by SIGHUP or (for prometheus, which runs --web.enable-lifecycle) the
@@ -80,39 +91,70 @@ sha256_of() {
 # does not depend on knowing the container's bound host/port, so it is used
 # for both. This is what was actually run and verified working on the host
 # on 2026-09-27.
+#
+# Verification compares log *line counts* before/after the signal rather than
+# a wall-clock `--since` cutoff: a coarse (1s) cutoff can include a
+# pre-existing "Completed loading" line from before the signal and falsely
+# confirm a reload that never happened. Counting lines and only inspecting
+# what's new avoids clock precision entirely.
 reload_via_hup() {
     local container="$1"
     local marker="Completed loading of configuration file"
-    local since
-    since="$(date -u +%Y-%m-%dT%H:%M:%S)"
+    local before_lines after_lines new_lines
+    before_lines="$(log_line_count "$container")"
     if ! docker kill -s HUP "$container" >/dev/null 2>&1; then
         echo "❌ failed to send SIGHUP to ${container}" >&2
         return 1
     fi
     for _ in $(seq 1 "$RELOAD_POLL_ATTEMPTS"); do
-        if docker logs --since "$since" "$container" 2>&1 | grep -qi "$marker"; then
-            echo "  ✓ ${container} reloaded config"
-            return 0
+        after_lines="$(log_line_count "$container")"
+        if [[ "$after_lines" -gt "$before_lines" ]]; then
+            new_lines="$(docker logs "$container" 2>&1 | tail -n "+$((before_lines + 1))")"
+            if printf '%s\n' "$new_lines" | grep -qi "$marker"; then
+                echo "  ✓ ${container} reloaded config"
+                return 0
+            fi
         fi
         sleep "$RELOAD_POLL_INTERVAL"
     done
-    echo "❌ ${container} did not confirm config reload (no '${marker}' in logs since ${since})" >&2
+    echo "❌ ${container} did not confirm config reload (no new '${marker}' log line)" >&2
     return 1
 }
 
 if $caddy_changed; then
-    echo "🔁 config/caddy/Caddyfile changed, restarting caddy-lan (file bind-mount; compose up -d won't recreate it)..."
-    if ! docker restart caddy-lan >/dev/null 2>&1; then
-        echo "❌ failed to restart caddy-lan" >&2
+    echo "🔁 config/caddy/Caddyfile changed, validating before restarting caddy-lan (file bind-mount; compose up -d won't recreate it)..."
+    # The bind mount is live, so the container already sees the new file even
+    # before a restart: validate it in place first. An invalid Caddyfile must
+    # never take the proxy down, so a failed validation skips the restart
+    # entirely and leaves caddy-lan serving the last-known-good config.
+    if ! docker exec caddy-lan caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+        echo "❌ new Caddyfile fails \`caddy validate\`, refusing to restart caddy-lan (left running on the old, valid config)" >&2
         errors=$((errors + 1))
     else
-        host_hash="$(sha256_of < config/caddy/Caddyfile)"
-        container_hash="$(docker exec caddy-lan cat /etc/caddy/Caddyfile 2>/dev/null | sha256_of)"
-        if [[ -z "$container_hash" || "$host_hash" != "$container_hash" ]]; then
-            echo "❌ caddy-lan is not serving the new Caddyfile (host sha256=${host_hash} container sha256=${container_hash:-<none>})" >&2
+        restart_count_before="$(docker inspect -f '{{.RestartCount}}' caddy-lan 2>/dev/null || echo 0)"
+        if ! docker restart caddy-lan >/dev/null 2>&1; then
+            echo "❌ failed to restart caddy-lan" >&2
             errors=$((errors + 1))
         else
-            echo "  ✓ caddy-lan serving current Caddyfile (sha256=${host_hash})"
+            # Give a crash-looping container (restart: unless-stopped) a
+            # moment to actually crash before we check.
+            sleep "$RELOAD_POLL_INTERVAL"
+            running="$(docker inspect -f '{{.State.Running}}' caddy-lan 2>/dev/null || echo false)"
+            restart_count_after="$(docker inspect -f '{{.RestartCount}}' caddy-lan 2>/dev/null || echo 0)"
+            host_hash="$(sha256_of < config/caddy/Caddyfile)"
+            container_hash="$(docker exec caddy-lan cat /etc/caddy/Caddyfile 2>/dev/null | sha256_of)"
+            if [[ "$running" != "true" ]]; then
+                echo "❌ caddy-lan is not running after restart" >&2
+                errors=$((errors + 1))
+            elif [[ "$restart_count_after" != "$restart_count_before" ]]; then
+                echo "❌ caddy-lan is crash-looping after restart (RestartCount ${restart_count_before} -> ${restart_count_after})" >&2
+                errors=$((errors + 1))
+            elif [[ -z "$container_hash" || "$host_hash" != "$container_hash" ]]; then
+                echo "❌ caddy-lan is not serving the new Caddyfile (host sha256=${host_hash} container sha256=${container_hash:-<none>})" >&2
+                errors=$((errors + 1))
+            else
+                echo "  ✓ caddy-lan validated, restarted, running, and serving current Caddyfile (sha256=${host_hash})"
+            fi
         fi
     fi
 fi

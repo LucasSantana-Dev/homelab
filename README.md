@@ -368,10 +368,12 @@ three manual deploys hit on 2026-09-27:
      re-reads them without a signal. The script sends the container a
      SIGHUP and verifies the reload succeeded from its logs.
    - The comparison base is the SHA of the last successful deploy
-     (`scripts/deployment/deployed-sha.sh`, a small state file next to the
-     ADR-0023 deploy-health textfile, falling back gracefully without root).
-     If there's no recorded SHA yet, every managed config path is treated
-     as changed.
+     (`scripts/deployment/deployed-sha.sh`, state file at
+     `/var/lib/homelab/deployed-sha` by default, same root-owned-directory
+     fallback pattern as the ADR-0023 deploy-health textfile under
+     `/var/lib/node_exporter/textfile/`, falling back gracefully without
+     root). If there's no recorded SHA yet, every managed config path is
+     treated as changed.
 
 Existing `make deploy` callers are unaffected beyond this new post-step;
 `make pull-deploy` is the only new entry point.

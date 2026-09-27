@@ -30,12 +30,24 @@ case "$cmd" in
         ;;
     write)
         sha="${2:-$(git rev-parse HEAD)}"
-        mkdir -p "$STATE_DIR" 2>/dev/null || true
+        # A fresh host has no /var/lib/homelab yet; plain `mkdir -p` fails
+        # against a root-owned parent, and `sudo -n tee` alone can't create a
+        # missing directory either. Try a passwordless `sudo -n mkdir -p` too
+        # before giving up on the directory.
+        if ! mkdir -p "$STATE_DIR" 2>/dev/null; then
+            command -v sudo >/dev/null 2>&1 && sudo -n mkdir -p "$STATE_DIR" 2>/dev/null
+        fi
         if [[ -w "$STATE_DIR" ]] || { [[ -d "$STATE_DIR" ]] && touch "$STATE_DIR/.w" 2>/dev/null && rm -f "$STATE_DIR/.w"; }; then
             tmp="${STATE_FILE}.tmp"
-            echo "$sha" > "$tmp" && mv "$tmp" "$STATE_FILE"
-        elif command -v sudo >/dev/null 2>&1; then
-            echo "$sha" | sudo -n tee "$STATE_FILE" >/dev/null 2>&1 || true
+            if ! { echo "$sha" > "$tmp" && mv "$tmp" "$STATE_FILE"; }; then
+                echo "⚠️  deployed-sha: writable dir but failed to write ${STATE_FILE}" >&2
+                exit 1
+            fi
+        elif command -v sudo >/dev/null 2>&1 && echo "$sha" | sudo -n tee "$STATE_FILE" >/dev/null 2>&1; then
+            : # written via sudo
+        else
+            echo "⚠️  deployed-sha: could not persist deployed SHA to ${STATE_FILE} (no write access, no passwordless sudo). The next apply-config-changes.sh run will treat everything as changed." >&2
+            exit 1
         fi
         ;;
     *)

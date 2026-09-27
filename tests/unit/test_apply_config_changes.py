@@ -22,17 +22,35 @@ REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "deployment" / "apply-config-changes.sh"
 
 FAKE_DOCKER = """#!/bin/bash
-# Fake docker for tests: logs every invocation, simulates exec/logs/restart/kill.
+# Fake docker for tests: logs every invocation, simulates exec/logs/restart/
+# kill/inspect. `kill` touches a per-container marker file so `logs` only
+# returns FAKE_DOCKER_LOGS_OUTPUT for calls made *after* that container was
+# signaled -- mirrors real "only new log lines count" semantics without
+# depending on wall-clock precision.
 echo "$@" >> "$FAKE_DOCKER_LOG"
+args=("$@")
+last="${args[$((${#args[@]} - 1))]}"
 case "$1" in
     exec)
-        if [[ -n "${FAKE_DOCKER_EXEC_OUTPUT:-}" ]]; then
-            cat "$FAKE_DOCKER_EXEC_OUTPUT"
-        fi
-        exit 0
+        case "$3" in
+            cat)
+                if [[ -n "${FAKE_DOCKER_EXEC_OUTPUT:-}" ]]; then
+                    cat "$FAKE_DOCKER_EXEC_OUTPUT"
+                fi
+                exit 0
+                ;;
+            caddy)
+                [[ "${FAKE_DOCKER_VALIDATE_FAIL:-0}" == "1" ]] && exit 1
+                exit 0
+                ;;
+            *)
+                exit 0
+                ;;
+        esac
         ;;
     logs)
-        if [[ -n "${FAKE_DOCKER_LOGS_OUTPUT:-}" ]]; then
+        marker_dir="${FAKE_DOCKER_KILL_MARKER_DIR:-/nonexistent}"
+        if [[ -n "${FAKE_DOCKER_LOGS_OUTPUT:-}" && -f "${marker_dir}/${last}.killed" ]]; then
             printf '%s\\n' "$FAKE_DOCKER_LOGS_OUTPUT"
         fi
         exit 0
@@ -43,6 +61,34 @@ case "$1" in
         ;;
     kill)
         [[ "${FAKE_DOCKER_KILL_FAIL:-0}" == "1" ]] && exit 1
+        if [[ -n "${FAKE_DOCKER_KILL_MARKER_DIR:-}" ]]; then
+            mkdir -p "$FAKE_DOCKER_KILL_MARKER_DIR"
+            touch "${FAKE_DOCKER_KILL_MARKER_DIR}/${last}.killed"
+        fi
+        exit 0
+        ;;
+    inspect)
+        fmt="$3"
+        case "$fmt" in
+            *State.Running*)
+                echo "${FAKE_DOCKER_RUNNING:-true}"
+                ;;
+            *RestartCount*)
+                if [[ "${FAKE_DOCKER_CRASH_LOOP:-0}" == "1" ]]; then
+                    counter_file="${FAKE_DOCKER_RESTART_COUNTER_FILE:-/tmp/fake-docker-restart-counter}"
+                    count=0
+                    [[ -f "$counter_file" ]] && count="$(cat "$counter_file")"
+                    count=$((count + 1))
+                    echo "$count" > "$counter_file"
+                    echo "$count"
+                else
+                    echo "0"
+                fi
+                ;;
+            *)
+                echo ""
+                ;;
+        esac
         exit 0
         ;;
     *)
@@ -88,6 +134,8 @@ def _run(
         **os.environ,
         "PATH": f"{bindir}:{os.environ['PATH']}",
         "FAKE_DOCKER_LOG": str(log),
+        "FAKE_DOCKER_KILL_MARKER_DIR": str(log.parent / "kill-markers"),
+        "FAKE_DOCKER_RESTART_COUNTER_FILE": str(log.parent / "restart-counter"),
         "RELOAD_POLL_ATTEMPTS": "2",
         "RELOAD_POLL_INTERVAL": "0",
     }
@@ -154,6 +202,7 @@ def test_caddyfile_change_restarts_and_verifies_caddy_lan(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     log_text = log.read_text()
+    assert "exec caddy-lan caddy validate" in log_text
     assert "restart caddy-lan" in log_text
     assert "exec caddy-lan cat /etc/caddy/Caddyfile" in log_text
     assert "kill -s HUP prometheus" not in log_text
@@ -198,6 +247,105 @@ def test_caddy_restart_failure_is_reported(tmp_path):
     assert "failed to restart caddy-lan" in result.stdout + result.stderr
 
 
+def test_caddy_invalid_config_refuses_restart(tmp_path):
+    """An invalid new Caddyfile must never take the proxy down: validation
+    runs against the live bind mount before any restart, and a failure skips
+    the restart entirely."""
+    repo = _setup_repo(tmp_path)
+    old_sha = _commit(repo, "init")
+    (repo / "config" / "caddy" / "Caddyfile").write_text("not valid caddyfile {{{\n")
+    _commit(repo, "caddy change")
+
+    bindir = _fake_docker_bin(tmp_path)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+
+    result = _run(
+        repo, old_sha, bindir, log, extra_env={"FAKE_DOCKER_VALIDATE_FAIL": "1"}
+    )
+    assert result.returncode == 1
+    assert "fails `caddy validate`" in result.stdout + result.stderr
+    log_text = log.read_text()
+    assert "exec caddy-lan caddy validate" in log_text
+    assert "restart caddy-lan" not in log_text
+
+
+def test_caddy_crash_loop_after_restart_detected(tmp_path):
+    repo = _setup_repo(tmp_path)
+    old_sha = _commit(repo, "init")
+    (repo / "config" / "caddy" / "Caddyfile").write_text("changed\n")
+    _commit(repo, "caddy change")
+
+    bindir = _fake_docker_bin(tmp_path)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+
+    result = _run(
+        repo,
+        old_sha,
+        bindir,
+        log,
+        extra_env={
+            "FAKE_DOCKER_EXEC_OUTPUT": str(repo / "config" / "caddy" / "Caddyfile"),
+            "FAKE_DOCKER_CRASH_LOOP": "1",
+        },
+    )
+    assert result.returncode == 1
+    assert "crash-looping" in result.stdout + result.stderr
+
+
+def test_caddy_not_running_after_restart_detected(tmp_path):
+    repo = _setup_repo(tmp_path)
+    old_sha = _commit(repo, "init")
+    (repo / "config" / "caddy" / "Caddyfile").write_text("changed\n")
+    _commit(repo, "caddy change")
+
+    bindir = _fake_docker_bin(tmp_path)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+
+    result = _run(
+        repo,
+        old_sha,
+        bindir,
+        log,
+        extra_env={
+            "FAKE_DOCKER_EXEC_OUTPUT": str(repo / "config" / "caddy" / "Caddyfile"),
+            "FAKE_DOCKER_RUNNING": "false",
+        },
+    )
+    assert result.returncode == 1
+    assert "not running after restart" in result.stdout + result.stderr
+
+
+def test_uncommitted_caddyfile_change_is_detected(tmp_path):
+    """DEPLOY_FORCE=1 lets `make deploy` run with uncommitted tracked-config
+    edits still in the worktree. Those never show up in old-sha..HEAD, so the
+    worktree itself must also be diffed against HEAD."""
+    repo = _setup_repo(tmp_path)
+    old_sha = _commit(repo, "init")
+    # No commit: simulates a DEPLOY_FORCE=1 host edit still sitting dirty.
+    (repo / "config" / "caddy" / "Caddyfile").write_text(
+        'example.home {\n  respond "v2"\n}\n'
+    )
+
+    bindir = _fake_docker_bin(tmp_path)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+
+    result = _run(
+        repo,
+        old_sha,
+        bindir,
+        log,
+        extra_env={
+            "FAKE_DOCKER_EXEC_OUTPUT": str(repo / "config" / "caddy" / "Caddyfile")
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "restart caddy-lan" in log.read_text()
+
+
 def test_prometheus_change_sends_hup_only(tmp_path):
     repo = _setup_repo(tmp_path)
     old_sha = _commit(repo, "init")
@@ -239,6 +387,30 @@ def test_prometheus_reload_not_confirmed_fails(tmp_path):
     )  # no FAKE_DOCKER_LOGS_OUTPUT -> no confirmation
     assert result.returncode == 1
     assert "did not confirm config reload" in result.stdout + result.stderr
+
+
+def test_prometheus_kill_failure_reported(tmp_path):
+    repo = _setup_repo(tmp_path)
+    old_sha = _commit(repo, "init")
+    (repo / "config" / "prometheus" / "rules.yml").write_text("groups: [rule]\n")
+    _commit(repo, "prometheus change")
+
+    bindir = _fake_docker_bin(tmp_path)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+
+    result = _run(
+        repo,
+        old_sha,
+        bindir,
+        log,
+        extra_env={
+            "FAKE_DOCKER_KILL_FAIL": "1",
+            "FAKE_DOCKER_LOGS_OUTPUT": "Completed loading of configuration file",
+        },
+    )
+    assert result.returncode == 1
+    assert "failed to send SIGHUP to prometheus" in result.stdout + result.stderr
 
 
 def test_alertmanager_change_sends_hup_only(tmp_path):
