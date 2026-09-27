@@ -63,8 +63,29 @@ snapshot detects drift, it does not prevent it. The host still has the old
 untracked `infra/terraform/` files (state, tfvars); delete them by hand after
 this merges.
 
+## Follow-up (2026-09-27)
+
+The debate's remaining steps were carried out:
+
+- **Caddy guards** (#437): a CI lint makes every public site block gate all
+  requests through tinyauth or be allowlisted with a reason, and requires the
+  `:80` catch-all to answer 404.
+- **Wildcard** (#438): `*.${DOMAIN}` is a proxied CNAME plus an ingress rule to
+  caddy-lan before the 404, so a new host in that zone needs only its Caddy
+  block. Existing hosts answered the same before and after.
+- **No edit token on the host** (#439): the host's Cloudflare token is read-only
+  (a DNS write returns 403). Edits use a short-lived token from the laptop.
+- **Locally managed tunnel, 1-hour prototype: rejected.** A throwaway tunnel
+  with config in git and a sops credential worked end to end, but hit 5
+  friction points and 2 shims (container uid to read the credential; tunnel id
+  passed on the command line since `config.yml` does not expand variables). The
+  decisive one: a remotely managed tunnel cannot go back to local, so migrating
+  means a new tunnel and repointing every DNS record of the live edge. With the
+  wildcard the ingress is nearly static, so the snapshot's drift detection is
+  enough. The prototype was torn down.
+
 ## Revisit when
 
-- The tunnel moves to local management (`config.yml` + credentials via sops): that
-  makes ingress a PR, and this ADR's step 3 changes.
+- Ingress starts changing often again (hosts outside the wildcard zone, or
+  per-host origin settings), which would make ingress-as-PR worth a migration.
 - A second host, VMs or another provider appear, where a planner earns its cost.
