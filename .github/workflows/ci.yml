@@ -9,9 +9,10 @@ on:
 permissions:
   contents: read
 
-# A new push to a PR supersedes the previous run; branch pushes always finish.
+# A new push to a PR supersedes the previous run. Branch pushes get a group
+# per commit, so a queued push run is never replaced by the next one.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
