@@ -21,10 +21,6 @@ http://ai.home {
 	reverse_proxy {$BIND_IP:127.0.0.1}:3000
 }
 
-http://craftvaria.home {
-	reverse_proxy 127.0.0.1:3333
-}
-
 http://lucky.luk-homeserver.com.br {
 	import protected
 	reverse_proxy {$BIND_IP:127.0.0.1}:8090
@@ -150,7 +146,7 @@ http://forgejo.home {
 }
 
 http://homelab.home, http://home {
-	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home stremio.home n8n.home linkding.home miniflux.home forgejo.home" 200
+	respond "homelab services: ai.home lucky.home registry.home pihole.home cockpit.home stremio.home n8n.home linkding.home miniflux.home forgejo.home" 200
 }
 
 # ---------- Public HTTPS via Cloudflare Tunnel (*.luk-homeserver.com.br) ----------
