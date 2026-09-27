@@ -37,7 +37,7 @@ Access, and hit TLS-cert mismatch errors.
 | Portainer | — | via `tailscale serve` | `portainer.luk-homeserver.com.br` | CF Access gated (critical) |
 | n8n | — | via `tailscale serve` | `n8n.luk-homeserver.com.br` | CF Access gated |
 | Nextcloud | — | `cloud.homelab.example.com` | `cloud.luk-homeserver.com.br` | Primary public access via CF |
-| Paperless-ngx | — | via `tailscale serve` | `docs.luk-homeserver.com.br` | CF Access gated |
+| Paperless-ngx | — | via `tailscale serve` | `paperless.luk-homeserver.com.br` | CF Access gated |
 | Tinyauth | — | — | `auth.luk-homeserver.com.br` | SSO broker — CF path only |
 | Pi-hole admin | `pihole.home` | `pihole.homelab.example.com` | — | Never public |
 | Prometheus | — | `prom.homelab.example.com` | — | Never public |

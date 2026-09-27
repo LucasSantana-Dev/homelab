@@ -274,7 +274,7 @@ services:
     health_endpoint: "/"
     description: "Document management system"
     sensitive: true
-    url_path: "docs"
+    url_path: "paperless"
 
   paperless-db:
     name: "Paperless DB"
