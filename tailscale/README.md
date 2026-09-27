@@ -22,7 +22,7 @@ merges to `main` auto-push this file. One-time setup in the admin console.
 ## Tag the homelab host
 
 The ACL references `tag:homelab-friends-exposed`. Apply it once on the
-host running the friend-facing services (Jellyfin / Stremio / Craftvaria):
+host running the friend-facing services (Jellyfin / Stremio):
 
 ```bash
 sudo tailscale up --advertise-tags=tag:homelab-friends-exposed --reset
@@ -39,7 +39,7 @@ Friend stays on their own tailnet. Zero seats on yours.
 1. Admin console → **Machines** → homelab host → **Share** →
    enter friend's Tailscale email → send invite.
 2. Friend accepts → homelab host appears in their tailnet as a shared node.
-3. ACL via `autogroup:shared` restricts them to Jellyfin/Stremio/Minecraft.
+3. ACL via `autogroup:shared` restricts them to Jellyfin/Stremio.
 
 ### Path B — Guest user on this tailnet
 

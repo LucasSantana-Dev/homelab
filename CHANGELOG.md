@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-09-27
+
+Release cut of the `release` branch (44 commits since v2.13.0). No breaking changes.
+
+### Added
+
+- **Host security audit**: weekly Lynis + Trivy scan of every running image, exported as Prometheus metrics, with alerts for a missed or failed audit, a hardening-index drop, and new CRITICAL CVEs (the existing upstream baseline does not page).
+- **Vanished-service alert**: a default-profile compose service without a running container now fires within 15 minutes (the 2026-09-20 outage went 7 days unnoticed).
+- **Edge guards**: Caddy public blocks must carry an auth gate or a reasoned allowlist entry (pre-commit + CI), and a weekly check asserts every public hostname, plus a random subdomain under the wildcard, redirects to Cloudflare Access.
+- **Read-only edge snapshot** of tunnel ingress and DNS replaces the Terraform Phase-1 module (ADR 0041).
+- **Drift detection** between the host checkout and this repo.
+- CoJam metrics scrape and outside-the-tunnel Gatus probe; brain-mcp served to claude.ai custom connectors; self-hosted GitHub Stats Extended.
+- Home and privacy pages for the rclone OAuth client.
+
+### Changed
+
+- cloudflared 2026.3.0 -> 2026.9.3 (digest-pinned).
+- Wildcard ingress for the homelab zone, gated by Cloudflare Access; DNS and ingress cleanup.
+- Host Cloudflare token is now read-only.
+- Google Drive offsite activated for kopia.
+- Dependency updates (4) and CI chores.
+
+### Removed
+
+- Craftvaria (Minecraft) stack, open-webui (`ai.home`), brainchat-web, and the Terraform Phase-1 module.
+
+### Fixed
+
+- `docker-prune` no longer removes compose-managed containers; boot-time `compose pull` failures no longer block the stack.
+- `make sops-verify` never prints secret values.
+- CoJam loopback ports (502 outage), provider key passthrough, and CI secrets; paperless served on its own host; Gatus Portainer check; drift check covers every deployable file.
+
 ## [2.13.0] - 2026-07-18
 
 Release cut of the `release` branch (141 commits since v2.12.1). No breaking changes.

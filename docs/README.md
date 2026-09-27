@@ -8,7 +8,7 @@ This directory contains detailed documentation for specific components and featu
 
 - **[Access Layers](access-layers.md)** - **START HERE.** Canonical service × layer matrix (LAN / Tailscale / Cloudflare Tunnel) with DNS invariant
 - **[Tailscale Setup](tailscale-setup.md)** - Complete Tailscale configuration and security setup
-- **[Tailscale Friends Sharing](tailscale-friends-sharing.md)** - Give friends scoped access to Jellyfin/Stremio/Craftvaria via node sharing + ACL
+- **[Tailscale Friends Sharing](tailscale-friends-sharing.md)** - Give friends scoped access to Jellyfin/Stremio via node sharing + ACL
 - **[Tailscale Features Checklist](tailscale-features-checklist.md)** - Full feature activation (HTTPS, SSH, subnet router, exit node, tailnet lock, ACL sync)
 - **[Interactive CLI](interactive-cli.md)** - Comprehensive interactive console application
 - **[Project Structure](project-structure.md)** - Improved project organization and structure

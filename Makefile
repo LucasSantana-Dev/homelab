@@ -9,11 +9,11 @@
         concurrency-guard pressure-watch pressure-capture-checkpoint pressure-checkpoint-gate pressure-gates-status \
         schedule-pressure-gate-checkpoints \
         baseline-bundle \
-        post-t24-terraform-apply schedule-post-t24-terraform-apply \
         ssl-status sso-register-apps sso-register-dry-run sso-register-status \
         serena-mcp-setup k3s-registry-mirror \
         secret-gate secret-gate-history public-safety-gate public-release-checkpoint rewrite-history \
         forge-space-up forge-space-down forge-space-logs forge-space-status forge-space-mcp-setup \
+        brain-mcp-up brain-mcp-down brain-mcp-logs brain-mcp-status \
         sops-status sops-encrypt sops-decrypt sops-verify sops-edit
 
 # Default target
@@ -71,6 +71,23 @@ forge-space-status: ## Show Forge Space MCP Gateway status
 
 forge-space-mcp-setup: ## Register Forge Space MCP client in Codex (requires FORGE_MCP_SERVER_URL and FORGE_MCP_JWT)
 	@./scripts/deployment/setup-forge-space-mcp.sh
+
+brain-mcp-up: ## Deploy the knowledge-brain MCP server (build context must be synced first)
+	@echo "🧠 Starting knowledge-brain MCP..."
+	@docker compose --profile brain-mcp up -d --build brain-mcp
+	@echo "✅ brain-mcp started (readiness takes ~60s: make brain-mcp-status)"
+
+brain-mcp-down: ## Stop the knowledge-brain MCP server
+	@echo "🛑 Stopping knowledge-brain MCP..."
+	@docker compose --profile brain-mcp stop brain-mcp
+	@echo "✅ brain-mcp stopped"
+
+brain-mcp-logs: ## Tail knowledge-brain MCP logs
+	@docker compose --profile brain-mcp logs -f --tail=100 brain-mcp
+
+brain-mcp-status: ## Show knowledge-brain MCP status and readiness
+	@docker compose --profile brain-mcp ps brain-mcp
+	@printf 'brain-mcp readyz: '; curl -fsS localhost:8098/readyz || echo 'unreachable'
 
 status: ## Show status of all services
 	@echo "📊 Homelab Status"
@@ -490,43 +507,7 @@ baseline-bundle: ## Capture baseline evidence bundle (health, burn-in, budget, p
 	@echo "📦 Capturing baseline bundle..."
 	@./scripts/maintenance/capture-baseline-bundle.sh
 
-post-t24-terraform-apply: ## Run gated Terraform apply using pressure-watch T+24 artifacts (WATCH_DIR=/tmp/... SWAP_THRESHOLD_GIB=2.0 EXPECTED_PLAN_ADDS=7)
-	@echo "🧭 Running post-T+24 gated Terraform apply"
-	@WATCH_DIR="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}" \
-	 SWAP_THRESHOLD_GIB="$${SWAP_THRESHOLD_GIB:-2.0}" \
-	 EXPECTED_PLAN_ADDS="$${EXPECTED_PLAN_ADDS:-7}" \
-	 "$(CURDIR)/scripts/maintenance/post-t24-terraform-apply.sh"
 
-schedule-post-t24-terraform-apply: ## Schedule gated Terraform apply after pressure watch (default: T+24 timer + 5 min)
-	@set -e; \
-	 t24_next="$$(systemctl --user list-timers --all --no-legend homelab-pressure-watch-tplus24h.timer 2>/dev/null | awk '{if ($$1 != "-") print $$1" "$$2" "$$3" "$$4}')"; \
-	 if [ -n "$${APPLY_ON_CALENDAR:-}" ]; then \
-	   on_calendar="$${APPLY_ON_CALENDAR}"; \
-	 elif [ -n "$$t24_next" ] && [ "$$t24_next" != "n/a" ]; then \
-	   on_calendar="$$(date -d "$$t24_next + 5 minutes" '+%Y-%m-%d %H:%M:%S')"; \
-	 else \
-	   on_calendar="2026-03-15 12:05:00"; \
-	 fi; \
-	 watch_dir="$${WATCH_DIR:-/tmp/homelab-pressure-watch-20260314_115740}"; \
-	 swap_threshold="$${SWAP_THRESHOLD_GIB:-2.0}"; \
-	 if [ -n "$$t24_next" ] && [ "$$t24_next" != "n/a" ]; then \
-	   on_epoch="$$(date -d "$$on_calendar" +%s)"; \
-	   t24_epoch="$$(date -d "$$t24_next" +%s)"; \
-	   if [ "$$on_epoch" -le "$$t24_epoch" ]; then \
-	     echo "❌ Refusing schedule: apply time ($$on_calendar) must be after T+24 timer ($$t24_next)"; \
-	     exit 1; \
-	   fi; \
-	 fi; \
-	 systemctl --user stop homelab-post-t24-terraform-apply.timer >/dev/null 2>&1 || true; \
-	 systemctl --user stop homelab-post-t24-terraform-apply.service >/dev/null 2>&1 || true; \
-	 systemctl --user reset-failed homelab-post-t24-terraform-apply.timer >/dev/null 2>&1 || true; \
-	 systemctl --user reset-failed homelab-post-t24-terraform-apply.service >/dev/null 2>&1 || true; \
-	 echo "⏱️ Scheduling post-T+24 apply on: $$on_calendar"; \
-	 systemd-run --user --on-calendar="$$on_calendar" --unit=homelab-post-t24-terraform-apply \
-	   env WATCH_DIR="$$watch_dir" SWAP_THRESHOLD_GIB="$$swap_threshold" \
-	   "$(CURDIR)/scripts/maintenance/post-t24-terraform-apply.sh" \
-	   >/dev/null; \
-	 echo "✅ Timer scheduled: homelab-post-t24-terraform-apply.timer (watch_dir=$$watch_dir threshold=$$swap_threshold)"
 
 # MCP helpers
 serena-mcp-setup: ## Build and register Serena MCP image with node+terraform dependencies
@@ -632,7 +613,11 @@ sops-encrypt: ## Encrypt .env -> .env.enc (commit .env.enc; .env stays gitignore
 	@command -v sops >/dev/null 2>&1 || { echo "sops not installed: brew install sops age"; exit 1; }
 	@[ -n "$(SOPS_AGE_PUB)" ] || { echo "Set a real age public key in .sops.yaml first (docs/secrets.md §Activation)"; exit 1; }
 	@[ -f .env ] || { echo ".env not found"; exit 1; }
-	sops --encrypt --age '$(SOPS_AGE_PUB)' --input-type dotenv --output-type dotenv .env > .env.enc
+	# --filename-override: sops matches creation_rules against the INPUT path,
+	# which is `.env`, but .sops.yaml only has a rule for `^\.env\.enc$` — the
+	# output name. Without this the encrypt dies on "no matching creation rules
+	# found". Verified on sops 3.9.4: exit 1 without the flag, exit 0 with it.
+	sops --encrypt --age '$(SOPS_AGE_PUB)' --input-type dotenv --output-type dotenv --filename-override .env.enc .env > .env.enc
 	@echo "Wrote .env.enc — run 'make sops-verify', then commit .env.enc."
 
 sops-decrypt: ## Decrypt .env.enc -> .env (needs SOPS_AGE_KEY_FILE; run on host before deploy)
@@ -644,10 +629,19 @@ sops-decrypt: ## Decrypt .env.enc -> .env (needs SOPS_AGE_KEY_FILE; run on host 
 sops-verify: ## Round-trip check: decrypt .env.enc and diff against current .env
 	@sops --decrypt --input-type dotenv --output-type dotenv .env.enc > .env.sops-check 2>/dev/null \
 		|| { echo "decrypt failed — is SOPS_AGE_KEY_FILE exported?"; rm -f .env.sops-check; exit 1; }
-	@sort .env > .env.sops-a; sort .env.sops-check > .env.sops-b; \
-	if diff -q .env.sops-a .env.sops-b >/dev/null; then echo "OK: .env.enc round-trips to .env exactly"; \
-	else echo "MISMATCH (.env vs decrypted .env.enc):"; diff .env.sops-a .env.sops-b | head -20; fi; \
-	rm -f .env.sops-check .env.sops-a .env.sops-b
+	@# Skip only comments and blank lines (sops drops them); compare everything
+	@# else. Each assignment and its continuation lines (multiline/PEM values)
+	@# form one record, so sorting reorders assignments, never a value's lines.
+	@# A mismatch names keys, never values: this output lands in terminals and
+	@# agent logs, and a record that is not plainly KEY= is shown as a marker.
+	@norm() { grep -vE '^[[:space:]]*(#|$$)' "$$1" | awk 'function flush() { if (r != "") print r } /^(export[ \t]+)?[A-Za-z_][A-Za-z0-9_.-]*=/ { flush(); r = $$0; next } { r = r "\037" $$0 } END { flush() }' | sort; }; \
+	norm .env > .env.sops-a; norm .env.sops-check > .env.sops-b; \
+	rm -f .env.sops-check; \
+	if cmp -s .env.sops-a .env.sops-b; then echo "OK: .env.enc round-trips to .env ($$(wc -l < .env.sops-a | tr -d ' ') entries)"; rc=0; \
+	else echo "MISMATCH, keys that differ:"; diff .env.sops-a .env.sops-b | sed -n 's/^[<>] //p' \
+		| awk '{ if (match($$0, /^(export[ \t]+)?[A-Z_][A-Z0-9_]*=/)) { k = substr($$0, 1, RLENGTH - 1); sub(/^export[ \t]+/, "", k); print "  " k } else print "  <line that is not KEY=value>" }' \
+		| sort -u | head -20; rc=1; fi; \
+	rm -f .env.sops-a .env.sops-b; exit $$rc
 
 sops-edit: ## Edit secrets in place (sops decrypts -> $$EDITOR -> re-encrypts)
 	sops --input-type dotenv --output-type dotenv .env.enc

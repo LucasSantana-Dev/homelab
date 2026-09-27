@@ -37,12 +37,14 @@ correlate it with a leaked credentials.json.
 
 1. Cloudflare dashboard → Zero Trust → Networks → Tunnels → delete the old
    tunnel, create a new one.
-2. Copy the new credentials.json to `~/homelab/config/cloudflared/credentials.json`
-   (server-side, NOT tracked in repo).
-3. Add `CF_TUNNEL_ID=<new-uuid>` to `~/homelab/.env`.
-4. Update `config/cloudflared/config.yml` in the repo to reference
-   `${CF_TUNNEL_ID}` instead of the hardcoded UUID.
-5. `docker compose restart cloudflared`.
+2. On the host: `make sops-edit` and set `CLOUDFLARED_TUNNEL_TOKEN` to the new
+   tunnel's token (the only thing the container reads, as `TUNNEL_TOKEN` in
+   `compose/core.yml`), then `make sops-decrypt` so the plain `.env` that
+   compose interpolates from has it. Commit `.env.enc`.
+3. `docker compose up -d cloudflared` (recreate: `restart` keeps the old env).
+4. Nothing to change in the repo: `config/cloudflared/config.yml` is a
+   reference only (ADR 0041) and its `${CF_TUNNEL_ID}` routes nothing.
+   Refresh `config/cloudflared/edge-snapshot.json` afterwards.
 
 ## Homepage server-side version (in flight)
 

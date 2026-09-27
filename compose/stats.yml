@@ -1,0 +1,58 @@
+# GitHub Stats Extended: self-hosted README stats cards.
+#
+# Exists so the cards can count private repositories. The public instance
+# authenticates with its own public-only token, so Python and Java read wrong
+# on the profile card and Rust (100% private) never appears at all. Running it
+# here keeps the PAT on our hardware instead of a third party's env store.
+#
+# Reached from GitHub Actions via cloudflared -> Caddy, which requires the
+# X-Stats-Key header — the endpoint is internet-facing and unauthenticated
+# upstream, so without that gate strangers would spend our PAT's rate limit.
+#
+# Secrets required in .env (host-only, then `make sops-encrypt`):
+#   GITHUB_STATS_PAT=<GitHub PAT that can read your private repos>
+#   GITHUB_STATS_KEY=<shared secret, must match the profile repo's STATS_KEY>
+services:
+  github-stats:
+    image: ${IMG_GITHUB_STATS:-ghcr.io/lucassantana-dev/github-stats-extended:latest}
+    labels:
+      - wud.watch=true
+    container_name: github-stats
+    restart: unless-stopped
+    environment:
+      # PAT_1 is the name the app reads; it supports PAT_2.. for rotation.
+      PAT_1: ${GITHUB_STATS_PAT}
+      PORT: 9000
+      # Cards are regenerated once a day by the profile repo's workflow, so
+      # anything shorter than that just burns GitHub API quota.
+      CACHE_SECONDS: "86400"
+      # Silences turbo's build-time warning about env vars absent from
+      # turbo.json, which is not meaningful for this deployment.
+      TURBO_PLATFORM_ENV_DISABLED: "true"
+      TZ: ${TIMEZONE:-UTC}
+    ports:
+      # Caddy (host network) reverse-proxies to this local port. 8097 chosen
+      # because 8090-8096, 8300 and 9000 are already bound on the host.
+      - "${BIND_IP:-127.0.0.1}:8097:9000"
+    networks:
+      - frontend
+    healthcheck:
+      # /api/status/up answers without touching the GitHub API.
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:9000/api/status/up || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
