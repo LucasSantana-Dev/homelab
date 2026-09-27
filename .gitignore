@@ -249,13 +249,6 @@ config/alertmanager/deadman_ping_url
 config/nginx/ssl/
 config/nginx/logs/
 
-# Terraform local state and cache
-infra/terraform/.terraform/
-infra/terraform/.terraform.lock.hcl
-infra/terraform/terraform.tfstate
-infra/terraform/terraform.tfstate.*
-infra/terraform/terraform.tfvars
-infra/terraform/*.tfplan
 
 # Kubernetes secret workflow artifacts
 k8s/secrets/*.dec.yaml
