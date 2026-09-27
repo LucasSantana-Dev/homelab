@@ -85,7 +85,8 @@ The debate's remaining steps were carried out:
      of the public repo, audit C1) has to be passed on the command line.
   4. Decisive: a remotely managed tunnel cannot go back to local management,
      so migrating means a new tunnel and repointing every DNS record of the
-     live edge (27 records plus the wildcard).
+     live edge (30 records across both zones in the snapshot, wildcard
+     included).
   5. The laptop's `cert.pem` can create DNS only in the second zone, so routes
      for `${DOMAIN}` would still need an API token.
   With the wildcard the ingress is nearly static, so the snapshot's drift
