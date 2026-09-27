@@ -2,8 +2,11 @@
 # host-security-audit.sh
 # Weekly defensive audit of this host: Lynis (hardening) and Trivy (HIGH and
 # CRITICAL CVEs in the images of running containers). Results go to the
-# node-exporter textfile collector, reports to REPORT_DIR. The script only
-# reads: it changes no host setting and no container.
+# node-exporter textfile collector, reports to REPORT_DIR. It changes no host
+# setting and no existing container, but it is not read-only: it may `docker
+# pull` an image that is not yet local (an IMAGES override can name one), and
+# it creates/reuses a `trivy-cache` Docker volume to cache Trivy's CVE
+# database across runs.
 #
 # Trivy never gets the Docker socket (a `:ro` mount would still grant full
 # daemon control). This script, already root, exports each image with
@@ -38,7 +41,7 @@ TEMP_FILE="$(mktemp "${TEXTFILE_DIR}/.host-security-audit.XXXXXX")" || die "mkte
 WORK="$(mktemp -d "${SCAN_TMP}/host-audit.XXXXXX")" || die "mktemp failed in $SCAN_TMP"
 chmod 700 "$WORK"
 trap 'rm -rf "$TEMP_FILE" "$WORK"' EXIT
-out() { printf '%s\n' "$*" >> "$TEMP_FILE"; }
+out() { printf '%s\n' "$*" >> "$TEMP_FILE" || die "write to $TEMP_FILE failed"; }
 
 # ---- Lynis --------------------------------------------------------------
 lynis_ok=0 hardening=0 warnings=0
@@ -63,9 +66,28 @@ out "# TYPE host_lynis_warnings gauge"
 out "host_lynis_warnings ${warnings:-0}"
 
 # ---- Trivy --------------------------------------------------------------
+# IMAGE_PAIRS holds one "id|label" per line: the immutable image ID to scan
+# and save (never changes underneath us), and a human repo:tag for the
+# metric's `image` label. `docker ps --format '{{.Image}}'` reports the
+# mutable tag a container was started with; if that tag gets retagged or
+# re-pulled between enumeration and `docker save`, the scan would silently
+# cover a different image than the one actually running. Resolving each
+# running container's bound image ID with `docker inspect` closes that race.
 if [ -z "${IMAGES:-}" ]; then
-  IMAGES=$(docker ps --format '{{.Image}}') || die "docker ps failed; no image was scanned"
-  IMAGES=$(sort -u <<< "$IMAGES")
+  container_ids=$(docker ps -q) || die "docker ps failed; no image was scanned"
+  IMAGE_PAIRS=""
+  for cid in $container_ids; do
+    pair=$(docker inspect --format '{{.Image}}|{{.Config.Image}}' "$cid" 2>/dev/null) || die "docker inspect failed for container $cid; no image was scanned"
+    IMAGE_PAIRS="${IMAGE_PAIRS}${pair}"$'\n'
+  done
+  IMAGE_PAIRS=$(sort -u <<< "$IMAGE_PAIRS")
+else
+  # An IMAGES override names images directly (not necessarily running), so
+  # the id and the label are the same pullable reference.
+  IMAGE_PAIRS=""
+  for name in $IMAGES; do
+    IMAGE_PAIRS="${IMAGE_PAIRS}${name}|${name}"$'\n'
+  done
 fi
 
 out "# HELP host_image_scan_ok Trivy scanned the image"
@@ -74,8 +96,8 @@ out "# HELP host_image_vulnerabilities HIGH/CRITICAL CVEs in an image in use"
 out "# TYPE host_image_vulnerabilities gauge"
 summary="$REPORT_DIR/trivy-summary.txt"
 errors="$REPORT_DIR/trivy-errors.log"
-: > "$summary"
-: > "$errors"
+: > "$summary" || die "cannot write $summary"
+: > "$errors" || die "cannot write $errors"
 
 scan() {
   local tar="$WORK/image.tar"
@@ -92,10 +114,13 @@ scan() {
   return $rc
 }
 
-for img in $IMAGES; do
+for pair in $IMAGE_PAIRS; do
+  id="${pair%%|*}"
+  img="${pair#*|}"
+  [ -n "$img" ] || img="$id"
   label=${img//\"/}
   # One retry: the first scan of a run can fail while the CVE database downloads.
-  if { json=$(scan "$img") || json=$(scan "$img"); } &&
+  if { json=$(scan "$id") || json=$(scan "$id"); } &&
     counts=$(printf '%s' "$json" | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -109,10 +134,10 @@ print(c["HIGH"], c["CRITICAL"])'); then
     out "host_image_scan_ok{image=\"$label\"} 1"
     out "host_image_vulnerabilities{image=\"$label\",severity=\"HIGH\"} $high"
     out "host_image_vulnerabilities{image=\"$label\",severity=\"CRITICAL\"} $crit"
-    printf '%s CRITICAL=%s HIGH=%s\n' "$img" "$crit" "$high" >> "$summary"
+    printf '%s CRITICAL=%s HIGH=%s\n' "$img" "$crit" "$high" >> "$summary" || die "write to $summary failed"
   else
     out "host_image_scan_ok{image=\"$label\"} 0"
-    printf '%s SCAN FAILED\n' "$img" >> "$summary"
+    printf '%s SCAN FAILED\n' "$img" >> "$summary" || die "write to $summary failed"
   fi
 done
 

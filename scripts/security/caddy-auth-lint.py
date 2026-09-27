@@ -32,7 +32,14 @@ def strip_code(text):
     out, quote, marker = [], None, None
     for line in text.split("\n"):
         if marker:
-            first, _, rest = line.strip().partition(" ")
+            # split on ANY whitespace run, not just a literal space: a tab
+            # between the terminator and trailing args must still close the
+            # heredoc, or the rest of the file is swallowed as heredoc body
+            # and every later site block silently drops out of the lint.
+            parts = line.strip().split(None, 1)
+            first, rest = (
+                (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
+            )
             if first != marker:
                 out.append("")
                 continue
@@ -66,6 +73,17 @@ def site_blocks(text):
         s = line.strip()
         if depth == 0:
             if not s:
+                continue
+            # a whole block opened and closed on one line, e.g.
+            # `http://x { reverse_proxy backend }`: `endswith("{")` below
+            # never fires for it, so without this branch it is absorbed into
+            # `pending` and never yielded as a block (lint bypass).
+            if "{" in s and s.endswith("}"):
+                head, _, rest = s.partition("{")
+                addr = " ".join(pending + [head.strip()]).strip()
+                pending = []
+                inner = rest.rsplit("}", 1)[0].strip()
+                yield n, addr, [(1, inner.split())] if inner else []
                 continue
             pending.append(s)
             if s.endswith("{"):

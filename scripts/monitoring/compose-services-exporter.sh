@@ -28,8 +28,26 @@ trap 'rm -f "$TEMP_FILE"' EXIT
 cd "$REPO_DIR" || die "cannot cd to $REPO_DIR"
 ok=1
 expected=$(docker compose config --services 2>/dev/null) || ok=0
-running=$(docker compose ps --status running --format '{{.Service}}' 2>/dev/null) || ok=0
 [ -n "$expected" ] || ok=0
+
+# `docker compose ps --status running --format '{{.Service}}'` also lists
+# one-off `docker compose run` containers under their target service's name,
+# so a leftover one-off run can mask a service that has no real, long-lived
+# container running. Resolve each running container's own labels instead and
+# skip the ones tagged com.docker.compose.oneoff=True.
+running=""
+if [ "$ok" = 1 ]; then
+  running_names=$(docker compose ps --status running --format '{{.Name}}' 2>/dev/null) || ok=0
+  if [ "$ok" = 1 ]; then
+    for cname in $running_names; do
+      info=$(docker inspect --format \
+        '{{ index .Config.Labels "com.docker.compose.oneoff" }}|{{ index .Config.Labels "com.docker.compose.service" }}' \
+        "$cname" 2>/dev/null) || continue
+      [ "${info%%|*}" = "True" ] && continue
+      running="${running}${info#*|}"$'\n'
+    done
+  fi
+fi
 
 {
   echo "# HELP homelab_compose_service_running 1 if the default-profile service has a running container"
@@ -37,7 +55,7 @@ running=$(docker compose ps --status running --format '{{.Service}}' 2>/dev/null
   missing=0
   if [ "$ok" = 1 ]; then
     for svc in $expected; do
-      if grep -qx "$svc" <<< "$running"; then
+      if grep -qxF -- "$svc" <<< "$running"; then
         echo "homelab_compose_service_running{service=\"$svc\"} 1"
       else
         echo "homelab_compose_service_running{service=\"$svc\"} 0"

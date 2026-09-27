@@ -66,6 +66,31 @@ def test_stale_allowlist_entry_fails(tmp_path):
     ]
 
 
+def test_heredoc_terminator_followed_by_tab_still_closes(tmp_path):
+    """A tab (not just a space) between the terminator and trailing args must
+    still close the heredoc, or the rest of the file is swallowed as heredoc
+    body and every later site block silently drops out of the lint."""
+    caddy = (
+        "http://a.example.org {\n\trespond @never <<TXT\n\tpayload\n\tTXT\t200\n"
+        "\treverse_proxy 127.0.0.1:1\n}\n" + OPEN + CATCH_ALL
+    )
+    errors = run(tmp_path, caddy)
+    assert open_hosts(errors) == {"a.example.org", "open.example.org"}
+
+
+def test_one_line_site_block_is_analyzed(tmp_path):
+    """`addr { directive }` all on one line must not be swallowed into the
+    next block's pending address (a bypass that skips it from the lint)."""
+    caddy = "http://open.example.org { reverse_proxy 127.0.0.1:1 }\n" + CATCH_ALL
+    errors = run(tmp_path, caddy)
+    assert open_hosts(errors) == {"open.example.org"}
+
+
+def test_one_line_site_block_gated_passes(tmp_path):
+    caddy = "http://a.example.org { import protected }\n" + CATCH_ALL
+    assert run(tmp_path, caddy) == []
+
+
 @pytest.mark.parametrize(
     "block",
     [

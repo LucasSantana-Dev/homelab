@@ -51,18 +51,25 @@ USER_AGENT = "homelab-access-coverage-check/1.0"
 class ProbeResult:
     """Outcome of one unauthenticated request: gated, plain response, or error."""
 
-    def __init__(self, status=None, location_host=None, error=None):
+    def __init__(
+        self, status=None, location_host=None, location_scheme=None, error=None
+    ):
         self.status = status
         self.location_host = location_host
+        self.location_scheme = location_scheme
         self.error = error
 
     @property
     def gated(self):
+        # The Cloudflare Access login redirect is always https. A Location
+        # with a matching host but another scheme (ftp://, or none captured)
+        # is not a real Access redirect and must not count as gated.
         return (
             self.error is None
             and self.status in (302, 303)
             and self.location_host is not None
             and self.location_host.endswith(ACCESS_SUFFIX)
+            and self.location_scheme == "https"
         )
 
 
@@ -85,18 +92,43 @@ def probe(hostname, timeout=TIMEOUT):
             return ProbeResult(status=resp.getcode())
     except urllib.error.HTTPError as e:
         location = e.headers.get("Location") if e.headers else None
-        host = urllib.parse.urlparse(location).hostname if location else None
-        return ProbeResult(status=e.code, location_host=host)
+        parsed = urllib.parse.urlparse(location) if location else None
+        host = parsed.hostname if parsed else None
+        scheme = parsed.scheme if parsed else None
+        return ProbeResult(status=e.code, location_host=host, location_scheme=scheme)
     except Exception as e:  # noqa: BLE001 - any network failure is a failure
         return ProbeResult(error=str(e))
 
 
-def load_snapshot(path):
-    """Return (hosts, skipped_wildcards) from the ingress list, in order."""
+def load_snapshot(path, errors):
+    """Return (hosts, skipped_wildcards) from the ingress list, in order.
+
+    A missing, non-list, or empty `ingress` must fail closed: with nothing to
+    probe, `check()` would otherwise return zero errors and pass silently,
+    turning a truncated or malformed snapshot into a false "all covered"
+    instead of the coverage gap it actually is.
+    """
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
+    # A root that isn't an object (`[]`, `null`, a bare string...) has no
+    # `.get()`; guard it before the fail-closed check below runs, or a
+    # malformed snapshot crashes with a traceback instead of reporting the
+    # coverage error it should.
+    ingress = data.get("ingress") if isinstance(data, dict) else None
+    if not isinstance(ingress, list) or not ingress:
+        errors.append(
+            f"{path}: 'ingress' is missing, not a list, or empty; "
+            "cannot verify access coverage without it (failing closed)"
+        )
+        return [], []
     hosts, wildcards = [], []
-    for rule in data.get("ingress", []):
+    for rule in ingress:
+        if not isinstance(rule, dict):
+            # A non-object rule (e.g. `null`) has no `hostname` to be
+            # missing; treating it like the harmless hostless catch-all
+            # would let a malformed snapshot pass coverage with zero probes.
+            errors.append(f"{path}: ingress contains a non-object rule; failing closed")
+            return [], []
         hostname = rule.get("hostname")
         if not hostname:
             continue  # the hostless catch-all rule
@@ -125,7 +157,7 @@ def load_allowlist(path, errors):
 
 def check(snapshot_path, allowlist_path):
     errors, notes = [], []
-    hosts, wildcards = load_snapshot(snapshot_path)
+    hosts, wildcards = load_snapshot(snapshot_path, errors)
     # A wildcard rule routes every unlisted name in the zone to the origin, so
     # a subdomain nobody declared is reachable. Probe a random one: it must be
     # gated. Wildcards cannot be allowlisted.

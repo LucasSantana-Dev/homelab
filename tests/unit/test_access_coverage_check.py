@@ -37,8 +37,8 @@ def write_allowlist(tmp_path, text):
     return path
 
 
-def gated(host="team.cloudflareaccess.com"):
-    return mod.ProbeResult(status=302, location_host=host)
+def gated(host="team.cloudflareaccess.com", scheme="https"):
+    return mod.ProbeResult(status=302, location_host=host, location_scheme=scheme)
 
 
 def plain(status=200):
@@ -221,6 +221,16 @@ def test_probe_does_not_follow_the_access_redirect(local_server):
     assert result.gated
 
 
+def test_probe_non_https_location_to_access_host_is_not_gated(local_server):
+    _Handler.routes = {
+        "/": (302, "ftp://team.cloudflareaccess.com/cdn-cgi/access/login/x")
+    }
+    result = mod.probe(local_server, timeout=5)
+    assert result.status == 302
+    assert result.location_host == "team.cloudflareaccess.com"
+    assert not result.gated
+
+
 def test_probe_redirect_to_lookalike_host_is_not_gated(local_server):
     _Handler.routes = {"/": (302, "https://cloudflareaccess.com.evil.example/login")}
     result = mod.probe(local_server, timeout=5)
@@ -253,6 +263,76 @@ def test_hostless_catch_all_rule_is_never_probed(monkeypatch, tmp_path):
     assert errors == []
 
 
+def test_non_https_redirect_to_access_host_does_not_count_as_gated(
+    monkeypatch, tmp_path
+):
+    """A matching cloudflareaccess.com host behind a non-https Location (ftp://,
+    or a scheme urlparse could not determine) is not a real Access redirect."""
+    errors, _ = run(
+        monkeypatch,
+        tmp_path,
+        ["open.example.org"],
+        "",
+        {"open.example.org": gated(scheme="ftp")},
+    )
+    assert len(errors) == 1
+    assert "not allowlisted" in errors[0]
+
+
+def test_snapshot_with_missing_ingress_fails_closed(monkeypatch, tmp_path):
+    path = tmp_path / "edge-snapshot.json"
+    path.write_text(json.dumps({"tunnel": "homelab"}))
+    allowlist = write_allowlist(tmp_path, "")
+    errors, _ = mod.check(str(path), str(allowlist))
+    assert len(errors) == 1
+    assert "failing closed" in errors[0]
+
+
+def test_snapshot_with_non_list_ingress_fails_closed(monkeypatch, tmp_path):
+    path = tmp_path / "edge-snapshot.json"
+    path.write_text(json.dumps({"tunnel": "homelab", "ingress": "not-a-list"}))
+    allowlist = write_allowlist(tmp_path, "")
+    errors, _ = mod.check(str(path), str(allowlist))
+    assert len(errors) == 1
+    assert "failing closed" in errors[0]
+
+
+def test_snapshot_with_non_object_root_fails_closed_without_crashing(
+    monkeypatch, tmp_path
+):
+    """A root that is a list or null has no `.get()`; the fail-closed check
+    must catch this before it crashes with an AttributeError."""
+    allowlist = write_allowlist(tmp_path, "")
+    for root in ("[]", "null", '"just a string"'):
+        path = tmp_path / "edge-snapshot.json"
+        path.write_text(root)
+        errors, _ = mod.check(str(path), str(allowlist))
+        assert len(errors) == 1
+        assert "failing closed" in errors[0]
+
+
+def test_snapshot_with_non_object_ingress_rule_fails_closed(monkeypatch, tmp_path):
+    """A malformed rule like `null` must not be silently treated as the
+    harmless hostless catch-all: that would let a snapshot pass coverage
+    with zero probes."""
+    path = tmp_path / "edge-snapshot.json"
+    path.write_text(json.dumps({"tunnel": "homelab", "ingress": [None]}))
+    allowlist = write_allowlist(tmp_path, "")
+    errors, _ = mod.check(str(path), str(allowlist))
+    assert len(errors) == 1
+    assert "non-object rule" in errors[0]
+    assert "failing closed" in errors[0]
+
+
+def test_snapshot_with_empty_ingress_fails_closed(monkeypatch, tmp_path):
+    path = tmp_path / "edge-snapshot.json"
+    path.write_text(json.dumps({"tunnel": "homelab", "ingress": []}))
+    allowlist = write_allowlist(tmp_path, "")
+    errors, _ = mod.check(str(path), str(allowlist))
+    assert len(errors) == 1
+    assert "failing closed" in errors[0]
+
+
 def test_redirect_to_a_lookalike_domain_does_not_count_as_gated(monkeypatch, tmp_path):
     """`notcloudflareaccess.com` must not satisfy the *.cloudflareaccess.com suffix."""
     errors, _ = run(
@@ -279,16 +359,20 @@ def test_real_snapshot_and_allowlist_are_internally_consistent(monkeypatch, tmp_
 
 
 @pytest.mark.parametrize(
-    "status,location_host,expected",
+    "status,location_host,location_scheme,expected",
     [
-        (302, "team.cloudflareaccess.com", True),
-        (303, "team.cloudflareaccess.com", True),
-        (301, "team.cloudflareaccess.com", False),  # only 302/303 count
-        (302, None, False),  # no Location header
-        (200, None, False),
-        (None, None, False),  # error case handled separately, but gated must be False
+        (302, "team.cloudflareaccess.com", "https", True),
+        (303, "team.cloudflareaccess.com", "https", True),
+        (301, "team.cloudflareaccess.com", "https", False),  # only 302/303 count
+        (302, None, "https", False),  # no Location header
+        (200, None, None, False),
+        (None, None, None, False),  # error case handled separately, gated must be False
+        (302, "team.cloudflareaccess.com", "ftp", False),  # non-https Location
+        (302, "team.cloudflareaccess.com", None, False),  # scheme not captured
     ],
 )
-def test_probe_result_gated_property(status, location_host, expected):
-    result = mod.ProbeResult(status=status, location_host=location_host)
+def test_probe_result_gated_property(status, location_host, location_scheme, expected):
+    result = mod.ProbeResult(
+        status=status, location_host=location_host, location_scheme=location_scheme
+    )
     assert result.gated is expected
