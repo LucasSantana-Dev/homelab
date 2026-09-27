@@ -293,10 +293,6 @@ homelab/
 │   ├── monitoring/       # Health checks, metrics
 │   └── security/         # Certificate renewal, audit
 │
-├── infra/terraform/       # IaC for DNS, Tunnel, network
-│   ├── cloudflare/       # Cloudflare Tunnel config
-│   └── tailscale/        # Tailscale ACLs (if managed)
-│
 ├── docs/                  # Documentation
 │   ├── adr/              # Architecture Decision Records
 │   ├── specs/            # Feature specs
