@@ -355,7 +355,7 @@ jobs:
         docker compose config --images | while read -r image; do
           if [ -n "$image" ] && [ "$image" != "<none>" ]; then
             echo "Scanning image: $image"
-            trivy image --severity HIGH,CRITICAL --format sarif --output "trivy-image-$(echo $image | tr '/' '_' | tr ':' '_').sarif" "$image" || true
+            trivy image --severity HIGH,CRITICAL --format sarif --output "trivy-image-$(echo "$image" | tr '/' '_' | tr ':' '_').sarif" "$image" || true
           fi
         done
 
