@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR supersedes the previous run. Branch pushes get a group
+# per commit, so a queued push run is never replaced by the next one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   repo-hygiene:
     runs-on: ubuntu-latest
@@ -43,7 +49,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -350,7 +356,7 @@ jobs:
         docker compose config --images | while read -r image; do
           if [ -n "$image" ] && [ "$image" != "<none>" ]; then
             echo "Scanning image: $image"
-            trivy image --severity HIGH,CRITICAL --format sarif --output "trivy-image-$(echo $image | tr '/' '_' | tr ':' '_').sarif" "$image" || true
+            trivy image --severity HIGH,CRITICAL --format sarif --output "trivy-image-$(echo "$image" | tr '/' '_' | tr ':' '_').sarif" "$image" || true
           fi
         done
 
