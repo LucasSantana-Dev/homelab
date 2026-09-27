@@ -58,7 +58,7 @@ http://cojam.lucassantana.tech {
 http://stats.lucassantana.tech {
 	@authorized header X-Stats-Key {$GITHUB_STATS_KEY}
 	handle @authorized {
-		reverse_proxy 127.0.0.1:8097
+		reverse_proxy {$BIND_IP:127.0.0.1}:8097
 	}
 	handle {
 		respond "forbidden" 403
@@ -67,7 +67,7 @@ http://stats.lucassantana.tech {
 
 # LAN access needs no key: reaching *.home already means being on the network.
 http://stats.home {
-	reverse_proxy 127.0.0.1:8097
+	reverse_proxy {$BIND_IP:127.0.0.1}:8097
 }
 
 # Knowledge-brain MCP server, consumed by claude.ai custom connectors.
@@ -84,12 +84,12 @@ http://stats.home {
 # No auth is enforced here on purpose, so keep this hostname off any wildcard
 # that would expose other backends.
 http://brain.lucassantana.tech {
-	reverse_proxy 127.0.0.1:8098
+	reverse_proxy {$BIND_IP:127.0.0.1}:8098
 }
 
 # LAN access for testing without the public hop.
 http://brain.home {
-	reverse_proxy 127.0.0.1:8098
+	reverse_proxy {$BIND_IP:127.0.0.1}:8098
 }
 
 http://cojam-api.home {
@@ -153,7 +153,7 @@ http://homelab.home, http://home {
 # a Host rewrite; docker-native services get direct 127.0.0.1 proxying.
 
 http://luk-homeserver.com.br, http://www.luk-homeserver.com.br, http://home.luk-homeserver.com.br {
-	reverse_proxy 127.0.0.1:3010
+	reverse_proxy {$BIND_IP:127.0.0.1}:3010
 }
 
 # Docker-native services on host ports (no k3s dependency)
