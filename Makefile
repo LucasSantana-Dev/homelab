@@ -630,13 +630,14 @@ sops-verify: ## Round-trip check: decrypt .env.enc and diff against current .env
 	@sops --decrypt --input-type dotenv --output-type dotenv .env.enc > .env.sops-check 2>/dev/null \
 		|| { echo "decrypt failed — is SOPS_AGE_KEY_FILE exported?"; rm -f .env.sops-check; exit 1; }
 	@# Skip only comments and blank lines (sops drops them); compare everything
-	@# else. A mismatch names keys, never values: this output lands in terminals
-	@# and agent logs, and a line that is not plainly KEY= (multiline value,
-	@# PEM continuation) is shown as a marker, not as text.
-	@grep -vE '^[[:space:]]*(#|$$)' .env | sort > .env.sops-a; \
-	grep -vE '^[[:space:]]*(#|$$)' .env.sops-check | sort > .env.sops-b; \
+	@# else. Each assignment and its continuation lines (multiline/PEM values)
+	@# form one record, so sorting reorders assignments, never a value's lines.
+	@# A mismatch names keys, never values: this output lands in terminals and
+	@# agent logs, and a record that is not plainly KEY= is shown as a marker.
+	@norm() { grep -vE '^[[:space:]]*(#|$$)' "$$1" | awk 'function flush() { if (r != "") print r } /^(export[ \t]+)?[A-Za-z_][A-Za-z0-9_.-]*=/ { flush(); r = $$0; next } { r = r "\037" $$0 } END { flush() }' | sort; }; \
+	norm .env > .env.sops-a; norm .env.sops-check > .env.sops-b; \
 	rm -f .env.sops-check; \
-	if cmp -s .env.sops-a .env.sops-b; then echo "OK: .env.enc round-trips to .env ($$(wc -l < .env.sops-a | tr -d ' ') lines)"; rc=0; \
+	if cmp -s .env.sops-a .env.sops-b; then echo "OK: .env.enc round-trips to .env ($$(wc -l < .env.sops-a | tr -d ' ') entries)"; rc=0; \
 	else echo "MISMATCH, keys that differ:"; diff .env.sops-a .env.sops-b | sed -n 's/^[<>] //p' \
 		| awk '{ if (match($$0, /^(export[ \t]+)?[A-Z_][A-Z0-9_]*=/)) { k = substr($$0, 1, RLENGTH - 1); sub(/^export[ \t]+/, "", k); print "  " k } else print "  <line that is not KEY=value>" }' \
 		| sort -u | head -20; rc=1; fi; \
