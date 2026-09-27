@@ -16,8 +16,12 @@
 # only shows the routing shape.
 #
 # Consequences, learned the slow way:
-#   - Adding a hostname here does nothing. Add it in the dashboard, then
-#     refresh the snapshot.
+#   - Adding a hostname here does nothing. Since 2026-09-27 a wildcard
+#     (*.luk-homeserver.com.br: proxied CNAME + ingress rule before the 404)
+#     sends every name in that zone to caddy-lan, so a new host there needs
+#     only its Caddy site block: gated by `import protected`, or listed in
+#     config/caddy/public-no-auth.txt (CI lint). Unknown names hit Caddy's 404.
+#     Other zones still need a dashboard route; refresh the snapshot after.
 #   - Restarting cloudflared re-pulls the same remote version; it does not
 #     pick up edits made here.
 #   - *.luk-homeserver.com.br also sits behind a Cloudflare Access app
