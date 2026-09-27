@@ -1,0 +1,13 @@
+[Unit]
+Description=Homelab host security audit (weekly)
+Requires=host-security-audit.service
+
+[Timer]
+# After docker-prune (Sun 04:00) and kopia offsite sync (04:30).
+OnCalendar=Sun *-*-* 05:30:00
+Persistent=true
+RandomizedDelaySec=30m
+AccuracySec=5m
+
+[Install]
+WantedBy=timers.target
