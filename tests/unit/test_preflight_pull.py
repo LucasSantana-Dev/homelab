@@ -97,8 +97,8 @@ def test_fails_on_unwritable_tracked_dir(tmp_path):
         # the mode-only fix is suggested, not a chown (that path needs a real
         # ownership mismatch, which requires root to simulate and is not
         # exercised here).
-        assert "chmod -R u+w" in result.stdout
-        assert "sudo chown -R" not in result.stdout
+        assert "chmod u+w" in result.stdout
+        assert "sudo chown" not in result.stdout
         # Never runs sudo itself: ownership must be unchanged.
         assert os.stat(sub).st_uid == os.getuid()
     finally:

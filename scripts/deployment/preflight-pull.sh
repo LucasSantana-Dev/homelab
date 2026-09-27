@@ -84,7 +84,10 @@ if [[ ${#unwritable_dirs[@]} -gt 0 ]]; then
     echo ""
     if [[ ${#chown_paths[@]} -gt 0 ]]; then
         echo "   Fix (owned by someone else; this script never runs sudo itself):"
-        printf '   sudo chown -R %s:%s' "$current_user" "$current_group"
+        # Non-recursive: only the directory entry's own permissions gate
+        # unlink+create inside it. -R would also rewrite ownership/mode on
+        # every unrelated descendant file, which is not what's broken here.
+        printf '   sudo chown %s:%s' "$current_user" "$current_group"
         for p in "${chown_paths[@]}"; do
             printf ' %q' "$p"
         done
@@ -92,7 +95,7 @@ if [[ ${#unwritable_dirs[@]} -gt 0 ]]; then
     fi
     if [[ ${#chmod_paths[@]} -gt 0 ]]; then
         echo "   Fix (already owned by you, just missing the write bit):"
-        printf '   chmod -R u+w'
+        printf '   chmod u+w'
         for p in "${chmod_paths[@]}"; do
             printf ' %q' "$p"
         done

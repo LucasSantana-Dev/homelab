@@ -43,6 +43,10 @@ case "$1" in
                 [[ "${FAKE_DOCKER_VALIDATE_FAIL:-0}" == "1" ]] && exit 1
                 exit 0
                 ;;
+            wget)
+                [[ "${FAKE_DOCKER_ADMIN_API_FAIL:-0}" == "1" ]] && exit 1
+                exit 0
+                ;;
             *)
                 exit 0
                 ;;
@@ -316,6 +320,33 @@ def test_caddy_not_running_after_restart_detected(tmp_path):
     )
     assert result.returncode == 1
     assert "not running after restart" in result.stdout + result.stderr
+
+
+def test_caddy_admin_api_not_answering_after_restart_detected(tmp_path):
+    """A file-hash match only proves the bind mount is current, not that
+    caddy itself is serving: also probe the admin API, same as the compose
+    healthcheck."""
+    repo = _setup_repo(tmp_path)
+    old_sha = _commit(repo, "init")
+    (repo / "config" / "caddy" / "Caddyfile").write_text("changed\n")
+    _commit(repo, "caddy change")
+
+    bindir = _fake_docker_bin(tmp_path)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+
+    result = _run(
+        repo,
+        old_sha,
+        bindir,
+        log,
+        extra_env={
+            "FAKE_DOCKER_EXEC_OUTPUT": str(repo / "config" / "caddy" / "Caddyfile"),
+            "FAKE_DOCKER_ADMIN_API_FAIL": "1",
+        },
+    )
+    assert result.returncode == 1
+    assert "admin API is not answering" in result.stdout + result.stderr
 
 
 def test_uncommitted_caddyfile_change_is_detected(tmp_path):

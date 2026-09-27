@@ -30,6 +30,10 @@ MANAGED_PATHS=(config/caddy config/prometheus config/alertmanager)
 # defaults (10 x 1s) match record-deploy-health.sh's retry style.
 RELOAD_POLL_ATTEMPTS="${RELOAD_POLL_ATTEMPTS:-10}"
 RELOAD_POLL_INTERVAL="${RELOAD_POLL_INTERVAL:-1}"
+# Bounded so a long-lived container's full log is never read: `--tail` costs
+# the same regardless of how much history (or how many rotated files, per the
+# compose `max-file` retention) sits behind it.
+LOG_TAIL_LINES="${LOG_TAIL_LINES:-200}"
 errors=0
 
 changed_all=false
@@ -80,8 +84,8 @@ sha256_of() {
     fi
 }
 
-log_line_count() {
-    docker logs "$1" 2>&1 | wc -l | tr -d ' '
+log_tail() {
+    docker logs --tail "$LOG_TAIL_LINES" "$1" 2>&1
 }
 
 # Prometheus and Alertmanager both use the same config-reload machinery and
@@ -92,28 +96,42 @@ log_line_count() {
 # for both. This is what was actually run and verified working on the host
 # on 2026-09-27.
 #
-# Verification compares log *line counts* before/after the signal rather than
-# a wall-clock `--since` cutoff: a coarse (1s) cutoff can include a
-# pre-existing "Completed loading" line from before the signal and falsely
-# confirm a reload that never happened. Counting lines and only inspecting
-# what's new avoids clock precision entirely.
+# Verification anchors on the single last log line before the signal (an
+# O(1) `--tail 1` read, cheap and stable regardless of total log size or a
+# rotation happening in between) rather than a wall-clock `--since` cutoff (a
+# coarse 1s cutoff can match a pre-existing "Completed loading" line and
+# falsely confirm a reload that never happened) or a raw line count (which
+# stops distinguishing old from new once a bounded `--tail` window is full,
+# which it usually is on a long-lived container). Content strictly after that
+# anchor line, within a bounded tail, is what counts as new.
 reload_via_hup() {
     local container="$1"
     local marker="Completed loading of configuration file"
-    local before_lines after_lines new_lines
-    before_lines="$(log_line_count "$container")"
+    local anchor after_tail anchor_line new_lines
+    anchor="$(docker logs --tail 1 "$container" 2>&1)"
     if ! docker kill -s HUP "$container" >/dev/null 2>&1; then
         echo "❌ failed to send SIGHUP to ${container}" >&2
         return 1
     fi
     for _ in $(seq 1 "$RELOAD_POLL_ATTEMPTS"); do
-        after_lines="$(log_line_count "$container")"
-        if [[ "$after_lines" -gt "$before_lines" ]]; then
-            new_lines="$(docker logs "$container" 2>&1 | tail -n "+$((before_lines + 1))")"
-            if printf '%s\n' "$new_lines" | grep -qi "$marker"; then
-                echo "  ✓ ${container} reloaded config"
-                return 0
+        after_tail="$(log_tail "$container")"
+        if [[ -z "$anchor" ]]; then
+            # No prior log line to anchor on (fresh container): everything in
+            # the tail is new.
+            new_lines="$after_tail"
+        else
+            anchor_line="$(printf '%s\n' "$after_tail" | grep -Fxn "$anchor" | tail -1 | cut -d: -f1)"
+            if [[ -n "$anchor_line" ]]; then
+                new_lines="$(printf '%s\n' "$after_tail" | tail -n "+$((anchor_line + 1))")"
+            else
+                # Anchor rolled out of the tail window: enough new lines
+                # appeared that the whole window is new content.
+                new_lines="$after_tail"
             fi
+        fi
+        if printf '%s\n' "$new_lines" | grep -qi "$marker"; then
+            echo "  ✓ ${container} reloaded config"
+            return 0
         fi
         sleep "$RELOAD_POLL_INTERVAL"
     done
@@ -152,8 +170,14 @@ if $caddy_changed; then
             elif [[ -z "$container_hash" || "$host_hash" != "$container_hash" ]]; then
                 echo "❌ caddy-lan is not serving the new Caddyfile (host sha256=${host_hash} container sha256=${container_hash:-<none>})" >&2
                 errors=$((errors + 1))
+            # Same probe as the compose healthcheck (compose/lan-proxy.yml):
+            # a matching file hash only proves the bind mount is current, not
+            # that caddy's own admin API (and therefore the LAN proxy) is up.
+            elif ! docker exec caddy-lan wget -qO- --tries=1 http://127.0.0.1:2019/config/ >/dev/null 2>&1; then
+                echo "❌ caddy-lan admin API is not answering after restart" >&2
+                errors=$((errors + 1))
             else
-                echo "  ✓ caddy-lan validated, restarted, running, and serving current Caddyfile (sha256=${host_hash})"
+                echo "  ✓ caddy-lan validated, restarted, running, admin API answering, and serving current Caddyfile (sha256=${host_hash})"
             fi
         fi
     fi
