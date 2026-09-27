@@ -212,9 +212,15 @@ def test_caddyfile_change_restarts_and_verifies_caddy_lan(tmp_path):
     log_text = log.read_text()
     # the NEW host file is copied in and validated, not the stale in-container
     # bind-mount inode
-    assert "cp config/caddy/Caddyfile caddy-lan:/tmp/Caddyfile.pending" in log_text
-    assert "exec caddy-lan caddy validate --config /tmp/Caddyfile.pending" in log_text
-    assert "restart caddy-lan" in log_text
+    lines = log_text.splitlines()
+
+    def first(prefix):
+        return next(i for i, line in enumerate(lines) if line.startswith(prefix))
+
+    copied = first("cp config/caddy/Caddyfile caddy-lan:/tmp/Caddyfile.pending")
+    validated = first("exec caddy-lan caddy validate --config /tmp/Caddyfile.pending")
+    restarted = first("restart caddy-lan")
+    assert copied < validated < restarted
     assert "exec caddy-lan cat /etc/caddy/Caddyfile" in log_text
     assert "kill -s HUP prometheus" not in log_text
     assert "kill -s HUP alertmanager" not in log_text
