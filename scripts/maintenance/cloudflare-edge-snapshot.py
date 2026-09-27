@@ -119,15 +119,18 @@ def main():
             continue
         records = []
         for rec in get(tok, f"zones/{zone['id']}/dns_records"):
-            content = (
-                tunnel_label(rec["content"])
-                if rec["type"] in KEEP_CONTENT_TYPES
-                else "<redacted>"
-            )
+            ours = tunnel_id in rec["content"]
             # Only this tunnel's records: the zones also hold other projects'
             # hostnames, and a full list in a public repo is a recon map.
-            if rec["name"] not in hosts and f"<tunnel:{name}>" not in content:
+            if rec["name"] not in hosts and not ours:
                 continue
+            # A CNAME at an ingress host that targets something else is drift
+            # worth seeing, but its target (maybe another tunnel) stays out.
+            content = (
+                tunnel_label(rec["content"])
+                if rec["type"] in KEEP_CONTENT_TYPES and ours
+                else "<redacted>"
+            )
             records.append(
                 {
                     "name": rec["name"],

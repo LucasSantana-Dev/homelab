@@ -43,7 +43,7 @@ Examples from recent history:
 - **Base branch is `release`, not `main`** ([`ADR-0022`](../docs/adr/0022-keep-tag-driven-release-branch-model.md)). Feature, fix, and dependency PRs target the long-lived `release` branch (use `/pr-to-release`). `main` is the released/deployed branch: only a release-cut (`chore/release-*`), a `hotfix/*`, or a reconcile (`chore/reconcile-*`) branch may PR into `main`. The **PR Base Guard** check enforces this — a PR with the wrong head→`main` will fail.
 - Releases batch on `release`, then `/release-cut` opens the `chore/release-vX.Y.Z` PR into `main` and tags it (tag push triggers deploy — [`ADR-0013`](../docs/adr/0013-auto-deploy-pipeline.md)).
 - Linear history is required on `main` — no merge commits, no rebase merges; all PRs into `main` are squash-merged.
-- Required CI checks on `release` (branch protection): `pre-commit`, `test (3.12)`, `repo-hygiene`. CodeQL, `docker` (includes the Caddyfile validation), `security`, and `container-security` also run but are advisory.
+- Required CI checks on `release` (branch protection): `pre-commit`, `test (3.12)`, `repo-hygiene`. CodeQL, `docker` (includes the Caddyfile validation), `security`, and `container-security` also run but are advisory. On `main` (release-cut, hotfix and reconcile PRs) the required checks are `pre-commit`, `test (3.12)`, `repo-hygiene` and `CodeQL`.
 - Renovate owns dependency bumps — do not open manual dep-update PRs unless Renovate is misconfigured.
 - If your change is non-trivial, draft a spec under [`docs/specs/`](../docs/specs/) first following the existing format (`spec.md` + `tasks.md`, frontmatter with `status`/`created`/`tags`).
 

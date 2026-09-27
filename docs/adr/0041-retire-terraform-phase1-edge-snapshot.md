@@ -2,6 +2,12 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-26
+- **Deciders:** Lucas (solo operator)
+- **Supersedes:** none
+- **Superseded by:** none
+- **Related:** [ADR-0039](./0039-ai-review-not-a-required-approval-gate.md) (required checks), [ADR-0036](./0036-host-config-management.md) (git-first deploy)
+
+---
 
 ## Context
 
@@ -11,13 +17,14 @@ that mutate nothing. Measured on 2026-09-26:
 
 - Last change 2026-03-15; `terraform.tfvars` and `terraform.tfstate` lived only on
   the host (not in git, no remote state). The tfvars covered 6 DNS records; the
-  tunnel serves 28 hostnames.
+  tunnel serves 27 hostnames (28 ingress rules with the 404 catch-all).
 - The tunnel is remotely managed (dashboard), so Terraform never owned the part
   that matters: which hostnames are public.
 - Adding `rclone.${DOMAIN}` that day needed a Caddy block (git), a
   dashboard route and an Access bypass app; Terraform was not usable for any of it.
 - Nothing on the host ran the Terraform scripts (no cron, timer or unit), and
-  `terraform-check` was not a required status check.
+  `terraform-check` was required only on `main` (ADR 0039), not on `release`
+  where PRs land; it was removed from `main` protection with this change.
 
 A three-lens debate (operating cost, disaster recovery, security) converged: the
 homelab's IaC is already compose + Caddyfile + sops-encrypted `.env.enc`; the gap
@@ -43,7 +50,7 @@ read-only export.
   plus all DNS, remote state): four objects that rarely change do not justify
   state handling, provider v5 breaking changes and an edit-scope token for a
   single operator. State in a public repo, even encrypted, was rejected.
-- **Keep Phase-1 as is:** it documented 6 of 28 hostnames and gave false
+- **Keep Phase-1 as is:** it documented 6 of 27 hostnames and gave false
   confidence; stale declarations are worse than none.
 
 ## Consequences

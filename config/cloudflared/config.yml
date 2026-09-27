@@ -12,8 +12,8 @@
 # file, written read-only from the Cloudflare API by
 # scripts/maintenance/cloudflare-edge-snapshot.py (tunnel ingress + DNS of the
 # zones it serves). Refresh it after any dashboard change. This file used to
-# carry its own host list; it drifted (24 hosts listed, 28 live, none of
-# lucassantana.tech), so it now only shows the routing shape.
+# carry its own host list; it drifted (24 hosts listed, 27 live), so it now
+# only shows the routing shape.
 #
 # Consequences, learned the slow way:
 #   - Adding a hostname here does nothing. Add it in the dashboard, then
@@ -27,8 +27,9 @@
 
 tunnel: ${CF_TUNNEL_ID}   # not hardcoded: the UUID is not published (audit C1)
 
-# Every live rule has this shape: the tunnel only forwards to the
-# host-networked caddy-lan on :80, which does the per-hostname routing.
+# Live rules share this shape: the tunnel only forwards to the host-networked
+# caddy-lan on :80, which does the per-hostname routing. Only some rules pin
+# httpHostHeader (18 of 27 on 2026-09-26); the snapshot says which.
 ingress:
   - hostname: <host>.luk-homeserver.com.br   # or <host>.lucassantana.tech
     service: http://host.docker.internal:80
