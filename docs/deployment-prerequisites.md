@@ -37,8 +37,10 @@ correlate it with a leaked credentials.json.
 
 1. Cloudflare dashboard → Zero Trust → Networks → Tunnels → delete the old
    tunnel, create a new one.
-2. Put the new tunnel's token in `CLOUDFLARED_TUNNEL_TOKEN` (sops, `.env.enc`):
-   it is the only thing the container reads (`TUNNEL_TOKEN` in `compose/core.yml`).
+2. On the host: `make sops-edit` and set `CLOUDFLARED_TUNNEL_TOKEN` to the new
+   tunnel's token (the only thing the container reads, as `TUNNEL_TOKEN` in
+   `compose/core.yml`), then `make sops-decrypt` so the plain `.env` that
+   compose interpolates from has it. Commit `.env.enc`.
 3. `docker compose up -d cloudflared` (recreate: `restart` keeps the old env).
 4. Nothing to change in the repo: `config/cloudflared/config.yml` is a
    reference only (ADR 0041) and its `${CF_TUNNEL_ID}` routes nothing.
