@@ -26,8 +26,15 @@ docker builder prune -af --filter "until=720h" 2>&1 | tail -3 | tee -a "$LOG_FIL
 log "pruning dangling + unused images older than 30d..."
 docker image prune -af --filter "until=720h" 2>&1 | tail -3 | tee -a "$LOG_FILE"
 
-log "pruning stopped containers older than 30d..."
-docker container prune -f --filter "until=720h" 2>&1 | tail -3 | tee -a "$LOG_FILE"
+# Never compose-managed containers: a stopped one is a failure to investigate, not
+# garbage. On 2026-09-20 homeassistant and nextcloud failed to start at boot, this
+# timer caught up minutes later (Persistent=true) and removed them, then their
+# images went too; both stayed down for 6 days with the data intact but no container.
+log "pruning stopped non-compose containers older than 30d..."
+docker container prune -f --filter "until=720h" --filter "label!=com.docker.compose.project" 2>&1 | tail -3 | tee -a "$LOG_FILE"
+# Filters AND together, so compose one-off containers (`docker compose run`) get
+# their own pass; they are disposable, unlike a stopped service container.
+docker container prune -f --filter "until=720h" --filter "label=com.docker.compose.oneoff=True" 2>&1 | tail -3 | tee -a "$LOG_FILE"
 
 log "after:  $(docker system df --format '{{.Type}}:{{.Size}}/{{.Reclaimable}}' | tr '\n' ' ')"
 log "=== docker-prune done ==="
