@@ -70,7 +70,7 @@ def test_public_host_not_allowlisted_fails(monkeypatch, tmp_path):
         monkeypatch, tmp_path, ["open.example.org"], "", {"open.example.org": plain()}
     )
     assert len(errors) == 1
-    assert "open.example.org" in errors[0]
+    assert errors[0].partition(":")[0] == "open.example.org"
     assert "not allowlisted" in errors[0]
 
 
@@ -141,7 +141,7 @@ def test_stale_allowlist_entry_not_in_snapshot_fails(monkeypatch, tmp_path):
         "gone.example.org  # used to exist\n",
         {"grafana.example.org": gated()},
     )
-    assert any("is not in" in e and "gone.example.org" in e for e in errors)
+    assert any("is not in" in e and e.split()[1] == "gone.example.org" for e in errors)
 
 
 def test_wildcard_ingress_entry_is_skipped_and_noted(monkeypatch, tmp_path):
