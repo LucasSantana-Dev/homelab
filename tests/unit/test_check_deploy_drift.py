@@ -123,6 +123,23 @@ def test_unsearchable_parent_dir_is_not_reported_as_absent(tmp_path):
     assert result.returncode == 2
 
 
+def test_non_regular_file_at_expected_path_is_unreadable_not_opened(tmp_path):
+    """A FIFO at an expected path would block fetch_remote forever if it were
+    treated as PRESENT; only regular files are compared."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _compose(repo_dir, "pipe.yml", "services:\n  a:\n    image: nginx\n")
+
+    remote_dir = tmp_path / "remote"
+    (remote_dir / "compose").mkdir(parents=True)
+    os.mkfifo(remote_dir / "compose" / "pipe.yml")
+
+    result = _run(repo_dir, remote_dir)
+
+    assert "ERROR compose/pipe.yml" in result.stdout
+    assert result.returncode == 2
+
+
 def test_block_scalar_header_with_inline_comment_is_still_detected(tmp_path):
     """`key: | # note` and `key: >- # x` are valid YAML block-scalar headers;
     missing the trailing comment would let the secret body below them print

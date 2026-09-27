@@ -118,7 +118,8 @@ remote_status() {
   full_q=$(printf '%q' "$full")
   parent_q=$(printf '%q' "$parent")
   ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
-    "if [ -e $full_q ]; then echo PRESENT; \
+    "if [ -f $full_q ]; then echo PRESENT; \
+     elif [ -e $full_q ] || [ -L $full_q ]; then echo UNREADABLE; \
      elif [ -d $parent_q ] && [ -x $parent_q ]; then echo ABSENT; \
      else echo UNREADABLE; fi" 2>/dev/null
 }
