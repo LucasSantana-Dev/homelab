@@ -330,6 +330,7 @@ mypy homelab_manager/     # Type checking
 ### Common Operations
 ```bash
 make deploy              # Full stack deploy
+make pull-deploy         # Preflight + git pull --ff-only + deploy (see below)
 make update-safe         # Rolling update with health checks
 make update-dry-run      # Preview updates (no apply)
 make health              # Service health summary
@@ -338,6 +339,42 @@ make power-restore-check # Validate post-power-loss recovery
 make sso-status          # Check Authentik edge runtime
 make ssl-renew           # Renew wildcard TLS cert
 ```
+
+### `make pull-deploy` (deliberate deploy, hardened)
+
+The deploy path stays the manual `ssh host; cd ~/homelab; git pull --ff-only;
+make deploy` (auto-deploy was rejected, see ADR-0013 "Superseded" and
+ADR-0023). `make pull-deploy` wraps the same three steps and closes gaps that
+three manual deploys hit on 2026-09-27:
+
+1. **`scripts/deployment/preflight-pull.sh`** runs before the pull. If any
+   tracked file, or the directory containing one, is not writable by the
+   deploy user (root-owned dirs from an old `sudo` edit, e.g.
+   `observability/`, `tailscale/`), `git pull` can stop halfway with
+   "unable to unlink old ... Permission denied", leaving HEAD stale while
+   some files are already new. The preflight check fails loudly first and
+   prints the exact `sudo chown -R <user>:<group> <paths>` fix, but never
+   runs `sudo` itself.
+2. `git pull --ff-only` runs as before.
+3. **`make deploy`** now also runs
+   **`scripts/deployment/apply-config-changes.sh`** after `docker compose up
+   -d --build`. Some config isn't picked up by a rebuild alone:
+   - `config/caddy/Caddyfile` is bind-mounted as a single file, so git
+     swapping the inode doesn't change what the running `caddy-lan`
+     container serves. The script restarts `caddy-lan` and verifies (via
+     sha256) that it is actually serving the new file.
+   - `config/prometheus/` and `config/alertmanager/` are directory mounts;
+     the new files are visible inside the containers but neither process
+     re-reads them without a signal. The script sends the container a
+     SIGHUP and verifies the reload succeeded from its logs.
+   - The comparison base is the SHA of the last successful deploy
+     (`scripts/deployment/deployed-sha.sh`, a small state file next to the
+     ADR-0023 deploy-health textfile, falling back gracefully without root).
+     If there's no recorded SHA yet, every managed config path is treated
+     as changed.
+
+Existing `make deploy` callers are unaffected beyond this new post-step;
+`make pull-deploy` is the only new entry point.
 
 ### Add a New Service
 1. Create compose file or add to existing: `compose/category.yml`
