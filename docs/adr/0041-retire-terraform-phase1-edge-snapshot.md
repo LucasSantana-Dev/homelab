@@ -76,13 +76,20 @@ The debate's remaining steps were carried out:
 - **No edit token on the host** (#439): the host's Cloudflare token is read-only
   (a DNS write returns 403). Edits use a short-lived token from the laptop.
 - **Locally managed tunnel, 1-hour prototype: rejected.** A throwaway tunnel
-  with config in git and a sops credential worked end to end, but hit 5
-  friction points and 2 shims (container uid to read the credential; tunnel id
-  passed on the command line since `config.yml` does not expand variables). The
-  decisive one: a remotely managed tunnel cannot go back to local, so migrating
-  means a new tunnel and repointing every DNS record of the live edge. With the
-  wildcard the ingress is nearly static, so the snapshot's drift detection is
-  enough. The prototype was torn down.
+  with config in git and a sops credential worked end to end (request reached
+  Caddy's 404), but hit 5 friction points, 2 of them shims:
+  1. sops was not installed on the laptop (one-time setup).
+  2. Shim: the container runs as a non-root uid and could not read the
+     decrypted credential (mode 600) without `--user` set to the host user.
+  3. Shim: `config.yml` does not expand variables, so the tunnel id (kept out
+     of the public repo, audit C1) has to be passed on the command line.
+  4. Decisive: a remotely managed tunnel cannot go back to local management,
+     so migrating means a new tunnel and repointing every DNS record of the
+     live edge (27 records plus the wildcard).
+  5. The laptop's `cert.pem` can create DNS only in the second zone, so routes
+     for `${DOMAIN}` would still need an API token.
+  With the wildcard the ingress is nearly static, so the snapshot's drift
+  detection is enough. The prototype was torn down.
 
 ## Revisit when
 
