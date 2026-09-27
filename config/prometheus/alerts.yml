@@ -305,6 +305,88 @@ groups:
           summary: "Kopia snapshot list query failed"
           description: "Failed to query kopia snapshot list. Container may be down, repo unreachable, or authentication failed."
 
+      # Compose services exporter (scripts/monitoring/compose-services-exporter.sh, 15 min).
+      - alert: ComposeServiceNotRunning
+        expr: homelab_compose_service_running == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Compose service {{ $labels.service }} has no running container"
+          description: "A default-profile service is down or its container is gone. Run: docker compose up -d {{ $labels.service }}"
+
+      - alert: ComposeServicesExporterMissing
+        expr: absent(homelab_compose_exporter_last_run_timestamp_seconds) or (time() - homelab_compose_exporter_last_run_timestamp_seconds) > 3600 or homelab_compose_exporter_ok == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Compose services exporter not reporting"
+          description: "Without it a vanished container alerts nobody. Check compose-services-exporter.timer."
+
+      # Host security audit (scripts/monitoring/host-security-audit.sh, weekly timer).
+      # absent() matters: an uninstalled timer writes no metric at all, and a
+      # threshold rule on a missing series never fires.
+      - alert: HostSecurityAuditMissing
+        expr: absent(host_security_audit_last_run_timestamp_seconds)
+        for: 1d
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host security audit has never reported"
+          description: "No host_security_audit metric. Is host-security-audit.timer installed and enabled?"
+
+      - alert: HostSecurityAuditStale
+        expr: (time() - host_security_audit_last_run_timestamp_seconds) > 8 * 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host security audit older than 8 days"
+          description: "The weekly audit last ran {{ $value | humanizeDuration }} ago."
+
+      - alert: HostLynisAuditFailed
+        expr: host_lynis_ok == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lynis audit did not run"
+          description: "lynis is missing or failed; see /var/log/homelab/security/lynis.log."
+
+      - alert: HostHardeningIndexDropped
+        # Retention is 72h (compose/monitoring.yml), so offset 7d would never
+        # match. The gauge changes once a week: for two days after a run,
+        # offset 2d still holds last week's value. Both sides need a good run.
+        expr: >
+          host_lynis_hardening_index < (host_lynis_hardening_index offset 2d) - 2
+          and on() host_lynis_ok == 1
+          and on() (host_lynis_ok offset 2d) == 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lynis hardening index dropped"
+          description: "Hardening index is {{ $value }}, more than 2 points below last week."
+
+      - alert: HostImageCriticalVulns
+        expr: host_image_vulnerabilities{severity="CRITICAL"} > 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Running image has CRITICAL CVEs: {{ $labels.image }}"
+          description: "{{ $value }} CRITICAL CVEs; see /var/log/homelab/security/trivy-summary.txt."
+
+      - alert: HostImageScanFailed
+        expr: host_image_scan_ok == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Trivy could not scan {{ $labels.image }}"
+          description: "Scan failed; the image stays unaudited until it succeeds."
+
   # Lucky-specific alerts. Bot + backend scrape targets are added by
   # PR — once `lucky-monitoring` external network is joined.
   - name: lucky_alerts
