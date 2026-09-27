@@ -629,10 +629,19 @@ sops-decrypt: ## Decrypt .env.enc -> .env (needs SOPS_AGE_KEY_FILE; run on host 
 sops-verify: ## Round-trip check: decrypt .env.enc and diff against current .env
 	@sops --decrypt --input-type dotenv --output-type dotenv .env.enc > .env.sops-check 2>/dev/null \
 		|| { echo "decrypt failed — is SOPS_AGE_KEY_FILE exported?"; rm -f .env.sops-check; exit 1; }
-	@sort .env > .env.sops-a; sort .env.sops-check > .env.sops-b; \
-	if diff -q .env.sops-a .env.sops-b >/dev/null; then echo "OK: .env.enc round-trips to .env exactly"; \
-	else echo "MISMATCH (.env vs decrypted .env.enc):"; diff .env.sops-a .env.sops-b | head -20; fi; \
-	rm -f .env.sops-check .env.sops-a .env.sops-b
+	@# Skip only comments and blank lines (sops drops them); compare everything
+	@# else. Each assignment and its continuation lines (multiline/PEM values)
+	@# form one record, so sorting reorders assignments, never a value's lines.
+	@# A mismatch names keys, never values: this output lands in terminals and
+	@# agent logs, and a record that is not plainly KEY= is shown as a marker.
+	@norm() { grep -vE '^[[:space:]]*(#|$$)' "$$1" | awk 'function flush() { if (r != "") print r } /^(export[ \t]+)?[A-Za-z_][A-Za-z0-9_.-]*=/ { flush(); r = $$0; next } { r = r "\037" $$0 } END { flush() }' | sort; }; \
+	norm .env > .env.sops-a; norm .env.sops-check > .env.sops-b; \
+	rm -f .env.sops-check; \
+	if cmp -s .env.sops-a .env.sops-b; then echo "OK: .env.enc round-trips to .env ($$(wc -l < .env.sops-a | tr -d ' ') entries)"; rc=0; \
+	else echo "MISMATCH, keys that differ:"; diff .env.sops-a .env.sops-b | sed -n 's/^[<>] //p' \
+		| awk '{ if (match($$0, /^(export[ \t]+)?[A-Z_][A-Z0-9_]*=/)) { k = substr($$0, 1, RLENGTH - 1); sub(/^export[ \t]+/, "", k); print "  " k } else print "  <line that is not KEY=value>" }' \
+		| sort -u | head -20; rc=1; fi; \
+	rm -f .env.sops-a .env.sops-b; exit $$rc
 
 sops-edit: ## Edit secrets in place (sops decrypts -> $$EDITOR -> re-encrypts)
 	sops --input-type dotenv --output-type dotenv .env.enc
