@@ -173,7 +173,7 @@ if $caddy_changed; then
             # Same probe as the compose healthcheck (compose/lan-proxy.yml):
             # a matching file hash only proves the bind mount is current, not
             # that caddy's own admin API (and therefore the LAN proxy) is up.
-            elif ! docker exec caddy-lan wget -qO- --tries=1 http://127.0.0.1:2019/config/ >/dev/null 2>&1; then
+            elif ! docker exec caddy-lan wget -qO- http://127.0.0.1:2019/config/ >/dev/null 2>&1; then
                 echo "❌ caddy-lan admin API is not answering after restart" >&2
                 errors=$((errors + 1))
             else
