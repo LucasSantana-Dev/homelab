@@ -5,6 +5,8 @@
 
 # Forward-auth via Tinyauth — applied to all public services that need OAuth.
 # caddy-lan runs on host network; tinyauth binds 127.0.0.1:3030.
+# A public block without it must be listed, with a reason, in public-no-auth.txt
+# (enforced by scripts/security/caddy-auth-lint.py in pre-commit).
 (protected) {
 	forward_auth 127.0.0.1:3030 {
 		uri /api/auth/caddy

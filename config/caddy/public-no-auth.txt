@@ -1,0 +1,18 @@
+# Public site blocks in Caddyfile allowed to run WITHOUT the tinyauth gate
+# (`import protected` or an inline forward_auth to it). Enforced in CI by
+# scripts/security/caddy-auth-lint.py: any other public host without the gate
+# fails the pre-commit check, and so does an entry here that no longer exists.
+#
+# One host per line, then the reason. *.home hosts are LAN-only and skipped.
+# Adding a line here is a security decision: say what authenticates instead.
+
+cojam.lucassantana.tech           # room app meant to be open; browser WebSockets cannot pass forward-auth
+stats.lucassantana.tech           # X-Stats-Key header checked in this site block
+brain.lucassantana.tech           # claude.ai connector (server-to-server); shared token checked in the app
+luk-homeserver.com.br             # Homepage; Cloudflare Access app in front
+www.luk-homeserver.com.br         # Homepage; Cloudflare Access app in front
+home.luk-homeserver.com.br        # Homepage; Cloudflare Access app in front
+homeassistant.luk-homeserver.com.br  # HA login + long-lived tokens for the mobile app
+cloud.luk-homeserver.com.br       # Nextcloud login; sync clients use app passwords
+auth.luk-homeserver.com.br        # tinyauth itself
+rclone.luk-homeserver.com.br      # static OAuth home/privacy pages; Access bypass app
