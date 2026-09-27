@@ -8,7 +8,7 @@ echo "[$(date)] Starting security hygiene scan..."
 source "$(dirname "$0")/common.sh"
 
 PROMPT='Security hygiene scan across /workspace repos.
-1. For Lucky, homelab, Craftvaria: grep for hardcoded secrets (sk-ant-api, github_pat_, ghp_, AKIA) in ts/js/py/yml files excluding node_modules
+1. For Lucky, homelab: grep for hardcoded secrets (sk-ant-api, github_pat_, ghp_, AKIA) in ts/js/py/yml files excluding node_modules
 2. npm audit --audit-level=high in /workspace/Lucky — report HIGH_VULNS count or VULNS_OK
 3. Output SECURITY_CLEAN if nothing found, or SECURITY_ISSUES: with specifics.
 Read-only.'

@@ -44,11 +44,6 @@
         href: https://lucky.luk-homeserver.com.br
         description: Discord bot dashboard
         container: lucky-frontend
-    - Craftvaria:
-        icon: minecraft
-        href: https://craftvaria.luk-homeserver.com.br
-        description: Minecraft server admin
-        container: craftvaria-admin-frontend
 
 - Management:
     - Homelab Manager:

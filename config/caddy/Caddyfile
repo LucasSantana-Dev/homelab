@@ -5,6 +5,8 @@
 
 # Forward-auth via Tinyauth — applied to all public services that need OAuth.
 # caddy-lan runs on host network; tinyauth binds 127.0.0.1:3030.
+# A public block without it must be listed, with a reason, in public-no-auth.txt
+# (enforced by scripts/security/caddy-auth-lint.py in pre-commit).
 (protected) {
 	forward_auth 127.0.0.1:3030 {
 		uri /api/auth/caddy
@@ -15,21 +17,13 @@
 
 # ---------- LAN (*.home) ----------
 
-http://ai.home {
-	reverse_proxy 127.0.0.1:3000
-}
-
-http://craftvaria.home {
-	reverse_proxy 127.0.0.1:3333
-}
-
 http://lucky.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:8090
+	reverse_proxy {$BIND_IP:127.0.0.1}:8090
 }
 
 http://lucky.home {
-	reverse_proxy 127.0.0.1:8090
+	reverse_proxy {$BIND_IP:127.0.0.1}:8090
 }
 
 # CoJam public app on cojam.lucassantana.tech (single subdomain, path-routed).
@@ -50,6 +44,54 @@ http://cojam.lucassantana.tech {
 }
 
 # LAN access (*.home) keeps the two-subdomain split for local testing.
+# GitHub Stats Extended — reached only by the profile repo's card workflow.
+# The upstream app has no auth of its own and our PAT can read private repos,
+# so anything without the shared key is refused here rather than at the app.
+# The key rides inside the Cloudflare tunnel, so Cloudflare terminates the TLS
+# it travels under; that is the same trust boundary every other public service
+# on this host already accepts.
+#
+# On lucassantana.tech rather than the shared domain, same as cojam: that zone
+# is the one our cloudflared cert can write DNS for. Pointing it at the other
+# domain made `cloudflared tunnel route dns` silently create the literal name
+# as a label inside this zone instead.
+http://stats.lucassantana.tech {
+	@authorized header X-Stats-Key {$GITHUB_STATS_KEY}
+	handle @authorized {
+		reverse_proxy {$BIND_IP:127.0.0.1}:8097
+	}
+	handle {
+		respond "forbidden" 403
+	}
+}
+
+# LAN access needs no key: reaching *.home already means being on the network.
+http://stats.home {
+	reverse_proxy {$BIND_IP:127.0.0.1}:8097
+}
+
+# Knowledge-brain MCP server, consumed by claude.ai custom connectors.
+# On lucassantana.tech for the same reason as stats/cojam above (that is the
+# zone our cloudflared cert can write DNS for).
+#
+# No `import protected` by design: claude.ai's connector is a server-to-server
+# client that cannot complete a tinyauth browser login. The gate is instead a
+# shared token checked inside the app, accepted either as an Authorization
+# bearer or as the first path segment (/<token>/mcp) - the path form is what
+# works while Claude's request-header auth is still a gated beta. Do not add a
+# Caddy-level header check: it would break the capability-URL form.
+#
+# No auth is enforced here on purpose, so keep this hostname off any wildcard
+# that would expose other backends.
+http://brain.lucassantana.tech {
+	reverse_proxy {$BIND_IP:127.0.0.1}:8098
+}
+
+# LAN access for testing without the public hop.
+http://brain.home {
+	reverse_proxy {$BIND_IP:127.0.0.1}:8098
+}
+
 http://cojam-api.home {
 	reverse_proxy 127.0.0.1:8094
 }
@@ -100,7 +142,7 @@ http://forgejo.home {
 }
 
 http://homelab.home, http://home {
-	respond "homelab services: ai.home craftvaria.home lucky.home registry.home pihole.home cockpit.home stremio.home n8n.home linkding.home miniflux.home forgejo.home" 200
+	respond "homelab services: lucky.home registry.home pihole.home cockpit.home stremio.home n8n.home linkding.home miniflux.home forgejo.home" 200
 }
 
 # ---------- Public HTTPS via Cloudflare Tunnel (*.luk-homeserver.com.br) ----------
@@ -111,7 +153,7 @@ http://homelab.home, http://home {
 # a Host rewrite; docker-native services get direct 127.0.0.1 proxying.
 
 http://luk-homeserver.com.br, http://www.luk-homeserver.com.br, http://home.luk-homeserver.com.br {
-	reverse_proxy 127.0.0.1:3010
+	reverse_proxy {$BIND_IP:127.0.0.1}:3010
 }
 
 # Docker-native services on host ports (no k3s dependency)
@@ -120,7 +162,7 @@ http://luk-homeserver.com.br, http://www.luk-homeserver.com.br, http://home.luk-
 # forward-auth gate would block. Public exposure relies on HA's own auth — intentional
 # (audit-deep 2026-06-19 reconciliation; do not "fix" without breaking the HA app).
 http://homeassistant.luk-homeserver.com.br {
-	reverse_proxy 127.0.0.1:8123
+	reverse_proxy {$BIND_IP:127.0.0.1}:8123
 }
 
 # No `import protected` by design: Nextcloud has its own login; desktop/mobile sync
@@ -169,7 +211,7 @@ http://n8n.luk-homeserver.com.br {
 
 http://grafana.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:3002
+	reverse_proxy {$BIND_IP:127.0.0.1}:3002
 }
 
 http://prometheus.luk-homeserver.com.br {
@@ -194,7 +236,7 @@ http://status.luk-homeserver.com.br {
 
 http://portainer.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:9000
+	reverse_proxy {$BIND_IP:127.0.0.1}:9000
 }
 
 http://pihole.luk-homeserver.com.br {
@@ -215,12 +257,12 @@ http://wud.luk-homeserver.com.br {
 
 http://paperless.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:8400
+	reverse_proxy {$BIND_IP:127.0.0.1}:8400
 }
 
 http://healthchecks.luk-homeserver.com.br {
 	import protected
-	reverse_proxy 127.0.0.1:8092 {
+	reverse_proxy {$BIND_IP:127.0.0.1}:8092 {
 		# cloudflared->caddy is plain http; force https so healthchecks (Django,
 		# SECURE_PROXY_SSL_HEADER) treats the request as secure -> login/signup CSRF ok.
 		header_up X-Forwarded-Proto https
@@ -230,7 +272,33 @@ http://healthchecks.luk-homeserver.com.br {
 http://kopia.luk-homeserver.com.br {
 	# tinyauth SSO gate (PR #240) — kopia UI is NOT unauthenticated
 	import protected
-	reverse_proxy 127.0.0.1:51515
+	reverse_proxy {$BIND_IP:127.0.0.1}:51515
+}
+
+# Google will not publish an OAuth consent screen without a home page and a privacy
+# policy on a domain the app owner controls. These two pages exist only for the
+# operator's personal rclone client (Drive backups). Static, no backend, no auth gate:
+# Google's reviewers and the consent screen link to them.
+http://rclone.luk-homeserver.com.br {
+	header Content-Type "text/html; charset=utf-8"
+	@privacy path /privacy /privacy/
+	handle @privacy {
+		respond `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>rclone-backup privacy policy</title></head><body style="font-family:system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem;line-height:1.5">
+<h1>rclone-backup: privacy policy</h1>
+<p>This app is used only by its owner. It accesses Google Drive to upload and update backup copies of the owner's own files.</p>
+<p>Files travel only between the owner's computer and the owner's Google Drive. No data is collected, stored, shared or sold by anyone else. No analytics, no cookies.</p>
+<p>Access can be revoked at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+<p>Contact: <a href="mailto:lucas.diassantana@gmail.com">lucas.diassantana@gmail.com</a></p>
+<p>Last updated: 2026-09-26.</p>
+</body></html>` 200
+	}
+	handle {
+		respond `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>rclone-backup</title></head><body style="font-family:system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem;line-height:1.5">
+<h1>rclone-backup</h1>
+<p>A personal backup tool. rclone copies its owner's files to the owner's own Google Drive. It is not offered to anyone else.</p>
+<p><a href="/privacy">Privacy policy</a></p>
+</body></html>` 200
+	}
 }
 
 # ---------- Catch-all ----------

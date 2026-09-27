@@ -20,11 +20,10 @@ OOM_THRESHOLD=3
 
 # Services the watchdog expects to always be running.
 # Keep in sync with actually-deployed services (see `docker ps`).
-# For the LAN-wide stack the canonical set is: pihole, caddy-lan, lucky-*, craftvaria-*.
+# For the LAN-wide stack the canonical set is: pihole, caddy-lan, lucky-*.
 CRITICAL_CONTAINERS=(
     "pihole"
     "caddy-lan"
-    "craftvaria-minecraft"
     "lucky-bot"
 )
 

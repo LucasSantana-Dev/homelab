@@ -38,8 +38,8 @@
 
 <!-- section: agent-box-rules -->
 ## Agent-Box Guardrails
-- Repos live in /workspace/ — Lucky, homelab, Craftvaria
-- Never stop, rm, or kill production containers (lucky, nextcloud, craftvaria, pihole, homeassistant, caddy-lan, cloudflared)
+- Repos live in /workspace/ — Lucky, homelab
+- Never stop, rm, or kill production containers (lucky, nextcloud, pihole, homeassistant, caddy-lan, cloudflared)
 - Never run `docker compose down` or `docker system prune`
 - Never publish to npm without explicit user confirmation
 - Always prefer `git push` with branch, never force to main
