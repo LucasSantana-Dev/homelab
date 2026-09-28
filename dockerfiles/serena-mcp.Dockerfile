@@ -1,6 +1,6 @@
 FROM ghcr.io/oraios/serena:v0.1.4
 
-USER root
+USER 0
 
 ARG TERRAFORM_VERSION=1.14.6
 RUN set -eux; \

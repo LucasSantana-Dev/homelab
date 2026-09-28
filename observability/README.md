@@ -20,7 +20,6 @@ All components run in the `observability` Docker network. Prometheus scrapes:
 
 Targets for health checks:
 - Lucky API: `http://lucky-api:5000/api/health`
-- Craftvaria RCON: `tcp://craftvaria:25575`
 - Pi-hole Admin: `http://pihole:80/admin`
 
 ## Starting the Stack

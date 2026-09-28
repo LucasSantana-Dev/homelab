@@ -1,0 +1,11 @@
+[Unit]
+Description=Homelab compose services exporter (every 15 minutes)
+Requires=compose-services-exporter.service
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=15min
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

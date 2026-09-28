@@ -9,7 +9,7 @@ CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null ||
 block() { printf 'BLOCK: %s\n' "$*" >&2; exit 2; }
 
 # ── Production containers that must not be touched ──────────────────────────
-PROTECTED_RE='lucky[-_](bot|backend|frontend|nginx|postgres|redis|webhook|tunnel)|nextcloud|nextcloud[-_](db|redis)|craftvaria|homeassistant|pihole|cloudflared|caddy[-_]lan|open[-_]webui|craftvaria[-_](admin|cloudflared|playit|minecraft)'
+PROTECTED_RE='lucky[-_](bot|backend|frontend|nginx|postgres|redis|webhook|tunnel)|nextcloud|nextcloud[-_](db|redis)|homeassistant|pihole|cloudflared|caddy[-_]lan'
 
 # docker stop / rm / kill / restart / pause on a protected container
 if printf '%s' "$CMD" | grep -qE 'docker\s+(stop|rm|kill|restart|pause)'; then

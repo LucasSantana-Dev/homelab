@@ -1,0 +1,13 @@
+# Hostnames from config/cloudflared/edge-snapshot.json's ingress that are
+# intentionally NOT behind the Cloudflare Access "Home Lab" app (no 302/303 to
+# *.cloudflareaccess.com on an unauthenticated request). Enforced by
+# scripts/security/access-coverage-check.py: any other public hostname fails
+# the check, and so does an entry here that no longer exists in the snapshot.
+#
+# One host per line, then the reason. Adding a line here is a security
+# decision: say what covers it instead of Cloudflare Access.
+
+rclone.luk-homeserver.com.br   # Cloudflare Access "Home Lab" app has a Bypass policy for this host; static OAuth home/privacy pages, no login needed
+cojam.lucassantana.tech        # lucassantana.tech zone carries no Cloudflare Access app; room app meant to be open, browser WebSockets cannot pass an auth challenge
+stats.lucassantana.tech        # lucassantana.tech zone carries no Cloudflare Access app; X-Stats-Key header checked by the app itself
+brain.lucassantana.tech        # lucassantana.tech zone carries no Cloudflare Access app; shared bearer token checked by the app itself (claude.ai connector, server-to-server)

@@ -1,0 +1,75 @@
+# brain-mcp: remote MCP server exposing the knowledge brain to claude.ai
+# custom connectors (Settings > Connectors > Add custom connector).
+#
+# Read-only, knowledge-only. The corpus bind-mounted here is a filtered export
+# (memory/standards/plans/handoffs/adrs) produced on the Mac by
+# rag-index/remote/export_knowledge_index.py - source code, git commits and
+# session transcripts are never copied to this host.
+#
+# Behind a `brain-mcp` profile on purpose: the build context lives outside the
+# repo (synced by rag-index/remote/sync-to-homelab.sh), so a missing source dir
+# must not be able to break `make deploy` for the whole stack.
+#
+# Deploy / update:  rag-index/remote/sync-to-homelab.sh --code
+# Corpus refresh:   rag-index/remote/sync-to-homelab.sh
+#
+# Secret required in .env (host-only, then `make sops-encrypt`):
+#   BRAIN_MCP_TOKEN=<openssl rand -hex 32>
+services:
+  brain-mcp:
+    profiles: ["brain-mcp"]
+    build:
+      context: ${BRAIN_MCP_SRC:-/home/luk-server/homelab/appdata/brain-mcp/src}
+      dockerfile: remote/Dockerfile
+    image: brain-mcp:local
+    container_name: brain-mcp
+    restart: unless-stopped
+    environment:
+      # Deliberately `:-` and not `:?`. Compose interpolates every included file
+      # before profiles are applied (verified), so a `:?` here would fail
+      # `docker compose up -d` for the WHOLE stack whenever the token is unset -
+      # the exact coupling the profile exists to prevent. The check still exists,
+      # it just lives in the app: server.py refuses to boot on a token under 32
+      # chars, so a missing value fails this container loudly and nothing else.
+      BRAIN_MCP_TOKEN: ${BRAIN_MCP_TOKEN:-}
+      BRAIN_MCP_ALLOWED_HOSTS: ${BRAIN_MCP_ALLOWED_HOSTS:-*}
+      TZ: ${TIMEZONE:-UTC}
+    volumes:
+      # Read-only: nothing on this host may mutate the corpus.
+      #
+      # `../` resolves against THIS file's directory (compose/), not the project
+      # directory - so this is <repo>/appdata/..., same as cojam. Getting that
+      # backwards points the mount at a path where the file does not exist, and
+      # Docker then silently creates a DIRECTORY with that name; the container
+      # boots, /healthz says 200, and only /readyz stays red. Keep the corpus
+      # under <repo>/appdata (gitignored) and keep sync-to-homelab.sh's DEST in
+      # sync with this path.
+      - ../appdata/brain-mcp/knowledge.sqlite:/data/knowledge.sqlite:ro
+    ports:
+      # Caddy (host network) reverse-proxies to this local port. Never bind 0.0.0.0:
+      # the token check is the only thing between this port and the whole brain.
+      - "${BIND_IP:-127.0.0.1}:8098:8098"
+    networks:
+      - frontend
+    healthcheck:
+      # /readyz is 200 only after the embedder and corpus are loaded, so a
+      # restart shows as "starting" for the ~60s of prewarm instead of flapping.
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8098/readyz')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+    deploy:
+      resources:
+        limits:
+          # torch + e5-small + 5.5k float32 embeddings resident: ~1.2GB observed.
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

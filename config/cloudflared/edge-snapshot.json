@@ -1,0 +1,354 @@
+{
+  "tunnel": "homelab",
+  "originRequest": {},
+  "ingress": [
+    {
+      "hostname": "luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "www.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "www.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "home.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "home.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "homeassistant.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "homeassistant.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "grafana.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "grafana.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "prometheus.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "prometheus.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "n8n.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "n8n.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "cloud.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "cloud.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "auth.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "auth.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "blackbox.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "blackbox.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "stremio.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "stremio.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "linkding.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "linkding.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "miniflux.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "miniflux.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "forgejo.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "forgejo.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "status.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "status.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "portainer.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "portainer.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "manager.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "paperless.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "healthchecks.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "kopia.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "wud.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "lucky.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "cojam.lucassantana.tech",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "stats.lucassantana.tech",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "brain.lucassantana.tech",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "hostname": "rclone.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80",
+      "originRequest": {
+        "httpHostHeader": "rclone.luk-homeserver.com.br"
+      }
+    },
+    {
+      "hostname": "*.luk-homeserver.com.br",
+      "service": "http://host.docker.internal:80"
+    },
+    {
+      "service": "http_status:404"
+    }
+  ],
+  "dns": {
+    "lucassantana.tech": [
+      {
+        "name": "brain.lucassantana.tech",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "cojam.lucassantana.tech",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "stats.lucassantana.tech",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      }
+    ],
+    "luk-homeserver.com.br": [
+      {
+        "name": "*.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "auth.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "blackbox.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "cloud.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "forgejo.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "grafana.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "healthchecks.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "home.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "homeassistant.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "kopia.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "linkding.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "lucky.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "luk-homeserver.com.br",
+        "type": "MX",
+        "content": "<redacted>",
+        "proxied": false
+      },
+      {
+        "name": "luk-homeserver.com.br",
+        "type": "MX",
+        "content": "<redacted>",
+        "proxied": false
+      },
+      {
+        "name": "luk-homeserver.com.br",
+        "type": "TXT",
+        "content": "<redacted>",
+        "proxied": false
+      },
+      {
+        "name": "manager.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "miniflux.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "n8n.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "paperless.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "portainer.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "prometheus.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "rclone.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "status.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "stremio.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "wud.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "name": "www.luk-homeserver.com.br",
+        "type": "CNAME",
+        "content": "<tunnel:homelab>.cfargotunnel.com",
+        "proxied": true
+      }
+    ]
+  }
+}
