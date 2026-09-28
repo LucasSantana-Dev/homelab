@@ -14,10 +14,11 @@ set -uo pipefail
 
 ENV_FILE="${ENV_FILE:-/home/luk-server/homelab/.env}"
 TIMEOUT="${WAIT_BIND_IP_TIMEOUT:-120}"
+[[ "$TIMEOUT" =~ ^[0-9]+$ ]] || TIMEOUT=120 # a typo must not fail the unit
 
 bind_ip="$(grep -E '^BIND_IP=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d "\"' ")"
 case "$bind_ip" in
-  "" | 127.0.0.1 | 0.0.0.0)
+  "" | 127.* | 0.0.0.0)
     echo "wait-for-bind-ip: BIND_IP=${bind_ip:-unset}, nothing to wait for"
     exit 0
     ;;

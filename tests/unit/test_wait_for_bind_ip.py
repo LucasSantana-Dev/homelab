@@ -81,3 +81,18 @@ def test_does_not_match_a_longer_address(tmp_path):
     # 100.95.204.10 must not be satisfied by 100.95.204.103 being present
     r, calls = run(tmp_path, "BIND_IP=100.95.204.10", timeout=2)
     assert "not assigned after 2s" in r.stderr
+    assert r.returncode == 0
+    assert calls == 2
+
+
+def test_any_loopback_address_needs_no_wait(tmp_path):
+    r, calls = run(tmp_path, "BIND_IP=127.0.0.2")
+    assert r.returncode == 0
+    assert calls == 0
+
+
+def test_invalid_timeout_falls_back_instead_of_failing(tmp_path):
+    r, calls = run(tmp_path, "BIND_IP=100.95.204.103", timeout="2m")
+    assert r.returncode == 0
+    assert "is up after 0s" in r.stdout
+    assert calls == 1
