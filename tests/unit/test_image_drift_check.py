@@ -22,21 +22,32 @@ if a[:2] == ["compose", "config"]:
         sys.exit(1)
     print(json.dumps(fx["config"])); sys.exit(0)
 if a[0] == "ps":
+    if fx.get("ps_fail"):
+        sys.exit(1)
+    # the script must scope to this project and exclude one-off containers
+    assert "label=com.docker.compose.project=homelab" in a, a
+    assert "label=com.docker.compose.oneoff=False" in a, a
     svc = [x.rsplit("=", 1)[1] for x in a if x.startswith("label=com.docker.compose.service=")][0]
     cid = fx["running"].get(svc)
     print(cid or ""); sys.exit(0)
 if a[0] == "inspect":
+    assert a[1:3] == ["--format", "{{.Image}}"], a
     print(fx["container_image"][a[-1]]); sys.exit(0)
 if a[:2] == ["image", "inspect"]:
+    assert a[2:4] == ["--format", "{{.Id}}"], a
+    if fx.get("image_inspect_error"):
+        print("permission denied while trying to connect to the Docker daemon", file=sys.stderr)
+        sys.exit(1)
     ref = a[-1]
     if ref not in fx["local_images"]:
+        print(f"Error: No such image: {ref}", file=sys.stderr)
         sys.exit(1)
     print(fx["local_images"][ref]); sys.exit(0)
 sys.exit(3)
 """
 
 
-def run(tmp_path, fixture, env_extra=None):
+def run(tmp_path, fixture, env_extra=None, path_override=None):
     bindir = tmp_path / "bin"
     bindir.mkdir()
     docker = bindir / "docker"
@@ -45,9 +56,10 @@ def run(tmp_path, fixture, env_extra=None):
     fx = tmp_path / "fixture.json"
     fx.write_text(json.dumps(fixture))
     env = dict(os.environ)
-    env["PATH"] = f"{bindir}{os.pathsep}{env['PATH']}"
+    env["PATH"] = path_override or f"{bindir}{os.pathsep}{env['PATH']}"
     env["FAKE_FIXTURE"] = str(fx)
     env.pop("DEPLOY_ACCEPT_IMAGE_CHANGE", None)
+    env["HOMELAB_OVERRIDE_LOG"] = str(tmp_path / "overrides.log")
     env.update(env_extra or {})
     return subprocess.run(
         ["python3", str(SCRIPT)], capture_output=True, text=True, env=env, cwd=tmp_path
@@ -114,6 +126,9 @@ def test_accept_flag_lets_an_intended_change_through(tmp_path):
     r = run(tmp_path, fx, {"DEPLOY_ACCEPT_IMAGE_CHANGE": "1"})
     assert r.returncode == 0
     assert "web:" in r.stdout and "proceeding" in r.stdout
+    audit = (tmp_path / "overrides.log").read_text()
+    assert "DEPLOY_ACCEPT_IMAGE_CHANGE=1 by" in audit
+    assert "web: ghcr.io/x/web:latest" in audit
 
 
 def test_build_services_are_skipped(tmp_path):
@@ -135,3 +150,35 @@ def test_stopped_service_is_only_noted(tmp_path):
 def test_compose_failure_cannot_be_mistaken_for_no_change(tmp_path):
     r = run(tmp_path, base(config_fail=True))
     assert r.returncode == 2
+
+
+def test_ps_failure_is_a_check_error_not_a_pass(tmp_path):
+    r = run(tmp_path, base(ps_fail=True))
+    assert r.returncode == 2
+    assert "docker ps failed" in r.stderr
+
+
+def test_image_inspect_error_is_not_mistaken_for_absent(tmp_path):
+    # a daemon/permission error must not become "compose would pull it",
+    # which DEPLOY_ACCEPT_IMAGE_CHANGE=1 could then wave through
+    r = run(
+        tmp_path, base(image_inspect_error=True), {"DEPLOY_ACCEPT_IMAGE_CHANGE": "1"}
+    )
+    assert r.returncode == 2
+    assert "docker image inspect failed" in r.stderr
+
+
+def test_missing_docker_binary_is_a_check_error(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    r = subprocess.run(
+        ["/usr/bin/env", "python3", str(SCRIPT)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env={
+            "PATH": f"{empty}:{os.path.dirname(os.path.realpath(__import__('sys').executable))}"
+        },
+    )
+    assert r.returncode == 2
+    assert "cannot run docker" in r.stderr
