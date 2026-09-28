@@ -8,6 +8,7 @@ Docker daemon.
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -171,14 +172,14 @@ def test_image_inspect_error_is_not_mistaken_for_absent(tmp_path):
 def test_missing_docker_binary_is_a_check_error(tmp_path):
     empty = tmp_path / "empty"
     empty.mkdir()
+    # interpreter by absolute path, so PATH holds only the empty dir: a real
+    # docker next to python3 (e.g. /usr/bin on the host) must not be reachable
     r = subprocess.run(
-        ["/usr/bin/env", "python3", str(SCRIPT)],
+        [sys.executable, str(SCRIPT)],
         capture_output=True,
         text=True,
         cwd=tmp_path,
-        env={
-            "PATH": f"{empty}:{os.path.dirname(os.path.realpath(__import__('sys').executable))}"
-        },
+        env={"PATH": str(empty)},
     )
     assert r.returncode == 2
     assert "cannot run docker" in r.stderr
