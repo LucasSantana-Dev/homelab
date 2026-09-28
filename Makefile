@@ -48,6 +48,7 @@ deploy: validate-env ## Deploy all homelab services
 			exit 1 ; \
 		fi \
 	fi
+	@python3 scripts/deployment/image-drift-check.py
 	@echo "🚀 Deploying homelab services..."
 	docker compose up -d --build
 	@old_sha="$$(bash scripts/deployment/deployed-sha.sh read)"; \
