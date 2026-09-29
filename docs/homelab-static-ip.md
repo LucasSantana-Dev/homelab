@@ -7,7 +7,7 @@ hardcodes `192.168.0.250`:
 
 - Pi-hole `*.home` dnsmasq records (`config/pihole/etc-dnsmasq.d/02-local-home.conf`)
 - Caddy-LAN routes (LAN proxy to the homelab host)
-- Memory + docs (`memory/homelab-network.md`, `docs/dns-setup.md`)
+- Docs (`docs/dns-setup.md`, `docs/audit/README.md` item 16)
 
 When the lease rotates to, say, `192.168.0.4`, nothing on the LAN can
 reach the homelab by name anymore — only Tailscale works. A static IP
