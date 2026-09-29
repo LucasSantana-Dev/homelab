@@ -27,7 +27,7 @@ successfully for 2 minutes (`up{job="lucky-bot"} == 0`).
 
 **Investigate:**
 ```bash
-ssh luk-server@192.168.0.11
+ssh luk-server@192.168.0.250
 cd lucky
 docker compose ps bot
 docker compose logs bot --tail=200
