@@ -5,6 +5,13 @@ All notable changes to Luk's Homelab will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.1](https://github.com/LucasSantana-Dev/homelab/compare/v2.14.0...v2.14.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* **network:** move homelab static IP to .250, outside the DHCP pool ([#460](https://github.com/LucasSantana-Dev/homelab/issues/460)) ([4629606](https://github.com/LucasSantana-Dev/homelab/commit/4629606c8ad80158a8bddd3c5d4701718e5766c2))
+
 ## [Unreleased]
 
 ## [2.14.0] - 2026-09-27
