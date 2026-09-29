@@ -39,7 +39,7 @@ Verify from another LAN device:
 
 ```bash
 ping -c 2 192.168.0.250          # should respond in <10ms
-dig @192.168.0.250 stremio.home  # should return 192.168.0.6 (dnsmasq alias)
+dig @192.168.0.250 stremio.home  # should return 192.168.0.250 (dnsmasq record)
 ```
 
 ## Rollback
