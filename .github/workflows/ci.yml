@@ -344,13 +344,21 @@ jobs:
 
     - name: Scan container images
       run: |
-        # Install Trivy using modern gpg method
-        sudo apt-get update
-        sudo apt-get install wget apt-transport-https gnupg lsb-release
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/trivy-archive-keyring.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-        sudo apt-get update
-        sudo apt-get install trivy
+        # The trivy-action step above already puts trivy on PATH (setup-trivy
+        # writes $GITHUB_PATH), so apt is only a fallback. It is bounded
+        # (timeout + retries) so a hung mirror fails fast instead of eating
+        # the 30 min job timeout.
+        if ! command -v trivy >/dev/null 2>&1; then
+          # Install Trivy using modern gpg method
+          apt_opts=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30)
+          sudo timeout 300 apt-get "${apt_opts[@]}" update
+          sudo timeout 300 apt-get "${apt_opts[@]}" install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - --timeout=30 --tries=3 https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy-archive-keyring.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo timeout 300 apt-get "${apt_opts[@]}" update
+          sudo timeout 300 apt-get "${apt_opts[@]}" install -y trivy
+        fi
+        trivy --version
 
         # Pull and scan images
         docker compose config --images | while read -r image; do
