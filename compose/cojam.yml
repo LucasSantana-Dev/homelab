@@ -98,6 +98,10 @@ services:
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
       SPOTIFY_CLIENT_ID: ${COJAM_SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${COJAM_SPOTIFY_CLIENT_SECRET:-}
+      # Seals Spotify refresh tokens at rest (cojam#252). Without it the server
+      # never mounts /api/spotify/token, so "Conectar Spotify" fails after the
+      # redirect. 32 random bytes, base64.
+      SPOTIFY_TOKEN_KEY: ${COJAM_SPOTIFY_TOKEN_KEY:-}
       # Feeds radio refill. Stays unset until the Last.fm commercial LOI
       # exists (see docs/runbooks/launch-readiness.md in the cojam repo).
       LASTFM_API_KEY: ${LASTFM_API_KEY:-}
