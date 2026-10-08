@@ -11,6 +11,9 @@ alerting:
 
 rule_files:
   - "alerts.yml"
+  # Only Lucky's recap rules: the rest of its rules duplicate lucky_alerts in
+  # alerts.yml and would page twice. A glob, so a host without the Lucky checkout loads nothing.
+  - "/etc/prometheus-lucky/rules/recap-*.rules.yml"
 
 scrape_configs:
   # Prometheus itself
