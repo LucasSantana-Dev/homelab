@@ -30,3 +30,14 @@ providers:
         allowUiUpdates: true
         options:
           path: /etc/grafana/provisioning/dashboards/lukbot
+      # Lucky: comece aqui, negócio, erros, sistema. Source of truth is the
+      # Lucky repo; edit there and run observability/grafana/build_dashboards.py.
+      - name: 'Lucky (repo)'
+        orgId: 1
+        folder: 'Lucky'
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 60
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/lucky-dashboards

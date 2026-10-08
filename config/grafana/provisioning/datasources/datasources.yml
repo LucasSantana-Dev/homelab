@@ -60,3 +60,25 @@ datasources:
       timeout: 60
       manageAlerts: true
     version: 1
+  # Lucky Postgres, read-only role grafana_ro (Lucky repo:
+  # observability/postgres/grafana-ro.sql). Column-level SELECT on product
+  # tables only; reached over the lucky-db-ro network.
+  - name: Lucky Postgres
+    uid: lucky-postgres
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: lucky-postgres:5432
+    user: grafana_ro
+    isDefault: false
+    editable: false
+    jsonData:
+      database: discordbot
+      sslmode: disable
+      postgresVersion: 1800
+      maxOpenConns: 2
+      maxIdleConns: 1
+      connMaxLifetime: 14400
+      timeInterval: 1m
+    secureJsonData:
+      password: $__file{/etc/grafana/secrets/lucky_grafana_ro_password}
+    version: 1

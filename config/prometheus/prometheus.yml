@@ -73,6 +73,16 @@ scrape_configs:
           service: 'lucky-backend'
           environment: 'production'
     scrape_interval: 15s
+
+  # lucky-render sidecar (card renderer) serves /metrics on 8080; it joins
+  # lucky-monitoring like the bot and backend.
+  - job_name: 'lucky-render'
+    static_configs:
+      - targets: ['lucky-render:8080']
+        labels:
+          service: 'lucky-render'
+          environment: 'production'
+    scrape_interval: 30s
     metrics_path: /metrics
 
   # Blackbox Exporter - HTTP endpoint monitoring
