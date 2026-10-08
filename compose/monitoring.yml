@@ -179,6 +179,10 @@ services:
     volumes:
     - ../config/prometheus:/etc/prometheus
     - prometheus_data:/prometheus
+    # Lucky's recap alert rules, read from the Lucky checkout that its deploy
+    # keeps on origin/main (Lucky#2723). Outside /etc/prometheus so Docker
+    # does not create a mountpoint inside config/prometheus.
+    - ${LUCKY_REPO_DIR:-/home/luk-server/Lucky}/observability/prometheus/rules:/etc/prometheus-lucky/rules:ro
     command:
     - --config.file=/etc/prometheus/prometheus.yml
     - --storage.tsdb.path=/prometheus
