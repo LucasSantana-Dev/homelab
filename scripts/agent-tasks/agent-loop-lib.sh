@@ -56,11 +56,20 @@ budget_take() {
 # Permissions are pinned per run (mode + allow/deny lists from agent-gate.json), so
 # a later change to the box's global settings cannot widen what the worker may do.
 # The prompt goes in on stdin so the variadic tool flags cannot swallow it.
+# Push is allowed only as the exact `git push [-u] origin <branch>` (no globs, so no
+# refspec, --force or --delete variants); a branch outside agent/ gets no run at all.
 claude_cmd() {
-    local repo="$1" workdir="$2" prompt="$3" qprompt mode allowed denied t
+    local repo="$1" workdir="$2" prompt="$3" branch="$4" qprompt mode allowed denied t
+    if ! [[ "$branch" =~ ^agent/[A-Za-z0-9._/-]+$ ]]; then
+        echo "claude_cmd: refusing branch '$branch' (must be agent/...)" >&2
+        return 1
+    fi
     printf -v qprompt '%q' "$prompt"
     mode=$(cfg "$repo" claude_permission_mode)
     allowed="" denied=""
+    for t in "Bash(git push origin $branch)" "Bash(git push -u origin $branch)"; do
+        printf -v t '%q' "$t"; allowed+=" $t"
+    done
     while IFS= read -r t; do printf -v t '%q' "$t"; allowed+=" $t"; done \
         < <(cfg "$repo" claude_allowed_tools | jq -r '.[]')
     while IFS= read -r t; do printf -v t '%q' "$t"; denied+=" $t"; done \

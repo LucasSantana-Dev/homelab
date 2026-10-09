@@ -219,7 +219,7 @@ for REPO in $AGENT_REPOS; do
                     # measured from the checkout, not from $SHA.
                     START="$SHA"
                     [[ "$AGENT_DRY_RUN" == "1" ]] || START=$(run_on_agent "cd $WORKDIR && git rev-parse HEAD") || START="$SHA"
-                    if act "$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT")"; then
+                    if CMD=$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT" "$BRANCH") && act "$CMD"; then
                         if [[ "$FIX" == "threads" ]]; then
                             post_thread_replies "$REPO" "$N" "$BRANCH" "$WORKDIR" "$START" || echo "WARN: thread replies failed"
                         fi
