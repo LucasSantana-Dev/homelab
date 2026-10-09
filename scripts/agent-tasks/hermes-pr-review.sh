@@ -108,9 +108,10 @@ fi
 BODY="$(printf '[hermes] code review (%s)\n\n%s\n\n---\n*Advisory only — not a blocking gate.*' \
   "$SHORT_SHA" "$REVIEW")"
 
-# A failed post still records `error` in the state file, then fails the job.
+# A failed or timed-out post still records `error` in the state file, then
+# fails the job.
 COMMENT_RC=0
-gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY" || COMMENT_RC=$?
+timeout 60 gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY" || COMMENT_RC=$?
 if [ "$COMMENT_RC" -eq 0 ]; then
     log "Comment posted to PR #$PR_NUMBER"
 else
