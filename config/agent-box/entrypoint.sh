@@ -47,11 +47,14 @@ else
 fi
 
 # --- Git + gh config ---
-git config --global user.name "agent-box"
-git config --global user.email "lucas.diassantana@gmail.com"
-git config --global init.defaultBranch main
+# The entrypoint runs as root but git runs as agent, so write agent's config.
+AGENT_GITCONFIG=/home/agent/.gitconfig
+git config --file "$AGENT_GITCONFIG" user.name "agent-box"
+git config --file "$AGENT_GITCONFIG" user.email "lucas.diassantana@gmail.com"
+git config --file "$AGENT_GITCONFIG" init.defaultBranch main
+touch "$AGENT_GITCONFIG" && chown agent:agent "$AGENT_GITCONFIG"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
-    git config --global credential.helper store
+    git config --file "$AGENT_GITCONFIG" credential.helper store
     printf 'https://x-access-token:%s@github.com\n' "$AGENT_GITHUB_TOKEN" \
         > /home/agent/.git-credentials
     chmod 600 /home/agent/.git-credentials
