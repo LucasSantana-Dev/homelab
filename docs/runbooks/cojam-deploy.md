@@ -151,6 +151,9 @@ cd /home/luk-server/homelab
 # 1. secret file for the grafana_ro password (never printed), before (re)creating grafana
 umask 077
 openssl rand -base64 32 | tr -d '\n' > secrets/cojam_grafana_ro_password
+# grafana runs as uid 472: same owner and mode as lucky_grafana_ro_password, or provisioning
+# fails with "permission denied" and grafana restart-loops (all dashboards down)
+sudo chown 472 secrets/cojam_grafana_ro_password && sudo chmod 400 secrets/cojam_grafana_ro_password
 
 # 1b. product events key (stable, never printed) and client telemetry; idempotent
 grep -q '^COJAM_EVENTS_HMAC_KEY=' .env || echo "COJAM_EVENTS_HMAC_KEY=$(openssl rand -hex 32)" >> .env
