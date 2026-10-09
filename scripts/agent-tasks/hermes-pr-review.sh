@@ -62,7 +62,9 @@ log "Fetching PR branch and running review on agent-box..."
 REVIEW_STATUS=ok
 # agent-box authorizes only the dedicated key (the one the `agent-box` alias uses),
 # not the default ~/.ssh/id_* keys. Host key checking stays strict.
-if ! REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+# The outer 540s cap covers fetch and cleanup too, so a hung git or network
+# still leaves time to post the fallback inside the 10-minute job.
+if ! REVIEW=$(timeout 540 ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
     -i /home/luk-server/.ssh/agent-box -o IdentitiesOnly=yes \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
@@ -94,8 +96,15 @@ log "Review complete (${#REVIEW} chars)"
 BODY="$(printf '[hermes] code review (%s)\n\n%s\n\n---\n*Advisory only — not a blocking gate.*' \
   "$SHORT_SHA" "$REVIEW")"
 
-gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
-log "Comment posted to PR #$PR_NUMBER"
+# A failed post still records `error` in the state file, then fails the job.
+COMMENT_RC=0
+gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY" || COMMENT_RC=$?
+if [ "$COMMENT_RC" -eq 0 ]; then
+    log "Comment posted to PR #$PR_NUMBER"
+else
+    REVIEW_STATUS=error
+    log "ERROR: posting comment to PR #$PR_NUMBER failed (rc=$COMMENT_RC)"
+fi
 
 # Write metrics for node-exporter textfile collector and homelab-manager state
 END_TS=$(date +%s)
@@ -139,7 +148,10 @@ else
     log "Skipping Prometheus metrics: $PROM_DIR missing or not writable by $(id -un) (#382)"
 fi
 
-# JSON state for homelab-manager /hermes endpoint
+# JSON state for homelab-manager /hermes endpoint. Locked like the Prometheus
+# block: reviews of different PRs can run at once and lose an increment (#310).
+(
+flock 9
 python3 -c "
 import json, os, time
 state_file = '$STATE_DIR/hermes-state.json'
@@ -158,4 +170,7 @@ state['pr_review'] = {
 with open(state_file + '.tmp', 'w') as f:
     json.dump(state, f, indent=2)
 os.replace(state_file + '.tmp', state_file)
-" || log "WARN: could not write $STATE_DIR/hermes-state.json"
+"
+) 9>"$STATE_DIR/hermes-state.lock" || log "WARN: could not write $STATE_DIR/hermes-state.json"
+
+exit "$COMMENT_RC"
