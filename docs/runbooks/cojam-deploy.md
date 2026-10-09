@@ -131,6 +131,8 @@ checkout, and Grafana gets the "CoJam (repo)" dashboards folder plus the
 on database `cojam`, reached over the `cojam-db-ro` network that only
 `cojam-db` and `grafana` join).
 
+Run it after cojam#444 (product_events) is deployed: step 2 grants on that table.
+
 Depends on the CoJam repo: `observability/grafana/dashboards`,
 `observability/prometheus/rules` and `observability/postgres/grafana-ro.sql`.
 The checkout path is `COJAM_REPO_DIR` (default `/home/luk-server/cojam`). If a
@@ -149,6 +151,11 @@ cd /home/luk-server/homelab
 # 1. secret file for the grafana_ro password (never printed), before (re)creating grafana
 umask 077
 openssl rand -base64 32 | tr -d '\n' > secrets/cojam_grafana_ro_password
+
+# 1b. product events key (stable, never printed) and client telemetry; idempotent
+grep -q '^COJAM_EVENTS_HMAC_KEY=' .env || echo "COJAM_EVENTS_HMAC_KEY=$(openssl rand -hex 32)" >> .env
+grep -q '^COJAM_FEATURE_TELEMETRY=' .env || echo "COJAM_FEATURE_TELEMETRY=true" >> .env
+make sops-encrypt && make sops-verify
 
 # 2. create the role (idempotent); the password goes over stdin, never in argv
 { printf "\\set pw '%s'\n" "$(cat secrets/cojam_grafana_ro_password)"; cat /home/luk-server/cojam/observability/postgres/grafana-ro.sql; } \

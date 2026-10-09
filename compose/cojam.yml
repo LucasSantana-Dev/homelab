@@ -88,6 +88,10 @@ services:
       FEATURE_PUBLIC_ROOMS: ${FEATURE_PUBLIC_ROOMS:-false}
       FEATURE_QUEUE_VOTING: ${FEATURE_QUEUE_VOTING:-false}
       FEATURE_ROOM_CHAT: ${FEATURE_ROOM_CHAT:-false}
+      # Product events (cojam#444). The HMAC key pseudonymises room and actor
+      # ids; without it hashes change on every restart. Keep it stable.
+      EVENTS_HMAC_KEY: ${COJAM_EVENTS_HMAC_KEY:-}
+      FEATURE_PRODUCT_EVENTS: ${FEATURE_PRODUCT_EVENTS:-true}
       # Prometheus metrics on a dedicated listener, never the public port
       # (ADR-0004). 0.0.0.0 is the CONTAINER's interface, not the host's: the
       # port is never published, so this is reachable only from the frontend
@@ -168,6 +172,8 @@ services:
       COJAM_FEATURE_PUBLIC_ROOMS: ${COJAM_FEATURE_PUBLIC_ROOMS:-}
       COJAM_FEATURE_QUEUE_VOTING: ${COJAM_FEATURE_QUEUE_VOTING:-}
       COJAM_FEATURE_ROOM_CHAT: ${COJAM_FEATURE_ROOM_CHAT:-}
+      # Client telemetry + sync drift samples (cojam#442), served via /env.js.
+      COJAM_FEATURE_TELEMETRY: ${COJAM_FEATURE_TELEMETRY:-}
       # Supabase accounts OFF (see cojam-server FEATURE_SUPABASE_AUTH above) —
       # not required; the /env.js route already omits both fields unless BOTH
       # are set (apps/web/app/env.js/route.ts), so leaving these unset is safe.
