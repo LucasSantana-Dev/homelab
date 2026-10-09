@@ -62,9 +62,13 @@ log "Fetching PR branch and running review on agent-box..."
 REVIEW_STATUS=ok
 # agent-box authorizes only the dedicated key (the one the `agent-box` alias uses),
 # not the default ~/.ssh/id_* keys. Host key checking stays strict.
-# The outer 540s cap covers fetch and cleanup too, so a hung git or network
-# still leaves time to post the fallback inside the 10-minute job.
-if ! REVIEW=$(timeout 540 ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+# The outer cap covers fetch and cleanup too, so a hung git or network still
+# leaves time to post the fallback inside the 10-minute job. Budgeted from
+# START_TS (520s, not 540: checkout runs before this script starts), so slow gh
+# calls above shrink it instead of eating the posting window.
+SSH_CAP=$(( 520 - ($(date +%s) - START_TS) ))
+[ "$SSH_CAP" -ge 30 ] || SSH_CAP=30
+if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
     -i /home/luk-server/.ssh/agent-box -o IdentitiesOnly=yes \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
@@ -117,7 +121,10 @@ PROM_DIR="/var/lib/node_exporter/textfile"
 # user, which made the `9>lock` redirect fail with "Permission denied" and — under
 # `set -e` — failed the whole review job AFTER the review had already posted (#382).
 # A non-writable dir is now a logged skip, never a job failure.
-if [ -d "$PROM_DIR" ] && [ -w "$PROM_DIR" ]; then
+# The counter means reviews posted, so a failed post does not count.
+if [ "$COMMENT_RC" -ne 0 ]; then
+    log "Skipping Prometheus metrics: comment was not posted"
+elif [ -d "$PROM_DIR" ] && [ -w "$PROM_DIR" ]; then
     # Hold the lock across the ENTIRE read-modify-write — the previous version
     # only locked the read, so concurrent reviews could both read N and write
     # N+1, losing an increment (#310). fd 9 keeps the lock for the subshell.
