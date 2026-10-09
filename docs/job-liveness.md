@@ -60,9 +60,9 @@ is preserved. Liveness reporting must never block the work it watches.
 `systemd-failed-check.sh` immediately surfaced a backlog of silent failures —
 exactly the point:
 - `homelab-watchdog` — fixed (PR #363), revives on `make deploy`.
-- `kopia-offsite-sync` — target `192.168.0.3` sshd refused (#361).
-- `logrotate` — **NEW** (logs may not be rotating → disk-fill risk; triage).
-- `satisfactory-server` — **NEW** (game server crashed; triage or disable).
+- `kopia-offsite-sync` — now rclone to Google Drive; 2026-10-08 timeouts were Drive API rate limits (`403 rateLimitExceeded`), fixed with `--fast-list --tpslimit 8` and a 3h timeout.
+- `logrotate` — fixed 2026-10-08: `/etc/logrotate.d/agent-box` duplicated the `agent-logs` glob; the duplicate was removed on the host.
+- `satisfactory-server` — removed 2026-10-08 (owner decision); unit and scripts dropped.
 
 ## Services that vanish (2026-09-27)
 

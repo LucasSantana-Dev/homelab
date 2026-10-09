@@ -18,7 +18,6 @@ fi
 
 unit_files=(
     "homelab-docker.service"
-    "satisfactory-server.service"
     "lukbot.service"
     "homelab-update.service"
     "homelab-update.timer"
@@ -79,7 +78,6 @@ systemctl daemon-reload
 echo "Enabling managed services and timers..."
 enable_units=(
     "homelab-docker.service"
-    "satisfactory-server.service"
     "lukbot.service"
 )
 
@@ -103,7 +101,6 @@ echo "✓ Managed units installed and enabled"
 echo ""
 echo "Current enablement status:"
 systemctl is-enabled homelab-docker.service || echo "  ⚠ homelab-docker.service not enabled"
-systemctl is-enabled satisfactory-server.service || echo "  ⚠ satisfactory-server.service not enabled"
 systemctl is-enabled lukbot.service || echo "  ⚠ lukbot.service not enabled"
 systemctl is-enabled homelab-update.timer || echo "  ⚠ homelab-update.timer not enabled"
 systemctl is-enabled homelab-watchdog.timer || echo "  ⚠ homelab-watchdog.timer not enabled"
@@ -111,5 +108,4 @@ systemctl is-enabled homelab-watchdog.timer || echo "  ⚠ homelab-watchdog.time
 echo ""
 echo "To start services now, run:"
 echo "  sudo systemctl start homelab-docker"
-echo "  sudo systemctl start satisfactory-server"
 echo "  sudo systemctl start lukbot"
