@@ -67,16 +67,19 @@ if ! REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
-     set -o pipefail   # else the timeout-claude-tail pipeline masks a timed-out review as success
      cd /workspace/homelab
-     git fetch origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER' 2>&1
-     git checkout hermes-pr-$PR_NUMBER 2>&1
-     REVIEW_OUT=\$(timeout 600 claude --print \
+     git fetch -q origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER'
+     git checkout -q hermes-pr-$PR_NUMBER
+     # Subscription login, like claude_cmd: the exported API key is invalid and
+     # would take precedence. A failed review still restores main below.
+     rc=0
+     REVIEW_OUT=\$(timeout 600 env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY claude --print \
        'Review the current branch (hermes-pr-$PR_NUMBER) against $BASE_REF. What are the top 3-5 issues, bugs, or improvements? Format as markdown bullets. Include [severity: high|medium|low] for each. If nothing notable, say so in one line.' \
-       2>&1 | tail -n +1)
-     git checkout main 2>&1
-     git branch -D hermes-pr-$PR_NUMBER 2>&1 || true
-     printf '%s' \"\$REVIEW_OUT\"" 2>&1); then
+       2>&1) || rc=\$?
+     git checkout -q main
+     git branch -q -D hermes-pr-$PR_NUMBER || true
+     printf '%s' \"\$REVIEW_OUT\"
+     exit \$rc" 2>&1); then
     # Keep the real error in the log: the PR comment only gets the fallback.
     log "agent-box review failed: $(tail -c 1000 <<<"$REVIEW")"
     REVIEW="hermes: review unavailable (agent-box unreachable or error). Check $LOG_FILE."
