@@ -228,6 +228,12 @@ def test_bots_do_not_trigger_halt(cfg):
     assert gate.score(pr, make_issue(), cfg)["decision"] != "halt"
 
 
+def test_review_bots_without_bot_suffix_do_not_trigger_halt(cfg):
+    # gh pr view strips "[bot]" from app logins (Lucky#2779 halted on this).
+    pr = make_pr(["docs/a.md"], reviews=("graphify-labs", "cubic-dev-ai"))
+    assert gate.score(pr, make_issue(), cfg)["decision"] != "halt"
+
+
 # --- issue selection ------------------------------------------------------
 
 
