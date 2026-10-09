@@ -119,6 +119,10 @@ docker exec cojam-db psql -U cojam -d cojam -c "\dt"
 
 ## Observability rollout (owner-run)
 
+**Merge this PR only together with the rollout below.** `cojam-db-ro` is an
+external network, so any `docker compose up` of grafana or cojam before the
+"network create" step fails.
+
 CoJam is wired like Lucky: Loki gets `{container_name="cojam-server"}` (the
 `tag: "{{.Name}}"` log option), Prometheus scrapes `cojam-server:9100` with
 `service`/`environment` labels and loads `cojam-*.rules.yml` from the CoJam
@@ -138,6 +142,9 @@ Run on the server, in this order:
 
 ```bash
 cd /home/luk-server/homelab
+
+# 0. CoJam checkout (public repo), only if missing; step 2 reads grafana-ro.sql from it
+[ -d /home/luk-server/cojam ] || git clone --depth 1 https://github.com/LucasSantana-Dev/cojam.git /home/luk-server/cojam
 
 # 1. secret file for the grafana_ro password (never printed), before (re)creating grafana
 umask 077
@@ -169,6 +176,13 @@ docker exec prometheus wget -qO- 'http://localhost:9090/api/v1/query?query=up%7B
 
 # Grafana: datasource reaches Postgres as grafana_ro
 docker exec cojam-db psql -U cojam -d cojam -c "SELECT rolname, rolconnlimit FROM pg_roles WHERE rolname = 'grafana_ro'"
+```
+
+The CoJam deploy keeps the checkout current, then reloads the rules:
+
+```bash
+git -C /home/luk-server/cojam fetch --depth 1 origin main && git -C /home/luk-server/cojam reset --hard origin/main
+docker kill -s HUP prometheus
 ```
 
 Rerun step 2 after restoring a dump on another host (roles are not in
