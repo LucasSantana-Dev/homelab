@@ -37,13 +37,32 @@ workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 | Security | no sensitive path, no manifest change, checks green | dependency manifest changed, checks pending or failing | a `sensitive_paths` match: auth, oauth, secret, token, credential, password, session, jwt, permission, payment, billing, crypto, env files, certificate and `.key` files, npm config (`agent-gate.json` is the source of truth) |
 
 Decision order (pillars before CI, so a risky PR never gets an autofix run): value red -> `close`;
-security or impact red -> `needs-human`; size red -> `split`; failing checks -> `autofix`; pending or
-no checks yet -> `wait`; 4 greens and `auto_merge: true` -> `auto-merge`; else `owner-review`.
-A PR or linked issue authored, commented on or pushed to by another human (or a deleted
-account) -> `halt`. If the linked issue cannot be loaded, the PR is skipped for that run.
+security or impact red -> `needs-human`; size red -> `split`; failing checks -> `autofix` (CI);
+pending or no checks yet -> `wait`; unresolved review threads only from `bots` listed in
+`agent-gate.json` -> `autofix`
+(threads); an unresolved thread the owner joined -> `owner-review`; 4 greens and `auto_merge: true`
+-> `auto-merge`; else `owner-review`. A PR or linked issue authored, commented on or pushed to by
+another human (or a deleted account), including inside a review thread -> `halt`. In threads only a
+GitHub App (`__typename: Bot`) on that list counts as a bot (another App's thread waits for the
+owner), and more than 100 threads or 50 replies in one
+thread (unfetched pages) -> `halt`. If the linked issue or the review threads (GraphQL) cannot be
+loaded, the PR is skipped for that run.
+
+Thread autofix: the worker verifies each bot claim against the code (at most 20 threads per run),
+fixes the valid ones (adding or updating a test when behaviour changes), and writes
+`.git/agent-thread-replies.json`
+(`[{"id", "fixed", "reply"}]`). The model may not call `gh api` (a GraphQL mutation could merge),
+so the gate posts the replies itself, after checking the tree is clean, `origin/<branch>` has every
+local commit, and (reloading the PR and the issue) no human joined and the owner did not join a
+thread during the run. Only threads marked fixed with
+a new pushed commit are resolved; a dismissed claim keeps its thread open with the reply, which sends
+the PR to `owner-review`. CI and thread fixes share the `fix_attempts` counter per PR (some bots
+re-post identical threads on every push), then `needs-human`. Stale-close never applies to thread
+autofix.
+
 For `owner-review`, `needs-human`, `split` and `auto-merge` the gate posts one comment per head
 commit with the grades; `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
-`wait`/`autofix` PRs, never to ones waiting on the owner.
+`wait` and CI `autofix` PRs, never to ones waiting on the owner.
 
 ## Graduation
 

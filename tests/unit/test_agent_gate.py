@@ -438,3 +438,123 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
     assert "-u ANTHROPIC_API_KEY" in out
     # The prompt is one quoted printf argument, never bare shell.
     assert "printf '%s' fix\\ it\\;\\ rm\\ -rf\\ /" in out
+
+
+# --- review threads -------------------------------------------------------
+
+
+BOT_LOGINS = {"cubic-dev-ai", "coderabbitai"}
+
+
+def thread(*logins, resolved=False):
+    nodes = [
+        {
+            "author": {
+                "__typename": "Bot" if x in BOT_LOGINS else "User",
+                "login": x,
+            },
+            "body": "b",
+        }
+        for x in logins
+    ]
+    return {
+        "id": "T-" + "-".join(logins),
+        "isResolved": resolved,
+        "comments": {"totalCount": len(nodes), "nodes": nodes},
+    }
+
+
+def pr_with_threads(*threads, files=("docs/a.md",), checks="SUCCESS", more=False):
+    pr = make_pr(list(files), checks=checks)
+    pr["reviewThreads"] = {"pageInfo": {"hasNextPage": more}, "nodes": list(threads)}
+    return pr
+
+
+def test_bot_threads_on_green_checks_autofix(cfg):
+    pr = pr_with_threads(thread("cubic-dev-ai"), thread("coderabbitai"))
+    out = gate.score(pr, make_issue(), cfg)
+    assert (out["decision"], out["fix"]) == ("autofix", "threads")
+    assert "review: 2 unresolved thread(s)" in out["reasons"]
+
+
+def test_resolved_threads_leave_owner_review(cfg):
+    pr = pr_with_threads(thread("cubic-dev-ai", resolved=True))
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "owner-review"
+    assert "fix" not in out
+
+
+def test_thread_the_owner_joined_waits_for_the_owner(cfg):
+    pr = pr_with_threads(thread("cubic-dev-ai", OWNER))
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_empty_thread_is_not_bot_only(cfg):
+    empty = {"id": "T", "isResolved": False, "comments": {"totalCount": 0, "nodes": []}}
+    pr = pr_with_threads(empty)
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+@pytest.mark.parametrize("resolved", [False, True])
+def test_human_in_any_thread_halts(cfg, resolved):
+    pr = pr_with_threads(thread("cubic-dev-ai", "stranger", resolved=resolved))
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "halt"
+
+
+@pytest.mark.parametrize(
+    "files,decision",
+    [
+        ([".github/workflows/ci.yml"], "needs-human"),
+        ([f"docs/f{i}.md" for i in range(13)], "split"),
+    ],
+)
+def test_pillar_reds_win_over_threads(cfg, files, decision):
+    pr = pr_with_threads(thread("cubic-dev-ai"), files=files)
+    assert gate.score(pr, make_issue(), cfg)["decision"] == decision
+
+
+@pytest.mark.parametrize(
+    "checks,decision,fix",
+    [("FAILURE", "autofix", "ci"), ("IN_PROGRESS", "wait", None)],
+)
+def test_ci_state_wins_over_threads(cfg, checks, decision, fix):
+    pr = pr_with_threads(thread("cubic-dev-ai"))
+    if checks == "IN_PROGRESS":
+        pr["statusCheckRollup"] = [{"status": checks}]
+    else:
+        pr["statusCheckRollup"] = [{"conclusion": checks, "status": "COMPLETED"}]
+    out = gate.score(pr, make_issue(), cfg)
+    assert (out["decision"], out.get("fix")) == (decision, fix)
+
+
+def test_user_named_like_a_bot_in_a_thread_halts(cfg):
+    t = thread("cubic-dev-ai")
+    t["comments"]["nodes"][0]["author"] = {
+        "__typename": "User",
+        "login": "cubic-dev-ai",
+    }
+    assert gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "halt"
+
+
+def test_more_thread_pages_halt(cfg):
+    pr = pr_with_threads(thread("cubic-dev-ai"), more=True)
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "halt"
+
+
+def test_unfetched_thread_replies_halt(cfg):
+    t = thread("cubic-dev-ai")
+    t["comments"]["totalCount"] = 51
+    assert gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "halt"
+
+
+def test_pr_without_thread_data_scores_as_before(cfg):
+    pr = make_pr(["docs/a.md", "packages/bot/src/x.test.ts"])
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_unlisted_app_thread_waits_for_the_owner(cfg):
+    t = thread("cubic-dev-ai")
+    t["comments"]["nodes"][0]["author"] = {"__typename": "Bot", "login": "some-app"}
+    assert (
+        gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "owner-review"
+    )
