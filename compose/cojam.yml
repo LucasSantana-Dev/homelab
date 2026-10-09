@@ -22,6 +22,8 @@ services:
       - ../appdata/cojam/db:/var/lib/postgresql/data
     networks:
       - database
+      # Read-only Grafana datasource path; only cojam-db and grafana join it.
+      - cojam-db-ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d cojam -U cojam"]
       interval: 30s
@@ -39,6 +41,8 @@ services:
     logging:
       driver: "json-file"
       options:
+        # Loki derives container_name from this tag (promtail-config.yaml).
+        tag: "{{.Name}}"
         max-size: "10m"
         max-file: "3"
 
@@ -136,6 +140,8 @@ services:
     logging:
       driver: "json-file"
       options:
+        # Loki derives container_name from this tag (promtail-config.yaml).
+        tag: "{{.Name}}"
         max-size: "10m"
         max-file: "3"
 
@@ -192,5 +198,13 @@ services:
     logging:
       driver: "json-file"
       options:
+        # Loki derives container_name from this tag (promtail-config.yaml).
+        tag: "{{.Name}}"
         max-size: "10m"
         max-file: "3"
+
+networks:
+  # Created by hand once (docs/runbooks/cojam-deploy.md, Observability
+  # rollout); only cojam-db and grafana join it. Internal: no egress.
+  cojam-db-ro:
+    external: true
