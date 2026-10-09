@@ -60,4 +60,5 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(out)
 
 
-http.server.HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+# n8n reaches this over the Docker network; 8080 is not published on the host.
+http.server.HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()  # nosec B104
