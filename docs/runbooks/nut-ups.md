@@ -53,13 +53,14 @@ sudo apt install nut
 MODE=netserver
 ```
 
-`ups.conf` (prefer the `/dev/serial/by-id/...` path from step 1 over `/dev/ttyACM0`):
+`ups.conf` (use the `/dev/serial/by-id/...` path from step 1; `ttyACM0` can change across boots):
 
 ```
 [shara]
   driver = nutdrv_qx
   protocol = megatec
-  port = /dev/ttyACM0
+  port = /dev/serial/by-id/<id-from-step-1>
+  # port = /dev/ttyACM0   # fallback only if by-id is missing
   desc = "TS Shara UPS Senoidal Universal 2200"
   runtimecal = 600,100,1500,50
   default.battery.voltage.high = 27.6
@@ -107,8 +108,13 @@ SHUTDOWNCMD "/sbin/shutdown -h +0"
 NOTIFYCMD /usr/sbin/upssched
 NOTIFYFLAG ONBATT SYSLOG+WALL+EXEC
 NOTIFYFLAG ONLINE SYSLOG+WALL+EXEC
+POWERDOWNFLAG /etc/killpower
 FINALDELAY 5
 ```
+
+`POWERDOWNFLAG` makes the system-shutdown hook (`nutshutdown`) tell the UPS to cut output after
+`offdelay` and restore it after `ondelay` once AC is back. Without it the UPS keeps feeding a
+halted host and the BIOS power-on never triggers.
 
 `upssched.conf` (set `<seconds>` to ~85% of the runtime measured in step 6):
 
@@ -120,7 +126,29 @@ AT ONBATT * START-TIMER onbatt-shutdown <seconds>
 AT ONLINE * CANCEL-TIMER onbatt-shutdown
 ```
 
-`/usr/bin/upssched-cmd` must call `upsmon -c fsd` for `onbatt-shutdown`.
+Until step 6 measures the runtime, set `<seconds>` to `10800` (3h) so low battery triggers the
+shutdown first during the test.
+
+`/usr/bin/upssched-cmd` (Ubuntu ships a placeholder; replace it):
+
+```bash
+sudo tee /usr/bin/upssched-cmd >/dev/null <<'EOF'
+#!/bin/sh
+case "$1" in
+  onbatt-shutdown)
+    logger -t upssched-cmd "on battery past timer, forcing shutdown"
+    /sbin/upsmon -c fsd
+    ;;
+  *)
+    logger -t upssched-cmd "unrecognized command: $1"
+    ;;
+esac
+EOF
+sudo chown root:root /usr/bin/upssched-cmd
+sudo chmod 755 /usr/bin/upssched-cmd
+```
+
+Install the script before enabling `nut-monitor`, then:
 
 ```bash
 sudo chown root:nut /etc/nut/*.conf /etc/nut/upsd.users
@@ -147,19 +175,28 @@ Run with the real outage load on battery outlets: modem, homelab and one MacBook
 (MacBook below 50% so it is actually charging). Run the desktop for its first 5-10 min too, then
 let WinNUT shut it down.
 
-1. `upsc shara@localhost ups.status` shows `OL`.
-2. Pull the UPS plug from the wall: status goes `OB`.
-3. Leave it on battery until it drains: record the real runtime and the wall-to-battery draw.
-4. The upssched timer (or low battery) shuts the homelab down cleanly.
-5. Output is cut, then restored when AC returns (`shutdown.return` / `ondelay`).
-6. The UPS restarts from a drained battery, the homelab boots by itself, the modem comes back.
-7. After boot: `make power-restore-check` and `docker ps -a --filter status=exited`
-   (an `Exited (255)` with no logs is fixed with `docker start <name>`).
+Someone must stay near the UPS: step 5 needs a person to plug it back into the wall.
 
-Pass criterion: measured runtime **>= 3h** (2h requirement plus margin for battery aging in
-heat). Between 2h and 3h, or below: keep the UPS and add the 2x 45Ah external bank (charger
-current confirmed first; replace internal and external batteries together; fuse the string).
-Then set the upssched timer to ~85% of the measured runtime.
+1. `upsc shara@localhost ups.status` shows `OL`. The upssched timer is at `10800` (step 3).
+2. Pull the UPS plug from the wall: status goes `OB`. Note the time.
+3. Leave it on battery until `ups.status` shows `OB LB`. Record the runtime to `LB` (this is the
+   usable runtime, not time to empty) and the load (`upsc shara@localhost ups.load`).
+4. On `LB`, `upsmon` sets FSD and the homelab shuts down cleanly. About `offdelay` (60 s) later
+   the UPS cuts its output. The battery is not fully drained at this point.
+5. Within 10 min of the output cut, plug the UPS back into the wall. After `ondelay` (180 s) the
+   output comes back, the homelab boots by itself (BIOS, step 5) and the modem comes back.
+   If the output does not come back within 10 min of AC returning, the test fails.
+6. After boot, check:
+   - `journalctl -b -1 -u nut-monitor | grep -i -E 'fsd|shutdown'` shows the FSD.
+   - `last -x shutdown | head -3` shows a clean shutdown at the expected time.
+   - `upsc shara@localhost ups.status` shows `OL` (or `OL CHRG`).
+   - `make power-restore-check` and `docker ps -a --filter status=exited`
+     (an `Exited (255)` with no logs is fixed with `docker start <name>`).
+
+Pass criterion: all checks in step 6 pass **and** runtime to `LB` is **>= 3h** (2h requirement
+plus margin for battery aging in heat). Between 2h and 3h, or below: keep the UPS and add the
+2x 45Ah external bank (charger current confirmed first; replace internal and external batteries
+together; fuse the string). Then set the upssched timer to ~85% of the measured runtime.
 
 ## Maintenance
 
