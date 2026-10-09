@@ -43,15 +43,15 @@ load_pr() {  # repo n
     jq --argjson t "$threads" '.reviewThreads = $t' <<<"$pr"
 }
 
-score_pr() {  # pr_json: gate decision JSON for it and the global ISSUE_JSON
-    jq -n --argjson pr "$1" --argjson issue "${ISSUE_JSON:-null}" '{pr:$pr, issue:$issue}' \
+score_pr() {  # pr_json [issue_json]: gate decision JSON (issue defaults to the global ISSUE_JSON)
+    jq -n --argjson pr "$1" --argjson issue "${2:-${ISSUE_JSON:-null}}" '{pr:$pr, issue:$issue}' \
         | python3 "$GATE_PY" score --repo "$REPO"
 }
 
 # Post the model's replies as the owner. Only threads it fixed in a pushed commit are
 # resolved; a dismissed claim keeps its thread open, which sends the PR to owner-review.
-post_thread_replies() {  # repo pr branch workdir head_before_run
-    local repo="$1" n="$2" branch="$3" workdir="$4" before="$5" replies fresh head open r id body
+post_thread_replies() {  # repo pr branch workdir head_at_checkout
+    local repo="$1" n="$2" branch="$3" workdir="$4" before="$5" replies fresh issue head open r id body
     if [[ "$AGENT_DRY_RUN" == "1" ]]; then
         echo "DRY-RUN: post replies from $workdir/$REPLIES_FILE, resolve the fixed threads"
         return 0
@@ -63,9 +63,20 @@ post_thread_replies() {  # repo pr branch workdir head_before_run
     fi
     replies=$(run_on_agent "cat $workdir/$REPLIES_FILE") || { echo "#$n: no replies file, threads left open"; return 0; }
     jq -e 'type == "array"' <<<"$replies" >/dev/null 2>&1 || { echo "#$n: replies file is not a JSON array, threads left open"; return 0; }
-    # The run can take 45 minutes: a human may have joined since. Re-check before writing.
-    if ! fresh=$(load_pr "$repo" "$n") || [[ "$(score_pr "$fresh" | jq -r .decision)" == "halt" ]]; then
+    # The run can take 45 minutes: a human may have joined the PR or the issue, or the owner
+    # a thread, since. Reload both and re-check before writing as the owner.
+    issue=null
+    if [[ -n "$ISSUE_N" ]] && ! issue=$(run_on_agent "gh issue view $ISSUE_N --repo $repo --json number,author,labels,comments"); then
+        echo "#$n: issue reload failed after the run, threads left open"
+        return 0
+    fi
+    if ! fresh=$(load_pr "$repo" "$n") || [[ "$(score_pr "$fresh" "${issue:-null}" | jq -r .decision)" == "halt" ]]; then
         echo "#$n: halt or reload failed after the run, threads left open"
+        return 0
+    fi
+    if jq -e --arg o "$(cfg "$repo" owner)" 'any(.reviewThreads.nodes[]; (.isResolved | not)
+            and any(.comments.nodes[]; .author.login == $o))' <<<"$fresh" >/dev/null; then
+        echo "#$n: the owner joined a thread during the run, threads left open"
         return 0
     fi
     open=$(jq -c '[.reviewThreads.nodes[] | select(.isResolved | not) | .id]' <<<"$fresh")
@@ -204,9 +215,13 @@ for REPO in $AGENT_REPOS; do
                     PROMPT="You are on branch $BRANCH of $REPO, PR #$N. Its CI is failing. Read the failing checks with \`gh pr checks $N --repo $REPO\` and their logs, fix the root cause (not the test), run the checks locally, commit (no AI attribution) and push to $BRANCH. $GIT_RULES"
                 fi
                 if act "cd $WORKDIR && git fetch -q origin && git switch -q -C $BRANCH origin/$BRANCH && rm -f $REPLIES_FILE"; then
+                    # The branch may have moved since the PR was loaded: "the agent pushed" is
+                    # measured from the checkout, not from $SHA.
+                    START="$SHA"
+                    [[ "$AGENT_DRY_RUN" == "1" ]] || START=$(run_on_agent "cd $WORKDIR && git rev-parse HEAD") || START="$SHA"
                     if act "$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT")"; then
                         if [[ "$FIX" == "threads" ]]; then
-                            post_thread_replies "$REPO" "$N" "$BRANCH" "$WORKDIR" "$SHA" || echo "WARN: thread replies failed"
+                            post_thread_replies "$REPO" "$N" "$BRANCH" "$WORKDIR" "$START" || echo "WARN: thread replies failed"
                         fi
                     else
                         echo "claude exited non-zero"

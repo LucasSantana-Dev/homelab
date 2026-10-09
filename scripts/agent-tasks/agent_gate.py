@@ -60,10 +60,13 @@ def _thread_authors(thread):
 
 
 def thread_author_kind(author, cfg):
-    """'bot', 'owner' or 'human'. Thread authors carry __typename, so only a real
-    GitHub App counts as a bot: a user account named like a bot is a human."""
+    """'bot', 'app', 'owner' or 'human'. Thread authors carry __typename, so only a
+    real GitHub App counts as a bot: a user account named like a bot is a human. An
+    App outside cfg["bots"] is not human, but its threads are not the agent's to fix."""
     if author.get("__typename") == "Bot":
-        return "bot"
+        login = author.get("login") or ""
+        listed = login in cfg["bots"] or login.removesuffix("[bot]") in cfg["bots"]
+        return "bot" if listed else "app"
     login = author.get("login")
     return "owner" if login and login == cfg["owner"] else "human"
 

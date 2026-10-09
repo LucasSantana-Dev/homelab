@@ -529,7 +529,10 @@ def test_ci_state_wins_over_threads(cfg, checks, decision, fix):
 
 def test_user_named_like_a_bot_in_a_thread_halts(cfg):
     t = thread("cubic-dev-ai")
-    t["comments"]["nodes"][0]["author"] = {"__typename": "User", "login": "claude"}
+    t["comments"]["nodes"][0]["author"] = {
+        "__typename": "User",
+        "login": "cubic-dev-ai",
+    }
     assert gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "halt"
 
 
@@ -547,3 +550,11 @@ def test_unfetched_thread_replies_halt(cfg):
 def test_pr_without_thread_data_scores_as_before(cfg):
     pr = make_pr(["docs/a.md", "packages/bot/src/x.test.ts"])
     assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_unlisted_app_thread_waits_for_the_owner(cfg):
+    t = thread("cubic-dev-ai")
+    t["comments"]["nodes"][0]["author"] = {"__typename": "Bot", "login": "some-app"}
+    assert (
+        gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "owner-review"
+    )
