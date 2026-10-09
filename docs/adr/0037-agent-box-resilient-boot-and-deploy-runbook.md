@@ -38,6 +38,7 @@ su -c "git clone …/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
 - **`entrypoint.sh` is BAKED into `agent-box:latest`** (locally built via `compose/agent-box.yml` `build:`), **not** bind-mounted. An entrypoint change requires an **image rebuild** (`docker compose build`), not a restart.
 - **Secrets ARE bind-mounted** (`../secrets/agent-box.secrets.yaml.age:/run/secrets/...:ro`, decrypted at entrypoint runtime). A **token/secret change only needs a restart** — no rebuild.
 - **Repo clones are guarded by `[[ ! -d .git ]]`** — already-cloned repos on the persistent `agent_workspace` / `agent_claude_state` volumes are skipped. A fresh volume forces re-clone of all repos, which is when a missing-repo PAT gap bites.
+- **The SSH host key lives on the `agent_ssh_host_keys` volume** (`/etc/ssh/host_keys`, root only), not in the image. A rebuild keeps it, so the host's `known_hosts` entry for `[localhost]:2222` (checked strictly by `hermes-pr-review.sh`) stays valid. Only a fresh volume generates a new key: the boot log prints its fingerprint; refresh `known_hosts` on the host once, comparing against that line.
 
 ### Secret rotation (SOPS) — exact procedure
 
