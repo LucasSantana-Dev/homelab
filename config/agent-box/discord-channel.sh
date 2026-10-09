@@ -106,7 +106,8 @@ while true; do
             continue
         fi
         pane=$(tmux capture-pane -p -t "$SESSION" 2>/dev/null || true)
-        if grep -qiE 'do you trust the files|select login method|run /login|press enter to continue' <<<"$pane"; then
+        # 'enter to confirm' is the footer of every Claude Code choice dialog (upsells included).
+        if grep -qiE 'enter to confirm|do you trust the files|select login method|run /login|press enter to continue' <<<"$pane"; then
             why "stalled: claude is waiting for input (tmux attach -t $SESSION)"
         elif (( now - STARTED > 120 )) && ! pgrep -u "$(id -u)" -f 'bun.*server\.ts' >/dev/null; then
             why "warning: discord MCP server (bun) is not running"
