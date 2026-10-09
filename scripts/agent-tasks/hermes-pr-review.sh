@@ -24,15 +24,13 @@ START_TS=$(date +%s)
 log "hermes PR review — PR #$PR_NUMBER base=$BASE_REF repo=$REPO"
 
 # Guard: skip if any human (non-bot) has already commented — CLAUDE.md hard rule
-HUMAN_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq '[.comments[] | select(
-    .author.login != "github-actions[bot]" and
-    .author.login != "dependabot[bot]" and
-    .author.login != "renovate[bot]" and
-    .author.login != "coderabbitai[bot]" and
-    .author.login != "greptile-apps[bot]" and
-    (.author.is_bot // false) == false
-  )] | length' 2>&1) || { log "WARN: gh failed checking comments — skipping review"; exit 0; }
+# REST, not `gh pr view`: that strips the [bot] suffix and has no is_bot, so
+# hermes's own earlier comment (github-actions) counted as human and blocked
+# every later review on the PR. user.type tells bots from people.
+HUMAN_IDS=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+  --jq '.[] | select(.user.type != "Bot") | .id') \
+  || { log "WARN: gh failed checking comments, skipping review"; exit 0; }
+HUMAN_COMMENTS=$(grep -c . <<<"$HUMAN_IDS" || true)
 
 if [ "$HUMAN_COMMENTS" -gt 0 ]; then
     log "Skipping: $HUMAN_COMMENTS human comment(s) already present — CLAUDE.md hard rule"
@@ -60,21 +58,30 @@ fi
 
 # Fetch PR branch in agent-box workspace and run review
 log "Fetching PR branch and running review on agent-box..."
-REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+# agent-box authorizes only the dedicated key (the one the `agent-box` alias uses),
+# not the default ~/.ssh/id_* keys. Host key checking stays strict.
+if ! REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+    -i /home/luk-server/.ssh/agent-box -o IdentitiesOnly=yes \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
-     set -o pipefail   # else the timeout-claude-tail pipeline masks a timed-out review as success
      cd /workspace/homelab
-     git fetch origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER' 2>&1
-     git checkout hermes-pr-$PR_NUMBER 2>&1
-     REVIEW_OUT=\$(timeout 600 claude --print \
+     git fetch -q origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER'
+     git checkout -q hermes-pr-$PR_NUMBER
+     # Subscription login, like claude_cmd: the exported API key is invalid and
+     # would take precedence. A failed review still restores main below.
+     rc=0
+     REVIEW_OUT=\$(timeout 600 env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY claude --print \
        'Review the current branch (hermes-pr-$PR_NUMBER) against $BASE_REF. What are the top 3-5 issues, bugs, or improvements? Format as markdown bullets. Include [severity: high|medium|low] for each. If nothing notable, say so in one line.' \
-       2>&1 | tail -n +1)
-     git checkout main 2>&1
-     git branch -D hermes-pr-$PR_NUMBER 2>&1 || true
-     printf '%s' \"\$REVIEW_OUT\"" 2>&1) \
-  || REVIEW="hermes: review unavailable — agent-box unreachable or error. Check $LOG_FILE."
+       2>&1) || rc=\$?
+     git checkout -q main
+     git branch -q -D hermes-pr-$PR_NUMBER || true
+     printf '%s' \"\$REVIEW_OUT\"
+     exit \$rc" 2>&1); then
+    # Keep the real error in the log: the PR comment only gets the fallback.
+    log "agent-box review failed: $(tail -c 1000 <<<"$REVIEW")"
+    REVIEW="hermes: review unavailable (agent-box unreachable or error). Check $LOG_FILE."
+fi
 
 log "Review complete (${#REVIEW} chars)"
 
