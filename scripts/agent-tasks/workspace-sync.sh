@@ -4,7 +4,7 @@ LOG_FILE="/home/luk-server/agent-logs/workspace-sync-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee "$LOG_FILE") 2>&1
 echo "[$(date)] Starting workspace sync..."
 
-REPOS="Lucky homelab Craftvaria"
+REPOS="Lucky homelab"
 TMPDIR_SYNC=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_SYNC"' EXIT
 

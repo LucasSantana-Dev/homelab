@@ -1,0 +1,20 @@
+[Unit]
+Description=Homelab host security audit (Lynis + Trivy on running images)
+Documentation=file:///home/luk-server/homelab/scripts/monitoring/host-security-audit.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+# Runs from the checkout (kept current by git pull), not a copy under /opt
+# that can go stale.
+ExecStart=/home/luk-server/homelab/scripts/monitoring/host-security-audit.sh
+Environment="TEXTFILE_DIR=/var/lib/node_exporter/textfile"
+Environment="REPORT_DIR=/var/log/homelab/security"
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h
+StandardOutput=journal
+StandardError=journal

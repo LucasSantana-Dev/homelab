@@ -1,7 +1,6 @@
 # Sharing Homelab Services with Friends
 
-How to give personal contacts access to **Jellyfin, Stremio, and the
-Craftvaria Minecraft server** — without exposing admin panels, metrics,
+How to give personal contacts access to **Jellyfin and Stremio** — without exposing admin panels, metrics,
 SSH, or Pi-hole.
 
 No public internet exposure. No Cloudflare Tunnel. No seats billed.
@@ -14,8 +13,7 @@ No public internet exposure. No Cloudflare Tunnel. No seats billed.
 3. Share the host from the admin console (**Machines → Share**) with each
    friend's Tailscale email.
 4. Friend installs Tailscale on their device → accepts invite → reaches
-   `jellyfin.homelab.example.com`, `stremio.homelab.example.com`,
-   or the Minecraft server on `100.64.0.10:25565`.
+   `jellyfin.homelab.example.com` or `stremio.homelab.example.com`.
 
 ## Why this instead of Cloudflare Funnel / public DNS?
 
@@ -35,9 +33,9 @@ Friend's device
    │ Tailscale (their own tailnet)
    ▼
 shared node: homelab (tag:homelab-friends-exposed)
-   │ ACL: only ports 8096/8920/11470/12470/25565
+   │ ACL: only ports 8096/8920/11470/12470
    ▼
-Jellyfin · Stremio · Craftvaria
+Jellyfin · Stremio
 ```
 
 Everything else on the homelab (Grafana, Prometheus, Pi-hole admin,
@@ -83,7 +81,6 @@ Friends use **MagicDNS** names if their Tailscale app has it enabled
 |------------|---------------------------------------|-------------------|-------|
 | Jellyfin   | `http://homelab.<your-tailnet>.ts.net:8096` | `100.64.0.10:8096` | 8096  |
 | Stremio    | `http://homelab.<your-tailnet>.ts.net:11470`| `100.64.0.10:11470`| 11470 |
-| Craftvaria | `homelab.<your-tailnet>.ts.net`       | `100.64.0.10`     | 25565 |
 
 Tell the friend: "Install Tailscale, accept the invite, then open Jellyfin
 at the URL above."

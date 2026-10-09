@@ -3,8 +3,7 @@
 
 networks:
   # CIDRs moved out of 172.20-23 to avoid collision with the sibling
-  # compose projects on this host (lucky owns 172.20.0.0/16, craftvaria
-  # owns 172.22.0.0/16). Staying inside RFC1918 172.16.0.0/12.
+  # compose projects on this host (lucky owns 172.20.0.0/16). Staying inside RFC1918 172.16.0.0/12.
   frontend:
     driver: bridge
     ipam:

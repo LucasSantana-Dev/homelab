@@ -152,7 +152,6 @@ clone_repo() {
 }
 clone_repo "LucasSantana-Dev/Lucky"     "Lucky"
 clone_repo "LucasSantana-Dev/homelab"   "homelab"
-clone_repo "LucasSantana-Dev/Craftvaria" "Craftvaria"
 
 # --- Fix Docker socket GID ---
 if [[ -S /var/run/docker.sock ]]; then

@@ -76,7 +76,6 @@ cleanup_stale_user_cron() {
 sync_systemd_units() {
     local managed_units=(
         "homelab-docker.service"
-        "satisfactory-server.service"
         "lukbot.service"
         "homelab-update.service"
         "homelab-update.timer"

@@ -55,7 +55,7 @@ if [[ -n "${RCLONE_REMOTE}" ]]; then
   fi
   command -v rclone >/dev/null 2>&1 || { log "ERROR: rclone not installed."; exit 1; }
   log "Syncing ${REPO} → rclone:${RCLONE_REMOTE} (encrypted repo)"
-  if rclone sync "${REPO}" "${RCLONE_REMOTE}" --transfers 4 --checkers 8 >>"$LOG_FILE" 2>&1; then
+  if rclone sync "${REPO}" "${RCLONE_REMOTE}" --transfers 4 --checkers 4 --fast-list --tpslimit 8 >>"$LOG_FILE" 2>&1; then
     log "Offsite rclone sync OK ($(size_of))"; ping_hc
   else
     log "ERROR: rclone sync to ${RCLONE_REMOTE} failed"; fail_hc; exit 1

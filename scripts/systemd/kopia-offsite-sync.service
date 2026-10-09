@@ -14,7 +14,9 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Use the luk-server user's rclone config (set up with a non-sudo `rclone config`)
 # so the root-run sync can reach the cloud remote without a separate root config.
 Environment=RCLONE_CONFIG=/home/luk-server/.config/rclone/rclone.conf
-TimeoutStartSec=3600
+# Google Drive rate-limits listing (403 rateLimitExceeded); with --tpslimit a
+# full check of the ~34G repo can take well over an hour.
+TimeoutStartSec=3h
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=kopia-offsite-sync

@@ -13,6 +13,12 @@ services:
     # for the provider config that loads files from this directory.
     - ../config/grafana/provisioning:/etc/grafana/provisioning:ro
     - ../config/grafana/plugins/grafana-sentry-datasource:/var/lib/grafana/plugins/grafana-sentry-datasource:ro
+    # Lucky dashboards live in the Lucky repo (observability/grafana/dashboards);
+    # the host checkout is reset to origin/main on every Lucky deploy.
+    - ${LUCKY_REPO_DIR:-/home/luk-server/Lucky}/observability/grafana/dashboards:/var/lib/grafana/lucky-dashboards:ro
+    # Password of the Lucky Postgres role grafana_ro (datasources.yml, $__file).
+    # Create it before (re)creating grafana, or Docker makes a directory here.
+    - ../secrets/lucky_grafana_ro_password:/etc/grafana/secrets/lucky_grafana_ro_password:ro
     environment:
     - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=grafana-sentry-datasource
     # Consumed by the Sentry datasource provisioning (authToken: ${SENTRY_AUTH_TOKEN}).
@@ -51,6 +57,9 @@ services:
     - ${BIND_IP:-127.0.0.1}:${GRAFANA_PORT:-3002}:3000
     networks:
     - default
+    # Holds only lucky-postgres, for the read-only Lucky datasource. Not
+    # lucky-network: that one also carries Redis without a password.
+    - lucky-db-ro
     deploy:
       resources:
         limits:
@@ -170,6 +179,10 @@ services:
     volumes:
     - ../config/prometheus:/etc/prometheus
     - prometheus_data:/prometheus
+    # Lucky's recap alert rules, read from the Lucky checkout that its deploy
+    # keeps on origin/main (Lucky#2723). Outside /etc/prometheus so Docker
+    # does not create a mountpoint inside config/prometheus.
+    - ${LUCKY_REPO_DIR:-/home/luk-server/Lucky}/observability/prometheus/rules:/etc/prometheus-lucky/rules:ro
     command:
     - --config.file=/etc/prometheus/prometheus.yml
     - --storage.tsdb.path=/prometheus
@@ -572,4 +585,7 @@ networks:
   # change (network declaration + bot/backend membership) lands in a
   # paired PR in the Lucky repo.
   lucky-monitoring:
+    external: true
+  # Created by the Lucky deploy (scripts/deploy.sh); only lucky-postgres joins it.
+  lucky-db-ro:
     external: true

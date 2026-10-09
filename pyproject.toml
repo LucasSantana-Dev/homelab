@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "homelab-manager"
-version = "2.13.0"
+version = "2.14.0"
 description = "Modern homelab management CLI"
 authors = [{name = "Luk Homelab", email = "luk@homelab.com"}]
 license = { text = "MIT" }
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
     # CLI and UI

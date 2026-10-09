@@ -24,3 +24,4 @@ file in this directory.
 | [0036](0036-host-config-management.md) | Host config git-first flow with dirty-file gate on `make deploy` | Accepted |
 | [0037](0037-agent-box-resilient-boot-and-deploy-runbook.md) | Agent-box: non-fatal repo clones + SOPS/compose/deploy runbook (post-incident) | Accepted |
 | [0038](0038-reaffirm-compose-over-kubernetes-2026.md) | Reaffirm Compose over Kubernetes (2026 re-eval) + growth trigger | Accepted |
+| [0041](0041-retire-terraform-phase1-edge-snapshot.md) | Retire Terraform Phase-1; the Cloudflare edge is recorded by a read-only snapshot | Accepted |

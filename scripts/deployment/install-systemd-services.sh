@@ -18,7 +18,6 @@ fi
 
 unit_files=(
     "homelab-docker.service"
-    "satisfactory-server.service"
     "lukbot.service"
     "homelab-update.service"
     "homelab-update.timer"
@@ -45,17 +44,44 @@ for unit_file in "${unit_files[@]}"; do
     echo "  ✓ Installed ${unit_file}"
 done
 
+# Monitoring units live in systemd/ and run their scripts from the checkout.
+# kopia-snapshot-freshness sat there uninstalled for months because this
+# installer only knew scripts/systemd/.
+MONITORING_DIR="${PROJECT_ROOT}/systemd"
+monitoring_units=(
+    "compose-services-exporter.service"
+    "compose-services-exporter.timer"
+    "host-security-audit.service"
+    "host-security-audit.timer"
+    "kopia-snapshot-freshness.service"
+    "kopia-snapshot-freshness.timer"
+)
+for unit_file in "${monitoring_units[@]}"; do
+    src="${MONITORING_DIR}/${unit_file}"
+    if [ ! -f "${src}" ]; then
+        echo "  ⚠ Skipping missing unit: ${unit_file}"
+        continue
+    fi
+    install -m 644 "${src}" "${SYSTEMD_DIR}/${unit_file}"
+    installed_units+=("${unit_file}")
+    echo "  ✓ Installed ${unit_file}"
+done
+
+timers=(
+    homelab-update.timer homelab-watchdog.timer version-drift-exporter.timer
+    compose-services-exporter.timer host-security-audit.timer kopia-snapshot-freshness.timer
+)
+
 echo "Reloading systemd daemon..."
 systemctl daemon-reload
 
 echo "Enabling managed services and timers..."
 enable_units=(
     "homelab-docker.service"
-    "satisfactory-server.service"
     "lukbot.service"
 )
 
-for timer_unit in homelab-update.timer homelab-watchdog.timer version-drift-exporter.timer; do
+for timer_unit in "${timers[@]}"; do
     if [[ " ${installed_units[*]} " == *" ${timer_unit} "* ]]; then
         enable_units+=("${timer_unit}")
     fi
@@ -64,7 +90,7 @@ done
 systemctl enable "${enable_units[@]}"
 
 echo "Starting timers..."
-for timer_unit in homelab-update.timer homelab-watchdog.timer version-drift-exporter.timer; do
+for timer_unit in "${timers[@]}"; do
     if [[ " ${installed_units[*]} " == *" ${timer_unit} "* ]]; then
         systemctl start "${timer_unit}"
     fi
@@ -75,7 +101,6 @@ echo "✓ Managed units installed and enabled"
 echo ""
 echo "Current enablement status:"
 systemctl is-enabled homelab-docker.service || echo "  ⚠ homelab-docker.service not enabled"
-systemctl is-enabled satisfactory-server.service || echo "  ⚠ satisfactory-server.service not enabled"
 systemctl is-enabled lukbot.service || echo "  ⚠ lukbot.service not enabled"
 systemctl is-enabled homelab-update.timer || echo "  ⚠ homelab-update.timer not enabled"
 systemctl is-enabled homelab-watchdog.timer || echo "  ⚠ homelab-watchdog.timer not enabled"
@@ -83,5 +108,4 @@ systemctl is-enabled homelab-watchdog.timer || echo "  ⚠ homelab-watchdog.time
 echo ""
 echo "To start services now, run:"
 echo "  sudo systemctl start homelab-docker"
-echo "  sudo systemctl start satisfactory-server"
 echo "  sudo systemctl start lukbot"

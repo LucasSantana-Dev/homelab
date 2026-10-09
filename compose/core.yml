@@ -58,7 +58,7 @@ services:
         max-size: 5m
         max-file: '3'
   cloudflared:
-    image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:2025.4.0}
+    image: ${IMG_CLOUDFLARED:-cloudflare/cloudflared:2026.9.3}
     labels:
     - wud.watch=true
     - wud.tag.include=^\d+\.\d+\.\d+$$

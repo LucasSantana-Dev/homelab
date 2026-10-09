@@ -40,8 +40,8 @@ for manifest in manifests:
     base = os.path.dirname(manifest) or '.'
     try:
         doc = yaml.safe_load(open(manifest)) or {}
-    except yaml.YAMLError:
-        continue  # a malformed manifest is the yaml linter's problem, not ours
+    except (yaml.YAMLError, OSError, UnicodeDecodeError):
+        continue  # a malformed or unreadable manifest is not ours to fix
     for service in (doc.get('services') or {}).values():
         for volume in (service.get('volumes') or []):
             source = volume.split(':')[0] if isinstance(volume, str) else (volume.get('source') or '')
@@ -81,12 +81,48 @@ redact() {
 #     config is exactly where a webhook URL or token lives.
 #
 # Both are still COMPARED. Only the body is withheld.
+#
+# Checked against BOTH sides: the repo file alone is not enough. A block
+# scalar the host copy grew (drift the repo has never seen, so it cannot
+# appear in the repo file) would otherwise slip past this gate unredacted,
+# since redact() cannot touch a value that lives on the following lines.
 diff_is_safe_to_print() {
   case "$1" in
     compose/*.yml|docker-compose.yml|*/Caddyfile) ;;
     *) return 1 ;;
   esac
-  ! grep -qE ':[[:space:]]*[|>][-+0-9]*[[:space:]]*$' "$1"
+  # A valid block-scalar header may carry a trailing YAML comment after the
+  # chomping/indentation indicator (`key: | # note`, `key: >- # x`); missing
+  # that would let the diff below print the secret on the following lines.
+  ! grep -qE ':[[:space:]]*[|>][-+0-9]*[[:space:]]*(#.*)?$' "$1" "$2"
+}
+
+# A remote path built from REMOTE_DIR and a repo-relative filename, quoted
+# for the remote shell with printf %q so an apostrophe (or any other shell
+# metacharacter) in either piece cannot break out of the intended command and
+# run something else on the host.
+remote_quote() {
+  printf '%q' "$REMOTE_DIR/$1"
+}
+
+# `test -f` alone cannot tell ENOENT (the file is genuinely not there) from
+# a stat error (e.g. the remote user cannot search a parent directory): both
+# return exit 1. Ask the remote shell to distinguish them itself: PRESENT
+# when the path is a regular file, ABSENT only when its parent is a searchable
+# directory that plainly does not contain it, UNREADABLE for everything
+# else (a stat error, a missing parent, a FIFO/socket/directory at the
+# path, or the ssh call itself failing).
+remote_status() {
+  local full parent full_q parent_q
+  full="$REMOTE_DIR/$1"
+  parent="${full%/*}"
+  full_q=$(printf '%q' "$full")
+  parent_q=$(printf '%q' "$parent")
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
+    "if [ -f $full_q ]; then echo PRESENT; \
+     elif [ -e $full_q ] || [ -L $full_q ]; then echo UNREADABLE; \
+     elif [ -d $parent_q ] && [ -x $parent_q ]; then echo ABSENT; \
+     else echo UNREADABLE; fi" 2>/dev/null
 }
 
 # Bash command substitution strips NUL bytes and trailing newlines, so a binary
@@ -94,8 +130,10 @@ diff_is_safe_to_print() {
 # every run. Two are mounted today (a .png and a .gz). base64 survives the
 # round trip intact.
 fetch_remote() {
+  local quoted
+  quoted=$(remote_quote "$1")
   ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
-    "base64 < '$REMOTE_DIR/$1'" 2>/dev/null | base64 -d 2>/dev/null
+    "base64 < $quoted" 2>/dev/null | base64 -d 2>/dev/null
 }
 
 is_binary() {
@@ -121,16 +159,27 @@ checked=0
 for f in $FILES; do
   checked=$((checked + 1))
 
-  # `test -f` is asked separately from `cat` so the two failures stay distinct:
-  # a file the host never received is drift (the repo ships config production
-  # does not have), while a file that exists but cannot be read is a broken
-  # comparison and must not be reported as either in sync or drifted.
-  if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" \
-        "test -f '$REMOTE_DIR/$f'" 2>/dev/null; then
-    drifted=1
-    echo "ABSENT $f (never deployed to $SSH_HOST)"
-    continue
-  fi
+  # Existence is checked separately from `cat` so the two failures stay
+  # distinct: a file the host never received is drift (the repo ships config
+  # production does not have), while a file that exists but cannot be read
+  # is a broken comparison and must not be reported as either in sync or
+  # drifted. `remote_status` also tells a genuine ABSENT apart from a stat
+  # error (unsearchable parent dir, or the ssh call itself failing): both
+  # would otherwise return the same `test -f` exit code (1).
+  status=$(remote_status "$f")
+  case "$status" in
+    PRESENT) ;;
+    ABSENT)
+      drifted=1
+      echo "ABSENT $f (never deployed to $SSH_HOST)"
+      continue
+      ;;
+    *)
+      unreadable=1
+      echo "ERROR $f: could not determine existence on $SSH_HOST (stat error or ssh failure)"
+      continue
+      ;;
+  esac
 
   if ! fetch_remote "$f" > "$TMP_REMOTE"; then
     unreadable=1
@@ -159,7 +208,7 @@ for f in $FILES; do
   fi
 
   drifted=1
-  if diff_is_safe_to_print "$f"; then
+  if diff_is_safe_to_print "$f" "$TMP_REMOTE"; then
     echo "DRIFT  $f"
     echo "       < deployed on $SSH_HOST   > this repo"
     diff "$TMP_A" "$TMP_B" | sed 's/^/       /'

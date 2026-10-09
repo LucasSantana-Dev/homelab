@@ -126,3 +126,9 @@ repos:
         entry: ./scripts/security/public-safety-gate.sh
         language: system
         pass_filenames: false
+      - id: caddy-auth-lint
+        name: caddy public blocks need auth or an allowlist entry
+        entry: ./scripts/security/caddy-auth-lint.py
+        language: system
+        pass_filenames: false
+        files: ^(config/caddy/(Caddyfile|public-no-auth\.txt)|scripts/security/caddy-auth-lint\.py)$
