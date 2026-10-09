@@ -4,6 +4,15 @@ export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 log() { echo "[agent-box] $*"; }
 
+# Everything under /home/agent is writable by the agent uid, so a link planted there would
+# make a root write land anywhere (for example /entrypoint.sh at the next boot). Root never
+# writes into agent paths: these steps run as agent, where a planted link gains nothing.
+# --reset-env: root's environment holds every SOPS secret; children start clean.
+as_agent() {
+    setpriv --reuid=agent --regid=agent --init-groups --reset-env \
+        env LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 bash -c "$1"
+}
+
 # --- Decrypt secrets ---
 SECRETS_FILE=/run/secrets/agent-box.secrets.yaml
 AGE_KEY_FILE=/run/secrets/age.key
@@ -28,7 +37,9 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
       # raw literal assignment (no eval, no quote stripping)
       export "$_sk=$_sv"
     done < "$SOPS_TEMP"
-    {
+    rm -f "$SOPS_TEMP"
+    rm -f /etc/profile.d/agent-env.sh
+    (umask 027; {
         echo "export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export AGENT_DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"
         echo "export DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"  # alias for notify.sh
@@ -36,29 +47,35 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
         echo "export GITHUB_TOKEN='${AGENT_GITHUB_TOKEN:-}'"
         echo "export CLAUDE_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export CLAUDE_DIR='/home/agent/.claude'"
+        echo "export DOCKER_HOST='${DOCKER_HOST:-}'"  # from compose; agent steps start with a clean env
         echo "export LANG=en_US.UTF-8"
         echo "export LC_ALL=en_US.UTF-8"
-    } > /etc/profile.d/agent-env.sh
-    chmod 600 /etc/profile.d/agent-env.sh
-    chown agent:agent /etc/profile.d/agent-env.sh
+    } > /etc/profile.d/agent-env.sh)
+    # Root login shells source /etc/profile.d too, so the agent must not be able to edit it.
+    chown root:agent /etc/profile.d/agent-env.sh
+    chmod 640 /etc/profile.d/agent-env.sh
     log "Secrets loaded."
 else
     log "WARNING: Secrets file not found."
 fi
 
+# Older entrypoints created some of these dirs as root. chown -h never follows a link, and no
+# agent process runs yet, so this is safe; it keeps the agent block below from failing boot.
+for d in /home/agent/.claude/hooks /home/agent/.claude/channels /home/agent/.codex \
+         /home/agent/.config /home/agent/.config/opencode /home/agent/.ssh; do
+    [[ -d $d && ! -L $d ]] && chown -h agent:agent "$d"
+done
+
 # --- Git + gh config ---
-# The entrypoint runs as root but git runs as agent, so write agent's config.
-AGENT_GITCONFIG=/home/agent/.gitconfig
-git config --file "$AGENT_GITCONFIG" user.name "agent-box"
-git config --file "$AGENT_GITCONFIG" user.email "lucas.diassantana@gmail.com"
-git config --file "$AGENT_GITCONFIG" init.defaultBranch main
-touch "$AGENT_GITCONFIG" && chown agent:agent "$AGENT_GITCONFIG"
+as_agent 'git config --global user.name agent-box &&
+    git config --global user.email lucas.diassantana@gmail.com &&
+    git config --global init.defaultBranch main'
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     # gh is the single token holder; git asks gh for credentials.
-    rm -f /home/agent/.git-credentials
-    echo "$AGENT_GITHUB_TOKEN" | su -c \
-        "gh auth login --with-token --hostname github.com" agent 2>/dev/null || true
-    su -c "gh auth setup-git --hostname github.com" agent || log "WARN: gh auth setup-git failed"
+    printf '%s\n' "$AGENT_GITHUB_TOKEN" \
+        | as_agent 'rm -rf ~/.git-credentials; gh auth login --with-token --hostname github.com' \
+            2>/dev/null || true
+    as_agent 'gh auth setup-git --hostname github.com' || log "WARN: gh auth setup-git failed"
     log "gh CLI authenticated."
 fi
 
@@ -67,105 +84,86 @@ CLAUDE_ENV_DIR="/home/agent/.claude-env"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     if [[ ! -d "$CLAUDE_ENV_DIR/.git" ]]; then
         log "Cloning claude-env..."
-        su -c "git clone https://github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
+        as_agent "git clone https://github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" \
             || log "WARN: claude-env clone failed (token access or network) — continuing without it"
     else
         log "Pulling claude-env updates..."
-        su -c "cd $CLAUDE_ENV_DIR && git remote set-url origin https://github.com/LucasSantana-Dev/claude-env.git && git pull --ff-only 2>&1 || true" agent
+        as_agent "cd $CLAUDE_ENV_DIR && git remote set-url origin https://github.com/LucasSantana-Dev/claude-env.git && git pull --ff-only 2>&1 || true"
     fi
     if [[ -f "$CLAUDE_ENV_DIR/bin/sync" ]]; then
         log "Syncing claude environment..."
-        su -c "HOME=/home/agent CLAUDE_DIR=/home/agent/.claude $CLAUDE_ENV_DIR/bin/sync pull 2>&1 || true" agent
+        as_agent "CLAUDE_DIR=/home/agent/.claude $CLAUDE_ENV_DIR/bin/sync pull 2>&1 || true"
     fi
 fi
 
-# --- Apply server-specific overrides (guardrails + MCP config) ---
-# These overwrite what sync pulled — security-critical, must run after sync
-mkdir -p /home/agent/.claude
-cp /opt/agent-config/settings.json /home/agent/.claude/settings.json
-cp /opt/agent-config/mcp.json      /home/agent/.claude/mcp.json
-chown -R agent:agent /home/agent/.claude/settings.json \
-                      /home/agent/.claude/mcp.json
+# --- Agent config (runs as agent; see as_agent) ---
+# Overrides are security-critical and must run after the claude-env sync.
+as_agent 'bash -s' <<'AGENT'
+set -euo pipefail
+umask 022
+log() { echo "[agent-box] $*"; }
+C=/opt/agent-config
+cd /home/agent
+# install replaces the destination file instead of writing through it.
+install -D -m 644 "$C/settings.json" .claude/settings.json
+install -D -m 644 "$C/mcp.json"      .claude/mcp.json
 
-
-# --- Preserve/restore claude OAuth session (.claude.json lives outside named volume) ---
-# Rotates backups: claude-json-backup.json (latest) .1 (prev) .2 (oldest)
-CLAUDE_JSON=/home/agent/.claude.json
-CLAUDE_JSON_BACKUP=/home/agent/.claude/claude-json-backup.json
-
-if [[ -f "$CLAUDE_JSON" && $(wc -c < "$CLAUDE_JSON") -gt 100 ]]; then
-    # Rotate: .1 → .2, backup → .1, then write new backup
-    [[ -f "${CLAUDE_JSON_BACKUP}.1" ]] && cp "${CLAUDE_JSON_BACKUP}.1" "${CLAUDE_JSON_BACKUP}.2"
-    [[ -f "$CLAUDE_JSON_BACKUP" ]] && cp "$CLAUDE_JSON_BACKUP" "${CLAUDE_JSON_BACKUP}.1"
-    cp "$CLAUDE_JSON" "$CLAUDE_JSON_BACKUP"
-    chown agent:agent "$CLAUDE_JSON_BACKUP" "${CLAUDE_JSON_BACKUP}".* 2>/dev/null || true
+# .claude.json (OAuth session) lives outside the volume: back it up there, or restore it.
+# Rotates claude-json-backup.json (latest), .1 (prev), .2 (oldest).
+J=.claude.json B=.claude/claude-json-backup.json
+if [[ -f $J && $(wc -c < $J) -gt 100 ]]; then
+    [[ -f $B.1 ]] && install -m 600 "$B.1" "$B.2"
+    [[ -f $B ]] && install -m 600 "$B" "$B.1"
+    install -m 600 "$J" "$B"
     log ".claude.json backed up (rotated)."
 else
-    # Restore from most recent valid backup
-    for BACKUP in "$CLAUDE_JSON_BACKUP" "${CLAUDE_JSON_BACKUP}.1" "${CLAUDE_JSON_BACKUP}.2"; do
-        if [[ -f "$BACKUP" && $(wc -c < "$BACKUP") -gt 100 ]]; then
-            cp "$BACKUP" "$CLAUDE_JSON"
-            chown agent:agent "$CLAUDE_JSON"
-            log "Restored .claude.json from ${BACKUP##*/}."
+    for b in "$B" "$B.1" "$B.2"; do
+        if [[ -f $b && $(wc -c < "$b") -gt 100 ]]; then
+            install -m 600 "$b" "$J"
+            log "Restored .claude.json from ${b##*/}."
             break
         fi
     done
 fi
 
-# --- Install guardrail hooks ---
-mkdir -p /home/agent/.claude/hooks
-cp /opt/agent-config/hooks/protect-homelab.sh    /home/agent/.claude/hooks/protect-homelab.sh
-cp /opt/agent-config/hooks/secret-write-guard.sh /home/agent/.claude/hooks/secret-write-guard.sh
-cp /opt/agent-config/hooks/tag-deploy-guard.sh   /home/agent/.claude/hooks/tag-deploy-guard.sh
-chmod +x /home/agent/.claude/hooks/protect-homelab.sh          /home/agent/.claude/hooks/secret-write-guard.sh          /home/agent/.claude/hooks/tag-deploy-guard.sh
-chown agent:agent /home/agent/.claude/hooks/protect-homelab.sh                   /home/agent/.claude/hooks/secret-write-guard.sh                   /home/agent/.claude/hooks/tag-deploy-guard.sh
+for h in protect-homelab secret-write-guard tag-deploy-guard bash-secret-guard; do
+    install -D -m 755 "$C/hooks/$h.sh" ".claude/hooks/$h.sh"
+done
 log "Guardrail hooks installed."
-cp /opt/agent-config/CLAUDE.md /home/agent/.claude/CLAUDE.md
-chown agent:agent /home/agent/.claude/CLAUDE.md
+install -D -m 644 "$C/CLAUDE.md" .claude/CLAUDE.md
 
-# --- Codex CLI setup ---
-mkdir -p /home/agent/.codex
-# Always overwrite config/mcp (OAuth auth.json in volume is preserved)
-cp /opt/agent-config/codex-config.toml /home/agent/.codex/config.toml
-cp /opt/agent-config/codex-mcp.json    /home/agent/.codex/mcp.json
-cp /opt/agent-config/codex-agents.md   /home/agent/.codex/AGENTS.md
-chown -R agent:agent /home/agent/.codex
+# Codex: config and MCP are always overwritten; OAuth auth.json in the volume is kept.
+install -D -m 644 "$C/codex-config.toml" .codex/config.toml
+install -D -m 644 "$C/codex-mcp.json"    .codex/mcp.json
+install -D -m 644 "$C/codex-agents.md"   .codex/AGENTS.md
 log "Codex config installed."
-# --- Apply opencode config ---
-mkdir -p /home/agent/.config/opencode
-cp /opt/agent-config/opencode.jsonc /home/agent/.config/opencode/opencode.jsonc
-chown -R agent:agent /home/agent/.config/opencode
+install -D -m 644 "$C/opencode.jsonc" .config/opencode/opencode.jsonc
 
-# --- SSH authorized keys ---
-mkdir -p /home/agent/.ssh && chmod 700 /home/agent/.ssh
-cp /opt/agent-config/authorized_keys /home/agent/.ssh/authorized_keys
-chmod 600 /home/agent/.ssh/authorized_keys
-chown -R agent:agent /home/agent/.ssh
+install -d -m 700 .ssh
+install -m 600 "$C/authorized_keys" .ssh/authorized_keys
+AGENT
 
 # --- Discord channel (official plugin; values from SOPS, never in agent-env.sh) ---
 # The owner ID file is root-owned so the agent uid cannot change who may talk to the
-# channel; access.json is re-rendered from it on every boot.
-DISCORD_STATE=/home/agent/.claude/channels/discord
-install -d -m 700 -o agent -g agent /home/agent/.claude/channels "$DISCORD_STATE"
+# channel; access.json is re-rendered from it on every boot (written as agent).
 install -d -m 755 /etc/agent-box
-# rm before write and chown -h: the agent uid owns this dir and could plant a symlink.
-rm -f "$DISCORD_STATE/.env" "$DISCORD_STATE/access.json"
+as_agent 'install -d -m 700 ~/.claude/channels ~/.claude/channels/discord &&
+    rm -f ~/.claude/channels/discord/.env ~/.claude/channels/discord/access.json'
 if [[ -n "${DISCORD_BOT_TOKEN:-}" ]]; then
-    (umask 077; printf 'DISCORD_BOT_TOKEN=%s\n' "$DISCORD_BOT_TOKEN" > "$DISCORD_STATE/.env")
-    chown -h agent:agent "$DISCORD_STATE/.env"
+    printf 'DISCORD_BOT_TOKEN=%s\n' "$DISCORD_BOT_TOKEN" \
+        | as_agent 'umask 077; cat > ~/.claude/channels/discord/.env'
 fi
 if [[ "${DISCORD_OWNER_ID:-}" =~ ^[0-9]{15,22}$ ]]; then
     printf '%s\n' "$DISCORD_OWNER_ID" > /etc/agent-box/discord-owner-id
     chmod 644 /etc/agent-box/discord-owner-id
-    (umask 077; printf '{"dmPolicy": "allowlist", "allowFrom": ["%s"], "groups": {}}\n' \
-        "$DISCORD_OWNER_ID" > "$DISCORD_STATE/access.json")
-    chown -h agent:agent "$DISCORD_STATE/access.json"
+    printf '{"dmPolicy": "allowlist", "allowFrom": ["%s"], "groups": {}}\n' "$DISCORD_OWNER_ID" \
+        | as_agent 'umask 077; cat > ~/.claude/channels/discord/access.json'
 else
     rm -f /etc/agent-box/discord-owner-id
 fi
 # Nothing started below needs the token in its environment; the plugin reads .env.
 unset DISCORD_BOT_TOKEN
-su -s /bin/bash agent -c /opt/agent-config/discord-channel.sh &
+as_agent /opt/agent-config/discord-channel.sh &
 log "Discord channel supervisor started."
 
 # --- Clone working repos on first run ---
@@ -173,12 +171,12 @@ clone_repo() {
     local repo="$1" dir="$2"
     if [[ ! -d "/workspace/$dir/.git" && -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
         log "Cloning $repo..."
-        su -c "git clone https://github.com/${repo}.git /workspace/$dir 2>&1" agent \
+        as_agent "git clone https://github.com/${repo}.git /workspace/$dir 2>&1" \
             || log "WARN: $repo clone failed (token access or network) — continuing without it"
     elif [[ -d "/workspace/$dir/.git" ]]; then
         # Auth comes from the credential helper; a token baked into the remote
         # URL would outlive PAT rotation.
-        su -c "git -C /workspace/$dir remote set-url origin https://github.com/${repo}.git" agent || true
+        as_agent "git -C /workspace/$dir remote set-url origin https://github.com/${repo}.git" || true
     fi
 }
 clone_repo "LucasSantana-Dev/Lucky"     "Lucky"
@@ -194,52 +192,7 @@ fi
 
 # --- WUD classify HTTP endpoint (port 8080) ---
 # n8n calls POST /wud-classify with WUD payload; hermes returns classification JSON.
-cat > /tmp/wud-server.py << 'PYEOF'
-import http.server, json, subprocess
-
-CLASSIFY_CMD = [
-    'su', '-s', '/bin/bash', 'agent', '-c',
-    'source /etc/profile.d/agent-env.sh 2>/dev/null; exec bash /workspace/homelab/scripts/agent-tasks/hermes-wud-classify.sh'
-]
-FALLBACK = json.dumps({'safe_to_schedule': True, 'urgency': 'low', 'reason': 'hermes unavailable'}).encode()
-MAX_BODY = 64 * 1024  # WUD payloads are ~1-2KB; cap to avoid resource exhaustion (#310)
-
-class Handler(http.server.BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args): pass
-    def do_GET(self):
-        ok = self.path == '/healthz'
-        self.send_response(200 if ok else 404)
-        self.send_header('Content-Type', 'text/plain')
-        self.end_headers()
-        if ok:
-            self.wfile.write(b'ok')
-    def do_POST(self):
-        if self.path != '/wud-classify':
-            self.send_response(404)
-            self.end_headers()
-            return
-        try:
-            length = int(self.headers.get('Content-Length', 0))
-        except (TypeError, ValueError):
-            length = -1
-        if length < 0 or length > MAX_BODY:
-            self.send_response(413)
-            self.end_headers()
-            return
-        body = self.rfile.read(length)
-        try:
-            r = subprocess.run(CLASSIFY_CMD, input=body, capture_output=True, timeout=120)
-            out = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else FALLBACK
-        except Exception:
-            out = FALLBACK
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.end_headers()
-        self.wfile.write(out)
-
-http.server.HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
-PYEOF
-python3 /tmp/wud-server.py &
+as_agent 'exec python3 -I /opt/agent-config/wud-server.py' &
 log "WUD classify endpoint started on :8080"
 
 # --- Start SSH ---
