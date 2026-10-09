@@ -426,7 +426,7 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
         [
             "bash",
             "-c",
-            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w "fix it; rm -rf /"',
+            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w "fix it; rm -rf /" agent/issue-7',
         ],
         capture_output=True,
         text=True,
@@ -438,3 +438,42 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
     assert "-u ANTHROPIC_API_KEY" in out
     # The prompt is one quoted printf argument, never bare shell.
     assert "printf '%s' fix\\ it\\;\\ rm\\ -rf\\ /" in out
+    # Push is pinned to the exact branch: no glob that admits refspecs or flags.
+    assert "Bash\\(git\\ push\\ origin\\ agent/issue-7\\)" in out
+    assert "Bash\\(git\\ push\\ -u\\ origin\\ agent/issue-7\\)" in out
+    assert "agent/\\*" not in out
+
+
+@pytest.mark.parametrize(
+    "branch", ["", "main", "release", "agent/x:main", "agent/+x", "agent/x y"]
+)
+def test_claude_cmd_refuses_non_agent_branch(branch):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    res = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w p "$1"',
+            "_",
+            branch,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 1
+    assert res.stdout == ""
+
+
+def test_gate_denies_push_variants_and_workflow_edits(cfg):
+    denied = cfg["claude_disallowed_tools"]
+    for rule in (
+        "Bash(git push*--force*)",
+        "Bash(git push*--delete*)",
+        "Bash(git push*+*)",
+        # Literal colon: a trailing ":*" is the prefix syntax and would never match.
+        "Bash(git push*:**)",
+        # Edit rules also cover Write; Write(path) rules are never consulted.
+        "Edit(/.github/**)",
+    ):
+        assert rule in denied
+    assert not any(t.startswith("Bash(git push") for t in cfg["claude_allowed_tools"])

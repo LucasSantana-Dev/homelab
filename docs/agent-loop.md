@@ -51,6 +51,32 @@ commit with the grades; `wait` and `autofix` post nothing until the fix cap is h
 - Phase 2: after 10 agent PRs merged without rework and the grade matching your decision in at least 9 of 10, set `auto_merge: true`. Merges use `gh pr merge --auto --squash --match-head-commit`, so required checks still gate.
 - Brake: if an auto-merged PR is reverted or breaks the base branch, set `auto_merge: false` and tighten the pillar that missed.
 
+## Worker permissions
+
+Every `claude -p` run (worker and autofix) gets its mode and allow/deny lists from
+`agent-gate.json` via `claude_cmd`. Push is not in the config: `claude_cmd` takes the run's branch,
+refuses anything outside `agent/`, and allows exactly `git push origin <branch>` and
+`git push -u origin <branch>`. A rule with no `*` matches one exact command, so refspecs
+(`agent/x:main`, `+agent/x`), `--force` and `--delete` are not allowed; the deny list repeats them as
+a backstop. The colon deny is `Bash(git push*:**)`: a pattern ending in `:*` is Claude Code's prefix
+syntax, and `Bash(git push*:*)` matches nothing (verified on 2.1.292). `Edit(/.github/**)` blocks
+workflow edits from the repo root; Edit rules also cover the Write tool, and `Write(path)` rules are
+ignored. Bash rules are not a security boundary (`git -C . push` or a script can get around
+them); in dontAsk mode the exact allow entries are what keeps those forms out.
+
+Accepted risk (owner decision, 2026-10-09): `Bash(npm *)`, `npx *`, `pnpm *`, `node *`,
+`python3 *` and `cat *` stay allowed, because lint, typecheck and tests in the agent repos need
+them. That is arbitrary code execution and file reads as the `agent` user with `agent-env.sh`
+sourced, so a run (or a prompt injection through issue text, or review-bot text, which reaches the
+autofix prompt since #489) can read the GitHub PAT and the Claude login, and can use the PAT
+directly instead of going through `gh` or `git push`. What limits the damage: the PAT is
+fine-grained to the agent repos (contents, pull requests, issues; no workflows, no admin), base
+branches require a PR plus CI and Sonar, and the owner merges (`auto_merge: false`). Scoping the
+allow list to named scripts would not help much, since `npm test` runs repo-controlled scripts the
+agent can edit. The real fix is the Claude Code Bash sandbox, which agent-box cannot run (see the
+Discord section). If the PAT leaks: revoke it, issue a new fine-grained token and replace
+`AGENT_GITHUB_TOKEN`.
+
 ## Install (host, as luk-server)
 
 Prerequisites, in order:

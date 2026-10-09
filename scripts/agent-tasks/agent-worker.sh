@@ -78,7 +78,9 @@ for REPO in $AGENT_REPOS; do
     PROMPT=${PROMPT//__BASE__/$BASE}
 
     if act "cd $WORKDIR && git fetch -q origin && git switch -q -C $BRANCH origin/$BASE"; then
-        act "$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT")" || echo "claude exited non-zero"
+        if CMD=$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT" "$BRANCH"); then
+            act "$CMD" || echo "claude exited non-zero"
+        fi
     else
         echo "git checkout failed for $BRANCH"
     fi
