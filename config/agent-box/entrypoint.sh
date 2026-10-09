@@ -142,6 +142,16 @@ cp /opt/agent-config/authorized_keys /home/agent/.ssh/authorized_keys
 chmod 600 /home/agent/.ssh/authorized_keys
 chown -R agent:agent /home/agent/.ssh
 
+# --- Discord channel (official plugin; token from SOPS, never in agent-env.sh) ---
+DISCORD_STATE=/home/agent/.claude/channels/discord
+if [[ -n "${DISCORD_BOT_TOKEN:-}" ]]; then
+    install -d -m 700 -o agent -g agent /home/agent/.claude/channels "$DISCORD_STATE"
+    (umask 077; printf 'DISCORD_BOT_TOKEN=%s\n' "$DISCORD_BOT_TOKEN" > "$DISCORD_STATE/.env")
+    chown agent:agent "$DISCORD_STATE/.env"
+fi
+su -s /bin/bash agent -c /opt/agent-config/discord-channel.sh >> /var/log/discord-channel.log 2>&1 &
+log "Discord channel supervisor started (log /var/log/discord-channel.log)."
+
 # --- Clone working repos on first run ---
 clone_repo() {
     local repo="$1" dir="$2"

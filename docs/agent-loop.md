@@ -73,15 +73,37 @@ homelab (PRs target `release`) and cojam. cojam needs issues labeled `ready-for-
 
 ## Discord channel (phase 3)
 
-A separate Discord bot for the agent (not Lucky), using the official Claude Code channel plugin in a
-tmux session on agent-box:
+Bot `luk-agent` (app 1557913205966246039, not Lucky) talks to the owner by DM through the official
+Claude Code channel plugin, in a tmux session on agent-box. The channel reports queue status,
+creates `ready-for-agent` issues and pauses/resumes the loop. It never merges. Session rules:
+`config/agent-box/discord-channel.md`.
+
+Pieces (all baked into the image, so a rebuild from release picks them up):
+
+- `DISCORD_BOT_TOKEN` in `secrets/agent-box.secrets.yaml.age`. `sops set` fails on this file; use the
+  ADR 0037 decrypt/awk/encrypt pattern (token on stdin, round-trip check). The entrypoint writes it to
+  `~agent/.claude/channels/discord/.env` (0600); it is not exported in `agent-env.sh`, so the loop's
+  `claude -p` runs never see it in their environment.
+- `config/agent-box/discord-channel.sh`: supervisor started by the entrypoint. Every 30s, if the tmux
+  session `discord` is gone, it starts `claude --channels plugin:discord@claude-plugins-official`
+  with `DISCORD_ACCESS_MODE=static` and no API key (Max login). It fails closed: no start until the
+  token, the plugin and an allowlist-only `access.json` exist. Log: `/var/log/discord-channel.log`.
+
+One-time setup inside agent-box, as `agent`:
 
 ```bash
 claude plugin install discord@claude-plugins-official
-claude --channels plugin:discord@claude-plugins-official
+cat > ~/.claude/channels/discord/access.json <<'EOF'
+{"dmPolicy": "allowlist", "allowFrom": ["<owner Discord user ID>"], "groups": {}}
+EOF
+chmod 600 ~/.claude/channels/discord/access.json
+tmux attach -t discord   # once: accept the workspace trust prompt, then detach (Ctrl-b d)
 ```
 
-Inside the session: `/discord:configure <bot token>`, pair from a DM, then
-`/discord:access policy allowlist` so only the owner's account is accepted. Never start it with
-`--dangerously-skip-permissions`: approval prompts are relayed to Discord. The channel may create
-`ready-for-agent` issues, report queue status and pause/resume the loop. It never merges.
+No pairing: static mode downgrades `pairing` to `allowlist` and never writes `access.json`, so
+nothing said in the chat can widen access. Guild channels stay off (`groups` empty, the supervisor
+refuses otherwise); permission prompts are relayed to the owner's DM as buttons. Never start it with
+`--dangerously-skip-permissions`.
+
+Stop: `touch ~/discord-channel-off && tmux kill-session -t discord` (resume: `rm ~/discord-channel-off`).
+Rotate the token: Reset Token in the Developer Portal, store it in SOPS, `docker restart agent-box`.
