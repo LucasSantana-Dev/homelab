@@ -27,7 +27,7 @@ Six-domain audit run after the LAN-wide rollout (PR #9). Raw reports in this dir
 13. **No Renovate / Dependabot config.** Draft minimal `renovate.json` with auto-merge on patch for `docker-image` + `github-actions`, manual for `python-dev`.
 14. **Shellcheck hotspots**: `scripts/maintenance/update-containers.sh` (6 warnings), `scripts/security/security-scan.sh` (5), `scripts/maintenance/automated-backup.sh` (4). Fix + enable `shellcheck` in CI.
 15. **Test coverage on `core/`, `utils/`, `models/` is 0 test files referencing them.** Add smoke tests for `config.py` validators + `service.py` models before the refactor in item 8.
-16. **`compose/apps.yml` trusted-proxy env vars** still use `${TAILSCALE_IP}` (NEXTCLOUD_TRUSTED_DOMAINS, TRUSTED_PROXIES, PAPERLESS_TRUSTED_PROXIES). After LAN-wide flip, add `192.168.0.11` to each trust list.
+16. **`compose/apps.yml` trusted-proxy env vars** still use `${TAILSCALE_IP}` (NEXTCLOUD_TRUSTED_DOMAINS, TRUSTED_PROXIES, PAPERLESS_TRUSTED_PROXIES). After LAN-wide flip, add `192.168.0.250` (the LAN static IP) to each trust list.
 17. **Apt upgradable** — run on host; capture reboot-required state before any refactor lands.
 18. **GH Actions unpinned refs** — check `.github/workflows/*.yml` for floating `@v4` style tags; pin to SHAs at least for ci.yml's third-party actions.
 19. **`scripts/lib/` is sparse (1 file).** Refactor duplicated prelude across `diagnose-*.sh` / `fix-*.sh` into `scripts/lib/common.sh`; source it everywhere.

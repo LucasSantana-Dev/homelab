@@ -8,138 +8,35 @@
 # homelab > Public Hostnames); the logs show it as
 # "Updated to new configuration ... version=N".
 #
+# The record of what is actually public is edge-snapshot.json next to this
+# file, written read-only from the Cloudflare API by
+# scripts/maintenance/cloudflare-edge-snapshot.py (tunnel ingress + DNS of the
+# zones it serves). Refresh it after any dashboard change. This file used to
+# carry its own host list; it drifted (24 hosts listed, 27 live), so it now
+# only shows the routing shape.
+#
 # Consequences, learned the slow way:
-#   - Adding a hostname here does nothing. Add it in the dashboard.
+#   - Adding a hostname here does nothing. Since 2026-09-27 a wildcard
+#     (*.luk-homeserver.com.br: proxied CNAME + ingress rule before the 404)
+#     sends every name in that zone to caddy-lan, so a new host there needs
+#     only its Caddy site block: gated by `import protected`, or listed in
+#     config/caddy/public-no-auth.txt (CI lint). Unknown names hit Caddy's 404.
+#     Other zones still need a dashboard route; refresh the snapshot after.
 #   - Restarting cloudflared re-pulls the same remote version; it does not
 #     pick up edits made here.
-#   - This file has already drifted: credentials-file below does not exist in
-#     the container, and the extra_hosts note describes a compose setting the
-#     service no longer declares.
-#
-# Kept because it documents the intended routing shape (everything to
-# host-networked caddy-lan on :80, which does the per-hostname routing). Treat
-# it as a diagram, not as configuration.
+#   - *.luk-homeserver.com.br also sits behind a Cloudflare Access app
+#     ("Home Lab"); a host meant to be public needs its own Access app with a
+#     Bypass policy (rclone.luk-homeserver.com.br has one).
 # ============================================================================
 
-tunnel: 5cefde7a-6cd0-4d56-a1e2-67f922433682
-credentials-file: /etc/cloudflared/creds.json
+tunnel: ${CF_TUNNEL_ID}   # not hardcoded: the UUID is not published (audit C1)
 
-# Cloudflare Tunnel ingress policy.
-#
-# All traffic is forwarded to the host-networked caddy-lan instance,
-# which performs per-hostname routing into docker containers or the
-# k3s Traefik ClusterIP. `host.docker.internal` resolves to the
-# docker host because the cloudflared service in compose declares
-# `extra_hosts: ["host.docker.internal:host-gateway"]`.
-
+# Live rules share this shape: the tunnel only forwards to the host-networked
+# caddy-lan on :80, which does the per-hostname routing. Only some rules pin
+# httpHostHeader (18 of 27 on 2026-09-26); the snapshot says which.
 ingress:
-  - hostname: luk-homeserver.com.br
+  - hostname: <host>.luk-homeserver.com.br   # or <host>.lucassantana.tech
     service: http://host.docker.internal:80
     originRequest:
-      httpHostHeader: luk-homeserver.com.br
-  - hostname: www.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: www.luk-homeserver.com.br
-  - hostname: home.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: home.luk-homeserver.com.br
-  - hostname: homeassistant.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: homeassistant.luk-homeserver.com.br
-  - hostname: grafana.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: grafana.luk-homeserver.com.br
-  - hostname: prometheus.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: prometheus.luk-homeserver.com.br
-  - hostname: cloud.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: cloud.luk-homeserver.com.br
-  - hostname: auth.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: auth.luk-homeserver.com.br
-  - hostname: blackbox.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: blackbox.luk-homeserver.com.br
-  - hostname: stremio.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: stremio.luk-homeserver.com.br
-
-  - hostname: n8n.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: n8n.luk-homeserver.com.br
-
-  - hostname: linkding.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: linkding.luk-homeserver.com.br
-
-  - hostname: miniflux.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: miniflux.luk-homeserver.com.br
-
-  - hostname: forgejo.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: forgejo.luk-homeserver.com.br
-
-  - hostname: status.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: status.luk-homeserver.com.br
-
-  - hostname: portainer.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: portainer.luk-homeserver.com.br
-
-  - hostname: pihole.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: pihole.luk-homeserver.com.br
-
-  - hostname: manager.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: manager.luk-homeserver.com.br
-
-  - hostname: kopia.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: kopia.luk-homeserver.com.br
-
-  - hostname: paperless.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: paperless.luk-homeserver.com.br
-
-  - hostname: healthchecks.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: healthchecks.luk-homeserver.com.br
-
-  - hostname: wud.luk-homeserver.com.br
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: wud.luk-homeserver.com.br
-
-  # Reached only by the profile repo's card workflow; Caddy refuses requests
-  # that do not carry the matching X-Stats-Key header.
-  - hostname: stats.lucassantana.tech
-    service: http://host.docker.internal:80
-    originRequest:
-      httpHostHeader: stats.lucassantana.tech
-
-  # Final catch-all — cloudflared returns 404 for any hostname not listed above.
+      httpHostHeader: <host>.luk-homeserver.com.br
   - service: http_status:404

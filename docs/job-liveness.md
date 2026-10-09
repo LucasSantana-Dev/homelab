@@ -60,9 +60,32 @@ is preserved. Liveness reporting must never block the work it watches.
 `systemd-failed-check.sh` immediately surfaced a backlog of silent failures —
 exactly the point:
 - `homelab-watchdog` — fixed (PR #363), revives on `make deploy`.
-- `kopia-offsite-sync` — target `192.168.0.3` sshd refused (#361).
-- `logrotate` — **NEW** (logs may not be rotating → disk-fill risk; triage).
-- `satisfactory-server` — **NEW** (game server crashed; triage or disable).
+- `kopia-offsite-sync` — now rclone to Google Drive; 2026-10-08 timeouts were Drive API rate limits (`403 rateLimitExceeded`), fixed with `--fast-list --tpslimit 8` and a 3h timeout.
+- `logrotate` — fixed 2026-10-08: `/etc/logrotate.d/agent-box` duplicated the `agent-logs` glob; the duplicate was removed on the host.
+- `satisfactory-server` — removed 2026-10-08 (owner decision); unit and scripts dropped.
+
+## Services that vanish (2026-09-27)
+
+Job liveness covers jobs that run and fail. It did not cover services whose
+container is gone: on 2026-09-20 eight default-profile services (Prometheus,
+Alertmanager, Grafana, Healthchecks, CrowdSec, Portainer, WUD, Stremio) failed
+to start at boot and `docker-prune` then removed their containers. A missing
+container exposes no metric and no check, so nothing alerted for 7 days, and
+Healthchecks itself was one of them.
+
+- `compose-services-exporter` (every 15 min) exports
+  `homelab_compose_service_running{service}` for each default-profile service;
+  `ComposeServiceNotRunning` fires on a 0. Services under `profiles:` are not
+  expected (ADR 0040).
+- `host-security-audit` (weekly) runs Lynis and a Trivy scan of the images in
+  use; its alerts include `absent()`, since an uninstalled timer writes no
+  metric and a threshold rule on a missing series never fires. The same gap
+  hid `kopia-snapshot-freshness`, whose unit pointed at a path that did not
+  exist on the host and was never installed.
+
+**Open:** these alerts still go through Prometheus and Alertmanager, which were
+among the eight. An external dead-man for the alerting path itself is the next
+step.
 
 ## Related
 - ADR-0026 (dead-man-switch for notifications) — this generalizes it.

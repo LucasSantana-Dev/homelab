@@ -32,12 +32,11 @@ Access, and hit TLS-cert mismatch errors.
 | Home Assistant | — | `ha.homelab.example.com` | `homeassistant.luk-homeserver.com.br` | CF Access policy required |
 | Jellyfin | — | Tailscale direct :8096 | — | Friends path; see `tailscale-friends-sharing.md` |
 | Stremio | `stremio.home` | Tailscale direct :11470 | — | Friends path |
-| Craftvaria (Minecraft) | — | Tailscale direct :25565 | — | TCP, not HTTPS — CF Tunnel can't help |
 | Grafana | — | via `tailscale serve` | `grafana.luk-homeserver.com.br` | CF Access gated |
 | Portainer | — | via `tailscale serve` | `portainer.luk-homeserver.com.br` | CF Access gated (critical) |
 | n8n | — | via `tailscale serve` | `n8n.luk-homeserver.com.br` | CF Access gated |
 | Nextcloud | — | `cloud.homelab.example.com` | `cloud.luk-homeserver.com.br` | Primary public access via CF |
-| Paperless-ngx | — | via `tailscale serve` | `docs.luk-homeserver.com.br` | CF Access gated |
+| Paperless-ngx | — | via `tailscale serve` | `paperless.luk-homeserver.com.br` | CF Access gated |
 | Tinyauth | — | — | `auth.luk-homeserver.com.br` | SSO broker — CF path only |
 | Pi-hole admin | `pihole.home` | `pihole.homelab.example.com` | — | Never public |
 | Prometheus | — | `prom.homelab.example.com` | — | Never public |
@@ -49,7 +48,7 @@ Access, and hit TLS-cert mismatch errors.
 | Lucky bot dashboard | `lucky.home` | `lucky.homelab.example.com` | — | Internal |
 | forge-mcp-gateway | — | Tailscale direct | — | Profile-gated; dev-only |
 
-Services in CF Tunnel config (`config/cloudflared/config.yml`) but
+Services in the CF Tunnel ingress (recorded in `config/cloudflared/edge-snapshot.json`; the live config is in the dashboard, ADR 0041) but
 *not* in the phase-1 "included" list (e.g. `blackbox`, `pihole`,
 `prometheus`) are **ingressed but blocked by CF Access policy**. See
 the phase-1 doc for the full allow-list.
@@ -57,7 +56,7 @@ the phase-1 doc for the full allow-list.
 ## Layer-choice rules
 
 - **Needs browser access from anywhere** → CF Tunnel + Access policy.
-- **Needs raw-TCP access** (Minecraft, SSH) → Tailscale.
+- **Needs raw-TCP access** (SSH) → Tailscale.
 - **Needs zero-config guest access** (close friends) → Tailscale node sharing.
 - **Only used inside the house** → LAN `*.home`.
 - **Admin-only** → Tailscale (never CF Tunnel, even gated).
@@ -75,7 +74,7 @@ the phase-1 doc for the full allow-list.
       conflict with CF because the domain is different.
 - [ ] Enforce the invariant in CI: a lint script that fails if a
       hostname appears in both `tailscale/dns-records.json` and
-      `config/cloudflared/config.yml`.
+      `config/cloudflared/edge-snapshot.json` (the tunnel ingress record).
 
 ## Related docs
 

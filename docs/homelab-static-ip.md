@@ -1,13 +1,13 @@
-# Homelab Static IP (192.168.0.11)
+# Homelab Static IP (192.168.0.250)
 
 ## Why
 
 Router DHCP leases rotate after reboots. Every downstream reference
-hardcodes `192.168.0.11`:
+hardcodes `192.168.0.250`:
 
 - Pi-hole `*.home` dnsmasq records (`config/pihole/etc-dnsmasq.d/02-local-home.conf`)
 - Caddy-LAN routes (LAN proxy to the homelab host)
-- Memory + docs (`memory/homelab-network.md`, `docs/dns-setup.md`)
+- Docs (`docs/dns-setup.md`, `docs/audit/README.md` item 16)
 
 When the lease rotates to, say, `192.168.0.4`, nothing on the LAN can
 reach the homelab by name anymore — only Tailscale works. A static IP
@@ -15,10 +15,16 @@ at the host level prevents this class of outage without depending on
 the router's reservation UI (TP-Link DHCP reservations have been
 unreliable historically).
 
+The address must sit **outside the router's DHCP pool** (`.2` to `.249`
+on the TP-Link XX530v). Until 2026-09-29 the host used `.11`, inside the
+pool: the router leased `.11` to a Tuya smart plug, its ARP entry flipped
+between the two MACs, and the host lost internet about 5 s of every 20 s,
+taking the Cloudflare tunnel down with it. Moving to `.250` fixed it.
+
 ## What
 
 `config/netplan/60-homelab-static.yaml.example` — a netplan drop-in
-that fixes `enp1s0` at `192.168.0.11/24`, gateway `192.168.0.1`,
+that fixes `enp1s0` at `192.168.0.250/24`, gateway `192.168.0.1`,
 DNS pointing at local Pi-hole + upstream fallbacks.
 
 ## Apply (one-time, on the homelab host)
@@ -32,8 +38,8 @@ sudo netplan apply
 Verify from another LAN device:
 
 ```bash
-ping -c 2 192.168.0.11          # should respond in <10ms
-dig @192.168.0.11 stremio.home  # should return 192.168.0.6 (dnsmasq alias)
+ping -c 2 192.168.0.250          # should respond in <10ms
+dig @192.168.0.250 stremio.home  # should return 192.168.0.250 (dnsmasq record)
 ```
 
 ## Rollback

@@ -1,0 +1,179 @@
+{
+  "owner": "LucasSantana-Dev",
+  "bots": [
+    "github-actions",
+    "sonarqubecloud",
+    "dependabot",
+    "codecov",
+    "coderabbitai",
+    "claude",
+    "renovate"
+  ],
+  "agent_label": "agent",
+  "auto_merge": false,
+  "wip_cap": 2,
+  "fix_attempts": 2,
+  "stale_days": 5,
+  "size": {
+    "green_lines": 150,
+    "green_files": 5,
+    "yellow_lines": 400,
+    "yellow_files": 12
+  },
+  "max_modules": 2,
+  "low_impact_paths": [
+    "*.md",
+    "docs/*",
+    "*/docs/*",
+    ".eslintrc*",
+    "eslint.config.*",
+    ".prettierrc*",
+    "*.test.*",
+    "*.spec.*",
+    "tests/*",
+    "test/*",
+    "*/tests/*",
+    "*/test/*",
+    "*/__tests__/*"
+  ],
+  "high_impact_paths": [
+    ".github/*",
+    "*migrations/*",
+    "*.sql",
+    "*prisma/schema.prisma",
+    "*Dockerfile*",
+    "*docker-compose*",
+    "compose/*",
+    "*deploy*",
+    "infra/*",
+    "*.tf",
+    "Makefile",
+    "*/Makefile",
+    ".claude/*",
+    "*/.claude/*",
+    "CLAUDE.md",
+    "*/CLAUDE.md",
+    "AGENTS.md",
+    "*/AGENTS.md",
+    "config/agent-box/*",
+    "scripts/agent-tasks/*",
+    "*systemd/*"
+  ],
+  "sensitive_paths": [
+    "*auth*",
+    "*oauth*",
+    "*secret*",
+    "*token*",
+    "*permission*",
+    "*payment*",
+    "*billing*",
+    "*crypto*",
+    "*.env*",
+    "secrets/*",
+    "*.pem",
+    "*.key",
+    "*credential*",
+    "*password*",
+    "*jwt*",
+    "*session*",
+    "*.npmrc"
+  ],
+  "dependency_files": [
+    "package.json",
+    "*/package.json",
+    "pyproject.toml",
+    "Cargo.toml",
+    "*requirements*.txt"
+  ],
+  "issue_skip_words": [
+    "auth",
+    "oauth",
+    "payment",
+    "billing",
+    "deploy",
+    "migration",
+    "workflow",
+    "secret"
+  ],
+  "issue_skip_labels": [
+    "blocked",
+    "ready-for-human",
+    "agent-failed",
+    "needs-human"
+  ],
+  "required_effort": [
+    "effort:s"
+  ],
+  "rank_first": [
+    "cat:bug",
+    "bug",
+    "cat:docs",
+    "documentation",
+    "ci",
+    "cat:test"
+  ],
+  "value_green_labels": [
+    "P1",
+    "cat:bug",
+    "bug"
+  ],
+  "repos": {
+    "LucasSantana-Dev/Lucky": {
+      "base": "main",
+      "workdir": "/workspace/Lucky"
+    },
+    "LucasSantana-Dev/homelab": {
+      "base": "release",
+      "workdir": "/workspace/homelab"
+    }
+  },
+  "test_paths": [
+    "*.test.*",
+    "*.spec.*",
+    "tests/*",
+    "test/*",
+    "*/tests/*",
+    "*/test/*",
+    "*/__tests__/*"
+  ],
+  "claude_permission_mode": "dontAsk",
+  "claude_allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "TodoWrite",
+    "Bash(git status*)",
+    "Bash(git diff*)",
+    "Bash(git log*)",
+    "Bash(git add*)",
+    "Bash(git commit*)",
+    "Bash(git switch*)",
+    "Bash(git checkout*)",
+    "Bash(git push origin agent/*)",
+    "Bash(git push -u origin agent/*)",
+    "Bash(gh issue view*)",
+    "Bash(gh pr create*)",
+    "Bash(gh pr view*)",
+    "Bash(gh pr checks*)",
+    "Bash(gh run view*)",
+    "Bash(npm *)",
+    "Bash(npx *)",
+    "Bash(pnpm *)",
+    "Bash(node *)",
+    "Bash(python3 *)",
+    "Bash(pytest*)",
+    "Bash(ls*)",
+    "Bash(cat *)"
+  ],
+  "claude_disallowed_tools": [
+    "Bash(gh pr merge*)",
+    "Bash(git push --force*)",
+    "Bash(git push -f*)",
+    "Bash(git reset --hard*)",
+    "Bash(gh api*)",
+    "WebFetch",
+    "WebSearch"
+  ]
+}
