@@ -1,4 +1,5 @@
 {
+  "promptSuggestionEnabled": false,
   "enabledPlugins": {
     "discord@claude-plugins-official": true
   },
@@ -24,7 +25,6 @@
     "deny": [
       "Read(~/.claude/channels/**)",
       "Edit(~/.claude/channels/**)",
-      "Write(~/.claude/channels/**)",
       "Read(~/.claude/.credentials.json)",
       "Read(~/.claude.json)",
       "Read(~/.config/gh/**)",

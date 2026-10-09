@@ -68,7 +68,19 @@ os.replace(tmp, p)
 PY
 }
 
+# The plugin's MCP start runs `bun install` inside a 30s connect timeout; a cold install
+# can miss it and the channel never comes up. Install ahead of the session instead.
+plugin_deps() {
+    local dir
+    dir=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["plugins"][sys.argv[2]][0]["installPath"])' \
+        "$HOME/.claude/plugins/installed_plugins.json" "$PLUGIN" 2>/dev/null) || return 1
+    [[ -d $dir/node_modules ]] && return 0
+    log "installing plugin dependencies in $dir"
+    (cd "$dir" && timeout 300 bun install --no-summary)
+}
+
 start() {
+    plugin_deps || log "plugin dependency install failed"
     trust_workspace || log "could not pre-accept workspace trust"
     log "starting tmux session $SESSION"
     # static: access.json is read once at start and never written, so pairing is off and
@@ -77,7 +89,7 @@ start() {
     tmux new-session -d -s "$SESSION" -c /workspace \
         "source /etc/profile.d/agent-env.sh 2>/dev/null; \
 unset DISCORD_BOT_TOKEN ANTHROPIC_API_KEY CLAUDE_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX; \
-DISCORD_ACCESS_MODE=static claude --channels plugin:$PLUGIN \
+ENABLE_CLAUDEAI_MCP_SERVERS=false DISCORD_ACCESS_MODE=static claude --channels plugin:$PLUGIN \
 --settings $CONF/discord-channel-settings.json --permission-mode default \
 --append-system-prompt \"\$(cat $CONF/discord-channel.md)\"; \
 rc=\$?; echo \"\$(date +%FT%T%z) claude exited \$rc\" >> $EXIT_LOG"
