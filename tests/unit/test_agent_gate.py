@@ -380,3 +380,55 @@ def test_agent_rules_and_infra_are_high_impact(cfg, path):
 def test_select_counts_agent_branch_without_closing_ref(cfg):
     out = gate.select([make_issue(number=9)], [{"headRefName": "agent/issue-9"}], cfg)
     assert out["skipped"] == {"9": "agent PR already open"}
+
+
+# --- cubic review fixes ---------------------------------------------------
+
+
+def test_human_push_without_comment_halts(cfg):
+    pr = make_pr(["docs/a.md"])
+    pr["commits"] = [
+        {"authors": [{"login": OWNER}]},
+        {"authors": [{"login": "someone"}]},
+    ]
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "halt"
+
+
+def test_owner_commits_do_not_halt(cfg):
+    pr = make_pr(["docs/a.md", "x.test.ts"])
+    pr["commits"] = [{"authors": [{"login": OWNER}]}]
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_human_authored_issue_halts_instead_of_closing(cfg):
+    out = gate.score(make_pr(["docs/a.md"]), make_issue(author="stranger"), cfg)
+    assert out["decision"] == "halt"
+
+
+def test_nested_systemd_units_are_high_impact(cfg):
+    assert gate.grade_impact(make_pr(["scripts/systemd/x.service"]), cfg)[0] == "red"
+
+
+def test_nested_requirements_is_a_dependency_change(cfg):
+    pr = make_pr(["scripts/hacs/requirements-hacs-installer.txt"])
+    assert gate.grade_security(pr, cfg, "passing")[0] == "yellow"
+
+
+def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    out = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w "fix it; rm -rf /"',
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "--permission-mode dontAsk" in out
+    assert "--allowedTools" in out and "--disallowedTools" in out
+    assert "Bash\\(gh\\ pr\\ merge\\*\\)" in out
+    assert "-u ANTHROPIC_API_KEY" in out
+    # The prompt is one quoted printf argument, never bare shell.
+    assert "printf '%s' fix\\ it\\;\\ rm\\ -rf\\ /" in out

@@ -24,6 +24,7 @@ This directory contains detailed documentation for specific components and featu
 ### MCP / AI Tooling
 
 - **[Forge Space Tools](forge-space-tools.md)** - Deploy and operate Forge Space-compatible MCP gateway on homelab
+- **[Agent Loop](agent-loop.md)** - Autonomous dev loop on agent-box and its 4-pillar merge gate
 
 ### Public Release & Security Hygiene
 

@@ -42,11 +42,12 @@ for REPO in $AGENT_REPOS; do
     BASE=$(cfg "$REPO" base)
     FIX_MAX=$(cfg "$REPO" fix_attempts)
     STALE_DAYS=$(cfg "$REPO" stale_days)
+    AUTOFIX_LEFT="${AGENT_MAX_AUTOFIX_PER_RUN:-1}"
 
     NUMS=$(open_agent_prs "$REPO" | jq -r '.[].number') || { echo "gh pr list failed"; continue; }
     for N in $NUMS; do
         [[ "$N" =~ ^[0-9]+$ ]] || continue
-        PR_JSON=$(run_on_agent "gh pr view $N --repo $REPO --json number,author,files,additions,deletions,closingIssuesReferences,statusCheckRollup,labels,comments,reviews,updatedAt,headRefName,headRefOid") || continue
+        PR_JSON=$(run_on_agent "gh pr view $N --repo $REPO --json number,author,commits,files,additions,deletions,closingIssuesReferences,statusCheckRollup,labels,comments,reviews,updatedAt,headRefName,headRefOid") || continue
         SHA=$(jq -r '.headRefOid' <<<"$PR_JSON")
         BRANCH=$(jq -r '.headRefName' <<<"$PR_JSON")
         if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ && "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
@@ -59,7 +60,12 @@ for REPO in $AGENT_REPOS; do
         [[ -z "$ISSUE_N" && "$BRANCH" =~ ^agent/issue-([0-9]+)$ ]] && ISSUE_N="${BASH_REMATCH[1]}"
         ISSUE_JSON=null
         if [[ "$ISSUE_N" =~ ^[0-9]+$ ]]; then
-            ISSUE_JSON=$(run_on_agent "gh issue view $ISSUE_N --repo $REPO --json number,author,labels,comments") || ISSUE_JSON=null
+            # A failed lookup is not "no linked issue": skip this run instead of closing.
+            if ! ISSUE_JSON=$(run_on_agent "gh issue view $ISSUE_N --repo $REPO --json number,author,labels,comments") \
+                || [[ -z "$ISSUE_JSON" ]]; then
+                echo "#$N: could not load issue #$ISSUE_N, skipping this run"
+                continue
+            fi
         else
             ISSUE_N=""
         fi
@@ -112,12 +118,18 @@ for REPO in $AGENT_REPOS; do
                     notify --title "agent: dirty workdir" --body "$REPO $WORKDIR has uncommitted changes; autofix of #$N skipped" --urgency warn
                     continue
                 fi
+                (( AUTOFIX_LEFT > 0 )) || { echo "#$N: autofix deferred, per-run cap reached"; continue; }
                 budget_take || continue
                 # Count the attempt before running, so a crash cannot loop forever.
-                try_act "gh pr edit $N --repo $REPO --add-label agent-fix-$((TRIES + 1))"
+                # If the counter cannot be recorded, do not run (the cap would leak).
+                if ! act "gh pr edit $N --repo $REPO --add-label agent-fix-$((TRIES + 1))"; then
+                    echo "#$N: could not record fix attempt, skipping"
+                    continue
+                fi
+                AUTOFIX_LEFT=$((AUTOFIX_LEFT - 1))
                 PROMPT="You are on branch $BRANCH of $REPO, PR #$N. Its CI is failing. Read the failing checks with \`gh pr checks $N --repo $REPO\` and their logs, fix the root cause (not the test), run the checks locally, commit (no AI attribution) and push to $BRANCH. Do not touch unrelated files. Never force-push or merge."
                 if act "cd $WORKDIR && git fetch -q origin && git switch -q -C $BRANCH origin/$BRANCH"; then
-                    act "$(claude_cmd "$WORKDIR" "$PROMPT")" || echo "claude exited non-zero"
+                    act "$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT")" || echo "claude exited non-zero"
                 else
                     echo "git checkout failed for $BRANCH"
                 fi
@@ -128,8 +140,11 @@ for REPO in $AGENT_REPOS; do
                 ;;
             auto-merge)
                 comment_once "$REPO" "$N" "$SHA" "$TABLE"
-                try_act "gh pr merge $N --repo $REPO --auto --squash --match-head-commit $SHA"
-                notify --title "agent: auto-merge queued #$N" --body "$REPO #$N, 4 green pillars" --urgency info
+                if act "gh pr merge $N --repo $REPO --auto --squash --match-head-commit $SHA"; then
+                    notify --title "agent: auto-merge queued #$N" --body "$REPO #$N, 4 green pillars" --urgency info
+                else
+                    echo "#$N: gh pr merge --auto failed"
+                fi
                 ;;
         esac
     done

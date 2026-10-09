@@ -53,15 +53,30 @@ budget_take() {
 
 # Headless claude on the official binary with the Max OAuth login: every API or
 # alternate-provider env var is dropped so a run never bills the API by accident.
+# Permissions are pinned per run (mode + allow/deny lists from agent-gate.json), so
+# a later change to the box's global settings cannot widen what the worker may do.
+# The prompt goes in on stdin so the variadic tool flags cannot swallow it.
 claude_cmd() {
-    local workdir="$1" prompt="$2" qprompt
+    local repo="$1" workdir="$2" prompt="$3" qprompt mode allowed denied t
     printf -v qprompt '%q' "$prompt"
-    echo "cd $workdir && env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY -u ANTHROPIC_AUTH_TOKEN" \
-        "-u ANTHROPIC_BASE_URL -u CLAUDE_CODE_USE_BEDROCK -u CLAUDE_CODE_USE_VERTEX" \
-        "timeout 45m claude -p --max-turns 60 $qprompt"
+    mode=$(cfg "$repo" claude_permission_mode)
+    allowed="" denied=""
+    while IFS= read -r t; do printf -v t '%q' "$t"; allowed+=" $t"; done \
+        < <(cfg "$repo" claude_allowed_tools | jq -r '.[]')
+    while IFS= read -r t; do printf -v t '%q' "$t"; denied+=" $t"; done \
+        < <(cfg "$repo" claude_disallowed_tools | jq -r '.[]')
+    echo "cd $workdir && printf '%s' $qprompt | env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY" \
+        "-u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL -u CLAUDE_CODE_USE_BEDROCK" \
+        "-u CLAUDE_CODE_USE_VERTEX timeout 45m claude -p --max-turns 60" \
+        "--permission-mode $mode --allowedTools$allowed --disallowedTools$denied"
 }
 
-workdir_clean() { [[ -z "$(run_on_agent "cd $1 && git status --porcelain")" ]]; }
+# Fail closed: an unreachable box or a git error counts as dirty.
+workdir_clean() {
+    local out
+    out=$(run_on_agent "cd $1 && git status --porcelain") || return 1
+    [[ -z "$out" ]]
+}
 
 # Open agent PRs: labelled `agent` OR on an agent/ branch (the label is set by the
 # model and may be missing). JSON array.

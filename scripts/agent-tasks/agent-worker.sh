@@ -65,7 +65,11 @@ for REPO in $AGENT_REPOS; do
 
     # Claim first: if anything below dies, the issue stays out of selection
     # (agent-failed is a skip label) instead of being retried every run.
-    try_act "gh issue edit $ISSUE --repo $REPO --add-label agent-failed"
+    # No claim, no run.
+    if ! act "gh issue edit $ISSUE --repo $REPO --add-label agent-failed"; then
+        echo "could not claim #$ISSUE, not starting"
+        continue
+    fi
 
     BRANCH="agent/issue-$ISSUE"
     PROMPT=${PROMPT_TEMPLATE//__ISSUE__/$ISSUE}
@@ -73,7 +77,7 @@ for REPO in $AGENT_REPOS; do
     PROMPT=${PROMPT//__BASE__/$BASE}
 
     if act "cd $WORKDIR && git fetch -q origin && git switch -q -C $BRANCH origin/$BASE"; then
-        act "$(claude_cmd "$WORKDIR" "$PROMPT")" || echo "claude exited non-zero"
+        act "$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT")" || echo "claude exited non-zero"
     else
         echo "git checkout failed for $BRANCH"
     fi

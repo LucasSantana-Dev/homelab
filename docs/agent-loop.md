@@ -15,16 +15,16 @@ wrappers. The agent-box hooks are an extra layer.
 ## Anti-pile-up rules
 
 - At most `wip_cap` (2) open agent PRs per repo. When full, the worker starts nothing new.
-- One issue per repo per run, under a lock. Daily budget of `AGENT_MAX_RUNS_PER_DAY` (6) claude runs, shared by worker and autofix.
+- One issue and at most `AGENT_MAX_AUTOFIX_PER_RUN` (1) autofix per repo per run, under a lock. Daily budget of `AGENT_MAX_RUNS_PER_DAY` (6) claude runs, shared by worker and autofix.
 - Autofix at most `fix_attempts` (2) per PR, then `agent-failed` + `needs-human`.
 - PRs idle for `stale_days` (5) are closed and the issue gets `agent-failed`, so it is not picked again.
-- Any PR or issue another human authored or commented on is never touched.
+- Any PR or issue another human authored, commented on or pushed to is never touched.
 - Pause everything: `touch ~/agent-paused` inside agent-box (resume: `rm ~/agent-paused`).
 
 ## Issue selection
 
 Open, `ready-for-agent`, `effort:s`, authored by the owner, no foreign comments, no open agent PR,
-no skip label, no sensitive word in title or labels (auth, oauth, payment, deploy, migration,
+no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
 workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 
 ## Merge gate: 4 pillars
@@ -32,15 +32,17 @@ workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 | Pillar | Green | Yellow | Red |
 |---|---|---|---|
 | Size | <= 150 lines and <= 5 files | <= 400 lines and <= 12 files | larger: split it |
-| Impact | only docs, tests, lint config | runtime code | `.github/`, migrations, SQL, Dockerfile, compose, deploy, infra, Makefile, agent rules (CLAUDE.md, AGENTS.md, `.claude/`), the agent loop itself, > 2 modules |
+| Impact | only docs, tests, ESLint/Prettier config | runtime code | `.github/`, migrations, SQL, Dockerfile, compose, deploy, infra, Makefile, agent rules (CLAUDE.md, AGENTS.md, `.claude/`), the agent loop itself, > 2 modules |
 | Value | closes an owner `ready-for-agent` issue that is P1 or bug, with a new test | closes an owner issue | no linked issue, or issue not owner/ready-for-agent |
-| Security | no sensitive path, no manifest change, checks green | dependency manifest changed, checks pending or failing | auth/oauth/secret/token/password/session/permission/payment/crypto/key/.env paths |
+| Security | no sensitive path, no manifest change, checks green | dependency manifest changed, checks pending or failing | a `sensitive_paths` match: auth, oauth, secret, token, credential, password, session, jwt, permission, payment, billing, crypto, env files, certificate and `.key` files, npm config (`agent-gate.json` is the source of truth) |
 
 Decision order (pillars before CI, so a risky PR never gets an autofix run): value red -> `close`;
 security or impact red -> `needs-human`; size red -> `split`; failing checks -> `autofix`; pending or
 no checks yet -> `wait`; 4 greens and `auto_merge: true` -> `auto-merge`; else `owner-review`.
-A PR or linked issue with a comment from another human (or a deleted account) -> `halt`.
-The gate posts one comment per head commit with the grades. Stale-close applies only to
+A PR or linked issue authored, commented on or pushed to by another human (or a deleted
+account) -> `halt`. If the linked issue cannot be loaded, the PR is skipped for that run.
+For `owner-review`, `needs-human`, `split` and `auto-merge` the gate posts one comment per head
+commit with the grades; `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
 `wait`/`autofix` PRs, never to ones waiting on the owner.
 
 ## Graduation

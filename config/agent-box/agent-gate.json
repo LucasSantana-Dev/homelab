@@ -57,7 +57,7 @@
     "*/AGENTS.md",
     "config/agent-box/*",
     "scripts/agent-tasks/*",
-    "systemd/*"
+    "*systemd/*"
   ],
   "sensitive_paths": [
     "*auth*",
@@ -82,8 +82,8 @@
     "package.json",
     "*/package.json",
     "pyproject.toml",
-    "requirements*.txt",
-    "Cargo.toml"
+    "Cargo.toml",
+    "*requirements*.txt"
   ],
   "issue_skip_words": [
     "auth",
@@ -135,5 +135,45 @@
     "*/tests/*",
     "*/test/*",
     "*/__tests__/*"
+  ],
+  "claude_permission_mode": "dontAsk",
+  "claude_allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "TodoWrite",
+    "Bash(git status*)",
+    "Bash(git diff*)",
+    "Bash(git log*)",
+    "Bash(git add*)",
+    "Bash(git commit*)",
+    "Bash(git switch*)",
+    "Bash(git checkout*)",
+    "Bash(git push origin agent/*)",
+    "Bash(git push -u origin agent/*)",
+    "Bash(gh issue view*)",
+    "Bash(gh pr create*)",
+    "Bash(gh pr view*)",
+    "Bash(gh pr checks*)",
+    "Bash(gh run view*)",
+    "Bash(npm *)",
+    "Bash(npx *)",
+    "Bash(pnpm *)",
+    "Bash(node *)",
+    "Bash(python3 *)",
+    "Bash(pytest*)",
+    "Bash(ls*)",
+    "Bash(cat *)"
+  ],
+  "claude_disallowed_tools": [
+    "Bash(gh pr merge*)",
+    "Bash(git push --force*)",
+    "Bash(git push -f*)",
+    "Bash(git reset --hard*)",
+    "Bash(gh api*)",
+    "WebFetch",
+    "WebSearch"
   ]
 }

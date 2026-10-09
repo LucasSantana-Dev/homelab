@@ -49,18 +49,23 @@ def is_human_foreign(login, cfg):
 
 
 def foreign_activity(pr, issue, cfg):
-    """Hard rule: never act on a PR (or its issue) another human authored or commented on."""
+    """Hard rule: never act on a PR (or its issue) another human authored,
+    commented on or pushed to."""
     if (pr.get("author") or {}).get("login") != cfg["owner"]:
+        return True
+    if issue and is_human_foreign((issue.get("author") or {}).get("login"), cfg):
         return True
     items = (
         pr.get("comments", [])
         + pr.get("reviews", [])
         + (issue or {}).get("comments", [])
     )
-    for item in items:
-        if is_human_foreign((item.get("author") or {}).get("login"), cfg):
-            return True
-    return False
+    logins = [(item.get("author") or {}).get("login") for item in items]
+    # Commit authors: a human push without a comment must halt too.
+    logins += [
+        a.get("login") for c in pr.get("commits", []) for a in c.get("authors", [])
+    ]
+    return any(is_human_foreign(login, cfg) for login in logins)
 
 
 def checks_state(pr):

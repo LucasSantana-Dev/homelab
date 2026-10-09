@@ -2,6 +2,7 @@
 Description=Agent: autonomous dev loop (PR gate, then worker)
 Documentation=file:///home/luk-server/homelab/docs/agent-loop.md
 After=network-online.target docker.service
+Requires=docker.service
 Wants=network-online.target
 
 [Service]
@@ -10,6 +11,8 @@ User=luk-server
 # Gate first: it frees WIP slots. A gate failure must not block the worker.
 ExecStart=-/home/luk-server/homelab/scripts/agent-tasks/agent-pr-gate.sh
 ExecStart=/home/luk-server/homelab/scripts/agent-tasks/agent-worker.sh
-TimeoutStartSec=5h
+# Worst case per run: 1 autofix + 1 worker claude run (45m each) per repo.
+# Must stay under the 5h gap between timer slots (10->15, 15->20).
+TimeoutStartSec=4h
 StandardOutput=journal
 StandardError=journal
