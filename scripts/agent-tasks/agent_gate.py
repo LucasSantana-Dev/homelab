@@ -8,7 +8,8 @@ Subcommands (JSON on stdin, JSON on stdout):
           -> {"issue": <number> | null, "skipped": {number: reason}}
 
 Grades are green < yellow < red. Mechanical signals only: diff size, paths,
-labels, checks. Thresholds live in config/agent-box/agent-gate.json.
+labels, checks, review threads (pr.reviewThreads, the GraphQL connection).
+Thresholds live in config/agent-box/agent-gate.json.
 """
 
 import argparse
@@ -48,6 +49,41 @@ def is_human_foreign(login, cfg):
     return login not in cfg["bots"]
 
 
+def _threads(pr):
+    return (pr.get("reviewThreads") or {}).get("nodes", [])
+
+
+def _thread_authors(thread):
+    return [
+        c.get("author") or {} for c in (thread.get("comments") or {}).get("nodes", [])
+    ]
+
+
+def thread_author_kind(author, cfg):
+    """'bot', 'owner' or 'human'. Thread authors carry __typename, so only a real
+    GitHub App counts as a bot: a user account named like a bot is a human."""
+    if author.get("__typename") == "Bot":
+        return "bot"
+    login = author.get("login")
+    return "owner" if login and login == cfg["owner"] else "human"
+
+
+def threads_truncated(pr):
+    """A page we did not fetch could hold a human reply: callers must fail closed."""
+    conn = pr.get("reviewThreads") or {}
+    if (conn.get("pageInfo") or {}).get("hasNextPage"):
+        return True
+    for t in conn.get("nodes", []):
+        comments = t.get("comments") or {}
+        if comments.get("totalCount", 0) > len(comments.get("nodes", [])):
+            return True
+    return False
+
+
+def open_threads(pr):
+    return [t for t in _threads(pr) if not t.get("isResolved")]
+
+
 def foreign_activity(pr, issue, cfg):
     """Hard rule: never act on a PR (or its issue) another human authored,
     commented on or pushed to."""
@@ -65,6 +101,12 @@ def foreign_activity(pr, issue, cfg):
     logins += [
         a.get("login") for c in pr.get("commits", []) for a in c.get("authors", [])
     ]
+    if any(
+        thread_author_kind(a, cfg) == "human"
+        for t in _threads(pr)
+        for a in _thread_authors(t)
+    ):
+        return True
     return any(is_human_foreign(login, cfg) for login in logins)
 
 
@@ -162,6 +204,12 @@ def score(pr, issue, cfg):
             "pillars": {},
             "reasons": ["another human authored or commented"],
         }
+    if threads_truncated(pr):
+        return {
+            "decision": "halt",
+            "pillars": {},
+            "reasons": ["too many review threads or replies to check for humans"],
+        }
     checks = checks_state(pr)
     graded = {
         "size": grade_size(pr, cfg),
@@ -171,6 +219,19 @@ def score(pr, issue, cfg):
     }
     pillars = {k: g for k, (g, _) in graded.items()}
     reasons = [f"{k}: {why}" for k, (_, why) in graded.items()]
+    threads = open_threads(pr)
+    # Bot-only threads are the agent's to fix; one the owner joined waits for the owner.
+    bot_only = bool(threads) and all(
+        _thread_authors(t)
+        and all(thread_author_kind(a, cfg) == "bot" for a in _thread_authors(t))
+        for t in threads
+    )
+    if threads:
+        reasons.append(
+            f"review: {len(threads)} unresolved thread(s)"
+            + ("" if bot_only else ", owner involved")
+        )
+    fix = None
     # Pillars first: a sensitive, oversized or pointless PR never gets an autofix run.
     if pillars["value"] == "red":
         decision = "close"
@@ -179,19 +240,26 @@ def score(pr, issue, cfg):
     elif pillars["size"] == "red":
         decision = "split"
     elif checks == "failing":
-        decision = "autofix"
+        decision, fix = "autofix", "ci"
     elif checks == "pending":
         decision = "wait"
+    elif bot_only:
+        decision, fix = "autofix", "threads"
+    elif threads:
+        decision = "owner-review"
     elif all(g == "green" for g in pillars.values()) and cfg["auto_merge"] is True:
         decision = "auto-merge"
     else:
         decision = "owner-review"
-    return {
+    out = {
         "decision": decision,
         "pillars": pillars,
         "reasons": reasons,
         "checks": checks,
     }
+    if fix:
+        out["fix"] = fix
+    return out
 
 
 def _issue_skip_reason(issue, taken, cfg):
