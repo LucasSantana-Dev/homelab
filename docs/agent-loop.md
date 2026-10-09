@@ -123,6 +123,13 @@ login, which matter more, so a separate unix user for the channel (a second Max 
 worth it. Claude Code's Bash sandbox is not available: unprivileged user namespaces are blocked
 (Docker seccomp, `kernel.apparmor_restrict_unprivileged_userns=1`). If the token leaks: Reset
 Token, store it with `agent-box-secret-set.sh`, restart agent-box.
+The same uid can also stop the supervisor and run its own channel session; the allowlist only
+holds against people on Discord, not against code already running as `agent`.
+
+Boot fails closed: the entrypoint writes agent config as `agent` (never as root into agent
+paths) under `set -e`, so if something under `/home/agent` blocks it (for example a directory
+where `~/.claude/settings.json` should be), the container restarts without sshd. Recover with
+`docker exec agent-box ...` from the host, or `docker logs agent-box` to see which step failed.
 
 Stop: `touch ~/discord-channel-off && tmux kill-session -t discord` (resume: `rm ~/discord-channel-off`).
 Rotate the token: Reset Token in the Developer Portal, store it in SOPS, `docker restart agent-box`.

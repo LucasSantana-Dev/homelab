@@ -7,7 +7,11 @@ log() { echo "[agent-box] $*"; }
 # Everything under /home/agent is writable by the agent uid, so a link planted there would
 # make a root write land anywhere (for example /entrypoint.sh at the next boot). Root never
 # writes into agent paths: these steps run as agent, where a planted link gains nothing.
-as_agent() { su -s /bin/bash agent -c "$1"; }
+# --reset-env: root's environment holds every SOPS secret; children start clean.
+as_agent() {
+    setpriv --reuid=agent --regid=agent --init-groups --reset-env \
+        env LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 bash -c "$1"
+}
 
 # --- Decrypt secrets ---
 SECRETS_FILE=/run/secrets/agent-box.secrets.yaml
@@ -34,7 +38,8 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
       export "$_sk=$_sv"
     done < "$SOPS_TEMP"
     rm -f "$SOPS_TEMP"
-    {
+    rm -f /etc/profile.d/agent-env.sh
+    (umask 027; {
         echo "export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export AGENT_DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"
         echo "export DISCORD_WEBHOOK='${AGENT_DISCORD_WEBHOOK:-}'"  # alias for notify.sh
@@ -44,7 +49,7 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
         echo "export CLAUDE_DIR='/home/agent/.claude'"
         echo "export LANG=en_US.UTF-8"
         echo "export LC_ALL=en_US.UTF-8"
-    } > /etc/profile.d/agent-env.sh
+    } > /etc/profile.d/agent-env.sh)
     # Root login shells source /etc/profile.d too, so the agent must not be able to edit it.
     chown root:agent /etc/profile.d/agent-env.sh
     chmod 640 /etc/profile.d/agent-env.sh
@@ -59,10 +64,10 @@ as_agent 'git config --global user.name agent-box &&
     git config --global init.defaultBranch main'
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     # gh is the single token holder; git asks gh for credentials.
-    rm -f /home/agent/.git-credentials
-    echo "$AGENT_GITHUB_TOKEN" | su -c \
-        "gh auth login --with-token --hostname github.com" agent 2>/dev/null || true
-    su -c "gh auth setup-git --hostname github.com" agent || log "WARN: gh auth setup-git failed"
+    printf '%s\n' "$AGENT_GITHUB_TOKEN" \
+        | as_agent 'rm -rf ~/.git-credentials; gh auth login --with-token --hostname github.com' \
+            2>/dev/null || true
+    as_agent 'gh auth setup-git --hostname github.com' || log "WARN: gh auth setup-git failed"
     log "gh CLI authenticated."
 fi
 
@@ -71,19 +76,25 @@ CLAUDE_ENV_DIR="/home/agent/.claude-env"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     if [[ ! -d "$CLAUDE_ENV_DIR/.git" ]]; then
         log "Cloning claude-env..."
-        su -c "git clone https://github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
+        as_agent "git clone https://github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" \
             || log "WARN: claude-env clone failed (token access or network) — continuing without it"
     else
         log "Pulling claude-env updates..."
-        su -c "cd $CLAUDE_ENV_DIR && git remote set-url origin https://github.com/LucasSantana-Dev/claude-env.git && git pull --ff-only 2>&1 || true" agent
+        as_agent "cd $CLAUDE_ENV_DIR && git remote set-url origin https://github.com/LucasSantana-Dev/claude-env.git && git pull --ff-only 2>&1 || true"
     fi
     if [[ -f "$CLAUDE_ENV_DIR/bin/sync" ]]; then
         log "Syncing claude environment..."
-        su -c "HOME=/home/agent CLAUDE_DIR=/home/agent/.claude $CLAUDE_ENV_DIR/bin/sync pull 2>&1 || true" agent
+        as_agent "CLAUDE_DIR=/home/agent/.claude $CLAUDE_ENV_DIR/bin/sync pull 2>&1 || true"
     fi
 fi
 
 # --- Agent config (runs as agent; see as_agent) ---
+# Older entrypoints created some of these dirs as root. chown -h never follows a link, and no
+# agent process runs yet, so this is safe; it keeps the agent block below from failing boot.
+for d in /home/agent/.claude/hooks /home/agent/.claude/channels /home/agent/.codex \
+         /home/agent/.config /home/agent/.config/opencode /home/agent/.ssh; do
+    [[ -d $d && ! -L $d ]] && chown -h agent:agent "$d"
+done
 # Overrides are security-critical and must run after the claude-env sync.
 as_agent 'bash -s' <<'AGENT'
 set -euo pipefail
@@ -150,7 +161,7 @@ else
 fi
 # Nothing started below needs the token in its environment; the plugin reads .env.
 unset DISCORD_BOT_TOKEN
-su -s /bin/bash agent -c /opt/agent-config/discord-channel.sh &
+as_agent /opt/agent-config/discord-channel.sh &
 log "Discord channel supervisor started."
 
 # --- Clone working repos on first run ---
@@ -158,12 +169,12 @@ clone_repo() {
     local repo="$1" dir="$2"
     if [[ ! -d "/workspace/$dir/.git" && -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
         log "Cloning $repo..."
-        su -c "git clone https://github.com/${repo}.git /workspace/$dir 2>&1" agent \
+        as_agent "git clone https://github.com/${repo}.git /workspace/$dir 2>&1" \
             || log "WARN: $repo clone failed (token access or network) — continuing without it"
     elif [[ -d "/workspace/$dir/.git" ]]; then
         # Auth comes from the credential helper; a token baked into the remote
         # URL would outlive PAT rotation.
-        su -c "git -C /workspace/$dir remote set-url origin https://github.com/${repo}.git" agent || true
+        as_agent "git -C /workspace/$dir remote set-url origin https://github.com/${repo}.git" || true
     fi
 }
 clone_repo "LucasSantana-Dev/Lucky"     "Lucky"
@@ -179,52 +190,7 @@ fi
 
 # --- WUD classify HTTP endpoint (port 8080) ---
 # n8n calls POST /wud-classify with WUD payload; hermes returns classification JSON.
-cat > /tmp/wud-server.py << 'PYEOF'
-import http.server, json, subprocess
-
-CLASSIFY_CMD = [
-    'su', '-s', '/bin/bash', 'agent', '-c',
-    'source /etc/profile.d/agent-env.sh 2>/dev/null; exec bash /workspace/homelab/scripts/agent-tasks/hermes-wud-classify.sh'
-]
-FALLBACK = json.dumps({'safe_to_schedule': True, 'urgency': 'low', 'reason': 'hermes unavailable'}).encode()
-MAX_BODY = 64 * 1024  # WUD payloads are ~1-2KB; cap to avoid resource exhaustion (#310)
-
-class Handler(http.server.BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args): pass
-    def do_GET(self):
-        ok = self.path == '/healthz'
-        self.send_response(200 if ok else 404)
-        self.send_header('Content-Type', 'text/plain')
-        self.end_headers()
-        if ok:
-            self.wfile.write(b'ok')
-    def do_POST(self):
-        if self.path != '/wud-classify':
-            self.send_response(404)
-            self.end_headers()
-            return
-        try:
-            length = int(self.headers.get('Content-Length', 0))
-        except (TypeError, ValueError):
-            length = -1
-        if length < 0 or length > MAX_BODY:
-            self.send_response(413)
-            self.end_headers()
-            return
-        body = self.rfile.read(length)
-        try:
-            r = subprocess.run(CLASSIFY_CMD, input=body, capture_output=True, timeout=120)
-            out = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else FALLBACK
-        except Exception:
-            out = FALLBACK
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.end_headers()
-        self.wfile.write(out)
-
-http.server.HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
-PYEOF
-python3 /tmp/wud-server.py &
+as_agent 'exec python3 -I /opt/agent-config/wud-server.py' &
 log "WUD classify endpoint started on :8080"
 
 # --- Start SSH ---
