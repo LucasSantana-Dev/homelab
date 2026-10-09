@@ -114,11 +114,15 @@ No pairing: static mode downgrades `pairing` to `allowlist` and never writes `ac
 nothing said in the chat can widen access. Permission prompts reach the owner's DM as buttons.
 Never start it with `--dangerously-skip-permissions`.
 
-Known gap: the loop worker runs as the same unix user. Its gate denies Read/Edit/Write on
-`~/.claude/channels/**`, but `Bash(cat *)` can still read the token file, as it can read the
-Claude and gh credentials today. Tampering with `access.json` only blocks the channel (the
-supervisor refuses to start); it cannot add an ID. The real fix is a separate unix user for the
-channel.
+Accepted risk (owner decision, 2026-10-09, #485): the loop worker runs as the same unix user, so
+`Bash(cat *)` can read the bot token file even though its gate denies Read/Edit on
+`~/.claude/channels/**`. A leaked token lets someone post as the bot and read its DMs; it cannot
+command the agent, because inbound messages must come from the root-owned owner ID, and tampering
+with `access.json` only stops the channel. The loop can already read its own GitHub PAT and Claude
+login, which matter more, so a separate unix user for the channel (a second Max login) was not
+worth it. Claude Code's Bash sandbox is not available: unprivileged user namespaces are blocked
+(Docker seccomp, `kernel.apparmor_restrict_unprivileged_userns=1`). If the token leaks: Reset
+Token, store it with `agent-box-secret-set.sh`, restart agent-box.
 
 Stop: `touch ~/discord-channel-off && tmux kill-session -t discord` (resume: `rm ~/discord-channel-off`).
 Rotate the token: Reset Token in the Developer Portal, store it in SOPS, `docker restart agent-box`.
