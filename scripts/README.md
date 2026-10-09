@@ -36,8 +36,7 @@ scripts/
 │   ├── homelab-docker.service
 │   ├── homelab-update.service
 │   ├── homelab-update.timer
-│   ├── lukbot.service
-│   └── satisfactory-server.service
+│   └── lukbot.service
 └── hacs/                # Home Assistant specific scripts
     ├── install_hacs_addons.py
     ├── interactive_hacs_installer.py
