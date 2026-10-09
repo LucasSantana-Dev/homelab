@@ -95,8 +95,10 @@ the plugin install are runtime state:
   this session only; read-only allow list; denies secrets, `env`, `gh api`, PR merge/close/review,
   `git push`). It fails closed: no start unless the token and the plugin exist and `access.json`
   allows exactly the root-owned owner ID, with no guild groups. It pre-accepts the `/workspace`
-  trust dialog, logs claude's exit code, backs off on fast exits (up to 15 min) and logs a warning
-  when claude sits at a prompt or the bun MCP server is gone.
+  trust dialog, installs the plugin's bun dependencies before the first start, turns off
+  the claude.ai connectors and prompt suggestions for the session, logs claude's exit code, backs
+  off on fast exits (up to 15 min) and logs a warning when claude sits at a prompt or the bun MCP
+  server is gone.
 - `config/agent-box/discord-channel.md`: session rules, appended to the system prompt.
 
 One-time setup inside agent-box, as `agent` (the plugin lives in the persistent volume):
