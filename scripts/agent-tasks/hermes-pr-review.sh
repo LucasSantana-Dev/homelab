@@ -60,7 +60,10 @@ fi
 
 # Fetch PR branch in agent-box workspace and run review
 log "Fetching PR branch and running review on agent-box..."
-REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+# agent-box authorizes only the dedicated key (the one the `agent-box` alias uses),
+# not the default ~/.ssh/id_* keys. Host key checking stays strict.
+if ! REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+    -i /home/luk-server/.ssh/agent-box -o IdentitiesOnly=yes \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
@@ -73,8 +76,11 @@ REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
        2>&1 | tail -n +1)
      git checkout main 2>&1
      git branch -D hermes-pr-$PR_NUMBER 2>&1 || true
-     printf '%s' \"\$REVIEW_OUT\"" 2>&1) \
-  || REVIEW="hermes: review unavailable — agent-box unreachable or error. Check $LOG_FILE."
+     printf '%s' \"\$REVIEW_OUT\"" 2>&1); then
+    # Keep the real error in the log: the PR comment only gets the fallback.
+    log "agent-box review failed: $(tail -c 1000 <<<"$REVIEW")"
+    REVIEW="hermes: review unavailable (agent-box unreachable or error). Check $LOG_FILE."
+fi
 
 log "Review complete (${#REVIEW} chars)"
 
