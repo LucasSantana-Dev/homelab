@@ -87,9 +87,10 @@ workdir_clean() {
     [[ -z "$out" ]]
 }
 
-# All open PRs, agent or hand-opened. JSON array.
+# All open PRs, agent or hand-opened. JSON array. The limit is well above any
+# realistic open-PR count: a PR outside it would not block a duplicate pick.
 open_prs() {
-    run_on_agent "gh pr list --repo $1 --state open --limit 100 --json number,headRefName,closingIssuesReferences,labels"
+    run_on_agent "gh pr list --repo $1 --state open --limit 1000 --json number,headRefName,closingIssuesReferences,labels"
 }
 
 # Filters open_prs JSON on stdin to agent PRs: labelled `agent` OR on an agent/

@@ -285,15 +285,25 @@ def _issue_skip_reason(issue, taken, cfg):
     ):
         return "foreign comment"
     if issue["number"] in taken:
-        return "open PR already closes it"
+        return "open PR already claims it"
     return None
 
 
-def select(issues, open_prs, cfg):
+def _same_repo(ref, repo):
+    """A closing reference counts only for `repo`; refs without repo data count."""
+    r = ref.get("repository") or {}
+    name, owner = r.get("name"), (r.get("owner") or {}).get("login")
+    if not repo or not (name and owner):
+        return True
+    return f"{owner}/{name}".lower() == repo.lower()
+
+
+def select(issues, open_prs, cfg, repo=None):
     taken = {
         ref["number"]
         for pr in open_prs
         for ref in pr.get("closingIssuesReferences", [])
+        if _same_repo(ref, repo)
     }
     for pr in open_prs:
         m = re.fullmatch(r"agent/issue-(\d+)", pr.get("headRefName", ""))
@@ -338,7 +348,7 @@ def main(argv=None):
     if args.command == "score":
         out = score(data["pr"], data.get("issue"), cfg)
     else:
-        out = select(data.get("issues", []), data.get("open_prs", []), cfg)
+        out = select(data.get("issues", []), data.get("open_prs", []), cfg, args.repo)
     json.dump(out, sys.stdout)
     print()
     return 0
