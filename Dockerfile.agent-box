@@ -61,11 +61,15 @@ RUN useradd -m -s /bin/bash agent && \
     mkdir -p /home/agent/.claude /home/agent/.config/opencode && \
     chown -R agent:agent /home/agent
 
-# SSH: key auth only
+# SSH: key auth only. Host keys live on the agent_ssh_host_keys volume, created by
+# entrypoint.sh on first boot, so a rebuild keeps the host identity. The keys the
+# openssh-server package generated at build time are dropped from the image.
 RUN mkdir -p /var/run/sshd && \
+    rm -f /etc/ssh/ssh_host_* && \
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
     sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
-    echo "AllowUsers agent" >> /etc/ssh/sshd_config
+    echo "AllowUsers agent" >> /etc/ssh/sshd_config && \
+    echo "HostKey /etc/ssh/host_keys/ssh_host_ed25519_key" >> /etc/ssh/sshd_config
 
 COPY config/agent-box/entrypoint.sh /entrypoint.sh
 COPY config/agent-box/discord-channel.sh /opt/agent-config/discord-channel.sh

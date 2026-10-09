@@ -12,6 +12,7 @@ volumes:
   agent_claude_state: null
   agent_opencode_state: null
   agent_codex_state: null
+  agent_ssh_host_keys: null
 services:
   agent-box:
     build:
@@ -32,6 +33,7 @@ services:
     - agent_claude_state:/home/agent/.claude
     - agent_opencode_state:/home/agent/.config/opencode
     - agent_codex_state:/home/agent/.codex
+    - agent_ssh_host_keys:/etc/ssh/host_keys
     - ../config/agent-box/opencode.jsonc:/opt/agent-config/opencode.jsonc:ro
     - ../config/agent-box/settings.json:/opt/agent-config/settings.json:ro
     - ../config/agent-box/mcp.json:/opt/agent-config/mcp.json:ro
