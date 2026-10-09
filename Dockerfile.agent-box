@@ -70,6 +70,7 @@ RUN mkdir -p /var/run/sshd && \
 COPY config/agent-box/entrypoint.sh /entrypoint.sh
 COPY config/agent-box/discord-channel.sh /opt/agent-config/discord-channel.sh
 COPY config/agent-box/discord-channel.md /opt/agent-config/discord-channel.md
+COPY config/agent-box/discord-channel-settings.json /opt/agent-config/discord-channel-settings.json
 RUN chmod +x /entrypoint.sh /opt/agent-config/discord-channel.sh
 
 EXPOSE 22

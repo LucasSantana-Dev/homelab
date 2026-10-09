@@ -1,0 +1,47 @@
+{
+  "enabledPlugins": {
+    "discord@claude-plugins-official": true
+  },
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "mcp__plugin_discord_discord",
+      "Bash(gh pr list*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr checks*)",
+      "Bash(gh issue list*)",
+      "Bash(gh issue view*)",
+      "Bash(gh run list*)",
+      "Bash(gh run view*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(ls*)",
+      "Bash(touch /home/agent/agent-paused)",
+      "Bash(rm /home/agent/agent-paused)"
+    ],
+    "deny": [
+      "Read(~/.claude/channels/**)",
+      "Edit(~/.claude/channels/**)",
+      "Write(~/.claude/channels/**)",
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.claude.json)",
+      "Read(~/.config/gh/**)",
+      "Read(/run/secrets/**)",
+      "Read(/etc/profile.d/agent-env.sh)",
+      "Edit(~/.claude/settings.json)",
+      "Edit(/opt/agent-config/**)",
+      "Bash(env*)",
+      "Bash(printenv*)",
+      "Bash(cat ~/.claude*)",
+      "Bash(cat /home/agent/.claude*)",
+      "Bash(cat ~/.config/gh*)",
+      "Bash(cat /run/secrets*)",
+      "Bash(gh auth token*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr close*)",
+      "Bash(gh pr review*)",
+      "Bash(gh api*)",
+      "Bash(git push*)"
+    ]
+  }
+}

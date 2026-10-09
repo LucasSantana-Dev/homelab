@@ -80,30 +80,38 @@ creates `ready-for-agent` issues and pauses/resumes the loop. It never merges. S
 
 Pieces (all baked into the image, so a rebuild from release picks them up):
 
-- `DISCORD_BOT_TOKEN` in `secrets/agent-box.secrets.yaml.age`. `sops set` fails on this file; use the
-  ADR 0037 decrypt/awk/encrypt pattern (token on stdin, round-trip check). The entrypoint writes it to
-  `~agent/.claude/channels/discord/.env` (0600); it is not exported in `agent-env.sh`, so the loop's
-  `claude -p` runs never see it in their environment.
-- `config/agent-box/discord-channel.sh`: supervisor started by the entrypoint. Every 30s, if the tmux
-  session `discord` is gone, it starts `claude --channels plugin:discord@claude-plugins-official`
-  with `DISCORD_ACCESS_MODE=static` and no API key (Max login). It fails closed: no start until the
-  token, the plugin and an allowlist-only `access.json` exist. Log: `/var/log/discord-channel.log`.
+- SOPS keys in `secrets/agent-box.secrets.yaml.age`: `DISCORD_BOT_TOKEN` and `DISCORD_OWNER_ID` (the
+  owner's Discord user ID). `sops set` fails on this file; use the ADR 0037 decrypt/awk/encrypt
+  pattern (value on stdin, round-trip check). On every boot the entrypoint writes the token to
+  `~agent/.claude/channels/discord/.env` (0600), writes the owner ID to the root-owned
+  `/etc/agent-box/discord-owner-id`, re-renders `access.json` from it, then unsets the token. Neither
+  value goes into `agent-env.sh`.
+- `config/agent-box/discord-channel.sh`: supervisor started by the entrypoint (log: `docker logs
+  agent-box`). Every 30s, if the tmux session `discord` is gone, it starts `claude --channels
+  plugin:discord@claude-plugins-official` with `DISCORD_ACCESS_MODE=static`, no API key (Max
+  login), `--permission-mode default` and `discord-channel-settings.json` (enables the plugin for
+  this session only; read-only allow list; denies secrets, `env`, `gh api`, PR merge/close/review,
+  `git push`). It fails closed: no start unless the token and the plugin exist and `access.json`
+  allows exactly the root-owned owner ID, with no guild groups. It pre-accepts the `/workspace`
+  trust dialog, logs claude's exit code, backs off on fast exits (up to 15 min) and logs a warning
+  when claude sits at a prompt or the bun MCP server is gone.
+- `config/agent-box/discord-channel.md`: session rules, appended to the system prompt.
 
-One-time setup inside agent-box, as `agent`:
+One-time setup inside agent-box, as `agent` (the plugin lives in the persistent volume):
 
 ```bash
 claude plugin install discord@claude-plugins-official
-cat > ~/.claude/channels/discord/access.json <<'EOF'
-{"dmPolicy": "allowlist", "allowFrom": ["<owner Discord user ID>"], "groups": {}}
-EOF
-chmod 600 ~/.claude/channels/discord/access.json
-tmux attach -t discord   # once: accept the workspace trust prompt, then detach (Ctrl-b d)
 ```
 
 No pairing: static mode downgrades `pairing` to `allowlist` and never writes `access.json`, so
-nothing said in the chat can widen access. Guild channels stay off (`groups` empty, the supervisor
-refuses otherwise); permission prompts are relayed to the owner's DM as buttons. Never start it with
-`--dangerously-skip-permissions`.
+nothing said in the chat can widen access. Permission prompts reach the owner's DM as buttons.
+Never start it with `--dangerously-skip-permissions`.
+
+Known gap: the loop worker runs as the same unix user. Its gate denies Read/Edit/Write on
+`~/.claude/channels/**`, but `Bash(cat *)` can still read the token file, as it can read the
+Claude and gh credentials today. Tampering with `access.json` only blocks the channel (the
+supervisor refuses to start); it cannot add an ID. The real fix is a separate unix user for the
+channel.
 
 Stop: `touch ~/discord-channel-off && tmux kill-session -t discord` (resume: `rm ~/discord-channel-off`).
 Rotate the token: Reset Token in the Developer Portal, store it in SOPS, `docker restart agent-box`.

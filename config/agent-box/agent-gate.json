@@ -182,6 +182,8 @@
     "Bash(git reset --hard*)",
     "Bash(gh api*)",
     "Read(~/.claude/channels/**)",
+    "Edit(~/.claude/channels/**)",
+    "Write(~/.claude/channels/**)",
     "WebFetch",
     "WebSearch"
   ]
