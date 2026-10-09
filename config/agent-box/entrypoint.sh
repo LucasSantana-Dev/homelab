@@ -54,13 +54,11 @@ git config --file "$AGENT_GITCONFIG" user.email "lucas.diassantana@gmail.com"
 git config --file "$AGENT_GITCONFIG" init.defaultBranch main
 touch "$AGENT_GITCONFIG" && chown agent:agent "$AGENT_GITCONFIG"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
-    git config --file "$AGENT_GITCONFIG" credential.helper store
-    printf 'https://x-access-token:%s@github.com\n' "$AGENT_GITHUB_TOKEN" \
-        > /home/agent/.git-credentials
-    chmod 600 /home/agent/.git-credentials
-    chown agent:agent /home/agent/.git-credentials
+    # gh is the single token holder; git asks gh for credentials.
+    rm -f /home/agent/.git-credentials
     echo "$AGENT_GITHUB_TOKEN" | su -c \
         "gh auth login --with-token --hostname github.com" agent 2>/dev/null || true
+    su -c "gh auth setup-git --hostname github.com" agent || log "WARN: gh auth setup-git failed"
     log "gh CLI authenticated."
 fi
 
