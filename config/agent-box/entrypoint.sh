@@ -47,6 +47,7 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
         echo "export GITHUB_TOKEN='${AGENT_GITHUB_TOKEN:-}'"
         echo "export CLAUDE_API_KEY='${ANTHROPIC_API_KEY:-}'"
         echo "export CLAUDE_DIR='/home/agent/.claude'"
+        echo "export DOCKER_HOST='${DOCKER_HOST:-}'"  # from compose; agent steps start with a clean env
         echo "export LANG=en_US.UTF-8"
         echo "export LC_ALL=en_US.UTF-8"
     } > /etc/profile.d/agent-env.sh)
@@ -57,6 +58,13 @@ if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
 else
     log "WARNING: Secrets file not found."
 fi
+
+# Older entrypoints created some of these dirs as root. chown -h never follows a link, and no
+# agent process runs yet, so this is safe; it keeps the agent block below from failing boot.
+for d in /home/agent/.claude/hooks /home/agent/.claude/channels /home/agent/.codex \
+         /home/agent/.config /home/agent/.config/opencode /home/agent/.ssh; do
+    [[ -d $d && ! -L $d ]] && chown -h agent:agent "$d"
+done
 
 # --- Git + gh config ---
 as_agent 'git config --global user.name agent-box &&
@@ -89,12 +97,6 @@ if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
 fi
 
 # --- Agent config (runs as agent; see as_agent) ---
-# Older entrypoints created some of these dirs as root. chown -h never follows a link, and no
-# agent process runs yet, so this is safe; it keeps the agent block below from failing boot.
-for d in /home/agent/.claude/hooks /home/agent/.claude/channels /home/agent/.codex \
-         /home/agent/.config /home/agent/.config/opencode /home/agent/.ssh; do
-    [[ -d $d && ! -L $d ]] && chown -h agent:agent "$d"
-done
 # Overrides are security-critical and must run after the claude-env sync.
 as_agent 'bash -s' <<'AGENT'
 set -euo pipefail
