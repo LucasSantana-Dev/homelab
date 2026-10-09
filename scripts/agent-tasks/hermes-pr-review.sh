@@ -24,15 +24,13 @@ START_TS=$(date +%s)
 log "hermes PR review — PR #$PR_NUMBER base=$BASE_REF repo=$REPO"
 
 # Guard: skip if any human (non-bot) has already commented — CLAUDE.md hard rule
-HUMAN_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq '[.comments[] | select(
-    .author.login != "github-actions[bot]" and
-    .author.login != "dependabot[bot]" and
-    .author.login != "renovate[bot]" and
-    .author.login != "coderabbitai[bot]" and
-    .author.login != "greptile-apps[bot]" and
-    (.author.is_bot // false) == false
-  )] | length' 2>&1) || { log "WARN: gh failed checking comments — skipping review"; exit 0; }
+# REST, not `gh pr view`: that strips the [bot] suffix and has no is_bot, so
+# hermes's own earlier comment (github-actions) counted as human and blocked
+# every later review on the PR. user.type tells bots from people.
+HUMAN_IDS=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+  --jq '.[] | select(.user.type != "Bot") | .id') \
+  || { log "WARN: gh failed checking comments, skipping review"; exit 0; }
+HUMAN_COMMENTS=$(grep -c . <<<"$HUMAN_IDS" || true)
 
 if [ "$HUMAN_COMMENTS" -gt 0 ]; then
     log "Skipping: $HUMAN_COMMENTS human comment(s) already present — CLAUDE.md hard rule"
