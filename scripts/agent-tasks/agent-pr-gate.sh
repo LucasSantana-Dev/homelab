@@ -127,7 +127,7 @@ for REPO in $AGENT_REPOS; do
                     continue
                 fi
                 AUTOFIX_LEFT=$((AUTOFIX_LEFT - 1))
-                PROMPT="You are on branch $BRANCH of $REPO, PR #$N. Its CI is failing. Read the failing checks with \`gh pr checks $N --repo $REPO\` and their logs, fix the root cause (not the test), run the checks locally, commit (no AI attribution) and push to $BRANCH. Do not touch unrelated files. Never force-push or merge."
+                PROMPT="You are on branch $BRANCH of $REPO, PR #$N. Its CI is failing. Read the failing checks with \`gh pr checks $N --repo $REPO\` and their logs, fix the root cause (not the test), run the checks locally, commit (no AI attribution) and push to $BRANCH. Do not touch unrelated files. Never force-push or merge. Run git and gh as single plain commands from the repo root: no cd, no && or ; chains, no \$(...); write the message with the Write tool to .git/agent-commit-msg and use git commit -F .git/agent-commit-msg."
                 if act "cd $WORKDIR && git fetch -q origin && git switch -q -C $BRANCH origin/$BRANCH"; then
                     act "$(claude_cmd "$REPO" "$WORKDIR" "$PROMPT")" || echo "claude exited non-zero"
                 else

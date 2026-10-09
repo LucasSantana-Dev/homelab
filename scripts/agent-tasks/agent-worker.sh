@@ -29,6 +29,7 @@ You are working unattended on GitHub issue #__ISSUE__ in __REPO__, on branch age
 4. Commit with a conventional commit message. No AI attribution, no Co-Authored-By trailer, no em-dash or en-dash.
 5. Push the branch and open a PR to __BASE__ with `gh pr create --repo __REPO__ --base __BASE__ --label agent`, body starting with "Closes #__ISSUE__" and a short what/why/how-tested.
 6. Never merge, never force-push, never touch auth, secrets, workflows, deploy, migrations, CLAUDE.md, AGENTS.md or .claude/. If the issue needs any of those, stop and say why.
+7. Shell commands run under a fixed allowlist in dontAsk mode. Run git and gh from the repo root as single plain commands: no `cd`, no `&&` or `;` chains, no `$(...)`, no heredocs. Write the commit message and PR body with the Write tool to `.git/agent-commit-msg` and `.git/agent-pr-body.md` (inside .git, so they never dirty the working tree), then use `git commit -F .git/agent-commit-msg` and `gh pr create --repo __REPO__ --base __BASE__ --label agent --title "<conventional title>" --body-file .git/agent-pr-body.md` (always pass --title: there is no TTY to prompt). If a command is denied, retry it in that simple form before giving up.
 EOF
 
 for REPO in $AGENT_REPOS; do
