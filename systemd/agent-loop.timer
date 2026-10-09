@@ -1,0 +1,10 @@
+[Unit]
+Description=Agent: autonomous dev loop (4x per day)
+
+[Timer]
+OnCalendar=*-*-* 04,10,15,20:00:00
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target
