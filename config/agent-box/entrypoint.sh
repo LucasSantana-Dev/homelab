@@ -195,6 +195,17 @@ fi
 as_agent 'exec python3 -I /opt/agent-config/wud-server.py' &
 log "WUD classify endpoint started on :8080"
 
+# --- SSH host key ---
+# Persistent volume, root only: a rebuild keeps the host identity, so known_hosts
+# entries (hermes-pr-review.sh checks strictly) stay valid. Generated once.
+HOST_KEY_DIR=/etc/ssh/host_keys
+chmod 700 "$HOST_KEY_DIR"
+if [[ ! -f "$HOST_KEY_DIR/ssh_host_ed25519_key" ]]; then
+    ssh-keygen -q -t ed25519 -N '' -f "$HOST_KEY_DIR/ssh_host_ed25519_key"
+    log "Generated new SSH host key: refresh known_hosts on the host once"
+fi
+log "SSH host key: $(ssh-keygen -lf "$HOST_KEY_DIR/ssh_host_ed25519_key.pub")"
+
 # --- Start SSH ---
 log "Starting SSH daemon..."
 exec /usr/sbin/sshd -D -e
