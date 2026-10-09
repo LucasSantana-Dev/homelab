@@ -122,7 +122,8 @@ with `access.json` only stops the channel. The loop can already read its own Git
 login, which matter more, so a separate unix user for the channel (a second Max login) was not
 worth it. Claude Code's Bash sandbox is not available: unprivileged user namespaces are blocked
 (Docker seccomp, `kernel.apparmor_restrict_unprivileged_userns=1`). If the token leaks: Reset
-Token, store it with `agent-box-secret-set.sh`, restart agent-box.
+Token, store it with `scripts/security/agent-box-secret-set.sh DISCORD_BOT_TOKEN`, restart
+agent-box.
 The same uid can also stop the supervisor and run its own channel session; the allowlist only
 holds against people on Discord, not against code already running as `agent`.
 

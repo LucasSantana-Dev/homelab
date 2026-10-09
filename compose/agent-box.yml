@@ -39,6 +39,9 @@ services:
     - ../config/agent-box/protect-homelab.sh:/opt/agent-config/hooks/protect-homelab.sh:ro
     - ../config/agent-box/secret-write-guard.sh:/opt/agent-config/hooks/secret-write-guard.sh:ro
     - ../config/agent-box/tag-deploy-guard.sh:/opt/agent-config/hooks/tag-deploy-guard.sh:ro
+    # bash-secret-guard.sh, wud-server.py and the discord-channel files are baked into the image
+    # (Dockerfile.agent-box), not mounted: the running stack may be composed from a host checkout
+    # that is not on release, so new mounts would not reach it. They change only on rebuild.
     - ../config/agent-box/codex-config.toml:/opt/agent-config/codex-config.toml:ro
     - ../config/agent-box/codex-mcp.json:/opt/agent-config/codex-mcp.json:ro
     - ../config/agent-box/codex-agents.md:/opt/agent-config/codex-agents.md:ro
