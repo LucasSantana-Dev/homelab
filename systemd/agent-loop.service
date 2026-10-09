@@ -8,10 +8,11 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 User=luk-server
+Environment="AGENT_REPOS=LucasSantana-Dev/Lucky LucasSantana-Dev/cojam"
 # Gate first: it frees WIP slots. A gate failure must not block the worker.
 ExecStart=-/home/luk-server/homelab/scripts/agent-tasks/agent-pr-gate.sh
 ExecStart=/home/luk-server/homelab/scripts/agent-tasks/agent-worker.sh
-# Worst case per run: 1 autofix + 1 worker claude run (45m each) per repo.
+# Worst case per run: 1 autofix + 1 worker claude run (45m each) per repo (2 repos: 3h).
 # Must stay under the 5h gap between timer slots (10->15, 15->20).
 TimeoutStartSec=4h
 StandardOutput=journal

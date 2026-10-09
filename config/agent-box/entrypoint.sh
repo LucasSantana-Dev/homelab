@@ -47,17 +47,18 @@ else
 fi
 
 # --- Git + gh config ---
-git config --global user.name "agent-box"
-git config --global user.email "lucas.diassantana@gmail.com"
-git config --global init.defaultBranch main
+# The entrypoint runs as root but git runs as agent, so write agent's config.
+AGENT_GITCONFIG=/home/agent/.gitconfig
+git config --file "$AGENT_GITCONFIG" user.name "agent-box"
+git config --file "$AGENT_GITCONFIG" user.email "lucas.diassantana@gmail.com"
+git config --file "$AGENT_GITCONFIG" init.defaultBranch main
+touch "$AGENT_GITCONFIG" && chown agent:agent "$AGENT_GITCONFIG"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
-    git config --global credential.helper store
-    printf 'https://x-access-token:%s@github.com\n' "$AGENT_GITHUB_TOKEN" \
-        > /home/agent/.git-credentials
-    chmod 600 /home/agent/.git-credentials
-    chown agent:agent /home/agent/.git-credentials
+    # gh is the single token holder; git asks gh for credentials.
+    rm -f /home/agent/.git-credentials
     echo "$AGENT_GITHUB_TOKEN" | su -c \
         "gh auth login --with-token --hostname github.com" agent 2>/dev/null || true
+    su -c "gh auth setup-git --hostname github.com" agent || log "WARN: gh auth setup-git failed"
     log "gh CLI authenticated."
 fi
 
@@ -66,11 +67,11 @@ CLAUDE_ENV_DIR="/home/agent/.claude-env"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     if [[ ! -d "$CLAUDE_ENV_DIR/.git" ]]; then
         log "Cloning claude-env..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
+        su -c "git clone https://github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
             || log "WARN: claude-env clone failed (token access or network) — continuing without it"
     else
         log "Pulling claude-env updates..."
-        su -c "cd $CLAUDE_ENV_DIR && git pull --ff-only 2>&1 || true" agent
+        su -c "cd $CLAUDE_ENV_DIR && git remote set-url origin https://github.com/LucasSantana-Dev/claude-env.git && git pull --ff-only 2>&1 || true" agent
     fi
     if [[ -f "$CLAUDE_ENV_DIR/bin/sync" ]]; then
         log "Syncing claude environment..."
@@ -146,12 +147,17 @@ clone_repo() {
     local repo="$1" dir="$2"
     if [[ ! -d "/workspace/$dir/.git" && -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
         log "Cloning $repo..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/${repo}.git /workspace/$dir 2>&1" agent \
+        su -c "git clone https://github.com/${repo}.git /workspace/$dir 2>&1" agent \
             || log "WARN: $repo clone failed (token access or network) — continuing without it"
+    elif [[ -d "/workspace/$dir/.git" ]]; then
+        # Auth comes from the credential helper; a token baked into the remote
+        # URL would outlive PAT rotation.
+        su -c "git -C /workspace/$dir remote set-url origin https://github.com/${repo}.git" agent || true
     fi
 }
 clone_repo "LucasSantana-Dev/Lucky"     "Lucky"
 clone_repo "LucasSantana-Dev/homelab"   "homelab"
+clone_repo "LucasSantana-Dev/cojam"     "cojam"
 
 # --- Fix Docker socket GID ---
 if [[ -S /var/run/docker.sock ]]; then
