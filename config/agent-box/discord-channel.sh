@@ -74,7 +74,8 @@ plugin_deps() {
     local dir
     dir=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["plugins"][sys.argv[2]][0]["installPath"])' \
         "$HOME/.claude/plugins/installed_plugins.json" "$PLUGIN" 2>/dev/null) || return 1
-    [[ -d $dir/node_modules ]] && return 0
+    # Check a real dependency, not the dir: a killed install can leave node_modules half done.
+    [[ -d $dir/node_modules/discord.js ]] && return 0
     log "installing plugin dependencies in $dir"
     (cd "$dir" && timeout 300 bun install --no-summary)
 }
