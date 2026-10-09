@@ -67,8 +67,9 @@ sudo cp systemd/agent-loop.service systemd/agent-loop.timer /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now agent-loop.timer
 ```
 
-Repos in scope: `AGENT_REPOS` (default `LucasSantana-Dev/Lucky`). Add homelab only after the pilot;
-its PRs target `release`.
+Repos in scope: `AGENT_REPOS` (default `LucasSantana-Dev/Lucky`). Configured repos: Lucky,
+homelab (PRs target `release`) and cojam. cojam needs issues labeled `ready-for-agent` plus
+`effort:s` before the picker selects anything.
 
 ## Discord channel (phase 3)
 

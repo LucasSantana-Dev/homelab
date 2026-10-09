@@ -146,12 +146,17 @@ clone_repo() {
     local repo="$1" dir="$2"
     if [[ ! -d "/workspace/$dir/.git" && -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
         log "Cloning $repo..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/${repo}.git /workspace/$dir 2>&1" agent \
+        su -c "git clone https://github.com/${repo}.git /workspace/$dir 2>&1" agent \
             || log "WARN: $repo clone failed (token access or network) — continuing without it"
+    elif [[ -d "/workspace/$dir/.git" ]]; then
+        # Auth comes from the credential helper; a token baked into the remote
+        # URL would outlive PAT rotation.
+        su -c "git -C /workspace/$dir remote set-url origin https://github.com/${repo}.git" agent || true
     fi
 }
 clone_repo "LucasSantana-Dev/Lucky"     "Lucky"
 clone_repo "LucasSantana-Dev/homelab"   "homelab"
+clone_repo "LucasSantana-Dev/cojam"     "cojam"
 
 # --- Fix Docker socket GID ---
 if [[ -S /var/run/docker.sock ]]; then

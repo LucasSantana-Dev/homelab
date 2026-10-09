@@ -125,6 +125,10 @@
     "LucasSantana-Dev/homelab": {
       "base": "release",
       "workdir": "/workspace/homelab"
+    },
+    "LucasSantana-Dev/cojam": {
+      "base": "main",
+      "workdir": "/workspace/cojam"
     }
   },
   "test_paths": [
