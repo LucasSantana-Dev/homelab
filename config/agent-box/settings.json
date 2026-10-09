@@ -6,6 +6,11 @@
     "LC_ALL": "en_US.UTF-8"
   },
   "model": "claude-sonnet-4-6",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false,
   "autoUpdates": false,
   "skipDangerousModePermissionPrompt": false,
   "permissions": {
