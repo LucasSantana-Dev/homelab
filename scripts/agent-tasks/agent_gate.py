@@ -4,7 +4,7 @@
 Subcommands (JSON on stdin, JSON on stdout):
   score   {"pr": <gh pr view json>, "issue": <gh issue view json> | null}
           -> {"pillars": {size, impact, value, security}, "reasons": [...], "decision": ...}
-  select  {"issues": [<gh issue list json>], "open_prs": [<gh pr list json>]}
+  select  {"issues": [<gh issue list json>], "open_prs": [<gh pr list json, all open PRs>]}
           -> {"issue": <number> | null, "skipped": {number: reason}}
 
 Grades are green < yellow < red. Mechanical signals only: diff size, paths,
@@ -285,7 +285,7 @@ def _issue_skip_reason(issue, taken, cfg):
     ):
         return "foreign comment"
     if issue["number"] in taken:
-        return "agent PR already open"
+        return "open PR already closes it"
     return None
 
 

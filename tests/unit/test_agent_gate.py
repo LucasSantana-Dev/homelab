@@ -289,7 +289,18 @@ def test_select_skips_issue_with_open_agent_pr(cfg):
     out = gate.select(
         [make_issue(number=7)], [{"closingIssuesReferences": [{"number": 7}]}], cfg
     )
-    assert out == {"issue": None, "skipped": {"7": "agent PR already open"}}
+    assert out == {"issue": None, "skipped": {"7": "open PR already closes it"}}
+
+
+def test_select_skips_issue_closed_by_non_agent_open_pr(cfg):
+    owner_pr = {
+        "number": 2784,
+        "headRefName": "fix/hand-made",
+        "labels": [],
+        "closingIssuesReferences": [{"number": 2780}],
+    }
+    out = gate.select([make_issue(number=2780)], [owner_pr], cfg)
+    assert out == {"issue": None, "skipped": {"2780": "open PR already closes it"}}
 
 
 # --- CLI ------------------------------------------------------------------
@@ -385,7 +396,7 @@ def test_agent_rules_and_infra_are_high_impact(cfg, path):
 
 def test_select_counts_agent_branch_without_closing_ref(cfg):
     out = gate.select([make_issue(number=9)], [{"headRefName": "agent/issue-9"}], cfg)
-    assert out["skipped"] == {"9": "agent PR already open"}
+    assert out["skipped"] == {"9": "open PR already closes it"}
 
 
 # --- cubic review fixes ---------------------------------------------------

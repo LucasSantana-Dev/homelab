@@ -87,11 +87,19 @@ workdir_clean() {
     [[ -z "$out" ]]
 }
 
-# Open agent PRs: labelled `agent` OR on an agent/ branch (the label is set by the
-# model and may be missing). JSON array.
+# All open PRs, agent or hand-opened. JSON array.
+open_prs() {
+    run_on_agent "gh pr list --repo $1 --state open --limit 100 --json number,headRefName,closingIssuesReferences,labels"
+}
+
+# Filters open_prs JSON on stdin to agent PRs: labelled `agent` OR on an agent/
+# branch (the label is set by the model and may be missing).
+only_agent_prs() {
+    jq '[.[] | select((.headRefName | startswith("agent/")) or any(.labels[]; .name == "agent"))]'
+}
+
 open_agent_prs() {
-    run_on_agent "gh pr list --repo $1 --state open --limit 100 --json number,headRefName,closingIssuesReferences,labels" \
-        | jq '[.[] | select((.headRefName | startswith("agent/")) or any(.labels[]; .name == "agent"))]'
+    open_prs "$1" | only_agent_prs
 }
 
 ensure_labels() {
