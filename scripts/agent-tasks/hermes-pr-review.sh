@@ -27,7 +27,9 @@ log "hermes PR review — PR #$PR_NUMBER base=$BASE_REF repo=$REPO"
 # REST, not `gh pr view`: that strips the [bot] suffix and has no is_bot, so
 # hermes's own earlier comment (github-actions) counted as human and blocked
 # every later review on the PR. user.type tells bots from people.
-HUMAN_IDS=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+# Each gh call before the review gets 60s, so a slow API skips the run instead
+# of eating the ssh budget below.
+HUMAN_IDS=$(timeout 60 gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
   --jq '.[] | select(.user.type != "Bot") | .id') \
   || { log "WARN: gh failed checking comments, skipping review"; exit 0; }
 HUMAN_COMMENTS=$(grep -c . <<<"$HUMAN_IDS" || true)
@@ -41,7 +43,7 @@ fi
 # Use the PR HEAD SHA (what we actually review below), NOT `git rev-parse HEAD` —
 # on pull_request events the checkout is the ephemeral refs/pull/N/merge commit,
 # so its SHA changes with the base and never matches the reviewed head (#310).
-HEAD_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null) \
+HEAD_SHA=$(timeout 60 gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null) \
   || { log "WARN: gh failed resolving PR head SHA — skipping review"; exit 0; }
 if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; exit 0; fi
 # The posted comment stores only the 8-char short SHA (see printf below), so the
@@ -49,7 +51,7 @@ if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; e
 # never hit and duplicates would be posted (#310).
 SHORT_SHA="${HEAD_SHA:0:8}"
 # Paginated REST (gh pr view caps the comment list), bot comments only.
-EXISTING_REVIEW=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+EXISTING_REVIEW=$(timeout 60 gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
   --jq ".[] | select(.user.type == \"Bot\" and (.body | startswith(\"[hermes] code review ($SHORT_SHA)\"))) | .id") \
   || { log "WARN: gh failed checking existing reviews, skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
@@ -95,6 +97,12 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
 fi
 
 log "Review complete (${#REVIEW} chars)"
+# GitHub rejects comment bodies over 65536 chars; keep room for the wrapper.
+if [ "${#REVIEW}" -gt 60000 ]; then
+    REVIEW="${REVIEW:0:60000}
+
+(truncated at 60000 chars)"
+fi
 
 # Post comment
 BODY="$(printf '[hermes] code review (%s)\n\n%s\n\n---\n*Advisory only — not a blocking gate.*' \
