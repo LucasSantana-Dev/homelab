@@ -49,7 +49,9 @@ urgency rules:
 safe_to_schedule: false only when urgency=high AND container is critical infrastructure
 (database, proxy, auth, caddy, mariadb, redis, prometheus)"
 
-RESULT=$(claude --print "$PROMPT" 2>/dev/null | python3 -c "
+# wud-server.py sources agent-env.sh, whose ANTHROPIC_API_KEY is invalid and would
+# override the subscription login (the other agent-tasks scripts unset it too).
+RESULT=$(env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY claude --print "$PROMPT" 2>/dev/null | python3 -c "
 import sys, json, re
 text = sys.stdin.read()
 m = re.search(r'\{[^{}]+\}', text, re.DOTALL)
