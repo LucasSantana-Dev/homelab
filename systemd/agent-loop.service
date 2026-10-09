@@ -1,0 +1,15 @@
+[Unit]
+Description=Agent: autonomous dev loop (PR gate, then worker)
+Documentation=file:///home/luk-server/homelab/docs/agent-loop.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=luk-server
+# Gate first: it frees WIP slots. A gate failure must not block the worker.
+ExecStart=-/home/luk-server/homelab/scripts/agent-tasks/agent-pr-gate.sh
+ExecStart=/home/luk-server/homelab/scripts/agent-tasks/agent-worker.sh
+TimeoutStartSec=5h
+StandardOutput=journal
+StandardError=journal
