@@ -48,9 +48,10 @@ if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; e
 # dedup check must match that same form — comparing the full 40-char SHA would
 # never hit and duplicates would be posted (#310).
 SHORT_SHA="${HEAD_SHA:0:8}"
-EXISTING_REVIEW=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq ".comments[] | select(.body | startswith(\"[hermes] code review ($SHORT_SHA)\"))" \
-  2>&1) || { log "WARN: gh failed checking existing reviews — skipping review"; exit 0; }
+# Paginated REST (gh pr view caps the comment list), bot comments only.
+EXISTING_REVIEW=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+  --jq ".[] | select(.user.type == \"Bot\" and (.body | startswith(\"[hermes] code review ($SHORT_SHA)\"))) | .id") \
+  || { log "WARN: gh failed checking existing reviews, skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
     log "Already reviewed at $HEAD_SHA — skipping"
     exit 0
@@ -58,6 +59,7 @@ fi
 
 # Fetch PR branch in agent-box workspace and run review
 log "Fetching PR branch and running review on agent-box..."
+REVIEW_STATUS=ok
 # agent-box authorizes only the dedicated key (the one the `agent-box` alias uses),
 # not the default ~/.ssh/id_* keys. Host key checking stays strict.
 if ! REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
@@ -71,13 +73,16 @@ if ! REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
      # Subscription login, like claude_cmd: the exported API key is invalid and
      # would take precedence. A failed review still restores main below.
      rc=0
-     REVIEW_OUT=\$(timeout 600 env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY claude --print \
+     # 420s, not 600: the job has timeout-minutes 10, and the fallback comment
+     # must still post before GitHub kills the runner.
+     REVIEW_OUT=\$(timeout 420 env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY claude --print \
        'Review the current branch (hermes-pr-$PR_NUMBER) against $BASE_REF. What are the top 3-5 issues, bugs, or improvements? Format as markdown bullets. Include [severity: high|medium|low] for each. If nothing notable, say so in one line.' \
        2>&1) || rc=\$?
      git checkout -q main
      git branch -q -D hermes-pr-$PR_NUMBER || true
      printf '%s' \"\$REVIEW_OUT\"
      exit \$rc" 2>&1); then
+    REVIEW_STATUS=error
     # Keep the real error in the log: the PR comment only gets the fallback.
     log "agent-box review failed: $(tail -c 1000 <<<"$REVIEW")"
     REVIEW="hermes: review unavailable (agent-box unreachable or error). Check $LOG_FILE."
@@ -144,10 +149,13 @@ except Exception:
     state = {}
 state['pr_review'] = {
     'last_run': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime($END_TS)),
-    'status': 'ok',
+    'status': '$REVIEW_STATUS',
     'last_pr': $PR_NUMBER,
     'duration_s': $DURATION,
     'total': state.get('pr_review', {}).get('total', 0) + 1,
 }
-json.dump(state, open(state_file, 'w'), indent=2)
-" 2>/dev/null || true
+# Write then rename, so a crash mid-write never leaves truncated JSON.
+with open(state_file + '.tmp', 'w') as f:
+    json.dump(state, f, indent=2)
+os.replace(state_file + '.tmp', state_file)
+" || log "WARN: could not write $STATE_DIR/hermes-state.json"
