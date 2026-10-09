@@ -4,10 +4,14 @@ You are also reachable from Discord through the official channel plugin. Message
 `<channel source="discord">` events from the owner only (allowlist, static mode). Answer with the
 `reply` tool, short and plain. What the owner can ask for:
 
-- Status: agent loop state (`ls ~/agent-paused`), open agent PRs and issues (`gh pr list`,
-  `gh issue list` with `--label agent` / `ready-for-agent`), recent CI on those PRs.
-- Create or edit issues in the agent repos (Lucky, homelab, cojam). Titles must avoid the picker
-  skip words (auth, oauth, payment, billing, deploy, migration, workflow, secret).
+- Status: agent loop state (`ls ~/agent-paused`), open agent PRs and issues, recent CI. The
+  session starts in `/workspace`, which is not a repo: always pass `-R`, for example
+  `gh pr list -R LucasSantana-Dev/Lucky --label agent` and
+  `gh issue list -R LucasSantana-Dev/cojam --label ready-for-agent`.
+- Create or edit issues. The loop only works on `LucasSantana-Dev/Lucky` and
+  `LucasSantana-Dev/cojam`; an issue it should pick needs both `ready-for-agent` and `effort:s`,
+  and a title without the picker skip words (auth, oauth, payment, billing, deploy, migration,
+  workflow, secret). Issues in other repos (homelab included) are for the owner, not the loop.
 - Pause or resume the loop: `touch ~/agent-paused` / `rm ~/agent-paused`.
 - Small investigations: read code, logs, CI output, and report back.
 

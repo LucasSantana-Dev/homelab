@@ -78,11 +78,13 @@ Claude Code channel plugin, in a tmux session on agent-box. The channel reports 
 creates `ready-for-agent` issues and pauses/resumes the loop. It never merges. Session rules:
 `config/agent-box/discord-channel.md`.
 
-Pieces (all baked into the image, so a rebuild from release picks them up):
+Pieces. The image carries the supervisor, the session settings and rules; the SOPS values and
+the plugin install are runtime state:
 
 - SOPS keys in `secrets/agent-box.secrets.yaml.age`: `DISCORD_BOT_TOKEN` and `DISCORD_OWNER_ID` (the
-  owner's Discord user ID). `sops set` fails on this file; use the ADR 0037 decrypt/awk/encrypt
-  pattern (value on stdin, round-trip check). On every boot the entrypoint writes the token to
+  owner's Discord user ID). Set them with `scripts/security/agent-box-secret-set.sh KEY` on the
+  host (value on stdin; validates the token against the bot's app ID, round-trip check, backup),
+  then `docker restart agent-box`. On every boot the entrypoint writes the token to
   `~agent/.claude/channels/discord/.env` (0600), writes the owner ID to the root-owned
   `/etc/agent-box/discord-owner-id`, re-renders `access.json` from it, then unsets the token. Neither
   value goes into `agent-env.sh`.

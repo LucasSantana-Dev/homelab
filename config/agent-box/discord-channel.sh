@@ -3,7 +3,8 @@
 # Runs as agent, started in the background by entrypoint.sh. Fails closed: the session
 # only starts when the token, the plugin and an access.json that allows exactly the owner
 # (root-owned OWNER_FILE, from SOPS) are all present.
-# Stop it: touch ~/discord-channel-off (resume: rm it). Attach: tmux attach -t discord
+# Stop it: touch ~/discord-channel-off (kills the session within one interval; resume: rm it).
+# Attach: tmux attach -t discord
 set -uo pipefail
 
 SESSION=discord
@@ -86,6 +87,11 @@ STARTED=0 FAILS=0 NEXT=0
 while true; do
     now=$(date +%s)
     if tmux has-session -t "$SESSION" 2>/dev/null; then
+        if [[ -e $HOME/discord-channel-off ]]; then
+            log "off marker found, stopping session"
+            tmux kill-session -t "$SESSION" 2>/dev/null; STARTED=0; LAST=""
+            continue
+        fi
         pane=$(tmux capture-pane -p -t "$SESSION" 2>/dev/null || true)
         if grep -qiE 'do you trust the files|select login method|run /login|press enter to continue' <<<"$pane"; then
             why "stalled: claude is waiting for input (tmux attach -t $SESSION)"
