@@ -8,7 +8,7 @@ ENV LC_ALL=en_US.UTF-8
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl wget git openssh-server sudo jq \
     ca-certificates gnupg lsb-release \
-    locales age python3 python3-pip rsync && \
+    locales age python3 python3-pip rsync tmux && \
     locale-gen en_US.UTF-8 && \
     update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && \
     rm -rf /var/lib/apt/lists/*
@@ -48,11 +48,11 @@ RUN curl -fsSL https://github.com/getsops/sops/releases/download/v3.9.4/sops-v3.
 RUN pip3 install --no-cache-dir uv --break-system-packages && \
     ln -sf /usr/local/bin/uv /usr/local/bin/uvx 2>/dev/null || true
 
-# Claude CLI + OpenCode
+# Claude CLI + OpenCode; Bun runs the Discord channel plugin's MCP server
 # PINNED: @openai/codex@0.125.0 — newer versions (>=0.126) reject gpt-5.4 with ChatGPT Pro OAuth.
 # Upgrade only when OpenAI adds Pro OAuth support for a newer model in codex release notes.
 # hadolint ignore=DL3016
-RUN npm install -g @anthropic-ai/claude-code opencode-ai @openai/codex@0.125.0
+RUN npm install -g @anthropic-ai/claude-code opencode-ai @openai/codex@0.125.0 bun@1.4.2
 
 # agent user
 RUN useradd -m -s /bin/bash agent && \
@@ -68,7 +68,10 @@ RUN mkdir -p /var/run/sshd && \
     echo "AllowUsers agent" >> /etc/ssh/sshd_config
 
 COPY config/agent-box/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY config/agent-box/discord-channel.sh /opt/agent-config/discord-channel.sh
+COPY config/agent-box/discord-channel.md /opt/agent-config/discord-channel.md
+COPY config/agent-box/discord-channel-settings.json /opt/agent-config/discord-channel-settings.json
+RUN chmod +x /entrypoint.sh /opt/agent-config/discord-channel.sh
 
 EXPOSE 22
 CMD ["/entrypoint.sh"]

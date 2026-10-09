@@ -142,6 +142,32 @@ cp /opt/agent-config/authorized_keys /home/agent/.ssh/authorized_keys
 chmod 600 /home/agent/.ssh/authorized_keys
 chown -R agent:agent /home/agent/.ssh
 
+# --- Discord channel (official plugin; values from SOPS, never in agent-env.sh) ---
+# The owner ID file is root-owned so the agent uid cannot change who may talk to the
+# channel; access.json is re-rendered from it on every boot.
+DISCORD_STATE=/home/agent/.claude/channels/discord
+install -d -m 700 -o agent -g agent /home/agent/.claude/channels "$DISCORD_STATE"
+install -d -m 755 /etc/agent-box
+# rm before write and chown -h: the agent uid owns this dir and could plant a symlink.
+rm -f "$DISCORD_STATE/.env" "$DISCORD_STATE/access.json"
+if [[ -n "${DISCORD_BOT_TOKEN:-}" ]]; then
+    (umask 077; printf 'DISCORD_BOT_TOKEN=%s\n' "$DISCORD_BOT_TOKEN" > "$DISCORD_STATE/.env")
+    chown -h agent:agent "$DISCORD_STATE/.env"
+fi
+if [[ "${DISCORD_OWNER_ID:-}" =~ ^[0-9]{15,22}$ ]]; then
+    printf '%s\n' "$DISCORD_OWNER_ID" > /etc/agent-box/discord-owner-id
+    chmod 644 /etc/agent-box/discord-owner-id
+    (umask 077; printf '{"dmPolicy": "allowlist", "allowFrom": ["%s"], "groups": {}}\n' \
+        "$DISCORD_OWNER_ID" > "$DISCORD_STATE/access.json")
+    chown -h agent:agent "$DISCORD_STATE/access.json"
+else
+    rm -f /etc/agent-box/discord-owner-id
+fi
+# Nothing started below needs the token in its environment; the plugin reads .env.
+unset DISCORD_BOT_TOKEN
+su -s /bin/bash agent -c /opt/agent-config/discord-channel.sh &
+log "Discord channel supervisor started."
+
 # --- Clone working repos on first run ---
 clone_repo() {
     local repo="$1" dir="$2"
