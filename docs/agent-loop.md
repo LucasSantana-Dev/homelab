@@ -67,7 +67,7 @@ sudo cp systemd/agent-loop.service systemd/agent-loop.timer /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now agent-loop.timer
 ```
 
-Repos in scope: `AGENT_REPOS` (default `LucasSantana-Dev/Lucky`). Configured repos: Lucky,
+Repos in scope: `AGENT_REPOS` (script default `LucasSantana-Dev/Lucky`; `agent-loop.service` sets Lucky and cojam). Configured repos: Lucky,
 homelab (PRs target `release`) and cojam. cojam needs issues labeled `ready-for-agent` plus
 `effort:s` before the picker selects anything.
 

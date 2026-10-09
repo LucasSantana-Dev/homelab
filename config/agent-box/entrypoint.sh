@@ -67,11 +67,11 @@ CLAUDE_ENV_DIR="/home/agent/.claude-env"
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
     if [[ ! -d "$CLAUDE_ENV_DIR/.git" ]]; then
         log "Cloning claude-env..."
-        su -c "git clone https://x-access-token:${AGENT_GITHUB_TOKEN}@github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
+        su -c "git clone https://github.com/LucasSantana-Dev/claude-env.git $CLAUDE_ENV_DIR 2>&1" agent \
             || log "WARN: claude-env clone failed (token access or network) — continuing without it"
     else
         log "Pulling claude-env updates..."
-        su -c "cd $CLAUDE_ENV_DIR && git pull --ff-only 2>&1 || true" agent
+        su -c "cd $CLAUDE_ENV_DIR && git remote set-url origin https://github.com/LucasSantana-Dev/claude-env.git && git pull --ff-only 2>&1 || true" agent
     fi
     if [[ -f "$CLAUDE_ENV_DIR/bin/sync" ]]; then
         log "Syncing claude environment..."
