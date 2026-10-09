@@ -148,18 +148,18 @@ chown -R agent:agent /home/agent/.ssh
 DISCORD_STATE=/home/agent/.claude/channels/discord
 install -d -m 700 -o agent -g agent /home/agent/.claude/channels "$DISCORD_STATE"
 install -d -m 755 /etc/agent-box
+# rm before write and chown -h: the agent uid owns this dir and could plant a symlink.
+rm -f "$DISCORD_STATE/.env" "$DISCORD_STATE/access.json"
 if [[ -n "${DISCORD_BOT_TOKEN:-}" ]]; then
     (umask 077; printf 'DISCORD_BOT_TOKEN=%s\n' "$DISCORD_BOT_TOKEN" > "$DISCORD_STATE/.env")
-    chown agent:agent "$DISCORD_STATE/.env"
-else
-    rm -f "$DISCORD_STATE/.env"
+    chown -h agent:agent "$DISCORD_STATE/.env"
 fi
 if [[ "${DISCORD_OWNER_ID:-}" =~ ^[0-9]{15,22}$ ]]; then
     printf '%s\n' "$DISCORD_OWNER_ID" > /etc/agent-box/discord-owner-id
     chmod 644 /etc/agent-box/discord-owner-id
     (umask 077; printf '{"dmPolicy": "allowlist", "allowFrom": ["%s"], "groups": {}}\n' \
         "$DISCORD_OWNER_ID" > "$DISCORD_STATE/access.json")
-    chown agent:agent "$DISCORD_STATE/access.json"
+    chown -h agent:agent "$DISCORD_STATE/access.json"
 else
     rm -f /etc/agent-box/discord-owner-id
 fi

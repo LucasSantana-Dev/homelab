@@ -103,6 +103,9 @@ One-time setup inside agent-box, as `agent` (the plugin lives in the persistent 
 claude plugin install discord@claude-plugins-official
 ```
 
+Then `docker restart agent-box` on the host: the install also enables the plugin in the user
+settings, which the entrypoint overwrites on boot; until then loop runs would load it too.
+
 No pairing: static mode downgrades `pairing` to `allowlist` and never writes `access.json`, so
 nothing said in the chat can widen access. Permission prompts reach the owner's DM as buttons.
 Never start it with `--dangerously-skip-permissions`.

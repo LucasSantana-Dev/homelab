@@ -79,7 +79,7 @@ unset DISCORD_BOT_TOKEN ANTHROPIC_API_KEY CLAUDE_API_KEY ANTHROPIC_AUTH_TOKEN AN
 DISCORD_ACCESS_MODE=static claude --channels plugin:$PLUGIN \
 --settings $CONF/discord-channel-settings.json --permission-mode default \
 --append-system-prompt \"\$(cat $CONF/discord-channel.md)\"; \
-echo \"\$(date +%FT%T%z) claude exited \$?\" >> $EXIT_LOG"
+rc=\$?; echo \"\$(date +%FT%T%z) claude exited \$rc\" >> $EXIT_LOG"
 }
 
 STARTED=0 FAILS=0 NEXT=0
@@ -87,7 +87,7 @@ while true; do
     now=$(date +%s)
     if tmux has-session -t "$SESSION" 2>/dev/null; then
         pane=$(tmux capture-pane -p -t "$SESSION" 2>/dev/null || true)
-        if grep -qiE 'do you trust|trust this folder|select login|log ?in to|press enter to continue' <<<"$pane"; then
+        if grep -qiE 'do you trust the files|select login method|run /login|press enter to continue' <<<"$pane"; then
             why "stalled: claude is waiting for input (tmux attach -t $SESSION)"
         elif (( now - STARTED > 120 )) && ! pgrep -u "$(id -u)" -f 'bun.*server\.ts' >/dev/null; then
             why "warning: discord MCP server (bun) is not running"

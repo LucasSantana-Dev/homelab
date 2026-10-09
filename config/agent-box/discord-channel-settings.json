@@ -17,7 +17,9 @@
       "Bash(git log*)",
       "Bash(ls*)",
       "Bash(touch /home/agent/agent-paused)",
-      "Bash(rm /home/agent/agent-paused)"
+      "Bash(rm /home/agent/agent-paused)",
+      "Bash(touch ~/agent-paused)",
+      "Bash(rm ~/agent-paused)"
     ],
     "deny": [
       "Read(~/.claude/channels/**)",
