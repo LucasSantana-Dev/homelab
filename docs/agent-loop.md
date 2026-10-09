@@ -23,8 +23,8 @@ wrappers. The agent-box hooks are an extra layer.
 
 ## Issue selection
 
-Open, `ready-for-agent`, `effort:s`, authored by the owner, no foreign comments, no open agent PR,
-no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
+Open, `ready-for-agent`, `effort:s`, authored by the owner, no foreign comments, no open PR closing it
+(agent or hand-opened; an open PR on an `agent/issue-N` branch also counts), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
 workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 
 ## Merge gate: 4 pillars

@@ -39,15 +39,17 @@ for REPO in $AGENT_REPOS; do
     WORKDIR=$(cfg "$REPO" workdir)
     WIP_CAP=$(cfg "$REPO" wip_cap)
 
-    OPEN_PRS=$(open_agent_prs "$REPO") || { echo "gh pr list failed"; continue; }
-    OPEN_COUNT=$(jq 'length' <<<"$OPEN_PRS")
+    # WIP cap counts agent PRs only; selection sees every open PR, so an issue
+    # a hand-opened PR already closes is not picked again.
+    ALL_PRS=$(open_prs "$REPO") || { echo "gh pr list failed"; continue; }
+    OPEN_COUNT=$(only_agent_prs <<<"$ALL_PRS" | jq 'length')
     if (( OPEN_COUNT >= WIP_CAP )); then
         echo "WIP cap reached ($OPEN_COUNT/$WIP_CAP open agent PRs), not starting new work"
         continue
     fi
 
     ISSUES=$(run_on_agent "gh issue list --repo $REPO --label ready-for-agent --state open --limit 100 --json number,title,labels,author,comments,createdAt") || { echo "gh issue list failed"; continue; }
-    PICK=$(jq -n --argjson i "$ISSUES" --argjson p "$OPEN_PRS" '{issues:$i, open_prs:$p}' | python3 "$GATE_PY" select --repo "$REPO")
+    PICK=$(jq -n --argjson i "$ISSUES" --argjson p "$ALL_PRS" '{issues:$i, open_prs:$p}' | python3 "$GATE_PY" select --repo "$REPO")
     echo "selection: $PICK"
     ISSUE=$(jq -r '.issue // empty' <<<"$PICK")
     if [[ -z "$ISSUE" ]]; then
