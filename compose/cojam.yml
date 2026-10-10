@@ -60,11 +60,9 @@ services:
       # with room auth on, ROOM_AUTH_SECRET is at least 32 bytes. Verified
       # against the host .env on 2026-10-07 (secret 64 bytes, origins set).
       APP_ENV: production
-      # Idle persisted rooms are deleted after this many minutes. 0 keeps them
-      # forever (current behaviour). The privacy policy draft (cojam#253, #319)
-      # proposes 30 days = 43200; set COJAM_ROOM_PERSIST_IDLE_TTL_MINUTES in
-      # .env once the owner confirms, since it deletes data.
-      ROOM_PERSIST_IDLE_TTL_MINUTES: ${COJAM_ROOM_PERSIST_IDLE_TTL_MINUTES:-0}
+      # Idle persisted rooms (no member, no change) are deleted after this many
+      # minutes. Owner decision 2026-10-09: 30 days = 43200, as /privacidade states.
+      ROOM_PERSIST_IDLE_TTL_MINUTES: ${COJAM_ROOM_PERSIST_IDLE_TTL_MINUTES:-43200}
       # Optional webhook for user reports (cojam#259). Empty = off. The payload
       # carries the room id, which is the room's access link: point it at a
       # private channel only.
