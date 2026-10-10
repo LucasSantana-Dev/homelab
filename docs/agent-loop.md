@@ -160,6 +160,10 @@ No pairing: static mode downgrades `pairing` to `allowlist` and never writes `ac
 nothing said in the chat can widen access. There are no permission prompts: denied tools are refused silently (the existing PreToolUse hooks still apply).
 Never start it with `--dangerously-skip-permissions`.
 
+The Discord session's deny rules are speed bumps, not a boundary: broad `Bash` is allowed by owner
+decision, and a same-uid process (for example `python3 -c` running `gh`) can read the gh token.
+The guardrail hooks are root-owned so the session cannot rewrite them.
+
 Accepted risk (owner decision, 2026-10-09, #485): the loop worker runs as the same unix user, so
 `Bash(cat *)` can read the bot token file even though its gate denies Read/Edit on
 `~/.claude/channels/**`. A leaked token lets someone post as the bot and read its DMs; it cannot

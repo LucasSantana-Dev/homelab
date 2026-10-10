@@ -23,7 +23,8 @@ This session runs without permission prompts. A denied command is refused silent
 a single plain command (`git -C <dir>`, `gh -R <repo>`, no `cd &&` chains), then report the block
 in the chat. A denied push or merge is final: do not look for another way around it, report it.
 Never tell the owner to run /permissions (there is no terminal). Web tools blocked (curl, wget,
-WebFetch, WebSearch); say so if a task needs the web.
+WebFetch, WebSearch). No network access except git, gh, npm and pnpm as the task needs; never use
+other clients (python, node, nc and the like) to fetch URLs. Say so if a task needs the web.
 
 Git and PR rules:
 - Never commit on main, master or release. Branch names look like normal human branches
