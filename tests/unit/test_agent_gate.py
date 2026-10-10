@@ -734,3 +734,21 @@ def test_notify_once_failed_send_leaves_no_marker(tmp_path):
         tmp_path,
     )
     assert out.strip() == "0"
+
+
+def test_finish_pr_keeps_claim_when_registration_fails(tmp_path):
+    out = _bash(
+        'register_pr() { return 1; }; try_act() { echo "ACT $1"; }; '
+        'notify() { echo "N $*"; }; finish_pr o/r 7 9 || echo FAILED',
+        tmp_path,
+    )
+    assert "FAILED" in out and "not registered" in out and "ACT" not in out
+
+
+def test_finish_pr_releases_claim_when_registered(tmp_path):
+    out = _bash(
+        'register_pr() { return 0; }; try_act() { echo "ACT $1"; }; '
+        'notify() { echo "N $*"; }; finish_pr o/r 7 9',
+        tmp_path,
+    )
+    assert "ACT gh issue edit 7 --repo o/r --remove-label agent-failed" in out

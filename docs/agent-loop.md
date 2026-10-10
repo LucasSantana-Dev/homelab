@@ -61,7 +61,7 @@ re-post identical threads on every push), then `needs-human`. Stale-close never 
 autofix.
 
 For `owner-review`, `needs-human`, `split` and `auto-merge` the gate sends one Discord message per head
-commit and decision with the grades (the autofix cap and dirty-workdir alerts are separate) (nothing is posted on the PR, which carries no agent marker: branch `fix/issue-N`, no `agent` label, commits as the owner; dedup state is one file per PR and sha under `AGENT_STATE_DIR/notified`); `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
+commit and decision with the grades (the autofix cap and dirty-workdir alerts are separate) (nothing is posted on the PR, which carries no agent marker: branch `fix/issue-N`, no `agent` label, commits as the owner; dedup state is one file per repo, PR, head sha and decision under `AGENT_STATE_DIR/notified`); `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
 `wait` and CI `autofix` PRs, never to ones waiting on the owner.
 
 ## Graduation

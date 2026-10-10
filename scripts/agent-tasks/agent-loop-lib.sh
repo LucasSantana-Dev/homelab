@@ -112,6 +112,19 @@ register_pr() {  # repo pr
     fi
 }
 
+# Registration is a prerequisite: an unregistered fix/issue-N PR is ignored by the gate, so
+# on failure the claim label stays and the owner is told.
+finish_pr() {  # repo issue pr
+    if ! register_pr "$1" "$3"; then
+        notify --title "agent: PR #$3 not registered" \
+            --body "$1 PR #$3 opened for #$2 but not registered, gate will not manage it. Issue keeps agent-failed." \
+            --urgency warn || true
+        return 1
+    fi
+    try_act "gh issue edit $2 --repo $1 --remove-label agent-failed"
+    notify --title "agent: PR #$3 opened for #$2" --body "https://github.com/$1/pull/$3" --urgency info || true
+}
+
 # Filters open_prs JSON on stdin (arg: repo) to agent PRs: a legacy agent/ branch or `agent`
 # label, or a fix/issue-N branch whose PR number is in the registry.
 only_agent_prs() {
