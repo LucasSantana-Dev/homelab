@@ -4,23 +4,16 @@
     "discord@claude-plugins-official": true
   },
   "permissions": {
-    "defaultMode": "default",
+    "defaultMode": "dontAsk",
     "allow": [
       "mcp__plugin_discord_discord",
-      "Bash(gh pr list*)",
-      "Bash(gh pr view*)",
-      "Bash(gh pr checks*)",
-      "Bash(gh issue list*)",
-      "Bash(gh issue view*)",
-      "Bash(gh run list*)",
-      "Bash(gh run view*)",
-      "Bash(git status*)",
-      "Bash(git log*)",
-      "Bash(ls*)",
-      "Bash(touch /home/agent/agent-paused)",
-      "Bash(rm /home/agent/agent-paused)",
-      "Bash(touch ~/agent-paused)",
-      "Bash(rm ~/agent-paused)"
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "TodoWrite",
+      "Bash"
     ],
     "deny": [
       "Read(~/.claude/channels/**)",
@@ -43,7 +36,28 @@
       "Bash(gh pr close*)",
       "Bash(gh pr review*)",
       "Bash(gh api*)",
-      "Bash(git push*)"
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push*--force*)",
+      "Bash(git push*--delete*)",
+      "Bash(git push*+*)",
+      "Bash(git push*:**)",
+      "Bash(git push origin main*)",
+      "Bash(git push origin master*)",
+      "Bash(git push origin release*)",
+      "Bash(git push origin HEAD:main*)",
+      "Bash(git push origin HEAD:release*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(rm -rf*)",
+      "Bash(sudo*)",
+      "Bash(curl*)",
+      "Bash(wget*)",
+      "Bash(gh secret*)",
+      "Bash(gh repo delete*)",
+      "Bash(gh label delete*)",
+      "WebFetch",
+      "WebSearch"
     ]
   }
 }
