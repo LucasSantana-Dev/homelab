@@ -67,7 +67,7 @@ for d in /home/agent/.claude/hooks /home/agent/.claude/channels /home/agent/.cod
 done
 
 # --- Git + gh config ---
-as_agent 'git config --global user.name agent-box &&
+as_agent 'git config --global user.name "Lucas Santana" &&
     git config --global user.email lucas.diassantana@gmail.com &&
     git config --global init.defaultBranch main'
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then

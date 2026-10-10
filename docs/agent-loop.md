@@ -24,7 +24,7 @@ wrappers. The agent-box hooks are an extra layer.
 ## Issue selection
 
 Open, `ready-for-agent`, `effort:s`, authored by the owner, no foreign comments, no open PR closing it
-(agent or hand-opened; an open PR on an `agent/issue-N` branch also counts), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
+(agent or hand-opened; an open PR on a `fix/issue-N` branch, or a legacy `agent/issue-N` one, also counts), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
 workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 
 ## Merge gate: 4 pillars
@@ -60,13 +60,13 @@ the PR to `owner-review`. CI and thread fixes share the `fix_attempts` counter p
 re-post identical threads on every push), then `needs-human`. Stale-close never applies to thread
 autofix.
 
-For `owner-review`, `needs-human`, `split` and `auto-merge` the gate posts one comment per head
-commit with the grades; `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
+For `owner-review`, `needs-human`, `split` and `auto-merge` the gate sends one Discord message per head
+commit with the grades (nothing is posted on the PR, which carries no agent marker: branch `fix/issue-N`, no `agent` label, commits as the owner; dedup state is one file per PR and sha under `AGENT_STATE_DIR/notified`); `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
 `wait` and CI `autofix` PRs, never to ones waiting on the owner.
 
 ## Graduation
 
-- Phase 1 (now): `auto_merge: false`. The gate grades and comments; the owner merges. Compare the grade with your merge decision.
+- Phase 1 (now): `auto_merge: false`. The gate grades and notifies; the owner merges. Compare the grade with your merge decision.
 - Phase 2: after 10 agent PRs merged without rework and the grade matching your decision in at least 9 of 10, set `auto_merge: true`. Merges use `gh pr merge --auto --squash --match-head-commit`, so required checks still gate.
 - Brake: if an auto-merged PR is reverted or breaks the base branch, set `auto_merge: false` and tighten the pillar that missed.
 
@@ -74,9 +74,9 @@ commit with the grades; `wait` and `autofix` post nothing until the fix cap is h
 
 Every `claude -p` run (worker and autofix) gets its mode and allow/deny lists from
 `agent-gate.json` via `claude_cmd`. Push is not in the config: `claude_cmd` takes the run's branch,
-refuses anything outside `agent/`, and allows exactly `git push origin <branch>` and
+refuses anything outside `fix/` (legacy `agent/`), and allows exactly `git push origin <branch>` and
 `git push -u origin <branch>`. A rule with no `*` matches one exact command, so refspecs
-(`agent/x:main`, `+agent/x`), `--force` and `--delete` are not allowed; the deny list repeats them as
+(`fix/x:main`, `+fix/x`), `--force` and `--delete` are not allowed; the deny list repeats them as
 a backstop. The colon deny is `Bash(git push*:**)`: a pattern ending in `:*` is Claude Code's prefix
 syntax, and `Bash(git push*:*)` matches nothing (verified on 2.1.292). `Edit(/.github/**)` blocks
 workflow edits from the repo root; Edit rules also cover the Write tool, and `Write(path)` rules are

@@ -8,6 +8,9 @@ AGENT_REPOS="${AGENT_REPOS:-LucasSantana-Dev/Lucky}"
 AGENT_DRY_RUN="${AGENT_DRY_RUN:-0}"
 AGENT_MAX_RUNS_PER_DAY="${AGENT_MAX_RUNS_PER_DAY:-6}"
 AGENT_STATE_DIR="${AGENT_STATE_DIR:-/home/luk-server/agent-state}"
+# New work branches look like the owner's own: fix/issue-N. The legacy agent/ prefix and
+# the `agent` label still mark PRs opened before the switch, so those keep being tracked.
+export AGENT_BRANCH_PREFIX="fix/issue-"
 
 cfg() { python3 "$GATE_PY" get --repo "$1" --key "$2"; }
 
@@ -57,11 +60,11 @@ budget_take() {
 # a later change to the box's global settings cannot widen what the worker may do.
 # The prompt goes in on stdin so the variadic tool flags cannot swallow it.
 # Push is allowed only as the exact `git push [-u] origin <branch>` (no globs, so no
-# refspec, --force or --delete variants); a branch outside agent/ gets no run at all.
+# refspec, --force or --delete variants); a branch outside fix/ or agent/ gets no run at all.
 claude_cmd() {
     local repo="$1" workdir="$2" prompt="$3" branch="$4" qprompt mode allowed denied t
-    if ! [[ "$branch" =~ ^agent/[A-Za-z0-9._/-]+$ ]]; then
-        echo "claude_cmd: refusing branch '$branch' (must be agent/...)" >&2
+    if ! [[ "$branch" =~ ^(agent|fix)/[A-Za-z0-9._/-]+$ ]]; then
+        echo "claude_cmd: refusing branch '$branch' (must be fix/... or agent/...)" >&2
         return 1
     fi
     printf -v qprompt '%q' "$prompt"
@@ -93,10 +96,29 @@ open_prs() {
     run_on_agent "gh pr list --repo $1 --state open --limit 1000 --json number,headRefName,closingIssuesReferences,labels"
 }
 
-# Filters open_prs JSON on stdin to agent PRs: labelled `agent` OR on an agent/
-# branch (the label is set by the model and may be missing).
+# Filters open_prs JSON on stdin to agent PRs: on a fix/issue-N branch (current form),
+# or on a legacy agent/ branch, or carrying the legacy `agent` label.
 only_agent_prs() {
-    jq '[.[] | select((.headRefName | startswith("agent/")) or any(.labels[]; .name == "agent"))]'
+    jq '[.[] | select((.headRefName | test("^fix/issue-[0-9]+$")) or (.headRefName | startswith("agent/"))
+        or any(.labels[]; .name == "agent"))]'
+}
+
+# Discord instead of a PR comment: one message per PR head sha, so a re-run does not repeat
+# it. State is one file per key, written atomically (temp + mv).
+notify_once() {  # repo pr sha title body urgency
+    local repo="$1" n="$2" sha="$3" key f tmp
+    key="${repo//\//_}-$n-$sha"
+    f="$AGENT_STATE_DIR/notified/$key"
+    [[ -e "$f" ]] && return 0
+    if [[ "$AGENT_DRY_RUN" != "1" ]]; then
+        mkdir -p "$AGENT_STATE_DIR/notified"
+        tmp=$(mktemp "$AGENT_STATE_DIR/notified/.tmp.XXXXXX") || return 0
+        if ! { date +%s > "$tmp" && mv "$tmp" "$f"; }; then
+            rm -f "$tmp"
+            return 0
+        fi
+    fi
+    notify --title "$4" --body "$5" --urgency "${6:-info}"
 }
 
 open_agent_prs() {
@@ -106,7 +128,7 @@ open_agent_prs() {
 ensure_labels() {
     local repo="$1" have
     have=$(run_on_agent "gh label list --repo $repo --limit 200 --json name -q '.[].name'") || return 0
-    for l in agent agent-failed needs-human needs-split agent-fix-1 agent-fix-2; do
+    for l in agent-failed needs-human needs-split agent-fix-1 agent-fix-2; do
         grep -qx "$l" <<<"$have" || try_act "gh label create $l --repo $repo --color BFD4F2"
     done
 }
