@@ -16,7 +16,7 @@ wrappers. The agent-box hooks are an extra layer.
 
 - At most `wip_cap` (2) open agent PRs per repo. When full, the worker starts nothing new.
 - One issue and at most `AGENT_MAX_AUTOFIX_PER_RUN` (1) autofix per repo per run, under a lock. Daily budget of `AGENT_MAX_RUNS_PER_DAY` (6) claude runs, shared by worker and autofix.
-- Autofix at most `fix_attempts` (2) per PR, then `needs-human` on the PR. The attempt count lives in `AGENT_STATE_DIR/autofix` (seeded once from legacy `agent-fix-N` labels).
+- Autofix at most `fix_attempts` (2) per PR, then `needs-human` on the PR. The attempt count lives in `AGENT_STATE_DIR/autofix` (seeded once from legacy `agent-fix-N` labels; losing the state dir resets the counter, since the labels are no longer written).
 - PRs idle for `stale_days` (5) are closed and the issue gets `needs-look`, so it is not picked again.
 - Any PR or issue another human authored, commented on or pushed to is never touched.
 - Pause everything: `touch ~/agent-paused` inside agent-box (resume: `rm ~/agent-paused`).
@@ -24,7 +24,7 @@ wrappers. The agent-box hooks are an extra layer.
 ## Issue selection
 
 Open, `ready` (legacy `ready-for-agent` is still read), `effort:s`, authored by the owner, no foreign comments, no open PR closing it
-(agent or hand-opened; an open PR on a `fix/issue-N` branch, or a legacy `agent/issue-N` one, also counts), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
+(agent or hand-opened; an open PR on a `fix/issue-N` branch, or a legacy `agent/issue-N` one, also counts (a `fix/issue-N` PR is tracked only after the worker registers it in `AGENT_STATE_DIR/prs`, so a hand-opened one is never touched)), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
 workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 
 ## Merge gate: 4 pillars

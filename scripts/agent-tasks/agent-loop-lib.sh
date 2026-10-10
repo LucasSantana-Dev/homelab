@@ -36,7 +36,7 @@ notify() {
     if [[ "$AGENT_DRY_RUN" == "1" ]]; then
         echo "DRY-RUN notify: $*"
     else
-        $NOTIFY "$@" || true
+        $NOTIFY "$@"
     fi
 }
 
@@ -63,8 +63,8 @@ budget_take() {
 # refspec, --force or --delete variants); a branch outside fix/ or agent/ gets no run at all.
 claude_cmd() {
     local repo="$1" workdir="$2" prompt="$3" branch="$4" qprompt mode allowed denied t
-    if ! [[ "$branch" =~ ^(agent|fix)/[A-Za-z0-9._/-]+$ ]]; then
-        echo "claude_cmd: refusing branch '$branch' (must be fix/... or agent/...)" >&2
+    if ! [[ "$branch" =~ ^(agent/[A-Za-z0-9._/-]+|fix/issue-[0-9]+)$ ]]; then
+        echo "claude_cmd: refusing branch '$branch' (must be fix/issue-N or agent/...)" >&2
         return 1
     fi
     printf -v qprompt '%q' "$prompt"
@@ -96,33 +96,53 @@ open_prs() {
     run_on_agent "gh pr list --repo $1 --state open --limit 1000 --json number,headRefName,closingIssuesReferences,labels"
 }
 
-# Filters open_prs JSON on stdin to agent PRs: on a fix/issue-N branch (current form),
-# or on a legacy agent/ branch, or carrying the legacy `agent` label.
-only_agent_prs() {
-    jq '[.[] | select((.headRefName | test("^fix/issue-[0-9]+$")) or (.headRefName | startswith("agent/"))
-        or any(.labels[]; .name == "agent"))]'
+# Registry of PRs the worker opened: one file per PR, written after the worker confirms it.
+# A fix/issue-N branch alone proves nothing (the owner may open one by hand).
+pr_slug() { echo "${1//\//_}"; }
+
+register_pr() {  # repo pr
+    [[ "$AGENT_DRY_RUN" == "1" ]] && { echo "DRY-RUN: register PR $1#$2"; return 0; }
+    local d tmp
+    d="$AGENT_STATE_DIR/prs"
+    mkdir -p "$d" || return 1
+    tmp=$(mktemp "$d/.tmp.XXXXXX") || return 1
+    if ! { date +%s > "$tmp" && mv "$tmp" "$d/$(pr_slug "$1")-$2"; }; then
+        rm -f "$tmp"
+        return 1
+    fi
 }
 
-# Discord instead of a PR comment: one message per PR head sha, so a re-run does not repeat
-# it. State is one file per key, written atomically (temp + mv).
-notify_once() {  # repo pr sha title body urgency
-    local repo="$1" n="$2" sha="$3" key f tmp
-    key="${repo//\//_}-$n-$sha"
-    f="$AGENT_STATE_DIR/notified/$key"
+# Filters open_prs JSON on stdin (arg: repo) to agent PRs: a legacy agent/ branch or `agent`
+# label, or a fix/issue-N branch whose PR number is in the registry.
+only_agent_prs() {
+    local slug nums
+    slug=$(pr_slug "$1")
+    nums=$(find "$AGENT_STATE_DIR/prs" -maxdepth 1 -name "$slug-*" 2>/dev/null \
+        | sed -n "s|.*/$slug-\([0-9][0-9]*\)\$|\1|p" | jq -sc '.' 2>/dev/null) || nums="[]"
+    jq --argjson reg "${nums:-[]}" '[.[] | select((.headRefName | startswith("agent/"))
+        or any(.labels[]; .name == "agent")
+        or ((.headRefName | test("^fix/issue-[0-9]+$")) and (.number as $n | $reg | index($n))))]'
+}
+
+# Discord instead of a PR comment: one message per PR head sha and decision. The marker is
+# written only after a successful send (a failed send retries next run); a failed marker
+# write still notifies. State is one file per key, written atomically (temp + mv).
+notify_once() {  # repo pr sha decision title body urgency
+    local repo="$1" n="$2" sha="$3" decision="$4" f tmp
+    f="$AGENT_STATE_DIR/notified/$(pr_slug "$repo")-$n-$sha-$decision"
     [[ -e "$f" ]] && return 0
-    if [[ "$AGENT_DRY_RUN" != "1" ]]; then
-        mkdir -p "$AGENT_STATE_DIR/notified"
-        tmp=$(mktemp "$AGENT_STATE_DIR/notified/.tmp.XXXXXX") || return 0
-        if ! { date +%s > "$tmp" && mv "$tmp" "$f"; }; then
-            rm -f "$tmp"
-            return 0
-        fi
+    notify --title "$5" --body "$6" --urgency "${7:-info}" || return 0
+    [[ "$AGENT_DRY_RUN" == "1" ]] && return 0
+    mkdir -p "$AGENT_STATE_DIR/notified" || return 0
+    tmp=$(mktemp "$AGENT_STATE_DIR/notified/.tmp.XXXXXX") || return 0
+    if ! { date +%s > "$tmp" && mv "$tmp" "$f"; }; then
+        rm -f "$tmp"
     fi
-    notify --title "$4" --body "$5" --urgency "${6:-info}"
+    return 0
 }
 
 open_agent_prs() {
-    open_prs "$1" | only_agent_prs
+    open_prs "$1" | only_agent_prs "$1"
 }
 
 ensure_labels() {

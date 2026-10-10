@@ -148,7 +148,7 @@ for REPO in $AGENT_REPOS; do
         if [[ "$DECISION" == "wait" || ( "$DECISION" == "autofix" && "$FIX" == "ci" ) ]] && ! has_label needs-human \
             && (( $(date +%s) - $(date -d "$UPDATED" +%s) > STALE_DAYS * 86400 )); then
             try_act "gh pr close $N --repo $REPO"
-            notify_once "$REPO" "$N" "$SHA" "agent: #$N closed as stale" "$REPO #$N: no progress in $STALE_DAYS days, closed. The issue is labelled needs-look." warn
+            notify_once "$REPO" "$N" "$SHA" stale "agent: #$N closed as stale" "$REPO #$N: no progress in $STALE_DAYS days, closed. The issue is labelled needs-look." warn
             [[ -n "$ISSUE_N" ]] && try_act "gh issue edit $ISSUE_N --repo $REPO --add-label needs-look"
             continue
         fi
@@ -159,19 +159,19 @@ for REPO in $AGENT_REPOS; do
             wait) ;;
             close)
                 try_act "gh pr close $N --repo $REPO"
-                notify_once "$REPO" "$N" "$SHA" "agent: #$N closed" "$REPO #$N"$'\n'"$TABLE" warn
+                notify_once "$REPO" "$N" "$SHA" close "agent: #$N closed" "$REPO #$N"$'\n'"$TABLE" warn
                 [[ -n "$ISSUE_N" ]] && try_act "gh issue edit $ISSUE_N --repo $REPO --add-label needs-look"
                 ;;
             needs-human)
                 if ! has_label needs-human; then
                     try_act "gh pr edit $N --repo $REPO --add-label needs-human"
-                    notify --title "agent: #$N needs a human" --body "$REPO #$N: $(jq -r '.reasons | join("; ")' <<<"$RES")" --urgency alert
+                    notify --title "agent: #$N needs a human" --body "$REPO #$N: $(jq -r '.reasons | join("; ")' <<<"$RES")" --urgency alert || true
                 fi
-                notify_once "$REPO" "$N" "$SHA" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
+                notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
                 ;;
             split)
                 has_label needs-split || try_act "gh pr edit $N --repo $REPO --add-label needs-split"
-                notify_once "$REPO" "$N" "$SHA" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
+                notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
                 ;;
             autofix)
                 has_label needs-human && continue
@@ -182,12 +182,12 @@ for REPO in $AGENT_REPOS; do
                 TRIES=$(fix_tries "$REPO" "$N" "$LEGACY_TRIES")
                 if (( TRIES >= FIX_MAX )); then
                     try_act "gh pr edit $N --repo $REPO --add-label needs-human"
-                    notify --title "agent: #$N needs a human" --body "$REPO #$N: $WHAT after $TRIES fixes" --urgency warn
+                    notify --title "agent: #$N needs a human" --body "$REPO #$N: $WHAT after $TRIES fixes" --urgency warn || true
                     continue
                 fi
                 if [[ "$AGENT_DRY_RUN" != "1" ]] && ! workdir_clean "$WORKDIR"; then
                     echo "workdir $WORKDIR is dirty, skipping autofix of #$N"
-                    notify --title "agent: dirty workdir" --body "$REPO $WORKDIR has uncommitted changes; autofix of #$N skipped" --urgency warn
+                    notify --title "agent: dirty workdir" --body "$REPO $WORKDIR has uncommitted changes; autofix of #$N skipped" --urgency warn || true
                     continue
                 fi
                 (( AUTOFIX_LEFT > 0 )) || { echo "#$N: autofix deferred, per-run cap reached"; continue; }
@@ -225,12 +225,12 @@ for REPO in $AGENT_REPOS; do
                 try_act "cd $WORKDIR && git switch -q --detach origin/$BASE"
                 ;;
             owner-review)
-                notify_once "$REPO" "$N" "$SHA" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
+                notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
                 ;;
             auto-merge)
-                notify_once "$REPO" "$N" "$SHA" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
+                notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
                 if act "gh pr merge $N --repo $REPO --auto --squash --match-head-commit $SHA"; then
-                    notify --title "agent: auto-merge queued #$N" --body "$REPO #$N, 4 green pillars" --urgency info
+                    notify --title "agent: auto-merge queued #$N" --body "$REPO #$N, 4 green pillars" --urgency info || true
                 else
                     echo "#$N: gh pr merge --auto failed"
                 fi

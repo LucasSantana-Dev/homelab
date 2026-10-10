@@ -421,23 +421,28 @@ def test_select_ignores_other_branch_shapes(cfg, branch):
     assert "9" not in out["skipped"]
 
 
-def test_only_agent_prs_matches_new_and_legacy_forms():
+def test_only_agent_prs_needs_registry_for_fix_branches(tmp_path):
     lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
     prs = [
         {"number": 1, "headRefName": "fix/issue-1", "labels": []},
         {"number": 2, "headRefName": "agent/issue-2", "labels": []},
         {"number": 3, "headRefName": "other", "labels": [{"name": "agent"}]},
         {"number": 4, "headRefName": "fix/typo", "labels": []},
-        {"number": 5, "headRefName": "feat/x", "labels": []},
+        {"number": 5, "headRefName": "fix/issue-5", "labels": []},
     ]
+    script = (
+        f'source "{lib}"; AGENT_STATE_DIR="{tmp_path}"; AGENT_DRY_RUN=0; '
+        "register_pr o/r 5; register_pr o/other 1; only_agent_prs o/r"
+    )
     out = subprocess.run(
-        ["bash", "-c", f'source "{lib}"; only_agent_prs'],
+        ["bash", "-c", script],
         input=json.dumps(prs),
         capture_output=True,
         text=True,
         check=True,
     ).stdout
-    assert [p["number"] for p in json.loads(out)] == [1, 2, 3]
+    # 1: hand-opened fix/issue-1 (only registered in another repo) is not tracked.
+    assert [p["number"] for p in json.loads(out)] == [2, 3, 5]
 
 
 # --- cubic review fixes ---------------------------------------------------
@@ -517,16 +522,17 @@ def test_notify_once_dedups_per_sha(tmp_path):
     lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
     script = (
         f'source "{lib}"; AGENT_STATE_DIR="{tmp_path}"; AGENT_DRY_RUN=0; '
-        'notify() { echo "N $*"; }; notify_once o/r 5 abc t b warn; notify_once o/r 5 abc t b warn; '
-        "notify_once o/r 5 def t b warn"
+        'notify() { echo "N $*"; }; notify_once o/r 5 abc wait t b warn; notify_once o/r 5 abc wait t b warn; '
+        "notify_once o/r 5 abc close t b warn; notify_once o/r 5 def wait t b warn"
     )
     out = subprocess.run(
         ["bash", "-c", script], capture_output=True, text=True, check=True
     ).stdout
-    assert out.count("N --title t") == 2
+    assert out.count("N --title t") == 3
     assert sorted(p.name for p in (tmp_path / "notified").iterdir()) == [
-        "o_r-5-abc",
-        "o_r-5-def",
+        "o_r-5-abc-close",
+        "o_r-5-abc-wait",
+        "o_r-5-def-wait",
     ]
 
 
@@ -733,3 +739,12 @@ def test_fix_counter_dry_run_writes_nothing(tmp_path):
     out = _bash("AGENT_DRY_RUN=1; fix_record o/r 5 2; fix_tries o/r 5 0", tmp_path)
     assert "DRY-RUN" in out and out.split()[-1] == "0"
     assert not (tmp_path / "autofix").exists()
+
+
+def test_notify_once_failed_send_leaves_no_marker(tmp_path):
+    out = _bash(
+        "AGENT_DRY_RUN=0; notify() { return 1; }; notify_once o/r 5 abc wait t b warn; "
+        'ls "$AGENT_STATE_DIR/notified" 2>/dev/null | wc -l',
+        tmp_path,
+    )
+    assert out.strip() == "0"

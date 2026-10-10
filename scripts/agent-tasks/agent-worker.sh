@@ -42,7 +42,7 @@ for REPO in $AGENT_REPOS; do
     # WIP cap counts agent PRs only; selection sees every open PR, so an issue
     # a hand-opened PR already closes is not picked again.
     ALL_PRS=$(open_prs "$REPO") || { echo "gh pr list failed"; continue; }
-    OPEN_COUNT=$(only_agent_prs <<<"$ALL_PRS" | jq 'length')
+    OPEN_COUNT=$(only_agent_prs "$REPO" <<<"$ALL_PRS" | jq 'length')
     if (( OPEN_COUNT >= WIP_CAP )); then
         echo "WIP cap reached ($OPEN_COUNT/$WIP_CAP open agent PRs), not starting new work"
         continue
@@ -60,7 +60,7 @@ for REPO in $AGENT_REPOS; do
 
     if [[ "$AGENT_DRY_RUN" != "1" ]] && ! workdir_clean "$WORKDIR"; then
         echo "workdir $WORKDIR is dirty, refusing to start"
-        notify --title "agent: dirty workdir" --body "$REPO $WORKDIR has uncommitted changes; worker skipped #$ISSUE" --urgency warn
+        notify --title "agent: dirty workdir" --body "$REPO $WORKDIR has uncommitted changes; worker skipped #$ISSUE" --urgency warn || true
         continue
     fi
 
@@ -91,10 +91,11 @@ for REPO in $AGENT_REPOS; do
     [[ "$AGENT_DRY_RUN" == "1" ]] && continue
     PR=$(run_on_agent "gh pr list --repo $REPO --head $BRANCH --state open --json number -q '.[0].number'") || PR=""
     if [[ "$PR" =~ ^[0-9]+$ ]]; then
+        register_pr "$REPO" "$PR" || echo "WARN: could not register PR #$PR, the gate will not track it"
         try_act "gh issue edit $ISSUE --repo $REPO --remove-label needs-look"
-        notify --title "agent: PR #$PR opened for #$ISSUE" --body "https://github.com/$REPO/pull/$PR" --urgency info
+        notify --title "agent: PR #$PR opened for #$ISSUE" --body "https://github.com/$REPO/pull/$PR" --urgency info || true
     else
-        notify --title "agent: no PR for #$ISSUE" --body "$REPO #$ISSUE left labelled needs-look. Log: $LOG_FILE" --urgency warn
+        notify --title "agent: no PR for #$ISSUE" --body "$REPO #$ISSUE left labelled needs-look. Log: $LOG_FILE" --urgency warn || true
     fi
 done
 
