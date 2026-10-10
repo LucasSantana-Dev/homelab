@@ -50,9 +50,11 @@ if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; e
 # dedup check must match that same form — comparing the full 40-char SHA would
 # never hit and duplicates would be posted (#310).
 SHORT_SHA="${HEAD_SHA:0:8}"
-# Paginated REST (gh pr view caps the comment list), bot comments only.
+# Paginated REST (gh pr view caps the comment list), bot comments only. Matches
+# the hidden marker the current format embeds and the legacy "[hermes]" prefix,
+# so commits reviewed before the rebrand are not reviewed twice.
 EXISTING_REVIEW=$(timeout 60 gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
-  --jq ".[] | select(.user.type == \"Bot\" and (.body | startswith(\"[hermes] code review ($SHORT_SHA)\"))) | .id") \
+  --jq ".[] | select(.user.type == \"Bot\" and ((.body | contains(\"<!-- review:$SHORT_SHA -->\")) or (.body | startswith(\"[hermes] code review ($SHORT_SHA)\")))) | .id") \
   || { log "WARN: gh failed checking existing reviews, skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
     log "Already reviewed at $HEAD_SHA — skipping"
@@ -93,7 +95,6 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
     REVIEW_STATUS=error
     # Keep the real error in the log: the PR comment only gets the fallback.
     log "agent-box review failed: $(tail -c 1000 <<<"$REVIEW")"
-    REVIEW="hermes: review unavailable (agent-box unreachable or error). Check $LOG_FILE."
 fi
 
 log "Review complete (${#REVIEW} chars)"
@@ -104,19 +105,25 @@ if [ "${#REVIEW}" -gt 60000 ]; then
 (truncated at 60000 chars)"
 fi
 
-# Post comment
-BODY="$(printf '[hermes] code review (%s)\n\n%s\n\n---\n*Advisory only — not a blocking gate.*' \
-  "$SHORT_SHA" "$REVIEW")"
-
-# A failed or timed-out post still records `error` in the state file, then
-# fails the job.
+# Post comment. A failed review posts nothing to the PR: the error is already in
+# the log and the state file below.
 COMMENT_RC=0
-timeout 60 gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY" || COMMENT_RC=$?
-if [ "$COMMENT_RC" -eq 0 ]; then
-    log "Comment posted to PR #$PR_NUMBER"
+POSTED=0
+if [ "$REVIEW_STATUS" = ok ]; then
+    BODY="$(printf 'Code review (%s)\n\n<!-- review:%s -->\n\n%s' \
+      "$SHORT_SHA" "$SHORT_SHA" "$REVIEW")"
+    # A failed or timed-out post still records `error` in the state file, then
+    # fails the job.
+    timeout 60 gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY" || COMMENT_RC=$?
+    if [ "$COMMENT_RC" -eq 0 ]; then
+        POSTED=1
+        log "Comment posted to PR #$PR_NUMBER"
+    else
+        REVIEW_STATUS=error
+        log "ERROR: posting comment to PR #$PR_NUMBER failed (rc=$COMMENT_RC)"
+    fi
 else
-    REVIEW_STATUS=error
-    log "ERROR: posting comment to PR #$PR_NUMBER failed (rc=$COMMENT_RC)"
+    log "Review failed: no PR comment posted"
 fi
 
 # Write metrics for node-exporter textfile collector and homelab-manager state
@@ -131,7 +138,7 @@ PROM_DIR="/var/lib/node_exporter/textfile"
 # `set -e` — failed the whole review job AFTER the review had already posted (#382).
 # A non-writable dir is now a logged skip, never a job failure.
 # The counter means reviews posted, so a failed post does not count.
-if [ "$COMMENT_RC" -ne 0 ]; then
+if [ "$POSTED" -ne 1 ]; then
     log "Skipping Prometheus metrics: comment was not posted"
 elif [ -d "$PROM_DIR" ] && [ -w "$PROM_DIR" ]; then
     # Hold the lock across the ENTIRE read-modify-write — the previous version

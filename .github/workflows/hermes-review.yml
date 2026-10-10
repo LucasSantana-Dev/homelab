@@ -1,4 +1,4 @@
-name: Hermes PR Review
+name: PR review
 
 on:
   pull_request:
@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   hermes-review:
+    name: PR review
     # Runs on the homelab self-hosted runner (luk-server).
     # Label set during runner registration: ./config.sh --labels homelab
     runs-on: [self-hosted, homelab]
@@ -41,7 +42,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Run hermes review
+      - name: Run review
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
