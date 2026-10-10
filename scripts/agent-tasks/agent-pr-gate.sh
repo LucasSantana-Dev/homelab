@@ -148,8 +148,8 @@ for REPO in $AGENT_REPOS; do
         if [[ "$DECISION" == "wait" || ( "$DECISION" == "autofix" && "$FIX" == "ci" ) ]] && ! has_label needs-human \
             && (( $(date +%s) - $(date -d "$UPDATED" +%s) > STALE_DAYS * 86400 )); then
             try_act "gh pr close $N --repo $REPO"
-            notify_once "$REPO" "$N" "$SHA" "agent: #$N closed as stale" "$REPO #$N: no progress in $STALE_DAYS days, closed. The issue is labelled agent-failed." warn
-            [[ -n "$ISSUE_N" ]] && try_act "gh issue edit $ISSUE_N --repo $REPO --add-label agent-failed"
+            notify_once "$REPO" "$N" "$SHA" "agent: #$N closed as stale" "$REPO #$N: no progress in $STALE_DAYS days, closed. The issue is labelled needs-look." warn
+            [[ -n "$ISSUE_N" ]] && try_act "gh issue edit $ISSUE_N --repo $REPO --add-label needs-look"
             continue
         fi
 
@@ -160,7 +160,7 @@ for REPO in $AGENT_REPOS; do
             close)
                 try_act "gh pr close $N --repo $REPO"
                 notify_once "$REPO" "$N" "$SHA" "agent: #$N closed" "$REPO #$N"$'\n'"$TABLE" warn
-                [[ -n "$ISSUE_N" ]] && try_act "gh issue edit $ISSUE_N --repo $REPO --add-label agent-failed"
+                [[ -n "$ISSUE_N" ]] && try_act "gh issue edit $ISSUE_N --repo $REPO --add-label needs-look"
                 ;;
             needs-human)
                 if ! has_label needs-human; then
@@ -178,9 +178,10 @@ for REPO in $AGENT_REPOS; do
                 # One counter per PR for both kinds: some bots re-post the same threads on every push.
                 WHAT="CI still red"
                 [[ "$FIX" == "threads" ]] && WHAT="review-bot threads still open"
-                TRIES=$(jq '[.labels[].name | select(startswith("agent-fix-"))] | length' <<<"$PR_JSON")
+                LEGACY_TRIES=$(jq '[.labels[].name | select(startswith("agent-fix-"))] | length' <<<"$PR_JSON")
+                TRIES=$(fix_tries "$REPO" "$N" "$LEGACY_TRIES")
                 if (( TRIES >= FIX_MAX )); then
-                    try_act "gh pr edit $N --repo $REPO --add-label agent-failed --add-label needs-human"
+                    try_act "gh pr edit $N --repo $REPO --add-label needs-human"
                     notify --title "agent: #$N needs a human" --body "$REPO #$N: $WHAT after $TRIES fixes" --urgency warn
                     continue
                 fi
@@ -193,7 +194,7 @@ for REPO in $AGENT_REPOS; do
                 budget_take || continue
                 # Count the attempt before running, so a crash cannot loop forever.
                 # If the counter cannot be recorded, do not run (the cap would leak).
-                if ! act "gh pr edit $N --repo $REPO --add-label agent-fix-$((TRIES + 1))"; then
+                if ! fix_record "$REPO" "$N" "$((TRIES + 1))"; then
                     echo "#$N: could not record fix attempt, skipping"
                     continue
                 fi

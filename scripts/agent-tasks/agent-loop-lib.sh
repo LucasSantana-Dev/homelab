@@ -128,7 +128,34 @@ open_agent_prs() {
 ensure_labels() {
     local repo="$1" have
     have=$(run_on_agent "gh label list --repo $repo --limit 200 --json name -q '.[].name'") || return 0
-    for l in agent-failed needs-human needs-split agent-fix-1 agent-fix-2; do
+    for l in needs-look needs-human needs-split; do
         grep -qx "$l" <<<"$have" || try_act "gh label create $l --repo $repo --color BFD4F2"
     done
+}
+
+# Autofix attempts per PR, kept in a state file (not as PR labels). The first read seeds
+# the count from legacy agent-fix-N labels (arg 3, read only) so in-flight PRs keep theirs.
+fix_file() { echo "$AGENT_STATE_DIR/autofix/${1//\//_}-$2"; }
+
+fix_tries() {  # repo pr legacy_count
+    local f n
+    f=$(fix_file "$1" "$2")
+    if n=$(cat "$f" 2>/dev/null) && [[ "$n" =~ ^[0-9]+$ ]]; then
+        echo "$n"
+    else
+        echo "${3:-0}"
+    fi
+}
+
+# Returns 1 when the counter cannot be written (the caller must then not run).
+fix_record() {  # repo pr new_count
+    [[ "$AGENT_DRY_RUN" == "1" ]] && { echo "DRY-RUN: autofix count for $1#$2 -> $3"; return 0; }
+    local f tmp
+    f=$(fix_file "$1" "$2")
+    mkdir -p "$(dirname "$f")" || return 1
+    tmp=$(mktemp "$(dirname "$f")/.tmp.XXXXXX") || return 1
+    if ! { echo "$3" > "$tmp" && mv "$tmp" "$f"; }; then
+        rm -f "$tmp"
+        return 1
+    fi
 }

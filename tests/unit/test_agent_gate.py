@@ -48,7 +48,7 @@ def make_pr(
 
 
 def make_issue(
-    labels=("ready-for-agent", "cat:bug", "effort:s"),
+    labels=("ready", "cat:bug", "effort:s"),
     author=OWNER,
     number=1,
     title="fix: thing",
@@ -122,7 +122,7 @@ def test_value_yellow_for_bug_without_test(cfg):
 
 
 def test_value_yellow_for_docs_issue(cfg):
-    issue = make_issue(labels=("ready-for-agent", "cat:docs", "effort:s"))
+    issue = make_issue(labels=("ready", "cat:docs", "effort:s"))
     assert gate.grade_value(make_pr(["README.md"]), issue, cfg)[0] == "yellow"
 
 
@@ -241,17 +241,17 @@ def test_select_ranks_bug_then_p1_then_oldest(cfg):
     issues = [
         make_issue(
             number=10,
-            labels=("ready-for-agent", "effort:s", "cat:feature", "P1"),
+            labels=("ready", "effort:s", "cat:feature", "P1"),
             created="2026-01-01",
         ),
         make_issue(
             number=11,
-            labels=("ready-for-agent", "effort:s", "cat:bug"),
+            labels=("ready", "effort:s", "cat:bug"),
             created="2026-09-01",
         ),
         make_issue(
             number=12,
-            labels=("ready-for-agent", "effort:s", "cat:bug", "P1"),
+            labels=("ready", "effort:s", "cat:bug", "P1"),
             created="2026-09-02",
         ),
     ]
@@ -263,11 +263,11 @@ def test_select_ranks_bug_then_p1_then_oldest(cfg):
     [
         (make_issue(author="stranger"), "not owner-authored"),
         (
-            make_issue(labels=("ready-for-agent", "effort:m", "cat:bug")),
+            make_issue(labels=("ready", "effort:m", "cat:bug")),
             "effort not allowed",
         ),
-        (make_issue(labels=("ready-for-agent", "cat:bug")), "effort not allowed"),
-        (make_issue(labels=("ready-for-agent", "effort:s", "blocked")), "skip label"),
+        (make_issue(labels=("ready", "cat:bug")), "effort not allowed"),
+        (make_issue(labels=("ready", "effort:s", "blocked")), "skip label"),
         (
             make_issue(title="ci(deploy): skip unchanged image"),
             "sensitive topic: deploy",
@@ -693,3 +693,43 @@ def test_unlisted_app_thread_waits_for_the_owner(cfg):
     assert (
         gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "owner-review"
     )
+
+
+@pytest.mark.parametrize("label", ["ready", "ready-for-agent"])
+def test_select_reads_old_and_new_ready_label(cfg, label):
+    out = gate.select(
+        [make_issue(number=3, labels=(label, "effort:s", "cat:bug"))], [], cfg
+    )
+    assert out["issue"] == 3
+
+
+@pytest.mark.parametrize("skip", ["needs-look", "agent-failed"])
+def test_select_skips_old_and_new_failed_label(cfg, skip):
+    issue = make_issue(number=3, labels=("ready", "effort:s", skip))
+    assert gate.select([issue], [], cfg)["skipped"] == {"3": "skip label"}
+
+
+def _bash(script, state):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    return subprocess.run(
+        ["bash", "-c", f'source "{lib}"; AGENT_STATE_DIR="{state}"; {script}'],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def test_fix_counter_seeds_from_legacy_then_increments(tmp_path):
+    out = _bash(
+        "AGENT_DRY_RUN=0; fix_tries o/r 5 1; fix_record o/r 5 2; fix_tries o/r 5 0; "
+        "fix_record o/r 5 3; fix_tries o/r 5 0; fix_tries o/r 6 0",
+        tmp_path,
+    )
+    assert out.split() == ["1", "2", "3", "0"]
+    assert (tmp_path / "autofix" / "o_r-5").read_text().strip() == "3"
+
+
+def test_fix_counter_dry_run_writes_nothing(tmp_path):
+    out = _bash("AGENT_DRY_RUN=1; fix_record o/r 5 2; fix_tries o/r 5 0", tmp_path)
+    assert "DRY-RUN" in out and out.split()[-1] == "0"
+    assert not (tmp_path / "autofix").exists()
