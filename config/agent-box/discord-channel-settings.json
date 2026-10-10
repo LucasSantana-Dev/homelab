@@ -90,7 +90,15 @@
       "Edit(~/.claude/CLAUDE.md)",
       "Edit(~/.claude/settings.local.json)",
       "Edit(~/.claude.json)",
-      "Edit(/home/agent/.claude/settings.json)"
+      "Edit(/home/agent/.claude/settings.json)",
+      "Bash(gh * pr merge*)",
+      "Bash(gh * pr close*)",
+      "Bash(gh * pr review*)",
+      "Bash(gh * api*)",
+      "Bash(gh * auth*)",
+      "Bash(gh * secret*)",
+      "Bash(gh * repo delete*)",
+      "Bash(gh * label delete*)"
     ]
   }
 }
