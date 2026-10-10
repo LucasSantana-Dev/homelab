@@ -22,6 +22,8 @@ services:
       - ../appdata/cojam/db:/var/lib/postgresql/data
     networks:
       - database
+      # Read-only Grafana datasource path; only cojam-db and grafana join it.
+      - cojam-db-ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d cojam -U cojam"]
       interval: 30s
@@ -39,6 +41,8 @@ services:
     logging:
       driver: "json-file"
       options:
+        # Loki derives container_name from this tag (promtail-config.yaml).
+        tag: "{{.Name}}"
         max-size: "10m"
         max-file: "3"
 
@@ -56,11 +60,9 @@ services:
       # with room auth on, ROOM_AUTH_SECRET is at least 32 bytes. Verified
       # against the host .env on 2026-10-07 (secret 64 bytes, origins set).
       APP_ENV: production
-      # Idle persisted rooms are deleted after this many minutes. 0 keeps them
-      # forever (current behaviour). The privacy policy draft (cojam#253, #319)
-      # proposes 30 days = 43200; set COJAM_ROOM_PERSIST_IDLE_TTL_MINUTES in
-      # .env once the owner confirms, since it deletes data.
-      ROOM_PERSIST_IDLE_TTL_MINUTES: ${COJAM_ROOM_PERSIST_IDLE_TTL_MINUTES:-0}
+      # Idle persisted rooms (no member, no change) are deleted after this many
+      # minutes. Owner decision 2026-10-09: 30 days = 43200, as /privacidade states.
+      ROOM_PERSIST_IDLE_TTL_MINUTES: ${COJAM_ROOM_PERSIST_IDLE_TTL_MINUTES:-43200}
       # Optional webhook for user reports (cojam#259). Empty = off. The payload
       # carries the room id, which is the room's access link: point it at a
       # private channel only.
@@ -84,6 +86,10 @@ services:
       FEATURE_PUBLIC_ROOMS: ${FEATURE_PUBLIC_ROOMS:-false}
       FEATURE_QUEUE_VOTING: ${FEATURE_QUEUE_VOTING:-false}
       FEATURE_ROOM_CHAT: ${FEATURE_ROOM_CHAT:-false}
+      # Product events (cojam#444). The HMAC key pseudonymises room and actor
+      # ids; without it hashes change on every restart. Keep it stable.
+      EVENTS_HMAC_KEY: ${COJAM_EVENTS_HMAC_KEY:-}
+      FEATURE_PRODUCT_EVENTS: ${FEATURE_PRODUCT_EVENTS:-true}
       # Prometheus metrics on a dedicated listener, never the public port
       # (ADR-0004). 0.0.0.0 is the CONTAINER's interface, not the host's: the
       # port is never published, so this is reachable only from the frontend
@@ -136,6 +142,8 @@ services:
     logging:
       driver: "json-file"
       options:
+        # Loki derives container_name from this tag (promtail-config.yaml).
+        tag: "{{.Name}}"
         max-size: "10m"
         max-file: "3"
 
@@ -162,6 +170,8 @@ services:
       COJAM_FEATURE_PUBLIC_ROOMS: ${COJAM_FEATURE_PUBLIC_ROOMS:-}
       COJAM_FEATURE_QUEUE_VOTING: ${COJAM_FEATURE_QUEUE_VOTING:-}
       COJAM_FEATURE_ROOM_CHAT: ${COJAM_FEATURE_ROOM_CHAT:-}
+      # Client telemetry + sync drift samples (cojam#442), served via /env.js.
+      COJAM_FEATURE_TELEMETRY: ${COJAM_FEATURE_TELEMETRY:-}
       # Supabase accounts OFF (see cojam-server FEATURE_SUPABASE_AUTH above) —
       # not required; the /env.js route already omits both fields unless BOTH
       # are set (apps/web/app/env.js/route.ts), so leaving these unset is safe.
@@ -192,5 +202,13 @@ services:
     logging:
       driver: "json-file"
       options:
+        # Loki derives container_name from this tag (promtail-config.yaml).
+        tag: "{{.Name}}"
         max-size: "10m"
         max-file: "3"
+
+networks:
+  # Created by hand once (docs/runbooks/cojam-deploy.md, Observability
+  # rollout); only cojam-db and grafana join it. Internal: no egress.
+  cojam-db-ro:
+    external: true
