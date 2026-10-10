@@ -136,9 +136,10 @@ the plugin install are runtime state:
 - `config/agent-box/discord-channel.sh`: supervisor started by the entrypoint (log: `docker logs
   agent-box`). Every 30s, if the tmux session `discord` is gone, it starts `claude --channels
   plugin:discord@claude-plugins-official` with `DISCORD_ACCESS_MODE=static`, no API key (Max
-  login), `--permission-mode default` and `discord-channel-settings.json` (enables the plugin for
-  this session only; read-only allow list; denies secrets, `env`, `gh api`, PR merge/close/review,
-  `git push`). It fails closed: no start unless the token and the plugin exist and `access.json`
+  login), `--permission-mode dontAsk` and `discord-channel-settings.json` (enables the plugin for
+  this session only; broad `Bash`, file and Discord allow; unlisted tools are refused silently,
+  never prompted; denies secrets, `env`, `gh api`, PR merge/close/review, force/delete/main/release
+  pushes, `curl`/`wget`/web tools, `sudo`, `rm -rf`). It can commit, push feature branches and open PRs. It fails closed: no start unless the token and the plugin exist and `access.json`
   allows exactly the root-owned owner ID, with no guild groups. It pre-accepts the `/workspace`
   trust dialog, installs the plugin's bun dependencies before the first start, turns off
   the claude.ai connectors and prompt suggestions for the session, logs claude's exit code, backs
@@ -156,8 +157,12 @@ Then `docker restart agent-box` on the host: the install also enables the plugin
 settings, which the entrypoint overwrites on boot; until then loop runs would load it too.
 
 No pairing: static mode downgrades `pairing` to `allowlist` and never writes `access.json`, so
-nothing said in the chat can widen access. Permission prompts reach the owner's DM as buttons.
+nothing said in the chat can widen access. There are no permission prompts: denied tools are refused silently (the existing PreToolUse hooks still apply).
 Never start it with `--dangerously-skip-permissions`.
+
+The Discord session's deny rules are speed bumps, not a boundary: broad `Bash` is allowed by owner
+decision, and a same-uid process (for example `python3 -c` running `gh`) can read the gh token.
+The guardrail hooks are root-owned so the session cannot rewrite them.
 
 Accepted risk (owner decision, 2026-10-09, #485): the loop worker runs as the same unix user, so
 `Bash(cat *)` can read the bot token file even though its gate denies Read/Edit on
