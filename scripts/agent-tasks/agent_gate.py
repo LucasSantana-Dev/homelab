@@ -306,7 +306,7 @@ def select(issues, open_prs, cfg, repo=None):
         if _same_repo(ref, repo)
     }
     for pr in open_prs:
-        m = re.fullmatch(r"agent/issue-(\d+)", pr.get("headRefName", ""))
+        m = re.fullmatch(r"(?:fix|agent)/issue-(\d+)", pr.get("headRefName", ""))
         if m:
             taken.add(int(m.group(1)))
     skipped, eligible = {}, []
