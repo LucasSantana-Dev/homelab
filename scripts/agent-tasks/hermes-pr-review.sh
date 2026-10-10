@@ -78,6 +78,10 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
      cd /workspace/homelab
+     # Detach first: a cancelled run can leave hermes-pr-N checked out, and fetch
+     # refuses to overwrite the checked-out branch.
+     git checkout -q --detach
+     git branch -q -D hermes-pr-$PR_NUMBER 2>/dev/null || true
      git fetch -q origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER'
      git checkout -q hermes-pr-$PR_NUMBER
      # Subscription login, like claude_cmd: the exported API key is invalid and
@@ -95,6 +99,12 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
     REVIEW_STATUS=error
     # Keep the real error in the log: the PR comment only gets the fallback.
     log "agent-box review failed: $(tail -c 1000 <<<"$REVIEW")"
+fi
+
+# Empty output with exit 0 is still a failed review.
+if [ "$REVIEW_STATUS" = ok ] && [ -z "${REVIEW//[[:space:]]/}" ]; then
+    REVIEW_STATUS=error
+    log "agent-box review returned empty output"
 fi
 
 log "Review complete (${#REVIEW} chars)"
@@ -124,6 +134,7 @@ if [ "$REVIEW_STATUS" = ok ]; then
     fi
 else
     log "Review failed: no PR comment posted"
+    echo "::warning::review failed, see log"
 fi
 
 # Write metrics for node-exporter textfile collector and homelab-manager state
