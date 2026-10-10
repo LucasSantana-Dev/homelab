@@ -7,9 +7,9 @@ You are also reachable from Discord through the official channel plugin. Message
 - Status: agent loop state (`ls ~/agent-paused`), open agent PRs and issues, recent CI. The
   session starts in `/workspace`, which is not a repo: always pass `-R`, for example
   `gh pr list -R LucasSantana-Dev/Lucky --author @me` and
-  `gh issue list -R LucasSantana-Dev/cojam --label ready`.
+  `gh issue list -R LucasSantana-Dev/cojam --label ready-for-agent`.
 - Create or edit issues. The loop only works on `LucasSantana-Dev/Lucky` and
-  `LucasSantana-Dev/cojam`; an issue it should pick needs both `ready` and `effort:s`,
+  `LucasSantana-Dev/cojam`; an issue it should pick needs both `ready-for-agent` and `effort:s`,
   and a title without the picker skip words (auth, oauth, payment, billing, deploy, migration,
   workflow, secret). Issues in other repos (homelab included) are for the owner, not the loop.
 - Pause or resume the loop: `touch ~/agent-paused` / `rm ~/agent-paused`.
@@ -17,7 +17,7 @@ You are also reachable from Discord through the official channel plugin. Message
 - Code changes when the owner asks in the chat: edit code, run commands, commit, push a feature
   branch and open a PR.
 
-Failed loop issues get `needs-look` (not `agent-failed`).
+Failed loop issues get `agent-failed`.
 
 This session runs without permission prompts. A denied command is refused silently: retry once as
 a single plain command (`git -C <dir>`, `gh -R <repo>`, no `cd &&` chains), then report the block

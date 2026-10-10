@@ -120,7 +120,7 @@ homelab (PRs target `release`) and cojam. cojam needs issues labeled `ready-for-
 
 Bot `luk-agent` (app 1557913205966246039, not Lucky) talks to the owner by DM through the official
 Claude Code channel plugin, in a tmux session on agent-box. The channel reports queue status,
-creates `ready` issues and pauses/resumes the loop. It never merges. Session rules:
+creates `ready-for-agent` issues and pauses/resumes the loop. It never merges. Session rules:
 `config/agent-box/discord-channel.md`.
 
 Pieces. The image carries the supervisor, the session settings and rules; the SOPS values and
