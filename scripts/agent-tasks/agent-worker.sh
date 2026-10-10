@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agent-worker.sh: pick ONE ready issue per repo with a free WIP slot,
+# agent-worker.sh: pick ONE ready-for-agent issue per repo with a free WIP slot,
 # implement it with headless claude on agent-box, and open a PR (never merges).
 # Runs after agent-pr-gate.sh from agent-loop.service. AGENT_DRY_RUN=1 only reports.
 set -euo pipefail
@@ -48,7 +48,7 @@ for REPO in $AGENT_REPOS; do
         continue
     fi
 
-    ISSUES=$(run_on_agent "gh issue list --repo $REPO --search label:ready,ready-for-agent --state open --limit 100 --json number,title,labels,author,comments,createdAt") || { echo "gh issue list failed"; continue; }
+    ISSUES=$(run_on_agent "gh issue list --repo $REPO --label ready-for-agent --state open --limit 100 --json number,title,labels,author,comments,createdAt") || { echo "gh issue list failed"; continue; }
     PICK=$(jq -n --argjson i "$ISSUES" --argjson p "$ALL_PRS" '{issues:$i, open_prs:$p}' | python3 "$GATE_PY" select --repo "$REPO")
     echo "selection: $PICK"
     ISSUE=$(jq -r '.issue // empty' <<<"$PICK")
@@ -67,9 +67,9 @@ for REPO in $AGENT_REPOS; do
     budget_take || break
 
     # Claim first: if anything below dies, the issue stays out of selection
-    # (needs-look is a skip label) instead of being retried every run.
+    # (agent-failed is a skip label) instead of being retried every run.
     # No claim, no run.
-    if ! act "gh issue edit $ISSUE --repo $REPO --add-label needs-look"; then
+    if ! act "gh issue edit $ISSUE --repo $REPO --add-label agent-failed"; then
         echo "could not claim #$ISSUE, not starting"
         continue
     fi
@@ -92,10 +92,10 @@ for REPO in $AGENT_REPOS; do
     PR=$(run_on_agent "gh pr list --repo $REPO --head $BRANCH --state open --json number -q '.[0].number'") || PR=""
     if [[ "$PR" =~ ^[0-9]+$ ]]; then
         register_pr "$REPO" "$PR" || echo "WARN: could not register PR #$PR, the gate will not track it"
-        try_act "gh issue edit $ISSUE --repo $REPO --remove-label needs-look"
+        try_act "gh issue edit $ISSUE --repo $REPO --remove-label agent-failed"
         notify --title "agent: PR #$PR opened for #$ISSUE" --body "https://github.com/$REPO/pull/$PR" --urgency info || true
     else
-        notify --title "agent: no PR for #$ISSUE" --body "$REPO #$ISSUE left labelled needs-look. Log: $LOG_FILE" --urgency warn || true
+        notify --title "agent: no PR for #$ISSUE" --body "$REPO #$ISSUE left labelled agent-failed. Log: $LOG_FILE" --urgency warn || true
     fi
 done
 

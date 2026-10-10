@@ -102,7 +102,6 @@
     "blocked",
     "ready-for-human",
     "agent-failed",
-    "needs-look",
     "needs-human"
   ],
   "required_effort": [

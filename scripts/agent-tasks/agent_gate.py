@@ -34,10 +34,6 @@ def _match(path, patterns):
     return any(fnmatch(p, pat.lower()) for pat in patterns)
 
 
-# `ready-for-agent` is the legacy name of `ready`; both are read during the transition.
-READY_LABELS = {"ready", "ready-for-agent"}
-
-
 def _labels(obj):
     return {lbl["name"] for lbl in (obj or {}).get("labels", [])}
 
@@ -182,8 +178,8 @@ def grade_value(pr, issue, cfg):
     if (issue.get("author") or {}).get("login") != cfg["owner"]:
         return "red", "issue not authored by owner"
     labels = _labels(issue)
-    if not labels & READY_LABELS:
-        return "red", "issue not ready"
+    if "ready-for-agent" not in labels:
+        return "red", "issue not ready-for-agent"
     adds_test = any(_match(f["path"], cfg["test_paths"]) for f in pr.get("files", []))
     if labels & set(cfg["value_green_labels"]) and adds_test:
         return "green", "P1/bug with test"
@@ -273,8 +269,8 @@ def _issue_skip_reason(issue, taken, cfg):
     labels = _labels(issue)
     if (issue.get("author") or {}).get("login") != cfg["owner"]:
         return "not owner-authored"
-    if not labels & READY_LABELS:
-        return "not ready"
+    if "ready-for-agent" not in labels:
+        return "not ready-for-agent"
     if not labels & set(cfg["required_effort"]):
         return "effort not allowed"
     if labels & set(cfg["issue_skip_labels"]):

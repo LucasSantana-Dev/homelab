@@ -148,7 +148,7 @@ open_agent_prs() {
 ensure_labels() {
     local repo="$1" have
     have=$(run_on_agent "gh label list --repo $repo --limit 200 --json name -q '.[].name'") || return 0
-    for l in needs-look needs-human needs-split; do
+    for l in agent-failed needs-human needs-split; do
         grep -qx "$l" <<<"$have" || try_act "gh label create $l --repo $repo --color BFD4F2"
     done
 }
