@@ -409,9 +409,40 @@ def test_agent_rules_and_infra_are_high_impact(cfg, path):
     assert gate.grade_impact(make_pr([path]), cfg)[0] == "red"
 
 
-def test_select_counts_agent_branch_without_closing_ref(cfg):
-    out = gate.select([make_issue(number=9)], [{"headRefName": "agent/issue-9"}], cfg)
+@pytest.mark.parametrize("branch", ["fix/issue-9", "agent/issue-9"])
+def test_select_counts_issue_branch_without_closing_ref(cfg, branch):
+    out = gate.select([make_issue(number=9)], [{"headRefName": branch}], cfg)
     assert out["skipped"] == {"9": "open PR already claims it"}
+
+
+@pytest.mark.parametrize("branch", ["fix/issue-9-x", "feat/issue-9", "fix/issue-"])
+def test_select_ignores_other_branch_shapes(cfg, branch):
+    out = gate.select([make_issue(number=9)], [{"headRefName": branch}], cfg)
+    assert "9" not in out["skipped"]
+
+
+def test_only_agent_prs_needs_registry_for_fix_branches(tmp_path):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    prs = [
+        {"number": 1, "headRefName": "fix/issue-1", "labels": []},
+        {"number": 2, "headRefName": "agent/issue-2", "labels": []},
+        {"number": 3, "headRefName": "other", "labels": [{"name": "agent"}]},
+        {"number": 4, "headRefName": "fix/typo", "labels": []},
+        {"number": 5, "headRefName": "fix/issue-5", "labels": []},
+    ]
+    script = (
+        f'source "{lib}"; AGENT_STATE_DIR="{tmp_path}"; AGENT_DRY_RUN=0; '
+        "register_pr o/r 5; register_pr o/other 1; only_agent_prs o/r"
+    )
+    out = subprocess.run(
+        ["bash", "-c", script],
+        input=json.dumps(prs),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    # 1: hand-opened fix/issue-1 (only registered in another repo) is not tracked.
+    assert [p["number"] for p in json.loads(out)] == [2, 3, 5]
 
 
 # --- cubic review fixes ---------------------------------------------------
@@ -468,10 +499,55 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
     assert "Bash\\(git\\ push\\ origin\\ agent/issue-7\\)" in out
     assert "Bash\\(git\\ push\\ -u\\ origin\\ agent/issue-7\\)" in out
     assert "agent/\\*" not in out
+    assert "fix/\\*" not in out
+
+
+def test_claude_cmd_accepts_new_and_legacy_prefix():
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    for branch in ("fix/issue-7", "agent/issue-7"):
+        res = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w p {branch}',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert res.returncode == 0, branch
+        assert f"git\\ push\\ origin\\ {branch}" in res.stdout
+
+
+def test_notify_once_dedups_per_sha(tmp_path):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    script = (
+        f'source "{lib}"; AGENT_STATE_DIR="{tmp_path}"; AGENT_DRY_RUN=0; '
+        'notify() { echo "N $*"; }; notify_once o/r 5 abc wait t b warn; notify_once o/r 5 abc wait t b warn; '
+        "notify_once o/r 5 abc close t b warn; notify_once o/r 5 def wait t b warn"
+    )
+    out = subprocess.run(
+        ["bash", "-c", script], capture_output=True, text=True, check=True
+    ).stdout
+    assert out.count("N --title t") == 3
+    assert sorted(p.name for p in (tmp_path / "notified").iterdir()) == [
+        "o_r-5-abc-close",
+        "o_r-5-abc-wait",
+        "o_r-5-def-wait",
+    ]
 
 
 @pytest.mark.parametrize(
-    "branch", ["", "main", "release", "agent/x:main", "agent/+x", "agent/x y"]
+    "branch",
+    [
+        "",
+        "main",
+        "release",
+        "agent/x:main",
+        "agent/+x",
+        "agent/x y",
+        "fix/x:main",
+        "feat/x",
+    ],
 )
 def test_claude_cmd_refuses_non_agent_branch(branch):
     lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
@@ -623,3 +699,38 @@ def test_unlisted_app_thread_waits_for_the_owner(cfg):
     assert (
         gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "owner-review"
     )
+
+
+def _bash(script, state):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    return subprocess.run(
+        ["bash", "-c", f'source "{lib}"; AGENT_STATE_DIR="{state}"; {script}'],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def test_fix_counter_seeds_from_legacy_then_increments(tmp_path):
+    out = _bash(
+        "AGENT_DRY_RUN=0; fix_tries o/r 5 1; fix_record o/r 5 2; fix_tries o/r 5 0; "
+        "fix_record o/r 5 3; fix_tries o/r 5 0; fix_tries o/r 6 0",
+        tmp_path,
+    )
+    assert out.split() == ["1", "2", "3", "0"]
+    assert (tmp_path / "autofix" / "o_r-5").read_text().strip() == "3"
+
+
+def test_fix_counter_dry_run_writes_nothing(tmp_path):
+    out = _bash("AGENT_DRY_RUN=1; fix_record o/r 5 2; fix_tries o/r 5 0", tmp_path)
+    assert "DRY-RUN" in out and out.split()[-1] == "0"
+    assert not (tmp_path / "autofix").exists()
+
+
+def test_notify_once_failed_send_leaves_no_marker(tmp_path):
+    out = _bash(
+        "AGENT_DRY_RUN=0; notify() { return 1; }; notify_once o/r 5 abc wait t b warn; "
+        'ls "$AGENT_STATE_DIR/notified" 2>/dev/null | wc -l',
+        tmp_path,
+    )
+    assert out.strip() == "0"
