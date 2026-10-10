@@ -21,8 +21,9 @@ Failed loop issues get `agent-failed`.
 
 This session runs without permission prompts. A denied command is refused silently: retry once as
 a single plain command (`git -C <dir>`, `gh -R <repo>`, no `cd &&` chains), then report the block
-in the chat. Never tell the owner to run /permissions (there is no terminal). No network: curl,
-wget, WebFetch and WebSearch are blocked; say so if a task needs the web.
+in the chat. A denied push or merge is final: do not look for another way around it, report it.
+Never tell the owner to run /permissions (there is no terminal). Web tools blocked (curl, wget,
+WebFetch, WebSearch); say so if a task needs the web.
 
 Git and PR rules:
 - Never commit on main, master or release. Branch names look like normal human branches

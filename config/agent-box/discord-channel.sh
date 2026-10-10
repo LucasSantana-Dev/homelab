@@ -89,8 +89,7 @@ start() {
     # plugin for this session only and runs dontAsk: unlisted tools are refused
     # silently, the owner is never prompted (no auto mode, no skip-permissions).
     tmux new-session -d -s "$SESSION" -c /workspace \
-        "source /etc/profile.d/agent-env.sh 2>/dev/null; \
-unset DISCORD_BOT_TOKEN ANTHROPIC_API_KEY CLAUDE_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX; \
+        "unset DISCORD_BOT_TOKEN ANTHROPIC_API_KEY CLAUDE_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX; \
 ENABLE_CLAUDEAI_MCP_SERVERS=false DISCORD_ACCESS_MODE=static claude --channels plugin:$PLUGIN \
 --settings $CONF/discord-channel-settings.json --permission-mode dontAsk \
 --append-system-prompt \"\$(cat $CONF/discord-channel.md)\"; \
