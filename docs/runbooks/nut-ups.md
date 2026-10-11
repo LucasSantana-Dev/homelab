@@ -1,7 +1,8 @@
 # NUT UPS Runbook (TS Shara UPS Senoidal Universal 2200)
 
-Status: **pending hardware**. Run this when the UPS arrives, inside the 7-day return window
-(CDC art. 49). If any check in step 6 fails, return the unit.
+Status: **configured 2026-10-11** (steps 1-3 done on the host, `upsc` reads `OL`); steps 4-6
+pending. Run step 6 inside the 7-day return window (CDC art. 49). If any check fails, return the
+unit.
 
 Goal: on a power outage, the Windows desktop shuts down cleanly, while **the homelab, the modem
 and one MacBook stay up for at least 2 hours** (owner requirement, 2026-10-06). The homelab then
@@ -73,13 +74,30 @@ MODE=netserver
 `runtimecal` and the voltage limits are starting values; tune them with the runtime measured in
 step 6. `ondelay` must be longer than the homelab's shutdown time.
 
+The port is `root:dialout 0660` and the driver runs as `nut`, so it fails with
+"Unable to open ... Current user id: nut". Grant the `nut` group this one device only:
+
+```bash
+echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", GROUP="nut", MODE="0660"' \
+  | sudo tee /etc/udev/rules.d/62-nut-tsshara.rules
+sudo udevadm control --reload
+sudo udevadm trigger --subsystem-match=tty --action=add
+ls -l /dev/ttyACM0   # expect root nut
+```
+
 Test the driver alone (Ctrl+C after it prints values):
 
 ```bash
 sudo upsdrvctl -D start shara
 ```
 
-`upsd.conf` (LAN only; port 3493 must not be exposed through Cloudflare or Caddy):
+`upsd.conf` (LAN only; port 3493 must not be exposed through Cloudflare or Caddy). Open it in
+`ufw` for the LAN only:
+
+```bash
+sudo ufw allow from 192.168.0.0/24 to any port 3493 proto tcp comment "LAN: NUT upsd"
+```
+
 
 ```
 LISTEN 127.0.0.1 3493
@@ -202,3 +220,11 @@ together; fuse the string). Then set the upssched timer to ~85% of the measured 
 
 - Quarterly: `upscmd -u upsmon_local shara test.battery.start.quick`.
 - Replace all 4 internal batteries together every 2-3 years (heat shortens VRLA life).
+
+## Observed on the real unit (2026-10-11)
+
+- `device.model: Senoid  22`, `ups.firmware: V010208059`, `ups.type: offline / line interactive`.
+- `battery.charge` is estimated from voltage (27.6V float reads as 100%); trust `LB` and the
+  measured runtime, not the percentage.
+- Instant commands include `shutdown.return`, `load.off`, `load.on` and `test.battery.start.quick`.
+- `output.voltage` reads the output switch position (111V = 115V setting).
