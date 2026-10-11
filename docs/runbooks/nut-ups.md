@@ -227,4 +227,9 @@ together; fuse the string). Then set the upssched timer to ~85% of the measured 
 - `battery.charge` is estimated from voltage (27.6V float reads as 100%); trust `LB` and the
   measured runtime, not the percentage.
 - Instant commands include `shutdown.return`, `load.off`, `load.on` and `test.battery.start.quick`.
-- `output.voltage` reads the output switch position (111V = 115V setting).
+- The unit is labelled **Cód. 4452** ("UPS Senoidal 2200 4BS Uni USB", 24VDC, 1-year warranty), a
+  sibling of #4222; NUT behaves the same.
+- The output selector ("CH115/220V") is a slide switch inside a slot on the **bottom**, near the
+  rear edge; factory setting 115V. Change it only with the UPS off and unplugged.
+- `output.voltage` does **not** follow the selector: it read 111V before and 109V after moving it
+  to the other position. Confirm the real output with a plug-in meter, not NUT.
