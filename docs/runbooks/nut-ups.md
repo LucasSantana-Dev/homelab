@@ -233,3 +233,13 @@ together; fuse the string). Then set the upssched timer to ~85% of the measured 
   rear edge; factory setting 115V. Change it only with the UPS off and unplugged.
 - `output.voltage` does **not** follow the selector: it read 111V before and 109V after moving it
   to the other position. Confirm the real output with a plug-in meter, not NUT.
+
+## Runtime test 2026-10-12 (internal batteries only): FAIL
+
+Unattended deep battery test (`test.battery.start.deep`, mains connected) at 01:00 after ~13h of
+charge, load = modem + homelab + one MacBook charger (`ups.load` 10-12%). Stopped by the script at
+22.6V after **5105 s (1h25m)**; estimated ~1h45m to the UPS low-battery cutoff. Curve: 27.6V start,
+24.6V at 15 min, 24.0V at 45 min, 23.6V at 1h, 23.2V at 1h15, knee below 22.8V. The homelab
+stayed up (the script stops before `LB`). Next step: add the 2x 12V 45Ah external bank on the
+`+ 24V -` terminals (unit sold as "1 Exp. 7Ah/45Ah"), then rerun this test and the attended
+shutdown/power-on test.
