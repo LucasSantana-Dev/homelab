@@ -118,6 +118,21 @@ LISTEN 192.168.0.250 3493
   upsmon secondary
 ```
 
+`upsd` binds the LAN address only once, at start. On boot it can start before `enp1s0` has
+`192.168.0.250`, log `not listening on 192.168.0.250 port 3493`, and stay localhost-only, so the
+desktop's WinNUT never connects (seen 2026-10-11 19:24 to 2026-10-12 13:59). Order it after the
+network:
+
+```bash
+sudo mkdir -p /etc/systemd/system/nut-server.service.d
+printf '[Unit]\nWants=network-online.target\nAfter=network-online.target\n' \
+  | sudo tee /etc/systemd/system/nut-server.service.d/wait-network.conf
+sudo systemctl daemon-reload && sudo systemctl restart nut-server nut-monitor
+ss -ltn | grep 3493   # expect both 127.0.0.1 and 192.168.0.250
+```
+
+After every reboot, check `ss -ltn | grep 3493` shows the LAN address.
+
 `upsmon.conf`:
 
 ```
