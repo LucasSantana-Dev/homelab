@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # hermes-wud-classify.sh — classify a WUD container update via claude --print.
-# Called by the agent-box HTTP server on POST /wud-classify.
+# Called by the agent-box HTTP server on POST /wud-classify, from the copy the
+# image bakes into /opt/agent-config (rebuild agent-box to ship a change).
 #
 # Input:  JSON on stdin (WUD container update payload from n8n)
 # Output: JSON on stdout — {"safe_to_schedule": bool, "urgency": "low|medium|high", "reason": "string"}
