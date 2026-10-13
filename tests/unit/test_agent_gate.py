@@ -22,7 +22,10 @@ OWNER = "LucasSantana-Dev"
 
 @pytest.fixture
 def cfg():
-    return gate.load_config(CONFIG)
+    # Pin Phase 1 so scoring tests do not follow the live auto_merge flag.
+    c = gate.load_config(CONFIG)
+    c["auto_merge"] = False
+    return c
 
 
 def make_pr(
@@ -334,7 +337,10 @@ def _cli(*args, stdin=""):
 def test_cli_score_roundtrip():
     payload = {"pr": make_pr(["docs/a.md", "x.test.ts"]), "issue": make_issue()}
     out = json.loads(_cli("score", stdin=json.dumps(payload)).stdout)
-    assert out["decision"] == "owner-review"
+    live = gate.load_config(CONFIG)
+    assert (
+        out["decision"] == gate.score(payload["pr"], payload["issue"], live)["decision"]
+    )
 
 
 def test_cli_get_merges_repo_overrides():
@@ -344,7 +350,8 @@ def test_cli_get_merges_repo_overrides():
         ).stdout.strip()
         == "release"
     )
-    assert _cli("get", "--key", "auto_merge").stdout.strip() == "false"
+    live = str(gate.load_config(CONFIG)["auto_merge"]).lower()
+    assert _cli("get", "--key", "auto_merge").stdout.strip() == live
 
 
 # --- critic fixes (T2 review) ---------------------------------------------
