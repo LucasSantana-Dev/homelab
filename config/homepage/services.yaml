@@ -15,16 +15,6 @@
         href: https://cloud.luk-homeserver.com.br
         description: Files, photos, sync
         container: nextcloud
-    - Paperless:
-        icon: paperless-ngx
-        href: https://paperless.luk-homeserver.com.br
-        description: Document management
-        container: paperless-ngx
-        widget:
-          type: paperlessngx
-          url: http://host.docker.internal:8400
-          username: admin
-          password: '{{HOMEPAGE_VAR_PAPERLESS_PASSWORD}}'
 
 - Home:
     - Home Assistant:

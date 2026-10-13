@@ -61,7 +61,7 @@ Automated service deployment agent that validates environment, deploys services 
 **Deployment Order:**
 1. Databases (postgres, redis, etc.)
 2. Core services (nginx, homepage)
-3. Applications (n8n, paperless, etc.)
+3. Applications (n8n, nextcloud, etc.)
 4. Monitoring (prometheus, grafana)
 
 **Health Check Timeout:**

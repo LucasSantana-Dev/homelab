@@ -43,9 +43,6 @@ OPTIONAL_VARS=(
     "NEXTCLOUD_DB_PASSWORD"
     "AUTHENTIK_SECRET_KEY"
     "AUTHENTIK_DB_PASSWORD"
-    "PAPERLESS_SECRET_KEY"
-    "PAPERLESS_DB_PASSWORD"
-    "PAPERLESS_ADMIN_PASSWORD"
 )
 
 # Compose-referenced vars that may legitimately be blank (optional integrations:

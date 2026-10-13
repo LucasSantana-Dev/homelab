@@ -110,7 +110,6 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
   │                                    │
   │  ┌─ Applications ──────────────┐  │
   │  │ • Nextcloud (cloud storage) │  │
-  │  │ • Paperless-ngx (OCR docs)  │  │
   │  │ • n8n (workflows)           │  │
   │  │ • Jellyfin (media)          │  │
   │  │ • Stremio (streaming)       │  │
@@ -119,9 +118,8 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
   │                                    │
   │  ┌─ Databases & Caches ────────┐  │
   │  │ • MariaDB (Nextcloud)        │  │
-  │  │ • PostgreSQL (Paperless)     │  │
   │  │ • PostgreSQL (Authentik)     │  │
-  │  │ • Redis (cache/broker x3)    │  │
+  │  │ • Redis (cache/broker)       │  │
   │  └────────────────────────────────┘ │
   │                                    │
   └────────────────────────────────────┘
@@ -170,7 +168,6 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 | Service | Port | Purpose | Access |
 |---------|------|---------|--------|
 | **Nextcloud** | 8300 | Cloud storage & NAS | Public via Tunnel + SSO |
-| **Paperless-ngx** | 8400 | Document mgmt & OCR | Tailscale only |
 | **n8n** | 5678 | Workflow automation | Tailscale only |
 | **Jellyfin** | 8096 | Media streaming | Public/Tailscale |
 | **Stremio** | 11470 | Add-on streaming | Public/Tailscale |
@@ -178,9 +175,8 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 
 ### Support Services (Databases & Caches)
 - **MariaDB** (Nextcloud) — internal
-- **PostgreSQL** (Paperless-ngx) — internal
 - **PostgreSQL** (Authentik) — internal
-- **Redis** (Nextcloud, Paperless-ngx, Authentik caches) — internal
+- **Redis** (Nextcloud, Authentik caches) — internal
 
 ---
 
@@ -266,7 +262,7 @@ homelab/
 ├── compose/               # Modular Docker Compose manifests
 │   ├── core.yml          # Nginx, Homepage, Portainer, Cloudflared
 │   ├── monitoring.yml    # Prometheus, Grafana, Loki, Alertmanager
-│   ├── apps.yml          # Nextcloud, Paperless, n8n
+│   ├── apps.yml          # Nextcloud, n8n
 │   ├── media.yml         # Jellyfin, Stremio
 │   ├── security.yml      # Pi-hole, Authentik
 │   └── automation.yml    # Home Assistant
