@@ -636,6 +636,15 @@ def test_empty_thread_is_not_bot_only(cfg):
     assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
 
 
+def test_empty_thread_beside_bot_threads_waits_for_the_owner(cfg):
+    empty = {"id": "T", "isResolved": False, "comments": {"totalCount": 0, "nodes": []}}
+    pr = pr_with_threads(thread("cubic-dev-ai"), empty)
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "owner-review"
+    assert "fix" not in out
+    assert "review: 2 unresolved thread(s), owner involved" in out["reasons"]
+
+
 @pytest.mark.parametrize("resolved", [False, True])
 def test_human_in_any_thread_halts(cfg, resolved):
     pr = pr_with_threads(thread("cubic-dev-ai", "stranger", resolved=resolved))
@@ -734,3 +743,37 @@ def test_notify_once_failed_send_leaves_no_marker(tmp_path):
         tmp_path,
     )
     assert out.strip() == "0"
+
+
+@pytest.mark.parametrize("key", ["fix-cap", "dirty-workdir"])
+def test_gate_autofix_alerts_fire_once_per_sha(tmp_path, key):
+    # Runs the gate's own alert line: the label edit may fail and the workdir may stay
+    # dirty, so the same alert must not repeat on every timer run.
+    gate_sh = REPO / "scripts" / "agent-tasks" / "agent-pr-gate.sh"
+    lines = [
+        ln.strip()
+        for ln in gate_sh.read_text().splitlines()
+        if ln.strip().startswith("notify_once") and f" {key} " in ln
+    ]
+    assert len(lines) == 1, lines
+    env = (
+        'AGENT_DRY_RUN=0; notify() { echo "N $*"; }; REPO=o/r; N=5; '
+        "WHAT='CI still red'; TRIES=3; WORKDIR=/w; "
+    )
+    run = f"SHA=abc; {lines[0]}; {lines[0]}; SHA=def; {lines[0]}"
+    out = _bash(env + run, tmp_path)
+    assert out.count("N --title") == 2
+    assert sorted(p.name for p in (tmp_path / "notified").iterdir()) == [
+        f"o_r-5-abc-{key}",
+        f"o_r-5-def-{key}",
+    ]
+
+
+def test_gate_sends_no_undeduped_alerts():
+    gate_sh = REPO / "scripts" / "agent-tasks" / "agent-pr-gate.sh"
+    bare = [
+        ln.strip()
+        for ln in gate_sh.read_text().splitlines()
+        if ln.strip().startswith("notify ")
+    ]
+    assert bare == []
