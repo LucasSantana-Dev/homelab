@@ -37,7 +37,9 @@ RESULT=$(ssh agent-box bash -c "
 case $rc in
   0) ;;
   255) RESULT="ERROR: SSH failed" ;;
-  *) RESULT="${RESULT:-ERROR: drift run failed (exit $rc)}" ;;
+  # Log what a failed run printed, but never alert on it: a partial reply can
+  # still contain the drift marker.
+  *) echo "$RESULT"; RESULT="ERROR: drift run failed (exit $rc)" ;;
 esac
 
 echo "$RESULT"
