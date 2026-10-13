@@ -71,6 +71,15 @@ def thread_author_kind(author, cfg):
     return "owner" if login and login == cfg["owner"] else "human"
 
 
+def _bot_only_thread(thread, cfg):
+    """True only when the thread has comments and every author is a listed bot. A
+    thread with no comments has no author to vouch for it: never the agent's to fix."""
+    authors = _thread_authors(thread)
+    if not authors:
+        return False
+    return all(thread_author_kind(a, cfg) == "bot" for a in authors)
+
+
 def threads_truncated(pr):
     """A page we did not fetch could hold a human reply: callers must fail closed."""
     conn = pr.get("reviewThreads") or {}
@@ -228,11 +237,7 @@ def score(pr, issue, cfg):
     reasons = [f"{k}: {why}" for k, (_, why) in graded.items()]
     threads = open_threads(pr)
     # Bot-only threads are the agent's to fix; one the owner joined waits for the owner.
-    bot_only = bool(threads) and all(
-        _thread_authors(t)
-        and all(thread_author_kind(a, cfg) == "bot" for a in _thread_authors(t))
-        for t in threads
-    )
+    bot_only = bool(threads) and all(_bot_only_thread(t, cfg) for t in threads)
     if threads:
         reasons.append(
             f"review: {len(threads)} unresolved thread(s)"
