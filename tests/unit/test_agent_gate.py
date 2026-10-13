@@ -22,7 +22,10 @@ OWNER = "LucasSantana-Dev"
 
 @pytest.fixture
 def cfg():
-    return gate.load_config(CONFIG)
+    # Pin Phase 1 so scoring tests do not follow the live auto_merge flag.
+    c = gate.load_config(CONFIG)
+    c["auto_merge"] = False
+    return c
 
 
 def make_pr(
@@ -37,7 +40,7 @@ def make_pr(
     lines = lines if lines is not None else 10 * len(files)
     return {
         "author": {"login": author},
-        "files": [{"path": p} for p in files],
+        "files": [{"path": p, "additions": 10, "deletions": 0} for p in files],
         "additions": lines,
         "deletions": 0,
         "closingIssuesReferences": [{"number": n} for n in closes],
@@ -112,6 +115,12 @@ def test_latest_is_not_mistaken_for_a_test_file(cfg):
 def test_value_green_for_p1_bug_with_test(cfg):
     pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
     assert gate.grade_value(pr, make_issue(), cfg)[0] == "green"
+
+
+def test_value_yellow_when_test_file_only_loses_lines(cfg):
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    pr["files"][1].update(additions=0, deletions=12)
+    assert gate.grade_value(pr, make_issue(), cfg)[0] == "yellow"
 
 
 def test_value_yellow_for_bug_without_test(cfg):
@@ -334,7 +343,10 @@ def _cli(*args, stdin=""):
 def test_cli_score_roundtrip():
     payload = {"pr": make_pr(["docs/a.md", "x.test.ts"]), "issue": make_issue()}
     out = json.loads(_cli("score", stdin=json.dumps(payload)).stdout)
-    assert out["decision"] == "owner-review"
+    live = gate.load_config(CONFIG)
+    assert (
+        out["decision"] == gate.score(payload["pr"], payload["issue"], live)["decision"]
+    )
 
 
 def test_cli_get_merges_repo_overrides():
@@ -344,7 +356,8 @@ def test_cli_get_merges_repo_overrides():
         ).stdout.strip()
         == "release"
     )
-    assert _cli("get", "--key", "auto_merge").stdout.strip() == "false"
+    live = str(gate.load_config(CONFIG)["auto_merge"]).lower()
+    assert _cli("get", "--key", "auto_merge").stdout.strip() == live
 
 
 # --- critic fixes (T2 review) ---------------------------------------------
