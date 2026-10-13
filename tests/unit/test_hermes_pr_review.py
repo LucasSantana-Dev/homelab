@@ -93,13 +93,29 @@ def test_review_clones_its_own_checkout_and_cleans_up(tmp_path):
 @needs_flock
 def test_second_review_reuses_the_checkout_and_refreshes_base(tmp_path):
     origin = _origin(tmp_path)
-    _run(tmp_path, origin)
+    res, review = _run(tmp_path, origin)
+    assert res.returncode == 0, res.stderr
+    # Survives only if the second run reuses the checkout instead of recloning.
+    (review / ".git" / "sentinel").touch()
     _commit(origin, "base moves")
     _git(origin, "branch", "-f", "release", "HEAD")
     res, review = _run(tmp_path, origin)
     assert res.returncode == 0, res.stderr
+    assert (review / ".git" / "sentinel").exists()
     base = _git(origin, "rev-parse", "release")
     assert _git(review, "rev-parse", "origin/release") == base
+
+
+@needs_flock
+def test_half_finished_clone_is_redone(tmp_path):
+    # A first clone killed before .git existed leaves a non-empty directory.
+    origin = _origin(tmp_path)
+    (tmp_path / "review").mkdir()
+    (tmp_path / "review" / "partial").write_text("x")
+    res, review = _run(tmp_path, origin)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert (review / ".git").is_dir()
+    assert not (tmp_path / "review.tmp").exists()
 
 
 @needs_flock

@@ -106,7 +106,13 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
        flock -w 60 8 || { echo 'another review holds the checkout'; exit 75; }
      fi
      echo \"$PR_NUMBER \$\$\" >\$DIR.owner
-     [ -d \$DIR/.git ] || git clone -q --no-checkout https://github.com/$REPO.git \$DIR 8>&-
+     # Clone aside and move into place, so a clone killed halfway is redone next
+     # time instead of leaving a broken checkout behind.
+     if [ ! -d \$DIR/.git ]; then
+       rm -rf \$DIR \$DIR.tmp
+       git clone -q --no-checkout https://github.com/$REPO.git \$DIR.tmp 8>&-
+       mv \$DIR.tmp \$DIR
+     fi
      cd \$DIR
      # Left by a run killed mid checkout. Only these two: a detached auto gc can
      # still hold its own locks.
