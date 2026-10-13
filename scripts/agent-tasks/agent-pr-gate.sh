@@ -227,10 +227,13 @@ for REPO in $AGENT_REPOS; do
                 notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
                 ;;
             auto-merge)
-                if act "gh pr merge $N --repo $REPO --auto --squash --match-head-commit $SHA"; then
-                    notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: auto-merge queued #$N" "$REPO #$N"$'\n'"$TABLE" info
+                # Merge now, never queue (--auto): a queued merge fires later without a new
+                # score, so a human who joins or pushes after this run would be merged over.
+                # Not mergeable yet (behind base, checks rerunning): fail, re-score next run.
+                if act "gh pr merge $N --repo $REPO --squash --match-head-commit $SHA"; then
+                    notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: auto-merged #$N" "$REPO #$N"$'\n'"$TABLE" info
                 else
-                    echo "#$N: gh pr merge --auto failed"
+                    echo "#$N: gh pr merge failed, retrying next run"
                 fi
                 ;;
         esac
