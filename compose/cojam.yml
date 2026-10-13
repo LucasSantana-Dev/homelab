@@ -86,6 +86,7 @@ services:
       FEATURE_PUBLIC_ROOMS: ${FEATURE_PUBLIC_ROOMS:-false}
       FEATURE_QUEUE_VOTING: ${FEATURE_QUEUE_VOTING:-false}
       FEATURE_ROOM_CHAT: ${FEATURE_ROOM_CHAT:-false}
+      FEATURE_SYNC: ${FEATURE_SYNC:-false}
       # Product events (cojam#444). The HMAC key pseudonymises room and actor
       # ids; without it hashes change on every restart. Keep it stable.
       EVENTS_HMAC_KEY: ${COJAM_EVENTS_HMAC_KEY:-}
@@ -170,6 +171,7 @@ services:
       COJAM_FEATURE_PUBLIC_ROOMS: ${COJAM_FEATURE_PUBLIC_ROOMS:-}
       COJAM_FEATURE_QUEUE_VOTING: ${COJAM_FEATURE_QUEUE_VOTING:-}
       COJAM_FEATURE_ROOM_CHAT: ${COJAM_FEATURE_ROOM_CHAT:-}
+      COJAM_FEATURE_SYNC: ${COJAM_FEATURE_SYNC:-}
       # Client telemetry + sync drift samples (cojam#442), served via /env.js.
       COJAM_FEATURE_TELEMETRY: ${COJAM_FEATURE_TELEMETRY:-}
       # Supabase accounts OFF (see cojam-server FEATURE_SUPABASE_AUTH above) —
