@@ -13,6 +13,8 @@ This rollout exposes only the selected phase-1 set through `cloudflared`.
 - `cloud.luk-homeserver.com.br`
 - `vault.luk-homeserver.com.br`
 - `auth.luk-homeserver.com.br`
+- `paperless.${DOMAIN}` (service removed in #511; ingress and DNS record still to be
+  removed in the dashboard, then the snapshot regenerated)
 
 These are defined in the Cloudflare dashboard (remotely managed tunnel) and
 recorded in `config/cloudflared/edge-snapshot.json` (ADR 0041).

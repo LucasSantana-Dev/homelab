@@ -27,8 +27,8 @@ updates:
 
   # H3 hardening: was 'docker' at '/' which only scans Dockerfiles at repo
   # root (none here). Switched to 'docker-compose' ecosystem pointed at the
-  # compose/ directory so floating tags like home-assistant:stable, netdata
-  # :stable, paperless-ngx:latest now get auto-PR'd. Requires Dependabot
+  # compose/ directory so floating tags like home-assistant:stable and netdata
+  # :stable now get auto-PR'd. Requires Dependabot
   # 2024-09+ which has docker-compose ecosystem GA.
   - package-ecosystem: "docker-compose"
     directory: "/compose"
