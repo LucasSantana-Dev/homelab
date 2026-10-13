@@ -747,3 +747,17 @@ def test_notify_once_failed_send_leaves_no_marker(tmp_path):
         tmp_path,
     )
     assert out.strip() == "0"
+
+
+def test_gate_merges_now_and_never_queues():
+    # A queued --auto merge fires later without a new score: a human who joins after
+    # the gate run would be merged over.
+    gate_sh = REPO / "scripts" / "agent-tasks" / "agent-pr-gate.sh"
+    merges = [
+        ln.strip()
+        for ln in gate_sh.read_text().splitlines()
+        if ln.strip().startswith('if act "gh pr merge')
+    ]
+    assert len(merges) == 1, merges
+    assert "--auto" not in merges[0]
+    assert "--match-head-commit $SHA" in merges[0]
