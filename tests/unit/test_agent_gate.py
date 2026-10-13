@@ -40,7 +40,7 @@ def make_pr(
     lines = lines if lines is not None else 10 * len(files)
     return {
         "author": {"login": author},
-        "files": [{"path": p} for p in files],
+        "files": [{"path": p, "additions": 10, "deletions": 0} for p in files],
         "additions": lines,
         "deletions": 0,
         "closingIssuesReferences": [{"number": n} for n in closes],
@@ -115,6 +115,12 @@ def test_latest_is_not_mistaken_for_a_test_file(cfg):
 def test_value_green_for_p1_bug_with_test(cfg):
     pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
     assert gate.grade_value(pr, make_issue(), cfg)[0] == "green"
+
+
+def test_value_yellow_when_test_file_only_loses_lines(cfg):
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    pr["files"][1].update(additions=0, deletions=12)
+    assert gate.grade_value(pr, make_issue(), cfg)[0] == "yellow"
 
 
 def test_value_yellow_for_bug_without_test(cfg):

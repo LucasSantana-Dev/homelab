@@ -67,7 +67,7 @@ commit and decision with the grades (the autofix cap and dirty-workdir alerts ar
 ## Graduation
 
 - Phase 1: `auto_merge: false`. The gate grades and notifies; the owner merges. Compare the grade with your merge decision.
-- Phase 2 (now, owner decision 2026-10-13, before the 10-PR criterion below was met): `auto_merge: true`. Merges use `gh pr merge --auto --squash --match-head-commit`, so required checks still gate. Only PRs with all four pillars green qualify, which in practice means docs, tests or lint config only, closing an owner `ready-for-agent` P1 or bug issue with a new test; runtime code stays `owner-review`.
+- Phase 2 (now, owner decision 2026-10-13, before the 10-PR criterion below was met): `auto_merge: true`. Merges use `gh pr merge --auto --squash --match-head-commit`, so required checks still gate. Only PRs with all four pillars green qualify, which in practice means docs, tests or ESLint/Prettier config only, closing an owner `ready-for-agent` P1 or bug issue with a test file that gains lines (edit-only or delete-only test changes are yellow); runtime code stays `owner-review`. Accepted risk: the halt check runs once per gate run, so a human comment or push that lands after `--auto` is queued and still passes checks gets merged; required checks cover CI, not human activity.
 - Original Phase 2 criterion: after 10 agent PRs merged without rework and the grade matching your decision in at least 9 of 10.
 - Brake: if an auto-merged PR is reverted or breaks the base branch, set `auto_merge: false` and tighten the pillar that missed.
 
@@ -91,7 +91,7 @@ sourced, so a run (or a prompt injection through issue text, or review-bot text,
 autofix prompt since #489) can read the GitHub PAT and the Claude login, and can use the PAT
 directly instead of going through `gh` or `git push`. What limits the damage: the PAT is
 fine-grained to the agent repos (contents, pull requests, issues; no workflows, no admin), base
-branches require a PR plus CI and Sonar, and the owner merges everything except all-green PRs (docs, tests, lint config) once `auto_merge: true`. Scoping the
+branches require a PR plus CI and Sonar, and the owner merges everything except all-green PRs (docs, tests, ESLint/Prettier config) once `auto_merge: true`. Scoping the
 allow list to named scripts would not help much, since `npm test` runs repo-controlled scripts the
 agent can edit. The real fix is the Claude Code Bash sandbox, which agent-box cannot run (see the
 Discord section). If the PAT leaks: revoke it, issue a new fine-grained token and replace
