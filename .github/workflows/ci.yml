@@ -100,7 +100,7 @@ jobs:
         pytest tests/ --cov=homelab_manager --cov-report=xml --cov-report=html --cov-fail-under=70 --tb=short -v
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         file: ./coverage.xml
         flags: unittests
@@ -189,7 +189,7 @@ jobs:
         EOF
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     - name: Validate Docker Compose configuration
       run: |
@@ -229,7 +229,7 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
       if: always()
       continue-on-error: true
       with:
@@ -304,7 +304,7 @@ jobs:
         EOF
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     - name: Run Trivy on Docker Compose config
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -344,13 +344,21 @@ jobs:
 
     - name: Scan container images
       run: |
-        # Install Trivy using modern gpg method
-        sudo apt-get update
-        sudo apt-get install wget apt-transport-https gnupg lsb-release
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/trivy-archive-keyring.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-        sudo apt-get update
-        sudo apt-get install trivy
+        # The trivy-action step above already puts trivy on PATH (setup-trivy
+        # writes $GITHUB_PATH), so apt is only a fallback. It is bounded
+        # (timeout + retries) so a hung mirror fails fast instead of eating
+        # the 30 min job timeout.
+        if ! command -v trivy >/dev/null 2>&1; then
+          # Install Trivy using modern gpg method
+          apt_opts=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30)
+          sudo timeout 300 apt-get "${apt_opts[@]}" update
+          sudo timeout 300 apt-get "${apt_opts[@]}" install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - --timeout=30 --tries=3 https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy-archive-keyring.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo timeout 300 apt-get "${apt_opts[@]}" update
+          sudo timeout 300 apt-get "${apt_opts[@]}" install -y trivy
+        fi
+        trivy --version
 
         # Pull and scan images
         docker compose config --images | while read -r image; do
@@ -361,7 +369,7 @@ jobs:
         done
 
     - name: Upload container security scan results
-      uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
       if: always()
       continue-on-error: true
       with:

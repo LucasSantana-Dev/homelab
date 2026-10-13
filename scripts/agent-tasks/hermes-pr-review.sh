@@ -24,15 +24,15 @@ START_TS=$(date +%s)
 log "hermes PR review — PR #$PR_NUMBER base=$BASE_REF repo=$REPO"
 
 # Guard: skip if any human (non-bot) has already commented — CLAUDE.md hard rule
-HUMAN_COMMENTS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq '[.comments[] | select(
-    .author.login != "github-actions[bot]" and
-    .author.login != "dependabot[bot]" and
-    .author.login != "renovate[bot]" and
-    .author.login != "coderabbitai[bot]" and
-    .author.login != "greptile-apps[bot]" and
-    (.author.is_bot // false) == false
-  )] | length' 2>&1) || { log "WARN: gh failed checking comments — skipping review"; exit 0; }
+# REST, not `gh pr view`: that strips the [bot] suffix and has no is_bot, so
+# hermes's own earlier comment (github-actions) counted as human and blocked
+# every later review on the PR. user.type tells bots from people.
+# Each gh call before the review gets 60s, so a slow API skips the run instead
+# of eating the ssh budget below.
+HUMAN_IDS=$(timeout 60 gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+  --jq '.[] | select(.user.type != "Bot") | .id') \
+  || { log "WARN: gh failed checking comments, skipping review"; exit 0; }
+HUMAN_COMMENTS=$(grep -c . <<<"$HUMAN_IDS" || true)
 
 if [ "$HUMAN_COMMENTS" -gt 0 ]; then
     log "Skipping: $HUMAN_COMMENTS human comment(s) already present — CLAUDE.md hard rule"
@@ -43,47 +43,144 @@ fi
 # Use the PR HEAD SHA (what we actually review below), NOT `git rev-parse HEAD` —
 # on pull_request events the checkout is the ephemeral refs/pull/N/merge commit,
 # so its SHA changes with the base and never matches the reviewed head (#310).
-HEAD_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null) \
+PR_INFO=$(timeout 60 gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid,baseRefName \
+  --jq '.headRefOid + " " + .baseRefName' 2>/dev/null) \
   || { log "WARN: gh failed resolving PR head SHA — skipping review"; exit 0; }
+read -r HEAD_SHA PR_BASE <<<"$PR_INFO" || true
 if [ -z "$HEAD_SHA" ]; then log "WARN: empty PR head SHA — skipping review"; exit 0; fi
+# Diff against the PR's own base: a manual run passes the workflow's 'main'
+# default, while PRs here target release.
+if [[ "$PR_BASE" =~ ^[A-Za-z0-9._/-]+$ && "$PR_BASE" != *".."* ]]; then
+    BASE_REF="$PR_BASE"
+fi
 # The posted comment stores only the 8-char short SHA (see printf below), so the
 # dedup check must match that same form — comparing the full 40-char SHA would
 # never hit and duplicates would be posted (#310).
 SHORT_SHA="${HEAD_SHA:0:8}"
-EXISTING_REVIEW=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
-  --jq ".comments[] | select(.body | startswith(\"[hermes] code review ($SHORT_SHA)\"))" \
-  2>&1) || { log "WARN: gh failed checking existing reviews — skipping review"; exit 0; }
+# Paginated REST (gh pr view caps the comment list), bot comments only. Matches
+# the hidden marker the current format embeds and the legacy "[hermes]" prefix,
+# so commits reviewed before the rebrand are not reviewed twice.
+EXISTING_REVIEW=$(timeout 60 gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+  --jq ".[] | select(.user.type == \"Bot\" and ((.body | contains(\"<!-- review:$SHORT_SHA -->\")) or (.body | startswith(\"[hermes] code review ($SHORT_SHA)\")))) | .id") \
+  || { log "WARN: gh failed checking existing reviews, skipping review"; exit 0; }
 if [ -n "$EXISTING_REVIEW" ]; then
     log "Already reviewed at $HEAD_SHA — skipping"
     exit 0
 fi
 
-# Fetch PR branch in agent-box workspace and run review
+# Fetch the PR into the review's own checkout on agent-box and run the review
 log "Fetching PR branch and running review on agent-box..."
-REVIEW=$(ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+REVIEW_STATUS=ok
+# agent-box authorizes only the dedicated key (the one the `agent-box` alias uses),
+# not the default ~/.ssh/id_* keys. Host key checking stays strict.
+# The outer cap covers fetch and cleanup too, so a hung git or network still
+# leaves time to post the fallback inside the 10-minute job. Budgeted from
+# START_TS (520s, not 540: checkout runs before this script starts), so slow gh
+# calls above shrink it instead of eating the posting window.
+SSH_CAP=$(( 520 - ($(date +%s) - START_TS) ))
+[ "$SSH_CAP" -ge 30 ] || SSH_CAP=30
+if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+    -i /home/luk-server/.ssh/agent-box -o IdentitiesOnly=yes \
     agent@localhost \
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
-     set -o pipefail   # else the timeout-claude-tail pipeline masks a timed-out review as success
-     cd /workspace/homelab
-     git fetch origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER' 2>&1
-     git checkout hermes-pr-$PR_NUMBER 2>&1
-     REVIEW_OUT=\$(timeout 600 claude --print \
-       'Review the current branch (hermes-pr-$PR_NUMBER) against $BASE_REF. What are the top 3-5 issues, bugs, or improvements? Format as markdown bullets. Include [severity: high|medium|low] for each. If nothing notable, say so in one line.' \
-       2>&1 | tail -n +1)
-     git checkout main 2>&1
-     git branch -D hermes-pr-$PR_NUMBER 2>&1 || true
-     printf '%s' \"\$REVIEW_OUT\"" 2>&1) \
-  || REVIEW="hermes: review unavailable — agent-box unreachable or error. Check $LOG_FILE."
+     # Own checkout, never the shared homelab one: the gate and worker switch branches
+     # there and wud-server runs scripts from it, so a review must not move it.
+     # The lock covers reviews only: a timed-out run keeps going on agent-box
+     # (no tty, so killing ssh does not stop it) and would race the next one.
+     # Children get 8>&- so nothing they leave running keeps the lock.
+     DIR=/workspace/.hermes-review
+     exec 8>\$DIR.lock
+     if ! flock -n 8; then
+       # The per-PR concurrency group allows one live job per PR, so a holder of
+       # this same PR is a cancelled run: its review is stale, stop it. The
+       # remote shell leads its own process group (sshd setsid), so only that
+       # group is signalled: a reused PID that leads no group is never hit. The
+       # lock is checked again after the read, so a holder that just finished
+       # (and left the owner file stale) is not mistaken for a live one.
+       opr= opid=
+       read -r opr opid 2>/dev/null <\$DIR.owner || true
+       if [ \"\$opr\" = $PR_NUMBER ] && [ -n \"\$opid\" ] && ! flock -n 8; then
+         kill -TERM -- -\$opid 2>/dev/null || true
+       fi
+       flock -w 60 8 || { echo 'another review holds the checkout'; exit 75; }
+     fi
+     echo \"$PR_NUMBER \$\$\" >\$DIR.owner
+     # Clone aside and move into place, so a clone killed halfway is redone next
+     # time instead of leaving a broken checkout behind.
+     if [ ! -d \$DIR/.git ]; then
+       rm -rf \$DIR \$DIR.tmp
+       git clone -q --no-checkout https://github.com/$REPO.git \$DIR.tmp 8>&-
+       mv \$DIR.tmp \$DIR
+     fi
+     cd \$DIR
+     # Left by a run killed mid checkout. Only these two: a detached auto gc can
+     # still hold its own locks.
+     rm -f .git/index.lock .git/HEAD.lock
+     cleanup() {
+       git checkout -q --detach 2>/dev/null || true
+       git branch -q -D hermes-pr-$PR_NUMBER 2>/dev/null || true
+     }
+     trap 'cleanup; rm -f \$DIR.owner' EXIT
+     # Detach first: a cancelled run can leave hermes-pr-N checked out, and fetch
+     # refuses to overwrite the checked-out branch.
+     cleanup
+     git fetch -q origin '+refs/pull/$PR_NUMBER/head:hermes-pr-$PR_NUMBER' \
+       '+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF' 8>&-
+     git checkout -q -f hermes-pr-$PR_NUMBER
+     # Subscription login, like claude_cmd: the exported API key is invalid and
+     # would take precedence.
+     rc=0
+     # 420s, not 600: the job has timeout-minutes 10, and the fallback comment
+     # must still post before GitHub kills the runner.
+     # --foreground keeps claude in this process group, so the kill above reaches it.
+     REVIEW_OUT=\$(timeout --foreground 420 env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY claude --print \
+       'Review the changes on the current branch (hermes-pr-$PR_NUMBER) against origin/$BASE_REF, that is git diff origin/$BASE_REF...HEAD. What are the top 3-5 issues, bugs, or improvements? Format as markdown bullets. Include [severity: high|medium|low] for each. If nothing notable, say so in one line.' \
+       2>&1 8>&-) || rc=\$?
+     # Before printing: if the outer timeout already closed the pipe, printf dies.
+     cleanup
+     printf '%s' \"\$REVIEW_OUT\"
+     exit \$rc" 2>&1); then
+    REVIEW_STATUS=error
+    # Keep the real error in the log: the PR comment only gets the fallback.
+    log "agent-box review failed: $(tail -c 1000 <<<"$REVIEW")"
+fi
+
+# Empty output with exit 0 is still a failed review.
+if [ "$REVIEW_STATUS" = ok ] && [ -z "${REVIEW//[[:space:]]/}" ]; then
+    REVIEW_STATUS=error
+    log "agent-box review returned empty output"
+fi
 
 log "Review complete (${#REVIEW} chars)"
+# GitHub rejects comment bodies over 65536 chars; keep room for the wrapper.
+if [ "${#REVIEW}" -gt 60000 ]; then
+    REVIEW="${REVIEW:0:60000}
 
-# Post comment
-BODY="$(printf '[hermes] code review (%s)\n\n%s\n\n---\n*Advisory only — not a blocking gate.*' \
-  "$SHORT_SHA" "$REVIEW")"
+(truncated at 60000 chars)"
+fi
 
-gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
-log "Comment posted to PR #$PR_NUMBER"
+# Post comment. A failed review posts nothing to the PR: the error is already in
+# the log and the state file below.
+COMMENT_RC=0
+POSTED=0
+if [ "$REVIEW_STATUS" = ok ]; then
+    BODY="$(printf 'Code review (%s)\n\n<!-- review:%s -->\n\n%s' \
+      "$SHORT_SHA" "$SHORT_SHA" "$REVIEW")"
+    # A failed or timed-out post still records `error` in the state file, then
+    # fails the job.
+    timeout 60 gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY" || COMMENT_RC=$?
+    if [ "$COMMENT_RC" -eq 0 ]; then
+        POSTED=1
+        log "Comment posted to PR #$PR_NUMBER"
+    else
+        REVIEW_STATUS=error
+        log "ERROR: posting comment to PR #$PR_NUMBER failed (rc=$COMMENT_RC)"
+    fi
+else
+    log "Review failed: no PR comment posted"
+    echo "::warning::review failed, see log"
+fi
 
 # Write metrics for node-exporter textfile collector and homelab-manager state
 END_TS=$(date +%s)
@@ -96,7 +193,10 @@ PROM_DIR="/var/lib/node_exporter/textfile"
 # user, which made the `9>lock` redirect fail with "Permission denied" and — under
 # `set -e` — failed the whole review job AFTER the review had already posted (#382).
 # A non-writable dir is now a logged skip, never a job failure.
-if [ -d "$PROM_DIR" ] && [ -w "$PROM_DIR" ]; then
+# The counter means reviews posted, so a failed post does not count.
+if [ "$POSTED" -ne 1 ]; then
+    log "Skipping Prometheus metrics: comment was not posted"
+elif [ -d "$PROM_DIR" ] && [ -w "$PROM_DIR" ]; then
     # Hold the lock across the ENTIRE read-modify-write — the previous version
     # only locked the read, so concurrent reviews could both read N and write
     # N+1, losing an increment (#310). fd 9 keeps the lock for the subshell.
@@ -127,7 +227,10 @@ else
     log "Skipping Prometheus metrics: $PROM_DIR missing or not writable by $(id -un) (#382)"
 fi
 
-# JSON state for homelab-manager /hermes endpoint
+# JSON state for homelab-manager /hermes endpoint. Locked like the Prometheus
+# block: reviews of different PRs can run at once and lose an increment (#310).
+(
+flock 9
 python3 -c "
 import json, os, time
 state_file = '$STATE_DIR/hermes-state.json'
@@ -137,10 +240,16 @@ except Exception:
     state = {}
 state['pr_review'] = {
     'last_run': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime($END_TS)),
-    'status': 'ok',
+    'status': '$REVIEW_STATUS',
     'last_pr': $PR_NUMBER,
     'duration_s': $DURATION,
     'total': state.get('pr_review', {}).get('total', 0) + 1,
 }
-json.dump(state, open(state_file, 'w'), indent=2)
-" 2>/dev/null || true
+# Write then rename, so a crash mid-write never leaves truncated JSON.
+with open(state_file + '.tmp', 'w') as f:
+    json.dump(state, f, indent=2)
+os.replace(state_file + '.tmp', state_file)
+"
+) 9>"$STATE_DIR/hermes-state.lock" || log "WARN: could not write $STATE_DIR/hermes-state.json"
+
+exit "$COMMENT_RC"
