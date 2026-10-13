@@ -14,6 +14,9 @@ rule_files:
   # Only Lucky's recap rules: the rest of its rules duplicate lucky_alerts in
   # alerts.yml and would page twice. A glob, so a host without the Lucky checkout loads nothing.
   - "/etc/prometheus-lucky/rules/recap-*.rules.yml"
+  # CoJam's own rules, from the CoJam checkout. A glob, so a host without the
+  # checkout (or without rules yet) loads nothing.
+  - "/etc/prometheus-cojam/rules/cojam-*.rules.yml"
 
 scrape_configs:
   # Prometheus itself
@@ -64,11 +67,6 @@ scrape_configs:
   # Lucky backend — /metrics exposed by prom-client (PR #875).
   # Backend listens on :3000 (not :5000) — wrong port left up=0 + empty
   # Lucky Application Metrics dashboard panels (2026-06-18 audit).
-  - job_name: 'cojam-server'
-    metrics_path: /metrics
-    static_configs:
-      - targets: ['cojam-server:9100']
-
   - job_name: 'lucky-backend'
     static_configs:
       - targets: ['lucky-backend:3000']
@@ -127,3 +125,13 @@ scrape_configs:
           service: 'grafana'
     scrape_interval: 15s
     metrics_path: /metrics
+
+  # CoJam server: /metrics on 9100 inside the container, never published
+  # (ADR-0004); Prometheus reaches it over the frontend network.
+  - job_name: 'cojam-server'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['cojam-server:9100']
+        labels:
+          service: 'cojam-server'
+          environment: 'production'

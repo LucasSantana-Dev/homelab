@@ -41,3 +41,14 @@ providers:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/lucky-dashboards
+      # CoJam dashboards. Source of truth is the CoJam repo
+      # (observability/grafana/dashboards); edits in the UI are not saved.
+      - name: 'CoJam (repo)'
+        orgId: 1
+        folder: 'CoJam'
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 60
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/cojam-dashboards
