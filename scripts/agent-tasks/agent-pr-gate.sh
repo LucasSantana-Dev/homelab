@@ -181,12 +181,13 @@ for REPO in $AGENT_REPOS; do
                 TRIES=$(fix_tries "$REPO" "$N" "$LEGACY_TRIES")
                 if (( TRIES >= FIX_MAX )); then
                     try_act "gh pr edit $N --repo $REPO --add-label needs-human"
-                    notify --title "agent: #$N needs a human" --body "$REPO #$N: $WHAT after $TRIES fixes" --urgency warn || true
+                    # Deduped: if the label edit fails, has_label stays false and this runs every timer tick.
+                    notify_once "$REPO" "$N" "$SHA" fix-cap "agent: #$N needs a human" "$REPO #$N: $WHAT after $TRIES fixes" warn
                     continue
                 fi
                 if [[ "$AGENT_DRY_RUN" != "1" ]] && ! workdir_clean "$WORKDIR"; then
                     echo "workdir $WORKDIR is dirty, skipping autofix of #$N"
-                    notify --title "agent: dirty workdir" --body "$REPO $WORKDIR has uncommitted changes; autofix of #$N skipped" --urgency warn || true
+                    notify_once "$REPO" "$N" "$SHA" dirty-workdir "agent: dirty workdir" "$REPO $WORKDIR has uncommitted changes; autofix of #$N skipped" warn
                     continue
                 fi
                 (( AUTOFIX_LEFT > 0 )) || { echo "#$N: autofix deferred, per-run cap reached"; continue; }
@@ -227,10 +228,13 @@ for REPO in $AGENT_REPOS; do
                 notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: #$N gate ($DECISION)" "$REPO #$N"$'\n'"$TABLE" info
                 ;;
             auto-merge)
-                if act "gh pr merge $N --repo $REPO --auto --squash --match-head-commit $SHA"; then
-                    notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: auto-merge queued #$N" "$REPO #$N"$'\n'"$TABLE" info
+                # Merge now, never queue (--auto): a queued merge fires later without a new
+                # score, so a human who joins or pushes after this run would be merged over.
+                # Not mergeable yet (behind base, checks rerunning): fail, re-score next run.
+                if act "gh pr merge $N --repo $REPO --squash --match-head-commit $SHA"; then
+                    notify_once "$REPO" "$N" "$SHA" "$DECISION" "agent: auto-merged #$N" "$REPO #$N"$'\n'"$TABLE" info
                 else
-                    echo "#$N: gh pr merge --auto failed"
+                    echo "#$N: gh pr merge failed, retrying next run"
                 fi
                 ;;
         esac
