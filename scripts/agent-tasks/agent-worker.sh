@@ -92,8 +92,15 @@ for REPO in $AGENT_REPOS; do
     PR=$(run_on_agent "gh pr list --repo $REPO --head $BRANCH --state open --json number -q '.[0].number'") || PR=""
     if [[ "$PR" =~ ^[0-9]+$ ]]; then
         register_pr "$REPO" "$PR" || echo "WARN: could not register PR #$PR, the gate will not track it"
-        try_act "gh issue edit $ISSUE --repo $REPO --remove-label agent-failed"
-        notify --title "agent: PR #$PR opened for #$ISSUE" --body "https://github.com/$REPO/pull/$PR" --urgency info || true
+        # A failed unclaim leaves the issue skipped for good if this PR is later
+        # closed unmerged, so say so in the alert instead of only in the log.
+        BODY="https://github.com/$REPO/pull/$PR" URGENCY=info
+        if ! act "gh issue edit $ISSUE --repo $REPO --remove-label agent-failed"; then
+            echo "WARN: could not remove agent-failed from #$ISSUE"
+            BODY+=" (could not remove agent-failed from #$ISSUE; remove it by hand)"
+            URGENCY=warn
+        fi
+        notify --title "agent: PR #$PR opened for #$ISSUE" --body "$BODY" --urgency "$URGENCY" || true
     else
         notify --title "agent: no PR for #$ISSUE" --body "$REPO #$ISSUE left labelled agent-failed. Log: $LOG_FILE" --urgency warn || true
     fi
