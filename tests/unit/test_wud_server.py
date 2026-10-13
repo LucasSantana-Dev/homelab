@@ -25,7 +25,9 @@ def test_classify_never_runs_from_the_shared_workspace():
 
 
 def test_classify_script_is_baked_into_the_image():
-    path = re.search(r"exec bash (\S+)", _classify_cmd()).group(1)
+    m = re.search(r"exec bash (\S+)", _classify_cmd())
+    assert m, f"no 'exec bash <script>' in CLASSIFY_CMD: {_classify_cmd()!r}"
+    path = m.group(1)
     copies = {
         dst: src
         for src, dst in re.findall(r"^COPY (\S+) (\S+)$", DOCKERFILE.read_text(), re.M)
