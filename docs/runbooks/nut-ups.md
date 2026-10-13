@@ -159,8 +159,9 @@ AT ONBATT * START-TIMER onbatt-shutdown <seconds>
 AT ONLINE * CANCEL-TIMER onbatt-shutdown
 ```
 
-Until step 6 measures the runtime, set `<seconds>` to `10800` (3h) so low battery triggers the
-shutdown first during the test.
+Until step 6 measures the runtime, set `<seconds>` to `21600` (6h), well above the 3h pass
+threshold, so low battery triggers the shutdown first and the runtime to `LB` can be measured.
+If the timer fires first instead, the runtime is above 6h: that is a pass.
 
 `/usr/bin/upssched-cmd` (Ubuntu ships a placeholder; replace it):
 
@@ -210,7 +211,7 @@ let WinNUT shut it down.
 
 Someone must stay near the UPS: step 5 needs a person to plug it back into the wall.
 
-1. `upsc shara@localhost ups.status` shows `OL`. The upssched timer is at `10800` (step 3).
+1. `upsc shara@localhost ups.status` shows `OL`. The upssched timer is at `21600` (step 3).
 2. Pull the UPS plug from the wall: status goes `OB`. Note the time.
 3. Leave it on battery until `ups.status` shows `OB LB`. Record the runtime to `LB` (this is the
    usable runtime, not time to empty) and the load (`upsc shara@localhost ups.load`).
