@@ -189,7 +189,11 @@ def grade_value(pr, issue, cfg):
     labels = _labels(issue)
     if "ready-for-agent" not in labels:
         return "red", "issue not ready-for-agent"
-    adds_test = any(_match(f["path"], cfg["test_paths"]) for f in pr.get("files", []))
+    # A test file must gain lines; editing or deleting tests only does not count.
+    adds_test = any(
+        _match(f["path"], cfg["test_paths"]) and (f.get("additions") or 0) > 0
+        for f in pr.get("files", [])
+    )
     if labels & set(cfg["value_green_labels"]) and adds_test:
         return "green", "P1/bug with test"
     return "yellow", "linked issue" + ("" if adds_test else ", no new test")
