@@ -84,3 +84,21 @@ def test_failed_fetch_restores_main(tmp_path):
     assert res.returncode != 0
     assert _git(ws, "symbolic-ref", "--short", "HEAD") == "main"
     assert _git(ws, "branch", "--list", "hermes-pr-7") == ""
+
+
+def test_review_fails_when_main_cannot_be_restored(tmp_path):
+    # The PR changes a tracked file and the review edits it: checkout main refuses
+    # to overwrite the edit, so the run must fail, not report success.
+    ws = _workspace(tmp_path, with_pr=False)
+    origin = tmp_path / "origin"
+    (origin / "f").write_text("base\n")
+    _git(origin, "add", "f")
+    _commit(origin, "add f")
+    (origin / "f").write_text("pr\n")
+    _git(origin, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "pr")
+    _git(origin, "update-ref", "refs/pull/7/head", "HEAD")
+    _git(origin, "reset", "-q", "--hard", "HEAD~1")
+    _git(ws, "pull", "-q")
+    res = _run(tmp_path, ws, claude=f"echo edited > {ws / 'f'}; echo review-text")
+    assert res.returncode != 0
+    assert "could not restore main" in res.stdout
