@@ -78,6 +78,13 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
     "source /etc/profile.d/agent-env.sh 2>/dev/null
      set -e
      cd /workspace/homelab
+     # Restore main on any exit, so a failed fetch or checkout under set -e does not
+     # leave the shared workspace detached or on the PR branch.
+     restore() {
+       git checkout -q main 2>/dev/null || true
+       git branch -q -D hermes-pr-$PR_NUMBER 2>/dev/null || true
+     }
+     trap restore EXIT
      # Detach first: a cancelled run can leave hermes-pr-N checked out, and fetch
      # refuses to overwrite the checked-out branch.
      git checkout -q --detach
@@ -92,8 +99,8 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
      REVIEW_OUT=\$(timeout 420 env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY claude --print \
        'Review the current branch (hermes-pr-$PR_NUMBER) against $BASE_REF. What are the top 3-5 issues, bugs, or improvements? Format as markdown bullets. Include [severity: high|medium|low] for each. If nothing notable, say so in one line.' \
        2>&1) || rc=\$?
-     git checkout -q main
-     git branch -q -D hermes-pr-$PR_NUMBER || true
+     # Before printing: if the outer timeout already closed the pipe, printf dies.
+     restore
      printf '%s' \"\$REVIEW_OUT\"
      exit \$rc" 2>&1); then
     REVIEW_STATUS=error
