@@ -70,9 +70,9 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Container groups for safe rolling updates (order matters)
-declare -a GROUP_DATABASES=("nextcloud-db" "paperless-db" "nextcloud-redis" "paperless-redis")
+declare -a GROUP_DATABASES=("nextcloud-db" "nextcloud-redis")
 declare -a GROUP_CORE=("caddy-lan" "homepage" "homeassistant")
-declare -a GROUP_APPS=("jellyfin" "stremio-server" "n8n" "nextcloud" "paperless-ngx" "filebrowser")
+declare -a GROUP_APPS=("jellyfin" "stremio-server" "n8n" "nextcloud" "filebrowser")
 declare -a GROUP_MONITORING=("prometheus" "grafana" "loki" "promtail" "alertmanager" "blackbox-exporter" "node-exporter" "cadvisor")
 declare -a GROUP_UTILITIES=("portainer" "whats-up-docker" "pihole")
 

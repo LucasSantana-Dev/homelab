@@ -165,9 +165,6 @@ jobs:
         N8N_PASSWORD=test_password_123
         NEXTCLOUD_DB_ROOT_PASSWORD=test_password_123
         NEXTCLOUD_DB_PASSWORD=test_password_123
-        PAPERLESS_DB_PASSWORD=test_password_123
-        PAPERLESS_SECRET_KEY=test_secret_key_123
-        PAPERLESS_ADMIN_PASSWORD=test_password_123
         HEALTHCHECKS_DB_PASSWORD=test_password_123
         HEALTHCHECKS_SECRET_KEY=test_secret_key_123
         HEALTHCHECKS_SUPERUSER_EMAIL=admin@example.com
@@ -221,10 +218,9 @@ jobs:
         scan-type: 'fs'
         scan-ref: '.'
         # Mirrors the exclusions formerly in .snyk (removed per ADR-0014):
-        # archive/** is reverted k3s history (ADR-0004), paperless-ngx is an
-        # upstream image whose base CVEs are upstream-owned. Neither is deployed
-        # from source here, so findings there are not actionable.
-        skip-dirs: 'archive,dockerfiles/paperless-ngx'
+        # archive/** is reverted k3s history (ADR-0004), not deployed from
+        # source here, so findings there are not actionable.
+        skip-dirs: 'archive'
         format: 'sarif'
         output: 'trivy-results.sarif'
 
@@ -280,9 +276,6 @@ jobs:
         N8N_PASSWORD=test_password_123
         NEXTCLOUD_DB_ROOT_PASSWORD=test_password_123
         NEXTCLOUD_DB_PASSWORD=test_password_123
-        PAPERLESS_DB_PASSWORD=test_password_123
-        PAPERLESS_SECRET_KEY=test_secret_key_123
-        PAPERLESS_ADMIN_PASSWORD=test_password_123
         HEALTHCHECKS_DB_PASSWORD=test_password_123
         HEALTHCHECKS_SECRET_KEY=test_secret_key_123
         HEALTHCHECKS_SUPERUSER_EMAIL=admin@example.com

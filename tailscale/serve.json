@@ -13,7 +13,6 @@
 				"/portainer/":       { "Proxy": "https://127.0.0.1:9443" },
 				"/uptime/":          { "Proxy": "http://127.0.0.1:3001" },
 				"/nextcloud/":       { "Proxy": "http://127.0.0.1:8080" },
-				"/paperless/":       { "Proxy": "http://127.0.0.1:8010" },
 				"/n8n/":             { "Proxy": "http://127.0.0.1:5678" },
 				"/homeassistant/":   { "Proxy": "http://127.0.0.1:8123" }
 			}

@@ -31,7 +31,6 @@ regexes = [
   '''test_(?:token|secret|password)_[A-Za-z0-9_]+''',
   '''https://discord\.com/api/webhooks/123[0-9]*/test[_A-Za-z0-9-]*''',
   '''^AUTHENTIK_SECRET_KEY=test_secret_key_123$''',
-  '''^PAPERLESS_SECRET_KEY=test_secret_key_123$''',
   '''REDACTED''',
   '''Required env var''',
   '''dry-run=client''',

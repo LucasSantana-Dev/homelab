@@ -265,33 +265,6 @@ services:
     sensitive: true
     has_port: false
 
-  paperless-ngx:
-    name: "Paperless-ngx"
-    category: apps
-    container_name: paperless-ngx
-    port: 8400
-    internal_port: 8000
-    health_endpoint: "/"
-    description: "Document management system"
-    sensitive: true
-    url_path: "paperless"
-
-  paperless-db:
-    name: "Paperless DB"
-    category: apps
-    container_name: paperless-db
-    description: "PostgreSQL for Paperless"
-    sensitive: true
-    has_port: false
-
-  paperless-redis:
-    name: "Paperless Redis"
-    category: apps
-    container_name: paperless-redis
-    description: "Redis broker for Paperless"
-    sensitive: true
-    has_port: false
-
   # Security Services
   pihole:
     name: "Pi-hole"
