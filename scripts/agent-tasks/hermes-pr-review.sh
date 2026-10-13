@@ -94,25 +94,28 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
      if ! flock -n 8; then
        # The per-PR concurrency group allows one live job per PR, so a holder of
        # this same PR is a cancelled run: its review is stale, stop it. The
-       # remote shell leads its own process group (sshd setsid).
+       # remote shell leads its own process group (sshd setsid), so only that
+       # group is signalled: a reused PID that leads no group is never hit. The
+       # lock is checked again after the read, so a holder that just finished
+       # (and left the owner file stale) is not mistaken for a live one.
        opr= opid=
        read -r opr opid 2>/dev/null <\$DIR.owner || true
-       if [ \"\$opr\" = $PR_NUMBER ] && [ -n \"\$opid\" ]; then
-         kill -TERM -- -\$opid 2>/dev/null || kill -TERM \$opid 2>/dev/null || true
+       if [ \"\$opr\" = $PR_NUMBER ] && [ -n \"\$opid\" ] && ! flock -n 8; then
+         kill -TERM -- -\$opid 2>/dev/null || true
        fi
        flock -w 60 8 || { echo 'another review holds the checkout'; exit 75; }
      fi
      echo \"$PR_NUMBER \$\$\" >\$DIR.owner
      [ -d \$DIR/.git ] || git clone -q --no-checkout https://github.com/$REPO.git \$DIR 8>&-
      cd \$DIR
-     # Every git writer here runs under the lock, so any lock file left is from
-     # a killed run.
-     find .git -name '*.lock' -delete
+     # Left by a run killed mid checkout. Only these two: a detached auto gc can
+     # still hold its own locks.
+     rm -f .git/index.lock .git/HEAD.lock
      cleanup() {
        git checkout -q --detach 2>/dev/null || true
        git branch -q -D hermes-pr-$PR_NUMBER 2>/dev/null || true
      }
-     trap cleanup EXIT
+     trap 'cleanup; rm -f \$DIR.owner' EXIT
      # Detach first: a cancelled run can leave hermes-pr-N checked out, and fetch
      # refuses to overwrite the checked-out branch.
      cleanup

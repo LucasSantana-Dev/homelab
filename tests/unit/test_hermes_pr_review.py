@@ -173,7 +173,7 @@ def test_review_stops_a_cancelled_run_of_the_same_pr(tmp_path):
         _stop(holder)
     assert res.returncode == 0, res.stdout + res.stderr
     assert res.stdout == "review-text"
-    assert (tmp_path / "review.owner").read_text().split()[0] == "7"
+    assert not (tmp_path / "review.owner").exists()
 
 
 @needs_flock
