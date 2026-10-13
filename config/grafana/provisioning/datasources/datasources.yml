@@ -82,3 +82,24 @@ datasources:
     secureJsonData:
       password: $__file{/etc/grafana/secrets/lucky_grafana_ro_password}
     version: 1
+  # CoJam Postgres, read-only role grafana_ro (CoJam repo:
+  # observability/postgres/grafana-ro.sql), reached over the cojam-db-ro network.
+  - name: CoJam Postgres
+    uid: cojam-postgres
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: cojam-db:5432
+    user: grafana_ro
+    isDefault: false
+    editable: false
+    jsonData:
+      database: cojam
+      sslmode: disable
+      postgresVersion: 1700
+      maxOpenConns: 2
+      maxIdleConns: 1
+      connMaxLifetime: 14400
+      timeInterval: 1m
+    secureJsonData:
+      password: $__file{/etc/grafana/secrets/cojam_grafana_ro_password}
+    version: 1

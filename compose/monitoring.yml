@@ -16,9 +16,13 @@ services:
     # Lucky dashboards live in the Lucky repo (observability/grafana/dashboards);
     # the host checkout is reset to origin/main on every Lucky deploy.
     - ${LUCKY_REPO_DIR:-/home/luk-server/Lucky}/observability/grafana/dashboards:/var/lib/grafana/lucky-dashboards:ro
+    # CoJam dashboards live in the CoJam repo (observability/grafana/dashboards).
+    - ${COJAM_REPO_DIR:-/home/luk-server/cojam}/observability/grafana/dashboards:/var/lib/grafana/cojam-dashboards:ro
     # Password of the Lucky Postgres role grafana_ro (datasources.yml, $__file).
     # Create it before (re)creating grafana, or Docker makes a directory here.
     - ../secrets/lucky_grafana_ro_password:/etc/grafana/secrets/lucky_grafana_ro_password:ro
+    # Same for the CoJam Postgres role grafana_ro.
+    - ../secrets/cojam_grafana_ro_password:/etc/grafana/secrets/cojam_grafana_ro_password:ro
     environment:
     - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=grafana-sentry-datasource
     # Consumed by the Sentry datasource provisioning (authToken: ${SENTRY_AUTH_TOKEN}).
@@ -60,6 +64,8 @@ services:
     # Holds only lucky-postgres, for the read-only Lucky datasource. Not
     # lucky-network: that one also carries Redis without a password.
     - lucky-db-ro
+    # Holds only cojam-db, for the read-only CoJam datasource.
+    - cojam-db-ro
     deploy:
       resources:
         limits:
@@ -183,6 +189,9 @@ services:
     # keeps on origin/main (Lucky#2723). Outside /etc/prometheus so Docker
     # does not create a mountpoint inside config/prometheus.
     - ${LUCKY_REPO_DIR:-/home/luk-server/Lucky}/observability/prometheus/rules:/etc/prometheus-lucky/rules:ro
+    # CoJam alert rules, read from the CoJam checkout. Outside /etc/prometheus
+    # for the same reason as the Lucky rules.
+    - ${COJAM_REPO_DIR:-/home/luk-server/cojam}/observability/prometheus/rules:/etc/prometheus-cojam/rules:ro
     command:
     - --config.file=/etc/prometheus/prometheus.yml
     - --storage.tsdb.path=/prometheus
@@ -588,4 +597,7 @@ networks:
     external: true
   # Created by the Lucky deploy (scripts/deploy.sh); only lucky-postgres joins it.
   lucky-db-ro:
+    external: true
+  # Created by hand (docs/runbooks/cojam-deploy.md); only cojam-db joins it.
+  cojam-db-ro:
     external: true

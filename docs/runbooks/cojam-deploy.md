@@ -116,3 +116,85 @@ docker exec cojam-db psql -U cojam -d cojam -c "\dt"
   mechanism as other stateful stacks.
 - **Rollback:** `docker compose down cojam-server cojam-db` removes the stack;
   the data volume persists unless you delete `appdata/cojam/db`.
+
+## Observability rollout (owner-run)
+
+**Merge this PR only together with the rollout below.** `cojam-db-ro` is an
+external network, so any `docker compose up` of grafana or cojam before the
+"network create" step fails.
+
+CoJam is wired like Lucky: Loki gets `{container_name="cojam-server"}` (the
+`tag: "{{.Name}}"` log option), Prometheus scrapes `cojam-server:9100` with
+`service`/`environment` labels and loads `cojam-*.rules.yml` from the CoJam
+checkout, and Grafana gets the "CoJam (repo)" dashboards folder plus the
+`CoJam Postgres` datasource (uid `cojam-postgres`, read-only role `grafana_ro`
+on database `cojam`, reached over the `cojam-db-ro` network that only
+`cojam-db` and `grafana` join).
+
+Run it after cojam#444 (product_events) is deployed: step 2 grants on that table.
+
+Depends on the CoJam repo: `observability/grafana/dashboards`,
+`observability/prometheus/rules` and `observability/postgres/grafana-ro.sql`.
+The checkout path is `COJAM_REPO_DIR` (default `/home/luk-server/cojam`). If a
+mounted directory is missing, Docker creates an empty one: Grafana shows no
+CoJam dashboards and Prometheus loads no CoJam rules (the glob matches
+nothing), nothing breaks.
+
+Run on the server, in this order:
+
+```bash
+cd /home/luk-server/homelab
+
+# 0. CoJam checkout (public repo), only if missing; step 2 reads grafana-ro.sql from it
+[ -d /home/luk-server/cojam ] || git clone --depth 1 https://github.com/LucasSantana-Dev/cojam.git /home/luk-server/cojam
+
+# 1. secret file for the grafana_ro password (never printed), before (re)creating grafana
+umask 077
+openssl rand -base64 32 | tr -d '\n' > secrets/cojam_grafana_ro_password
+# grafana runs as uid 472: same owner and mode as lucky_grafana_ro_password, or provisioning
+# fails with "permission denied" and grafana restart-loops (all dashboards down)
+sudo chown 472 secrets/cojam_grafana_ro_password && sudo chmod 400 secrets/cojam_grafana_ro_password
+
+# 1b. product events key (stable, never printed) and client telemetry; idempotent
+grep -q '^COJAM_EVENTS_HMAC_KEY=' .env || echo "COJAM_EVENTS_HMAC_KEY=$(openssl rand -hex 32)" >> .env
+grep -q '^COJAM_FEATURE_TELEMETRY=' .env || echo "COJAM_FEATURE_TELEMETRY=true" >> .env
+make sops-encrypt && make sops-verify
+
+# 2. create the role (idempotent); the password goes over stdin, never in argv
+{ printf "\\set pw '%s'\n" "$(cat secrets/cojam_grafana_ro_password)"; cat /home/luk-server/cojam/observability/postgres/grafana-ro.sql; } \
+  | docker exec -i cojam-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -1 -q'
+
+# 3. network shared by cojam-db and grafana only (internal: no egress)
+docker network create --internal cojam-db-ro
+
+# 4. recreate with the new log tag, mounts and network
+docker compose up -d cojam-db cojam-server cojam-web grafana prometheus
+
+# 5. pick up the new rule_files glob
+docker kill -s HUP prometheus
+```
+
+Verify:
+
+```bash
+# Loki: lines for the tagged container
+docker exec grafana wget -qO- 'http://loki:3100/loki/api/v1/query_range?limit=3&query=%7Bcontainer_name%3D%22cojam-server%22%7D' | head -c 400
+
+# Prometheus: target up, with service/environment labels
+docker exec prometheus wget -qO- 'http://localhost:9090/api/v1/targets?state=active' | grep -o '"job":"cojam-server"[^}]*'
+docker exec prometheus wget -qO- 'http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22cojam-server%22%7D'
+
+# Grafana: datasource reaches Postgres as grafana_ro
+docker exec cojam-db psql -U cojam -d cojam -c "SELECT rolname, rolconnlimit FROM pg_roles WHERE rolname = 'grafana_ro'"
+```
+
+The CoJam deploy keeps the checkout current, then reloads the rules:
+
+```bash
+git -C /home/luk-server/cojam fetch --depth 1 origin main && git -C /home/luk-server/cojam reset --hard origin/main
+docker kill -s HUP prometheus
+```
+
+Rerun step 2 after restoring a dump on another host (roles are not in
+`pg_dump`). Rollback: remove the CoJam entries from this repo and
+`docker network rm cojam-db-ro` after recreating grafana and cojam-db.
