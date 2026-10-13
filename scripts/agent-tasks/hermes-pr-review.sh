@@ -83,7 +83,7 @@ if ! REVIEW=$(timeout "$SSH_CAP" ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=
      # restored (a tracked edit in the way), fail the run instead of reporting
      # success with the PR branch still checked out.
      restore() {
-       git checkout -q main 2>/dev/null || { echo 'could not restore main in the workspace'; return 1; }
+       git checkout -q main || { echo 'could not restore main in the workspace'; return 1; }
        git branch -q -D hermes-pr-$PR_NUMBER 2>/dev/null || true
      }
      trap restore EXIT
