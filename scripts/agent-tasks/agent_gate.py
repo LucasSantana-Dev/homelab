@@ -347,11 +347,12 @@ def main(argv=None):
     if args.repo:
         cfg = {**cfg, **cfg.get("repos", {}).get(args.repo, {})}
     if args.command == "get":
-        print(
-            cfg[args.key]
-            if not isinstance(cfg[args.key], (dict, list, bool))
-            else json.dumps(cfg[args.key])
-        )
+        if not args.key:
+            ap.error("get needs --key")
+        if args.key not in cfg:
+            ap.error(f"unknown config key: {args.key}")
+        val = cfg[args.key]
+        print(json.dumps(val) if isinstance(val, (dict, list, bool)) else val)
         return 0
     data = json.load(sys.stdin)
     if args.command == "score":

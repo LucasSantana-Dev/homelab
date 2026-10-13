@@ -349,6 +349,26 @@ def test_cli_score_roundtrip():
     )
 
 
+def _cli_raw(*args):
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *args], capture_output=True, text=True
+    )
+
+
+def test_cli_get_without_key_is_a_usage_error():
+    res = _cli_raw("get")
+    assert res.returncode == 2
+    assert "get needs --key" in res.stderr
+    assert "Traceback" not in res.stderr
+
+
+def test_cli_get_unknown_key_is_a_usage_error():
+    res = _cli_raw("get", "--key", "no_such_key")
+    assert res.returncode == 2
+    assert "unknown config key: no_such_key" in res.stderr
+    assert "Traceback" not in res.stderr
+
+
 def test_cli_get_merges_repo_overrides():
     assert (
         _cli(
