@@ -13,6 +13,11 @@ This directory contains detailed documentation for specific components and featu
 - **[Interactive CLI](interactive-cli.md)** - Comprehensive interactive console application
 - **[Project Structure](project-structure.md)** - Improved project organization and structure
 
+### Power & Outage Recovery
+
+- **[BIOS Power-On Setup](bios-power-on-setup.md)** - Auto boot after AC loss (Firebat T8 Plus)
+- **[NUT UPS Runbook](runbooks/nut-ups.md)** - UPS low-battery shutdown via NUT and acceptance test
+
 ### Hybrid Migration (K3s + Terraform)
 
 - **[90-Day Migration Roadmap](k8s-terraform-migration-roadmap.md)** - Staged hybrid migration execution plan
@@ -24,6 +29,7 @@ This directory contains detailed documentation for specific components and featu
 ### MCP / AI Tooling
 
 - **[Forge Space Tools](forge-space-tools.md)** - Deploy and operate Forge Space-compatible MCP gateway on homelab
+- **[Agent Loop](agent-loop.md)** - Autonomous dev loop on agent-box and its 4-pillar merge gate
 
 ### Public Release & Security Hygiene
 

@@ -11,7 +11,6 @@ echo "---------------"
 
 services=(
     "homelab-docker"
-    "satisfactory-server"
     "lukbot"
     "docker"
     "tailscaled"
@@ -41,13 +40,6 @@ echo "-----------------"
 cd /home/luk-server/homelab 2>/dev/null || exit 1
 if [ -f docker-compose.yml ]; then
     echo "  Homelab stack:"
-    docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null | tail -n +2 | sed 's/^/    /' || echo "    ⚠ Unable to check containers"
-fi
-
-# Check satisfactory containers
-cd /home/luk-server/satisfactory-server 2>/dev/null || exit 1
-if [ -f docker-compose.yml ]; then
-    echo "  Satisfactory stack:"
     docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null | tail -n +2 | sed 's/^/    /' || echo "    ⚠ Unable to check containers"
 fi
 
@@ -81,5 +73,4 @@ fi
 echo ""
 echo "For detailed logs, run:"
 echo "  sudo journalctl -u homelab-docker -n 50"
-echo "  sudo journalctl -u satisfactory-server -n 50"
 echo "  sudo journalctl -u lukbot -n 50"

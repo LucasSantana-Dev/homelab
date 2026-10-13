@@ -14,13 +14,16 @@ check_api() {
 	local code
 	code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null) || code="000"
 	log_info "[$name] HTTP $code"
-	if ! echo "$ok_codes" | grep -qw "$code"; then
+	# Plain string match, no pipe: under `set -o pipefail`, `echo | grep -q`
+	# can fail when grep exits early and echo gets SIGPIPE (false alarms).
+	if [[ " $ok_codes " != *" $code "* ]]; then
 		ISSUES="${ISSUES}• ${name}: HTTP ${code}\n"
 	fi
 }
 
-# Spotify API — 401 = up (auth required), anything else = problem
-check_api "Spotify" "https://api.spotify.com/v1/" "401"
+# Spotify API — 401 = up (auth required), anything else = problem.
+# The bare /v1/ root answers 410 Gone since 2026-10, so probe a real endpoint.
+check_api "Spotify" "https://api.spotify.com/v1/search?q=a&type=track" "401"
 
 # Last.fm API — 400 = up (parameterless requests return 400, not 200)
 check_api "Last.fm" "https://ws.audioscrobbler.com/2.0/" "400"

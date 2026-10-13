@@ -6,7 +6,6 @@ This document provides a quick reference for the auto-start services configurati
 
 1. **Systemd Service Files** - Managed in `scripts/systemd/`:
    - `homelab-docker.service` - Main homelab stack
-   - `satisfactory-server.service` - Game server + Cloudflared tunnel
    - `lukbot.service` - Discord bot
 
 2. **Helper Scripts**:
@@ -54,7 +53,7 @@ See `docs/bios-power-on-setup.md` for detailed instructions.
 ./scripts/monitoring/status-services.sh
 
 # Verify services are enabled
-systemctl is-enabled homelab-docker satisfactory-server lukbot homelab-watchdog.timer homelab-update.timer
+systemctl is-enabled homelab-docker lukbot homelab-watchdog.timer homelab-update.timer
 
 # Test manual start
 ./scripts/deployment/startup-services.sh
@@ -121,9 +120,6 @@ make watchdog-status
 # Homelab services
 sudo journalctl -u homelab-docker -n 50 -f
 
-# Satisfactory server
-sudo journalctl -u satisfactory-server -n 50 -f
-
 # Lucky
 sudo journalctl -u lukbot -n 50 -f
 ```
@@ -148,8 +144,7 @@ sudo systemctl status homelab-docker
 4. **Tailscale Daemon** - Tailscale network starts
 5. **Network Online** - Network connectivity established
 6. **Homelab Services** - Starts after 10s delay
-7. **Satisfactory Server** - Starts 5s after homelab
-8. **Lucky** - Starts 5s after homelab
+7. **Lucky** - Starts 5s after homelab
 
 ## Troubleshooting
 
@@ -158,7 +153,7 @@ sudo systemctl status homelab-docker
 1. **Check if services are enabled:**
 
    ```bash
-   systemctl is-enabled homelab-docker satisfactory-server lukbot
+   systemctl is-enabled homelab-docker lukbot
    ```
 
 2. **Check service logs:**
