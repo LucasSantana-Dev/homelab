@@ -11,7 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "agent-tasks" / "homelab-drift.sh"
 START = 'RESULT=$(ssh agent-box bash -c "'
-END = '" 2>/dev/null) || RESULT='
+END = '") || rc=$?'
 
 
 def _remote_command(origin, checkout):
@@ -84,15 +84,31 @@ def test_next_run_follows_release_and_drops_local_edits(tmp_path):
     _git(origin, "branch", "-f", "release", "main")
     (checkout / "stray").write_text("x")
     _git(checkout, "add", "stray")
+    # An untracked compose file would otherwise stay in the service list.
+    (checkout / "compose").mkdir()
+    (checkout / "compose" / "stale.yml").write_text("services: {}\n")
     res, _ = _run(tmp_path, origin)
     assert res.returncode == 0, res.stderr
     assert res.stdout.split() == ["NO_DRIFT", _git(origin, "rev-parse", "release")]
     assert not (checkout / "stray").exists()
+    assert not (checkout / "compose").exists()
 
 
 def test_failed_refresh_does_not_run_claude(tmp_path):
-    # No release branch on origin: the fetch fails, and claude must not read a
-    # stale or empty checkout.
+    # A populated checkout from an earlier run, then the fetch fails: claude must
+    # not fall back to reading the stale checkout.
+    origin = _origin(tmp_path)
+    res, _ = _run(tmp_path, origin)
+    assert res.returncode == 0, res.stderr
+    _git(origin, "branch", "-D", "release")
+    res, _ = _run(tmp_path, origin)
+    assert res.returncode != 0
+    assert "NO_DRIFT" not in res.stdout
+    assert "ERROR: drift checkout refresh failed" in res.stdout
+    assert "release" in res.stderr
+
+
+def test_failed_refresh_on_first_run_does_not_run_claude(tmp_path):
     origin = _origin(tmp_path, with_release=False)
     res, _ = _run(tmp_path, origin)
     assert res.returncode != 0
