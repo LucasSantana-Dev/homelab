@@ -119,10 +119,6 @@
       "service": "http://host.docker.internal:80"
     },
     {
-      "hostname": "paperless.luk-homeserver.com.br",
-      "service": "http://host.docker.internal:80"
-    },
-    {
       "hostname": "healthchecks.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80"
     },
@@ -297,12 +293,6 @@
       },
       {
         "name": "n8n.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "paperless.luk-homeserver.com.br",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
         "proxied": true
