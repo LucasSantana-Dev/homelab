@@ -22,7 +22,10 @@ OWNER = "LucasSantana-Dev"
 
 @pytest.fixture
 def cfg():
-    return gate.load_config(CONFIG)
+    # Pin Phase 1 so scoring tests do not follow the live auto_merge flag.
+    c = gate.load_config(CONFIG)
+    c["auto_merge"] = False
+    return c
 
 
 def make_pr(
@@ -37,7 +40,7 @@ def make_pr(
     lines = lines if lines is not None else 10 * len(files)
     return {
         "author": {"login": author},
-        "files": [{"path": p} for p in files],
+        "files": [{"path": p, "additions": 10, "deletions": 0} for p in files],
         "additions": lines,
         "deletions": 0,
         "closingIssuesReferences": [{"number": n} for n in closes],
@@ -112,6 +115,12 @@ def test_latest_is_not_mistaken_for_a_test_file(cfg):
 def test_value_green_for_p1_bug_with_test(cfg):
     pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
     assert gate.grade_value(pr, make_issue(), cfg)[0] == "green"
+
+
+def test_value_yellow_when_test_file_only_loses_lines(cfg):
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    pr["files"][1].update(additions=0, deletions=12)
+    assert gate.grade_value(pr, make_issue(), cfg)[0] == "yellow"
 
 
 def test_value_yellow_for_bug_without_test(cfg):
@@ -334,7 +343,30 @@ def _cli(*args, stdin=""):
 def test_cli_score_roundtrip():
     payload = {"pr": make_pr(["docs/a.md", "x.test.ts"]), "issue": make_issue()}
     out = json.loads(_cli("score", stdin=json.dumps(payload)).stdout)
-    assert out["decision"] == "owner-review"
+    live = gate.load_config(CONFIG)
+    assert (
+        out["decision"] == gate.score(payload["pr"], payload["issue"], live)["decision"]
+    )
+
+
+def _cli_raw(*args):
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *args], capture_output=True, text=True
+    )
+
+
+def test_cli_get_without_key_is_a_usage_error():
+    res = _cli_raw("get")
+    assert res.returncode == 2
+    assert "get needs --key" in res.stderr
+    assert "Traceback" not in res.stderr
+
+
+def test_cli_get_unknown_key_is_a_usage_error():
+    res = _cli_raw("get", "--key", "no_such_key")
+    assert res.returncode == 2
+    assert "unknown config key: no_such_key" in res.stderr
+    assert "Traceback" not in res.stderr
 
 
 def test_cli_get_merges_repo_overrides():
@@ -344,7 +376,8 @@ def test_cli_get_merges_repo_overrides():
         ).stdout.strip()
         == "release"
     )
-    assert _cli("get", "--key", "auto_merge").stdout.strip() == "false"
+    live = str(gate.load_config(CONFIG)["auto_merge"]).lower()
+    assert _cli("get", "--key", "auto_merge").stdout.strip() == live
 
 
 # --- critic fixes (T2 review) ---------------------------------------------
@@ -409,9 +442,40 @@ def test_agent_rules_and_infra_are_high_impact(cfg, path):
     assert gate.grade_impact(make_pr([path]), cfg)[0] == "red"
 
 
-def test_select_counts_agent_branch_without_closing_ref(cfg):
-    out = gate.select([make_issue(number=9)], [{"headRefName": "agent/issue-9"}], cfg)
+@pytest.mark.parametrize("branch", ["fix/issue-9", "agent/issue-9"])
+def test_select_counts_issue_branch_without_closing_ref(cfg, branch):
+    out = gate.select([make_issue(number=9)], [{"headRefName": branch}], cfg)
     assert out["skipped"] == {"9": "open PR already claims it"}
+
+
+@pytest.mark.parametrize("branch", ["fix/issue-9-x", "feat/issue-9", "fix/issue-"])
+def test_select_ignores_other_branch_shapes(cfg, branch):
+    out = gate.select([make_issue(number=9)], [{"headRefName": branch}], cfg)
+    assert "9" not in out["skipped"]
+
+
+def test_only_agent_prs_needs_registry_for_fix_branches(tmp_path):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    prs = [
+        {"number": 1, "headRefName": "fix/issue-1", "labels": []},
+        {"number": 2, "headRefName": "agent/issue-2", "labels": []},
+        {"number": 3, "headRefName": "other", "labels": [{"name": "agent"}]},
+        {"number": 4, "headRefName": "fix/typo", "labels": []},
+        {"number": 5, "headRefName": "fix/issue-5", "labels": []},
+    ]
+    script = (
+        f'source "{lib}"; AGENT_STATE_DIR="{tmp_path}"; AGENT_DRY_RUN=0; '
+        "register_pr o/r 5; register_pr o/other 1; only_agent_prs o/r"
+    )
+    out = subprocess.run(
+        ["bash", "-c", script],
+        input=json.dumps(prs),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    # 1: hand-opened fix/issue-1 (only registered in another repo) is not tracked.
+    assert [p["number"] for p in json.loads(out)] == [2, 3, 5]
 
 
 # --- cubic review fixes ---------------------------------------------------
@@ -468,10 +532,55 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
     assert "Bash\\(git\\ push\\ origin\\ agent/issue-7\\)" in out
     assert "Bash\\(git\\ push\\ -u\\ origin\\ agent/issue-7\\)" in out
     assert "agent/\\*" not in out
+    assert "fix/\\*" not in out
+
+
+def test_claude_cmd_accepts_new_and_legacy_prefix():
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    for branch in ("fix/issue-7", "agent/issue-7"):
+        res = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w p {branch}',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert res.returncode == 0, branch
+        assert f"git\\ push\\ origin\\ {branch}" in res.stdout
+
+
+def test_notify_once_dedups_per_sha(tmp_path):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    script = (
+        f'source "{lib}"; AGENT_STATE_DIR="{tmp_path}"; AGENT_DRY_RUN=0; '
+        'notify() { echo "N $*"; }; notify_once o/r 5 abc wait t b warn; notify_once o/r 5 abc wait t b warn; '
+        "notify_once o/r 5 abc close t b warn; notify_once o/r 5 def wait t b warn"
+    )
+    out = subprocess.run(
+        ["bash", "-c", script], capture_output=True, text=True, check=True
+    ).stdout
+    assert out.count("N --title t") == 3
+    assert sorted(p.name for p in (tmp_path / "notified").iterdir()) == [
+        "o_r-5-abc-close",
+        "o_r-5-abc-wait",
+        "o_r-5-def-wait",
+    ]
 
 
 @pytest.mark.parametrize(
-    "branch", ["", "main", "release", "agent/x:main", "agent/+x", "agent/x y"]
+    "branch",
+    [
+        "",
+        "main",
+        "release",
+        "agent/x:main",
+        "agent/+x",
+        "agent/x y",
+        "fix/x:main",
+        "feat/x",
+    ],
 )
 def test_claude_cmd_refuses_non_agent_branch(branch):
     lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
@@ -560,6 +669,15 @@ def test_empty_thread_is_not_bot_only(cfg):
     assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
 
 
+def test_empty_thread_beside_bot_threads_waits_for_the_owner(cfg):
+    empty = {"id": "T", "isResolved": False, "comments": {"totalCount": 0, "nodes": []}}
+    pr = pr_with_threads(thread("cubic-dev-ai"), empty)
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "owner-review"
+    assert "fix" not in out
+    assert "review: 2 unresolved thread(s), owner involved" in out["reasons"]
+
+
 @pytest.mark.parametrize("resolved", [False, True])
 def test_human_in_any_thread_halts(cfg, resolved):
     pr = pr_with_threads(thread("cubic-dev-ai", "stranger", resolved=resolved))
@@ -623,3 +741,86 @@ def test_unlisted_app_thread_waits_for_the_owner(cfg):
     assert (
         gate.score(pr_with_threads(t), make_issue(), cfg)["decision"] == "owner-review"
     )
+
+
+def _bash(script, state):
+    lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+    return subprocess.run(
+        ["bash", "-c", f'source "{lib}"; AGENT_STATE_DIR="{state}"; {script}'],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def test_fix_counter_seeds_from_legacy_then_increments(tmp_path):
+    out = _bash(
+        "AGENT_DRY_RUN=0; fix_tries o/r 5 1; fix_record o/r 5 2; fix_tries o/r 5 0; "
+        "fix_record o/r 5 3; fix_tries o/r 5 0; fix_tries o/r 6 0",
+        tmp_path,
+    )
+    assert out.split() == ["1", "2", "3", "0"]
+    assert (tmp_path / "autofix" / "o_r-5").read_text().strip() == "3"
+
+
+def test_fix_counter_dry_run_writes_nothing(tmp_path):
+    out = _bash("AGENT_DRY_RUN=1; fix_record o/r 5 2; fix_tries o/r 5 0", tmp_path)
+    assert "DRY-RUN" in out and out.split()[-1] == "0"
+    assert not (tmp_path / "autofix").exists()
+
+
+def test_notify_once_failed_send_leaves_no_marker(tmp_path):
+    out = _bash(
+        "AGENT_DRY_RUN=0; notify() { return 1; }; notify_once o/r 5 abc wait t b warn; "
+        'ls "$AGENT_STATE_DIR/notified" 2>/dev/null | wc -l',
+        tmp_path,
+    )
+    assert out.strip() == "0"
+
+
+@pytest.mark.parametrize("key", ["fix-cap", "dirty-workdir"])
+def test_gate_autofix_alerts_fire_once_per_sha(tmp_path, key):
+    # Runs the gate's own alert line: the label edit may fail and the workdir may stay
+    # dirty, so the same alert must not repeat on every timer run.
+    gate_sh = REPO / "scripts" / "agent-tasks" / "agent-pr-gate.sh"
+    lines = [
+        ln.strip()
+        for ln in gate_sh.read_text().splitlines()
+        if ln.strip().startswith("notify_once") and f" {key} " in ln
+    ]
+    assert len(lines) == 1, lines
+    env = (
+        'AGENT_DRY_RUN=0; notify() { echo "N $*"; }; REPO=o/r; N=5; '
+        "WHAT='CI still red'; TRIES=3; WORKDIR=/w; "
+    )
+    run = f"SHA=abc; {lines[0]}; {lines[0]}; SHA=def; {lines[0]}"
+    out = _bash(env + run, tmp_path)
+    assert out.count("N --title") == 2
+    assert sorted(p.name for p in (tmp_path / "notified").iterdir()) == [
+        f"o_r-5-abc-{key}",
+        f"o_r-5-def-{key}",
+    ]
+
+
+def test_gate_sends_no_undeduped_alerts():
+    gate_sh = REPO / "scripts" / "agent-tasks" / "agent-pr-gate.sh"
+    bare = [
+        ln.strip()
+        for ln in gate_sh.read_text().splitlines()
+        if ln.strip().startswith("notify ")
+    ]
+    assert bare == []
+
+
+def test_gate_merges_now_and_never_queues():
+    # A queued --auto merge fires later without a new score: a human who joins after
+    # the gate run would be merged over.
+    gate_sh = REPO / "scripts" / "agent-tasks" / "agent-pr-gate.sh"
+    merges = [
+        ln.strip()
+        for ln in gate_sh.read_text().splitlines()
+        if ln.strip().startswith('if act "gh pr merge')
+    ]
+    assert len(merges) == 1, merges
+    assert "--auto" not in merges[0]
+    assert "--match-head-commit $SHA" in merges[0]

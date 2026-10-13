@@ -16,15 +16,15 @@ wrappers. The agent-box hooks are an extra layer.
 
 - At most `wip_cap` (2) open agent PRs per repo. When full, the worker starts nothing new.
 - One issue and at most `AGENT_MAX_AUTOFIX_PER_RUN` (1) autofix per repo per run, under a lock. Daily budget of `AGENT_MAX_RUNS_PER_DAY` (6) claude runs, shared by worker and autofix.
-- Autofix at most `fix_attempts` (2) per PR, then `agent-failed` + `needs-human`.
-- PRs idle for `stale_days` (5) are closed and the issue gets `agent-failed`, so it is not picked again.
+- Autofix at most `fix_attempts` (2) per PR, then `needs-human` on the PR. The attempt count lives in `AGENT_STATE_DIR/autofix` (seeded once from legacy `agent-fix-N` labels; losing the state dir resets the counter, since the labels are no longer written).
+- PRs stuck on pending or red CI with no activity for `stale_days` (5) are closed (never ones waiting on the owner or labelled `needs-human`) and the issue gets `agent-failed`, so it is not picked again.
 - Any PR or issue another human authored, commented on or pushed to is never touched.
 - Pause everything: `touch ~/agent-paused` inside agent-box (resume: `rm ~/agent-paused`).
 
 ## Issue selection
 
 Open, `ready-for-agent`, `effort:s`, authored by the owner, no foreign comments, no open PR closing it
-(agent or hand-opened; an open PR on an `agent/issue-N` branch also counts), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
+(agent or hand-opened; an open PR on a `fix/issue-N` branch, or a legacy `agent/issue-N` one, also counts (a `fix/issue-N` PR is tracked only after the worker registers it in `AGENT_STATE_DIR/prs`, so a hand-opened one is never touched)), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
 workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 
 ## Merge gate: 4 pillars
@@ -60,23 +60,24 @@ the PR to `owner-review`. CI and thread fixes share the `fix_attempts` counter p
 re-post identical threads on every push), then `needs-human`. Stale-close never applies to thread
 autofix.
 
-For `owner-review`, `needs-human`, `split` and `auto-merge` the gate posts one comment per head
-commit with the grades; `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
+For `owner-review`, `needs-human`, `split` and `auto-merge` the gate sends one Discord message per head
+commit and decision with the grades (the autofix cap and dirty-workdir alerts are separate) (nothing is posted on the PR, which carries no agent marker: branch `fix/issue-N`, no `agent` label, commits as the owner; dedup state is one file per PR and sha under `AGENT_STATE_DIR/notified`); `wait` and `autofix` post nothing until the fix cap is hit. Stale-close applies only to
 `wait` and CI `autofix` PRs, never to ones waiting on the owner.
 
 ## Graduation
 
-- Phase 1 (now): `auto_merge: false`. The gate grades and comments; the owner merges. Compare the grade with your merge decision.
-- Phase 2: after 10 agent PRs merged without rework and the grade matching your decision in at least 9 of 10, set `auto_merge: true`. Merges use `gh pr merge --auto --squash --match-head-commit`, so required checks still gate.
+- Phase 1: `auto_merge: false`. The gate grades and notifies; the owner merges. Compare the grade with your merge decision.
+- Phase 2 (now, owner decision 2026-10-13, before the 10-PR criterion below was met): `auto_merge: true`. The gate merges at once with `gh pr merge --squash --match-head-commit`, never a queued `--auto` merge, so required checks still gate and every merge follows a fresh score. Only PRs with all four pillars green qualify, which in practice means docs, tests or ESLint/Prettier config only, closing an owner `ready-for-agent` P1 or bug issue with a test file that gains lines (edit-only or delete-only test changes are yellow); runtime code stays `owner-review`. A PR behind `release` (up-to-date branches are required) or with checks rerunning fails the merge and is re-scored on the next run. Accepted risk: the seconds between loading the PR and the merge call; `--match-head-commit` covers a push in that window, a human comment is not re-checked.
+- Original Phase 2 criterion: after 10 agent PRs merged without rework and the grade matching your decision in at least 9 of 10.
 - Brake: if an auto-merged PR is reverted or breaks the base branch, set `auto_merge: false` and tighten the pillar that missed.
 
 ## Worker permissions
 
 Every `claude -p` run (worker and autofix) gets its mode and allow/deny lists from
 `agent-gate.json` via `claude_cmd`. Push is not in the config: `claude_cmd` takes the run's branch,
-refuses anything outside `agent/`, and allows exactly `git push origin <branch>` and
+refuses anything outside `fix/` (legacy `agent/`), and allows exactly `git push origin <branch>` and
 `git push -u origin <branch>`. A rule with no `*` matches one exact command, so refspecs
-(`agent/x:main`, `+agent/x`), `--force` and `--delete` are not allowed; the deny list repeats them as
+(`fix/x:main`, `+fix/x`), `--force` and `--delete` are not allowed; the deny list repeats them as
 a backstop. The colon deny is `Bash(git push*:**)`: a pattern ending in `:*` is Claude Code's prefix
 syntax, and `Bash(git push*:*)` matches nothing (verified on 2.1.292). `Edit(/.github/**)` blocks
 workflow edits from the repo root; Edit rules also cover the Write tool, and `Write(path)` rules are
@@ -90,7 +91,7 @@ sourced, so a run (or a prompt injection through issue text, or review-bot text,
 autofix prompt since #489) can read the GitHub PAT and the Claude login, and can use the PAT
 directly instead of going through `gh` or `git push`. What limits the damage: the PAT is
 fine-grained to the agent repos (contents, pull requests, issues; no workflows, no admin), base
-branches require a PR plus CI and Sonar, and the owner merges (`auto_merge: false`). Scoping the
+branches require a PR plus CI and Sonar, and the owner merges everything except all-green PRs (docs, tests, ESLint/Prettier config) once `auto_merge: true`. Scoping the
 allow list to named scripts would not help much, since `npm test` runs repo-controlled scripts the
 agent can edit. The real fix is the Claude Code Bash sandbox, which agent-box cannot run (see the
 Discord section). If the PAT leaks: revoke it, issue a new fine-grained token and replace
@@ -136,9 +137,10 @@ the plugin install are runtime state:
 - `config/agent-box/discord-channel.sh`: supervisor started by the entrypoint (log: `docker logs
   agent-box`). Every 30s, if the tmux session `discord` is gone, it starts `claude --channels
   plugin:discord@claude-plugins-official` with `DISCORD_ACCESS_MODE=static`, no API key (Max
-  login), `--permission-mode default` and `discord-channel-settings.json` (enables the plugin for
-  this session only; read-only allow list; denies secrets, `env`, `gh api`, PR merge/close/review,
-  `git push`). It fails closed: no start unless the token and the plugin exist and `access.json`
+  login), `--permission-mode dontAsk` and `discord-channel-settings.json` (enables the plugin for
+  this session only; broad `Bash`, file and Discord allow; unlisted tools are refused silently,
+  never prompted; denies secrets, `env`, `gh api`, PR merge/close/review, force/delete/main/release
+  pushes, `curl`/`wget`/web tools, `sudo`, `rm -rf`). It can commit, push feature branches and open PRs. It fails closed: no start unless the token and the plugin exist and `access.json`
   allows exactly the root-owned owner ID, with no guild groups. It pre-accepts the `/workspace`
   trust dialog, installs the plugin's bun dependencies before the first start, turns off
   the claude.ai connectors and prompt suggestions for the session, logs claude's exit code, backs
@@ -156,8 +158,12 @@ Then `docker restart agent-box` on the host: the install also enables the plugin
 settings, which the entrypoint overwrites on boot; until then loop runs would load it too.
 
 No pairing: static mode downgrades `pairing` to `allowlist` and never writes `access.json`, so
-nothing said in the chat can widen access. Permission prompts reach the owner's DM as buttons.
+nothing said in the chat can widen access. There are no permission prompts: denied tools are refused silently (the existing PreToolUse hooks still apply).
 Never start it with `--dangerously-skip-permissions`.
+
+The Discord session's deny rules are speed bumps, not a boundary: broad `Bash` is allowed by owner
+decision, and a same-uid process (for example `python3 -c` running `gh`) can read the gh token.
+The guardrail hooks are root-owned so the session cannot rewrite them.
 
 Accepted risk (owner decision, 2026-10-09, #485): the loop worker runs as the same unix user, so
 `Bash(cat *)` can read the bot token file even though its gate denies Read/Edit on

@@ -7,11 +7,14 @@ import http.server
 import json
 import subprocess
 
+# The copy baked into the image, not the one in /workspace/homelab: that checkout
+# is the agent gate's workdir and can sit on a PR branch, so its script is
+# whatever the PR under autofix says. A change to the script ships with the image.
 CLASSIFY_CMD = [
     "bash",
     "-c",
     "source /etc/profile.d/agent-env.sh 2>/dev/null; "
-    "exec bash /workspace/homelab/scripts/agent-tasks/hermes-wud-classify.sh",
+    "exec bash /opt/agent-config/hermes-wud-classify.sh",
 ]
 FALLBACK = json.dumps(
     {"safe_to_schedule": True, "urgency": "low", "reason": "hermes unavailable"}

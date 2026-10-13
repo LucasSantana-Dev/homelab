@@ -67,7 +67,7 @@ for d in /home/agent/.claude/hooks /home/agent/.claude/channels /home/agent/.cod
 done
 
 # --- Git + gh config ---
-as_agent 'git config --global user.name agent-box &&
+as_agent 'git config --global user.name "Lucas Santana" &&
     git config --global user.email lucas.diassantana@gmail.com &&
     git config --global init.defaultBranch main'
 if [[ -n "${AGENT_GITHUB_TOKEN:-}" ]]; then
@@ -142,6 +142,16 @@ install -D -m 644 "$C/opencode.jsonc" .config/opencode/opencode.jsonc
 install -d -m 700 .ssh
 install -m 600 "$C/authorized_keys" .ssh/authorized_keys
 AGENT
+
+# Lock the guardrail hooks: root-owned, so the agent uid (a Bash redirect included) cannot
+# change them. No agent process runs yet. The next boot chowns the dir back (loop above) before
+# the installs, then this block locks it again; the hooks are only written in the block above.
+H=/home/agent/.claude/hooks
+if [[ -d $H && ! -L $H ]]; then
+    chown -h root:root "$H" && chmod 755 "$H"
+    find -P "$H" -maxdepth 1 -type f -exec chown -h root:root {} + -exec chmod 755 {} +
+    log "Guardrail hooks locked (root-owned)."
+fi
 
 # --- Discord channel (official plugin; values from SOPS, never in agent-env.sh) ---
 # The owner ID file is root-owned so the agent uid cannot change who may talk to the

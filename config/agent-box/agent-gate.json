@@ -13,8 +13,7 @@
     "socket-security",
     "github-advanced-security"
   ],
-  "agent_label": "agent",
-  "auto_merge": false,
+  "auto_merge": true,
   "wip_cap": 2,
   "fix_attempts": 2,
   "stale_days": 5,

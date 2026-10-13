@@ -71,6 +71,15 @@ def thread_author_kind(author, cfg):
     return "owner" if login and login == cfg["owner"] else "human"
 
 
+def _bot_only_thread(thread, cfg):
+    """True only when the thread has comments and every author is a listed bot. A
+    thread with no comments has no author to vouch for it: never the agent's to fix."""
+    authors = _thread_authors(thread)
+    if not authors:
+        return False
+    return all(thread_author_kind(a, cfg) == "bot" for a in authors)
+
+
 def threads_truncated(pr):
     """A page we did not fetch could hold a human reply: callers must fail closed."""
     conn = pr.get("reviewThreads") or {}
@@ -180,7 +189,11 @@ def grade_value(pr, issue, cfg):
     labels = _labels(issue)
     if "ready-for-agent" not in labels:
         return "red", "issue not ready-for-agent"
-    adds_test = any(_match(f["path"], cfg["test_paths"]) for f in pr.get("files", []))
+    # A test file must gain lines; editing or deleting tests only does not count.
+    adds_test = any(
+        _match(f["path"], cfg["test_paths"]) and (f.get("additions") or 0) > 0
+        for f in pr.get("files", [])
+    )
     if labels & set(cfg["value_green_labels"]) and adds_test:
         return "green", "P1/bug with test"
     return "yellow", "linked issue" + ("" if adds_test else ", no new test")
@@ -224,11 +237,7 @@ def score(pr, issue, cfg):
     reasons = [f"{k}: {why}" for k, (_, why) in graded.items()]
     threads = open_threads(pr)
     # Bot-only threads are the agent's to fix; one the owner joined waits for the owner.
-    bot_only = bool(threads) and all(
-        _thread_authors(t)
-        and all(thread_author_kind(a, cfg) == "bot" for a in _thread_authors(t))
-        for t in threads
-    )
+    bot_only = bool(threads) and all(_bot_only_thread(t, cfg) for t in threads)
     if threads:
         reasons.append(
             f"review: {len(threads)} unresolved thread(s)"
@@ -306,7 +315,7 @@ def select(issues, open_prs, cfg, repo=None):
         if _same_repo(ref, repo)
     }
     for pr in open_prs:
-        m = re.fullmatch(r"agent/issue-(\d+)", pr.get("headRefName", ""))
+        m = re.fullmatch(r"(?:fix|agent)/issue-(\d+)", pr.get("headRefName", ""))
         if m:
             taken.add(int(m.group(1)))
     skipped, eligible = {}, []
@@ -338,11 +347,12 @@ def main(argv=None):
     if args.repo:
         cfg = {**cfg, **cfg.get("repos", {}).get(args.repo, {})}
     if args.command == "get":
-        print(
-            cfg[args.key]
-            if not isinstance(cfg[args.key], (dict, list, bool))
-            else json.dumps(cfg[args.key])
-        )
+        if not args.key:
+            ap.error("get needs --key")
+        if args.key not in cfg:
+            ap.error(f"unknown config key: {args.key}")
+        val = cfg[args.key]
+        print(json.dumps(val) if isinstance(val, (dict, list, bool)) else val)
         return 0
     data = json.load(sys.stdin)
     if args.command == "score":
