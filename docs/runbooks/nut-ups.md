@@ -259,3 +259,12 @@ charge, load = modem + homelab + one MacBook charger (`ups.load` 10-12%). Stoppe
 stayed up (the script stops before `LB`). Next step: add the 2x 12V 45Ah external bank on the
 `+ 24V -` terminals (unit sold as "1 Exp. 7Ah/45Ah"), then rerun this test and the attended
 shutdown/power-on test.
+
+## Runtime test 2026-10-14 (homelab + modem only, no MacBook): PASS
+
+Same unattended deep test at 01:00. Load `ups.load` 6-7% (vs 10-12% with the MacBook charger).
+Reached the 2h59m time cap at 22.8V, still above the 22.6V stop: **~3h** of runtime for homelab +
+modem. Curve: 27.2V start, 25.0V at 30 min, 24.6V at 1h, 24.2V at 1h30, 23.8V at 2h, 23.4V at
+2h30, 22.8V at 2h59. Decision: no external bank; the MacBook runs on its own battery during
+outages. `upssched` ONBATT timer set to `9000` s (2h30, ~85% of measured runtime); low battery
+stays as backup. Retest yearly or when the quarterly quick test looks worse (VRLA ages in heat).
