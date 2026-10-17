@@ -18,6 +18,7 @@ gate = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gate)
 
 OWNER = "LucasSantana-Dev"
+SCRATCH = "/tmp/agent-run.Ab3dEf9h"
 
 
 @pytest.fixture
@@ -516,7 +517,7 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
         [
             "bash",
             "-c",
-            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w "fix it; rm -rf /" agent/issue-7',
+            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w "fix it; rm -rf /" agent/issue-7 {SCRATCH}',
         ],
         capture_output=True,
         text=True,
@@ -533,6 +534,7 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
     assert "Bash\\(git\\ push\\ -u\\ origin\\ agent/issue-7\\)" in out
     assert "agent/\\*" not in out
     assert "fix/\\*" not in out
+    assert f"--add-dir {SCRATCH}" in out
 
 
 def test_claude_cmd_accepts_new_and_legacy_prefix():
@@ -542,7 +544,7 @@ def test_claude_cmd_accepts_new_and_legacy_prefix():
             [
                 "bash",
                 "-c",
-                f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w p {branch}',
+                f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w p {branch} {SCRATCH}',
             ],
             capture_output=True,
             text=True,
@@ -588,7 +590,7 @@ def test_claude_cmd_refuses_non_agent_branch(branch):
         [
             "bash",
             "-c",
-            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w p "$1"',
+            f'source "{lib}"; claude_cmd LucasSantana-Dev/Lucky /w p "$1" {SCRATCH}',
             "_",
             branch,
         ],
@@ -791,7 +793,7 @@ def test_gate_autofix_alerts_fire_once_per_sha(tmp_path, key):
     assert len(lines) == 1, lines
     env = (
         'AGENT_DRY_RUN=0; notify() { echo "N $*"; }; REPO=o/r; N=5; '
-        "WHAT='CI still red'; TRIES=3; WORKDIR=/w; "
+        "WHAT='CI still red'; TRIES=3; WORKDIR=/w; DIRTY_PATHS=x; "
     )
     run = f"SHA=abc; {lines[0]}; {lines[0]}; SHA=def; {lines[0]}"
     out = _bash(env + run, tmp_path)
@@ -824,3 +826,152 @@ def test_gate_merges_now_and_never_queues():
     assert len(merges) == 1, merges
     assert "--auto" not in merges[0]
     assert "--match-head-commit $SHA" in merges[0]
+
+
+# --- scratch dir (commit messages, PR bodies, thread replies) -------------
+
+LIB = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
+TASKS = REPO / "scripts" / "agent-tasks"
+
+
+def _lib(script, *args):
+    return subprocess.run(
+        ["bash", "-c", f'source "{LIB}"; {script}', "_", *args],
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "scratch",
+    [
+        "",
+        "/workspace/cojam",
+        "/workspace/cojam/.git",
+        "/tmp/agent-run.short",
+        "/tmp/agent-run.Ab3dEf9h/../x",
+        "/tmp/agent-run.Ab3dEf9h; rm -rf /",
+        "/tmp/discord-scratch",
+    ],
+)
+def test_claude_cmd_refuses_foreign_scratch_dir(scratch):
+    res = _lib('claude_cmd LucasSantana-Dev/Lucky /w p fix/issue-7 "$1"', scratch)
+    assert res.returncode == 1
+    assert res.stdout == ""
+
+
+def test_scratch_new_validates_the_remote_path():
+    ok = _lib(f"AGENT_DRY_RUN=0; run_on_agent() {{ echo {SCRATCH}; }}; scratch_new")
+    assert (ok.returncode, ok.stdout.strip()) == (0, SCRATCH)
+    for remote in ("echo /workspace/cojam", "echo", "return 1"):
+        bad = _lib(f"AGENT_DRY_RUN=0; run_on_agent() {{ {remote}; }}; scratch_new")
+        assert bad.returncode == 1, remote
+        assert bad.stdout == ""
+
+
+def test_scratch_new_dry_run_touches_nothing():
+    res = _lib(
+        'AGENT_DRY_RUN=1; run_on_agent() { echo CALLED; }; d=$(scratch_new) && scratch_ok "$d" && echo ok'
+    )
+    assert res.stdout.strip() == "ok"
+
+
+def test_scratch_rm_only_removes_scratch_paths():
+    res = _lib(
+        'AGENT_DRY_RUN=0; run_on_agent() { echo "RUN $1"; }; '
+        'scratch_rm ""; scratch_rm /workspace/cojam; scratch_rm "/tmp/agent-run.Ab3dEf9h/..";'
+        f" scratch_rm {SCRATCH}"
+    )
+    assert res.returncode == 0
+    assert res.stdout.splitlines() == [f"RUN rm -rf -- {SCRATCH}"]
+
+
+def test_workdir_clean_lists_offending_paths():
+    status = "\\n".join(
+        [
+            "?? apps/web/lib/telemetry.pr-body.md",
+            "?? telemetry.test.ts.commitmsg",
+            " M a.ts",
+            " M b.ts",
+            " M c.ts",
+            " M d.ts",
+            " M e.ts",
+        ]
+    )
+    res = _lib(
+        f"run_on_agent() {{ printf '{status}\\n'; }}; "
+        'if workdir_clean /w; then echo clean; else echo "dirty: $DIRTY_PATHS"; fi'
+    )
+    assert res.stdout.strip() == (
+        "dirty: apps/web/lib/telemetry.pr-body.md, telemetry.test.ts.commitmsg,"
+        " a.ts, b.ts, c.ts and 2 more"
+    )
+    clean = _lib(
+        'run_on_agent() { :; }; workdir_clean /w && echo "clean [$DIRTY_PATHS]"'
+    )
+    assert clean.stdout.strip() == "clean []"
+    down = _lib(
+        'run_on_agent() { return 255; }; workdir_clean /w || echo "$DIRTY_PATHS"'
+    )
+    assert down.stdout.strip() == "agent-box or git unreachable"
+
+
+def _bash_allowed(cmd, cfg):
+    import fnmatch
+
+    rules = [r[5:-1] for r in cfg["claude_allowed_tools"] if r.startswith("Bash(")]
+    return any(fnmatch.fnmatchcase(cmd, r) for r in rules)
+
+
+def test_worker_prompt_writes_outside_the_repo(cfg):
+    worker = (TASKS / "agent-worker.sh").read_text()
+    assert ".git/agent-" not in worker
+    assert "`git commit -F __SCRATCH__/commit-msg`" in worker
+    assert "--body-file __SCRATCH__/pr-body.md`" in worker
+    # The placeholder is filled before the prompt reaches claude_cmd.
+    assert '"${PROMPT//__SCRATCH__/$SCRATCH}"' in worker
+    for cmd in (
+        f"git commit -F {SCRATCH}/commit-msg",
+        f"gh pr create --repo o/r --base main --title t --body-file {SCRATCH}/pr-body.md",
+    ):
+        assert _bash_allowed(cmd, cfg), cmd
+
+
+def test_gate_autofix_writes_outside_the_repo():
+    gate_path = TASKS / "agent-pr-gate.sh"
+    gate_sh = gate_path.read_text()
+    assert ".git/agent-" not in gate_sh
+    assert "REPLIES_FILE" not in gate_sh
+    assert 'REPLIES="$SCRATCH/thread-replies.json"' in gate_sh
+    calls = [ln.strip() for ln in gate_sh.splitlines() if "CMD=$(claude_cmd" in ln]
+    assert len(calls) == 1 and '"$SCRATCH")' in calls[0], calls
+    extract = f'eval "$(sed -n "/^NEUTRAL=/p;/^git_rules()/,/^}}/p" "{gate_path}")"'
+    out = subprocess.run(
+        ["bash", "-c", f"{extract}; git_rules {SCRATCH}"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert f"git commit -F {SCRATCH}/commit-msg" in out
+
+
+@pytest.mark.parametrize("script", ["agent-worker.sh", "agent-pr-gate.sh"])
+def test_scratch_dir_is_removed_on_exit_and_after_each_run(script):
+    text = (TASKS / script).read_text()
+    assert "trap 'scratch_rm \"$SCRATCH\"' EXIT" in text
+    assert text.count('scratch_rm "$SCRATCH"') >= 2
+
+
+def test_discord_scratch_dir_agrees_across_files():
+    conf = REPO / "config" / "agent-box"
+    path = "/tmp/discord-scratch"
+    settings = json.loads((conf / "discord-channel-settings.json").read_text())
+    assert settings["permissions"]["additionalDirectories"] == [path]
+    sh = (conf / "discord-channel.sh").read_text()
+    assert f"SCRATCH={path}\n" in sh
+    assert 'mkdir -m 700 "$SCRATCH"' in sh
+    assert "rm -rf $SCRATCH;" in sh  # after claude exits, inside the tmux command
+    md = (conf / "discord-channel.md").read_text()
+    assert f"commit -F {path}/commit-msg" in md
+    assert f"--body-file {path}/pr-body.md" in md
+    assert ".git/agent-" not in md

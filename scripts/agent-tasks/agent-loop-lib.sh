@@ -61,10 +61,15 @@ budget_take() {
 # The prompt goes in on stdin so the variadic tool flags cannot swallow it.
 # Push is allowed only as the exact `git push [-u] origin <branch>` (no globs, so no
 # refspec, --force or --delete variants); a branch outside fix/ or agent/ gets no run at all.
+# The scratch dir (from scratch_new) is added with --add-dir so the Write tool may use it.
 claude_cmd() {
-    local repo="$1" workdir="$2" prompt="$3" branch="$4" qprompt mode allowed denied t
+    local repo="$1" workdir="$2" prompt="$3" branch="$4" scratch="$5" qprompt mode allowed denied t
     if ! [[ "$branch" =~ ^(agent/[A-Za-z0-9._/-]+|fix/issue-[0-9]+)$ ]]; then
         echo "claude_cmd: refusing branch '$branch' (must be fix/issue-N or agent/...)" >&2
+        return 1
+    fi
+    if ! scratch_ok "$scratch"; then
+        echo "claude_cmd: refusing scratch dir '$scratch' (must come from scratch_new)" >&2
         return 1
     fi
     printf -v qprompt '%q' "$prompt"
@@ -79,15 +84,49 @@ claude_cmd() {
         < <(cfg "$repo" claude_disallowed_tools | jq -r '.[]')
     echo "cd $workdir && printf '%s' $qprompt | env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY" \
         "-u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL -u CLAUDE_CODE_USE_BEDROCK" \
-        "-u CLAUDE_CODE_USE_VERTEX timeout 45m claude -p --max-turns 60" \
+        "-u CLAUDE_CODE_USE_VERTEX timeout 45m claude -p --max-turns 60 --add-dir $scratch" \
         "--permission-mode $mode --allowedTools$allowed --disallowedTools$denied"
 }
 
-# Fail closed: an unreachable box or a git error counts as dirty.
+# Per-run scratch dir on agent-box for commit messages, PR bodies and thread replies.
+# It must be outside the repo: dontAsk refuses Write into .git/, so the model put those
+# files in the work tree instead, where they stayed untracked and made workdir_clean fail
+# closed for every later run (cojam, 2026-10-10). Prints the path; remove it with scratch_rm.
+SCRATCH_RE='^/tmp/agent-run\.[A-Za-z0-9]{8}$'
+scratch_ok() { [[ "$1" =~ $SCRATCH_RE ]]; }
+
+scratch_new() {
+    local d
+    if [[ "$AGENT_DRY_RUN" == "1" ]]; then
+        echo "/tmp/agent-run.DRYRUN00"
+        return 0
+    fi
+    d=$(run_on_agent "mktemp -d /tmp/agent-run.XXXXXXXX") || return 1
+    scratch_ok "$d" || return 1
+    echo "$d"
+}
+
+# Best effort; a path that did not come from scratch_new (or an empty one) is ignored.
+scratch_rm() {
+    scratch_ok "${1:-}" || return 0
+    try_act "rm -rf -- $1"
+}
+
+# Fail closed: an unreachable box or a git error counts as dirty. Sets DIRTY_PATHS to a
+# short list of what is in the way, for the alert.
+# shellcheck disable=SC2034  # DIRTY_PATHS is read by the callers' alerts
 workdir_clean() {
     local out
+    DIRTY_PATHS="agent-box or git unreachable"
     out=$(run_on_agent "cd $1 && git status --porcelain") || return 1
+    DIRTY_PATHS=$(dirty_summary <<<"$out")
     [[ -z "$out" ]]
+}
+
+# `git status --porcelain` on stdin -> "a, b, c and 2 more" (first 5 paths).
+dirty_summary() {
+    awk 'NF { n++; if (n <= 5) p = p (n > 1 ? ", " : "") substr($0, 4) }
+        END { if (n > 5) p = p " and " (n - 5) " more"; print p }'
 }
 
 # All open PRs, agent or hand-opened. JSON array. The limit is well above any

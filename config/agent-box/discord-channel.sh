@@ -13,6 +13,10 @@ STATE_DIR=$HOME/.claude/channels/discord
 OWNER_FILE=${DISCORD_OWNER_FILE:-/etc/agent-box/discord-owner-id}
 CONF=/opt/agent-config
 EXIT_LOG=$HOME/discord-channel.exit
+# Commit messages and PR bodies go here, outside every repo: Write into .git/ is refused, and an
+# untracked file left in a loop workdir makes the loop refuse every later run. Recreated empty at
+# each start and removed when claude exits; also in discord-channel.md and the settings file.
+SCRATCH=/tmp/discord-scratch
 INTERVAL=${DISCORD_CHANNEL_INTERVAL:-30}
 MAX_BACKOFF=900
 
@@ -81,6 +85,10 @@ plugin_deps() {
 }
 
 start() {
+    if ! { rm -rf "$SCRATCH" && mkdir -m 700 "$SCRATCH"; }; then
+        log "could not create $SCRATCH"
+        return 1
+    fi
     plugin_deps || log "plugin dependency install failed"
     trust_workspace || log "could not pre-accept workspace trust"
     log "starting tmux session $SESSION"
@@ -98,7 +106,7 @@ unset DISCORD_BOT_TOKEN ANTHROPIC_API_KEY CLAUDE_API_KEY ANTHROPIC_AUTH_TOKEN AN
 ENABLE_CLAUDEAI_MCP_SERVERS=false DISCORD_ACCESS_MODE=static claude --channels plugin:$PLUGIN \
 --settings $CONF/discord-channel-settings.json --permission-mode dontAsk \
 --append-system-prompt \"\$(cat $CONF/discord-channel.md)\"; \
-rc=\$?; echo \"\$(date +%FT%T%z) claude exited \$rc\" >> $EXIT_LOG"
+rc=\$?; rm -rf $SCRATCH; echo \"\$(date +%FT%T%z) claude exited \$rc\" >> $EXIT_LOG"
 }
 
 STARTED=0 FAILS=0 NEXT=0
