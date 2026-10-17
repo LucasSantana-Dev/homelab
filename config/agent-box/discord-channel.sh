@@ -115,7 +115,8 @@ while true; do
     if tmux has-session -t "$SESSION" 2>/dev/null; then
         if [[ -e $HOME/discord-channel-off ]]; then
             log "off marker found, stopping session"
-            tmux kill-session -t "$SESSION" 2>/dev/null; STARTED=0; LAST=""
+            # A killed session never reaches the rm after claude exits.
+            tmux kill-session -t "$SESSION" 2>/dev/null; rm -rf "$SCRATCH"; STARTED=0; LAST=""
             continue
         fi
         pane=$(tmux capture-pane -p -t "$SESSION" 2>/dev/null || true)

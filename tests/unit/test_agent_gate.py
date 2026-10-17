@@ -780,7 +780,7 @@ def test_notify_once_failed_send_leaves_no_marker(tmp_path):
     assert out.strip() == "0"
 
 
-@pytest.mark.parametrize("key", ["fix-cap", "dirty-workdir"])
+@pytest.mark.parametrize("key", ["fix-cap", "dirty-workdir", "no-scratch"])
 def test_gate_autofix_alerts_fire_once_per_sha(tmp_path, key):
     # Runs the gate's own alert line: the label edit may fail and the workdir may stay
     # dirty, so the same alert must not repeat on every timer run.
@@ -793,7 +793,7 @@ def test_gate_autofix_alerts_fire_once_per_sha(tmp_path, key):
     assert len(lines) == 1, lines
     env = (
         'AGENT_DRY_RUN=0; notify() { echo "N $*"; }; REPO=o/r; N=5; '
-        "WHAT='CI still red'; TRIES=3; WORKDIR=/w; DIRTY_PATHS=x; "
+        "WHAT='CI still red'; TRIES=3; WORKDIR=/w; DIRTY=x; "
     )
     run = f"SHA=abc; {lines[0]}; {lines[0]}; SHA=def; {lines[0]}"
     out = _bash(env + run, tmp_path)
@@ -891,6 +891,7 @@ def test_workdir_clean_lists_offending_paths():
         [
             "?? apps/web/lib/telemetry.pr-body.md",
             "?? telemetry.test.ts.commitmsg",
+            "R  old.ts -> renamed.ts",
             " M a.ts",
             " M b.ts",
             " M c.ts",
@@ -900,20 +901,20 @@ def test_workdir_clean_lists_offending_paths():
     )
     res = _lib(
         f"run_on_agent() {{ printf '{status}\\n'; }}; "
-        'if workdir_clean /w; then echo clean; else echo "dirty: $DIRTY_PATHS"; fi'
+        'if out=$(workdir_clean /w); then echo clean; else echo "dirty: $out"; fi'
     )
     assert res.stdout.strip() == (
-        "dirty: apps/web/lib/telemetry.pr-body.md, telemetry.test.ts.commitmsg,"
-        " a.ts, b.ts, c.ts and 2 more"
+        "dirty: in the way: apps/web/lib/telemetry.pr-body.md,"
+        " telemetry.test.ts.commitmsg, renamed.ts, a.ts, b.ts and 3 more"
     )
     clean = _lib(
-        'run_on_agent() { :; }; workdir_clean /w && echo "clean [$DIRTY_PATHS]"'
+        'run_on_agent() { :; }; out=$(workdir_clean /w) && echo "clean [$out]"'
     )
     assert clean.stdout.strip() == "clean []"
     down = _lib(
-        'run_on_agent() { return 255; }; workdir_clean /w || echo "$DIRTY_PATHS"'
+        'run_on_agent() { return 255; }; out=$(workdir_clean /w) || echo "$out"'
     )
-    assert down.stdout.strip() == "agent-box or git unreachable"
+    assert down.stdout.strip() == "could not check: agent-box or git unreachable"
 
 
 def _bash_allowed(cmd, cfg):
@@ -958,8 +959,13 @@ def test_gate_autofix_writes_outside_the_repo():
 @pytest.mark.parametrize("script", ["agent-worker.sh", "agent-pr-gate.sh"])
 def test_scratch_dir_is_removed_on_exit_and_after_each_run(script):
     text = (TASKS / script).read_text()
-    assert "trap 'scratch_rm \"$SCRATCH\"' EXIT" in text
-    assert text.count('scratch_rm "$SCRATCH"') >= 2
+    trap = "trap 'scratch_rm \"$SCRATCH\"' EXIT"
+    assert text.count(trap) == 1
+    # Plus an explicit removal after the claude run, outside the trap string.
+    lines = [ln.strip() for ln in text.splitlines()]
+    after_run = [i for i, ln in enumerate(lines) if ln == 'scratch_rm "$SCRATCH"']
+    assert len(after_run) == 1, after_run
+    assert lines[after_run[0] + 1] == 'SCRATCH=""'
 
 
 def test_discord_scratch_dir_agrees_across_files():
@@ -971,6 +977,7 @@ def test_discord_scratch_dir_agrees_across_files():
     assert f"SCRATCH={path}\n" in sh
     assert 'mkdir -m 700 "$SCRATCH"' in sh
     assert "rm -rf $SCRATCH;" in sh  # after claude exits, inside the tmux command
+    assert 'kill-session -t "$SESSION" 2>/dev/null; rm -rf "$SCRATCH"' in sh
     md = (conf / "discord-channel.md").read_text()
     assert f"commit -F {path}/commit-msg" in md
     assert f"--body-file {path}/pr-body.md" in md

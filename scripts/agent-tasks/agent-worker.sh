@@ -61,9 +61,9 @@ for REPO in $AGENT_REPOS; do
     fi
     [[ "$ISSUE" =~ ^[0-9]+$ ]] || { echo "bad issue number: $ISSUE"; continue; }
 
-    if [[ "$AGENT_DRY_RUN" != "1" ]] && ! workdir_clean "$WORKDIR"; then
-        echo "workdir $WORKDIR is dirty, refusing to start"
-        notify --title "agent: dirty workdir" --body "$REPO $WORKDIR has uncommitted changes ($DIRTY_PATHS); worker skipped #$ISSUE" --urgency warn || true
+    if [[ "$AGENT_DRY_RUN" != "1" ]] && ! DIRTY=$(workdir_clean "$WORKDIR"); then
+        echo "workdir $WORKDIR is not clean ($DIRTY), refusing to start"
+        notify --title "agent: dirty workdir" --body "$REPO $WORKDIR is not clean ($DIRTY); worker skipped #$ISSUE" --urgency warn || true
         continue
     fi
 
@@ -85,6 +85,7 @@ for REPO in $AGENT_REPOS; do
     if act "cd $WORKDIR && git fetch -q origin && git switch -q -C $BRANCH origin/$BASE"; then
         if ! SCRATCH=$(scratch_new); then
             SCRATCH=""
+            # No separate alert: no PR follows, so the "no PR" alert below fires.
             echo "could not create a scratch dir on agent-box, not running claude"
         elif CMD=$(claude_cmd "$REPO" "$WORKDIR" "${PROMPT//__SCRATCH__/$SCRATCH}" "$BRANCH" "$SCRATCH"); then
             act "$CMD" || echo "claude exited non-zero"

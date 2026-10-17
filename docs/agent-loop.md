@@ -20,7 +20,7 @@ wrappers. The agent-box hooks are an extra layer.
 - PRs stuck on pending or red CI with no activity for `stale_days` (5) are closed (never ones waiting on the owner or labelled `needs-human`) and the issue gets `agent-failed`, so it is not picked again.
 - Any PR or issue another human authored, commented on or pushed to is never touched.
 - Pause everything: `touch ~/agent-paused` inside agent-box (resume: `rm ~/agent-paused`).
-- The worker and the gate refuse to run claude in a dirty workdir (the alert lists the first paths). Each claude run gets a scratch dir on agent-box (`mktemp -d /tmp/agent-run.XXXXXXXX`, passed with `--add-dir`, removed after the run) for the commit message, PR body and thread replies. dontAsk refuses Write into `.git/`, and on 2026-10-10 the model wrote those files into `/workspace/cojam` instead; left untracked, they blocked every cojam run until removed by hand on 2026-10-17. The Discord session uses `/tmp/discord-scratch` the same way.
+- The worker and the gate refuse to run claude in a workdir that is not clean (the alert lists the first paths, or says the check failed). Each claude run gets a scratch dir on agent-box (`mktemp -d /tmp/agent-run.XXXXXXXX`, passed with `--add-dir`, removed after the run) for the commit message, PR body and thread replies, never files in the repo: dontAsk refuses Write into `.git/`, and an untracked file left in the work tree blocks every later run. The Discord session uses a fixed `/tmp/discord-scratch` instead (allowed in its settings file), recreated empty at each session start and removed when claude exits or the supervisor stops the session.
 
 ## Issue selection
 

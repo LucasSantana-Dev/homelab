@@ -191,9 +191,9 @@ for REPO in $AGENT_REPOS; do
                     notify_once "$REPO" "$N" "$SHA" fix-cap "agent: #$N needs a human" "$REPO #$N: $WHAT after $TRIES fixes" warn
                     continue
                 fi
-                if [[ "$AGENT_DRY_RUN" != "1" ]] && ! workdir_clean "$WORKDIR"; then
-                    echo "workdir $WORKDIR is dirty, skipping autofix of #$N"
-                    notify_once "$REPO" "$N" "$SHA" dirty-workdir "agent: dirty workdir" "$REPO $WORKDIR has uncommitted changes ($DIRTY_PATHS); autofix of #$N skipped" warn
+                if [[ "$AGENT_DRY_RUN" != "1" ]] && ! DIRTY=$(workdir_clean "$WORKDIR"); then
+                    echo "workdir $WORKDIR is not clean ($DIRTY), skipping autofix of #$N"
+                    notify_once "$REPO" "$N" "$SHA" dirty-workdir "agent: dirty workdir" "$REPO $WORKDIR is not clean ($DIRTY); autofix of #$N skipped" warn
                     continue
                 fi
                 (( AUTOFIX_LEFT > 0 )) || { echo "#$N: autofix deferred, per-run cap reached"; continue; }
@@ -208,6 +208,7 @@ for REPO in $AGENT_REPOS; do
                 if ! SCRATCH=$(scratch_new); then
                     SCRATCH=""
                     echo "#$N: could not create a scratch dir on agent-box, skipping"
+                    notify_once "$REPO" "$N" "$SHA" no-scratch "agent: autofix skipped" "$REPO #$N: could not create a scratch dir on agent-box" warn
                     continue
                 fi
                 REPLIES="$SCRATCH/thread-replies.json"

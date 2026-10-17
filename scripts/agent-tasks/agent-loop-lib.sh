@@ -112,20 +112,24 @@ scratch_rm() {
     try_act "rm -rf -- $1"
 }
 
-# Fail closed: an unreachable box or a git error counts as dirty. Sets DIRTY_PATHS to a
-# short list of what is in the way, for the alert.
-# shellcheck disable=SC2034  # DIRTY_PATHS is read by the callers' alerts
+# Silent and 0 when the workdir is clean. Otherwise prints why, for the alert, and returns 1.
+# Fail closed: an unreachable box or a git error counts as not clean.
 workdir_clean() {
     local out
-    DIRTY_PATHS="agent-box or git unreachable"
-    out=$(run_on_agent "cd $1 && git status --porcelain") || return 1
-    DIRTY_PATHS=$(dirty_summary <<<"$out")
-    [[ -z "$out" ]]
+    if ! out=$(run_on_agent "cd $1 && git status --porcelain"); then
+        echo "could not check: agent-box or git unreachable"
+        return 1
+    fi
+    [[ -z "$out" ]] && return 0
+    echo "in the way: $(dirty_summary <<<"$out")"
+    return 1
 }
 
-# `git status --porcelain` on stdin -> "a, b, c and 2 more" (first 5 paths).
+# `git status --porcelain` on stdin -> "a, b, c and 2 more" (first 5 paths; a rename
+# shows its new path).
 dirty_summary() {
-    awk 'NF { n++; if (n <= 5) p = p (n > 1 ? ", " : "") substr($0, 4) }
+    awk 'NF { n++; f = substr($0, 4); sub(/.* -> /, "", f)
+            if (n <= 5) p = p (n > 1 ? ", " : "") f }
         END { if (n > 5) p = p " and " (n - 5) " more"; print p }'
 }
 
