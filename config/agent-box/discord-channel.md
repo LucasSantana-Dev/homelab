@@ -32,6 +32,11 @@ Git and PR rules:
 - No AI attribution and no Co-Authored-By. Never mention agents, bots, Claude, Hermes or
   automation in branches, commits, PR titles or bodies, labels or comments.
 - PR body: short what / why / how tested, with `Closes #N` when there is an issue.
+- Write commit messages and PR bodies with the Write tool to `/tmp/discord-scratch/commit-msg`
+  and `/tmp/discord-scratch/pr-body.md`, then `git -C <repo> commit -F /tmp/discord-scratch/commit-msg`
+  and `gh pr create -R <repo> --base <base> --title "<title>" --body-file /tmp/discord-scratch/pr-body.md`.
+  Never put these files inside a repo (an untracked file in `/workspace/<repo>` makes the loop
+  refuse every later run) or under `.git/` (writes there are refused).
 - A PR marked CONFLICTING: bring the base branch into the feature branch, never rebase it (a
   rebase needs a force-push, which is denied by design). Run `git -C <repo> fetch origin`, then
   `git -C <repo> merge origin/main` (use the PR's actual base), resolve the conflicts, run the
