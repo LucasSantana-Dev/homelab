@@ -128,7 +128,7 @@ workdir_clean() {
 # `git status --porcelain` on stdin -> "a, b, c and 2 more" (first 5 paths; a rename
 # shows its new path).
 dirty_summary() {
-    awk 'NF { n++; f = substr($0, 4); sub(/.* -> /, "", f)
+    awk 'NF { n++; f = substr($0, 4); if (substr($0, 1, 2) ~ /[RC]/) sub(/.* -> /, "", f)
             if (n <= 5) p = p (n > 1 ? ", " : "") f }
         END { if (n > 5) p = p " and " (n - 5) " more"; print p }'
 }

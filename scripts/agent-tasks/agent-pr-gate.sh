@@ -197,20 +197,24 @@ for REPO in $AGENT_REPOS; do
                     continue
                 fi
                 (( AUTOFIX_LEFT > 0 )) || { echo "#$N: autofix deferred, per-run cap reached"; continue; }
-                budget_take || continue
-                # Count the attempt before running, so a crash cannot loop forever.
-                # If the counter cannot be recorded, do not run (the cap would leak).
-                if ! fix_record "$REPO" "$N" "$((TRIES + 1))"; then
-                    echo "#$N: could not record fix attempt, skipping"
-                    continue
-                fi
-                AUTOFIX_LEFT=$((AUTOFIX_LEFT - 1))
+                # Before the budget and the attempt counter: a box that cannot make one must
+                # not burn fix attempts and push the PR to needs-human without a run.
                 if ! SCRATCH=$(scratch_new); then
                     SCRATCH=""
                     echo "#$N: could not create a scratch dir on agent-box, skipping"
                     notify_once "$REPO" "$N" "$SHA" no-scratch "agent: autofix skipped" "$REPO #$N: could not create a scratch dir on agent-box" warn
                     continue
                 fi
+                budget_take || { scratch_rm "$SCRATCH"; SCRATCH=""; continue; }
+                # Count the attempt before running, so a crash cannot loop forever.
+                # If the counter cannot be recorded, do not run (the cap would leak).
+                if ! fix_record "$REPO" "$N" "$((TRIES + 1))"; then
+                    echo "#$N: could not record fix attempt, skipping"
+                    scratch_rm "$SCRATCH"
+                    SCRATCH=""
+                    continue
+                fi
+                AUTOFIX_LEFT=$((AUTOFIX_LEFT - 1))
                 REPLIES="$SCRATCH/thread-replies.json"
                 if [[ "$FIX" == "threads" ]]; then
                     # Capped so the prompt stays far below the shell argument limit; the rest wait a run.

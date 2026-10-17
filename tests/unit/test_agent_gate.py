@@ -892,6 +892,7 @@ def test_workdir_clean_lists_offending_paths():
             "?? apps/web/lib/telemetry.pr-body.md",
             "?? telemetry.test.ts.commitmsg",
             "R  old.ts -> renamed.ts",
+            "?? odd -> name.md",
             " M a.ts",
             " M b.ts",
             " M c.ts",
@@ -905,7 +906,7 @@ def test_workdir_clean_lists_offending_paths():
     )
     assert res.stdout.strip() == (
         "dirty: in the way: apps/web/lib/telemetry.pr-body.md,"
-        " telemetry.test.ts.commitmsg, renamed.ts, a.ts, b.ts and 3 more"
+        " telemetry.test.ts.commitmsg, renamed.ts, odd -> name.md, a.ts and 4 more"
     )
     clean = _lib(
         'run_on_agent() { :; }; out=$(workdir_clean /w) && echo "clean [$out]"'
@@ -938,6 +939,13 @@ def test_worker_prompt_writes_outside_the_repo(cfg):
         assert _bash_allowed(cmd, cfg), cmd
 
 
+def test_gate_makes_scratch_before_spending_budget_or_attempts():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    made = text.index("SCRATCH=$(scratch_new)")
+    assert made < text.index("budget_take ||")
+    assert made < text.index('fix_record "$REPO"')
+
+
 def test_gate_autofix_writes_outside_the_repo():
     gate_path = TASKS / "agent-pr-gate.sh"
     gate_sh = gate_path.read_text()
@@ -964,8 +972,12 @@ def test_scratch_dir_is_removed_on_exit_and_after_each_run(script):
     # Plus an explicit removal after the claude run, outside the trap string.
     lines = [ln.strip() for ln in text.splitlines()]
     after_run = [i for i, ln in enumerate(lines) if ln == 'scratch_rm "$SCRATCH"']
-    assert len(after_run) == 1, after_run
-    assert lines[after_run[0] + 1] == 'SCRATCH=""'
+    assert after_run, "no explicit scratch_rm after the claude run"
+    last = after_run[-1]
+    assert lines[last + 1] == 'SCRATCH=""'
+    runs = [i for i, ln in enumerate(lines) if 'act "$CMD"' in ln]
+    assert len(runs) == 1, runs
+    assert runs[0] < last
 
 
 def test_discord_scratch_dir_agrees_across_files():
