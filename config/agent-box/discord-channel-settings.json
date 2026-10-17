@@ -5,6 +5,9 @@
   },
   "permissions": {
     "defaultMode": "dontAsk",
+    "additionalDirectories": [
+      "/tmp/discord-scratch"
+    ],
     "allow": [
       "mcp__plugin_discord_discord",
       "Read",
