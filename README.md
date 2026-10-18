@@ -20,7 +20,7 @@ Homelab infrastructure with zero-trust networking, full observability and one-co
 ### Trust Model
 - Services are **Tailscale-first by default**, bound to localhost and the private network
 - Public exposure is **opt-in via Cloudflare Tunnel**, restricted to selected hostnames
-- Public hostnames gate through **Tinyauth SSO** (Google and GitHub OAuth, email allowlist) by default. Exceptions use another control: Cloudflare Access (Homepage), the service's own auth (Home Assistant, Nextcloud), or an app token (stats, brain). CoJam is open by design
+- Public hostnames gate through **Tinyauth SSO** (Google and GitHub OAuth, email allowlist) by default. Exceptions use another control: Cloudflare Access (Homepage), the service's own auth (Home Assistant, Nextcloud), or an app token (stats, brain). CoJam and the static rclone OAuth pages are open by design
 - DNS filtering via **Pi-hole** (LAN) and Tailscale MagicDNS (remote)
 
 Full details: [Security Policy](.github/SECURITY.md) | [Hardening Guide](docs/public-release-hardening.md) | [Network Architecture](docs/network-architecture.md)
