@@ -20,7 +20,7 @@ Homelab infrastructure with zero-trust networking, full observability and one-co
 ### Trust Model
 - Services are **Tailscale-first by default**, bound to localhost and the private network
 - Public exposure is **opt-in via Cloudflare Tunnel**, restricted to selected hostnames
-- All public traffic gates through **Tinyauth SSO** with Google and GitHub OAuth (email allowlist)
+- Public hostnames gate through **Tinyauth SSO** (Google and GitHub OAuth, email allowlist) by default. Exceptions use another control: Cloudflare Access (Homepage), the service's own auth (Home Assistant, Nextcloud), or an app token (stats, brain). CoJam is open by design
 - DNS filtering via **Pi-hole** (LAN) and Tailscale MagicDNS (remote)
 
 Full details: [Security Policy](.github/SECURITY.md) | [Hardening Guide](docs/public-release-hardening.md) | [Network Architecture](docs/network-architecture.md)
@@ -118,7 +118,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
   │                                    │
   │  ┌─ Databases & Caches ────────┐  │
   │  │ • MariaDB (Nextcloud)        │  │
-    │  │ • Redis (cache/broker)       │  │
+  │  │ • Redis (cache/broker)       │  │
   │  └────────────────────────────────┘ │
   │                                    │
   └────────────────────────────────────┘
@@ -196,10 +196,10 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
    - Public domains routed through Cloudflare's edge
    - Eliminates port forwarding
    - DDoS protection, WAF, and rate limiting at Cloudflare
-   - **Homepage, Tinyauth, Nextcloud, Jellyfin** (configurable)
+   - **Homepage, Tinyauth, Nextcloud** and other hostnames in `config/cloudflared/edge-snapshot.json`
 
 ### Authentication & Authorization
-- **Public services** gate through **Tinyauth SSO**
+- **Public services** gate through **Tinyauth SSO** unless listed in `config/caddy/public-no-auth.txt`
 - Providers: **Google and GitHub OAuth**
 - Access limited to the emails in `TINYAUTH_ALLOWED_EMAILS`
 
@@ -230,7 +230,6 @@ Container and service events trigger alerts to Discord via the **Lucky bot**:
 | **Update Available** | Docker image update detected | What's Up Docker → Lucky → #homelab |
 | **Deploy Status** | Service deploy succeeds/fails | CLI → Lucky → #homelab |
 | **Log Anomalies** | Errors in container logs | Loki rules → Alertmanager → Lucky |
-| **Security Events** | Failed auth, SSH attempts (if enabled) | Pi-hole/Tinyauth → Lucky → #homelab |
 
 ### Configuration
 Set in `.env`:
