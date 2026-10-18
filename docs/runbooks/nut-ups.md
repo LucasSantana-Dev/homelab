@@ -5,7 +5,8 @@ pending. Run step 6 inside the 7-day return window (CDC art. 49). If any check f
 unit.
 
 Goal: on a power outage, the Windows desktop shuts down cleanly, while **the homelab, the modem
-and one MacBook stay up for at least 2 hours** (owner requirement, 2026-10-06). The homelab then
+and one MacBook stay up for at least 2 hours** (owner requirement, 2026-10-06; narrowed to homelab
++ modem on 2026-10-14, see the last runtime test). The homelab then
 shuts down cleanly before the battery is empty and boots by itself when AC returns. Context: the 2026-09-28 outage left the host off for ~24h and
 `prometheus` in `Exited (255)` after a hard power loss. The fix is clean shutdown plus automatic
 power-on, not long runtime.
@@ -159,9 +160,10 @@ AT ONBATT * START-TIMER onbatt-shutdown <seconds>
 AT ONLINE * CANCEL-TIMER onbatt-shutdown
 ```
 
-Until step 6 measures the runtime, set `<seconds>` to `21600` (6h), well above the 3h pass
-threshold, so low battery triggers the shutdown first and the runtime to `LB` can be measured.
-If the timer fires first instead, the runtime is above 6h: that is a pass.
+Current host setting: `9000` (2h30), set on 2026-10-14 from the runtime test at the end of this
+runbook. To measure the runtime to `LB` again, set `<seconds>` to `21600` (6h) for the test, well
+above the 3h pass threshold, so low battery triggers the shutdown first. If the timer fires first
+instead, the runtime is above 6h: that is a pass.
 
 `/usr/bin/upssched-cmd` (Ubuntu ships a placeholder; replace it):
 
@@ -211,7 +213,8 @@ let WinNUT shut it down.
 
 Someone must stay near the UPS: step 5 needs a person to plug it back into the wall.
 
-1. `upsc shara@localhost ups.status` shows `OL`. The upssched timer is at `21600` (step 3).
+1. `upsc shara@localhost ups.status` shows `OL`. The upssched timer is at `21600` for a runtime
+   measurement, or at the current `9000` for a shutdown and restore check only (step 3).
 2. Pull the UPS plug from the wall: status goes `OB`. Note the time.
 3. Leave it on battery until `ups.status` shows `OB LB`. Record the runtime to `LB` (this is the
    usable runtime, not time to empty) and the load (`upsc shara@localhost ups.load`).
@@ -259,3 +262,14 @@ charge, load = modem + homelab + one MacBook charger (`ups.load` 10-12%). Stoppe
 stayed up (the script stops before `LB`). Next step: add the 2x 12V 45Ah external bank on the
 `+ 24V -` terminals (unit sold as "1 Exp. 7Ah/45Ah"), then rerun this test and the attended
 shutdown/power-on test.
+
+## Runtime test 2026-10-14 (homelab + modem only, no MacBook): >= 2h59, lower bound
+
+Same unattended deep test at 01:00. Load `ups.load` 6-7% (vs 10-12% with the MacBook charger).
+Reached the 2h59m time cap at 22.8V, still above the 22.6V stop, before `LB`: a lower bound of
+**>= 2h59** for homelab + modem, above the 2h requirement. Curve: 27.2V start, 25.0V at 30 min, 24.6V at 1h, 24.2V at 1h30, 23.8V at 2h, 23.4V at
+2h30, 22.8V at 2h59. Decision (owner, 2026-10-14): no external bank; the MacBook runs on its own
+battery during outages, so the requirement covers homelab + modem only. `upssched` ONBATT timer
+set to `9000` s (2h30), a conservative choice below the measured lower bound, not 85% of a runtime
+to `LB`; low battery stays as backup. The attended FSD and power-restore checks (step 6, items
+4-6) are not recorded here yet. Retest yearly or when the quarterly quick test looks worse (VRLA ages in heat).
