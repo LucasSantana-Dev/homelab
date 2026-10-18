@@ -9,7 +9,7 @@ Resolves the ambiguity between Cloudflare Tunnel, Tailscale, and LAN.
 |---|---|---|---|---|
 | **LAN** | `*.home` | None (physical presence) | Household on Wi-Fi | Low-friction in-home use |
 | **Tailscale** | `*.homelab.example.com` · `<hostname>.<tailnet>.ts.net` | Tailscale identity | Self + close friends | Private remote access, admin tasks |
-| **Cloudflare Tunnel** | `*.luk-homeserver.com.br` | Cloudflare Access policy | Public internet (with auth) | Services that need to be reachable without installing Tailscale |
+| **Cloudflare Tunnel** | `*.luk-homeserver.com.br` | Tinyauth forward-auth in Caddy (`import protected`); exceptions in `config/caddy/public-no-auth.txt`; Cloudflare Access app in front of `*.luk-homeserver.com.br` | Public internet (with auth) | Services that need to be reachable without installing Tailscale |
 
 ## Invariant — DNS guardrail
 
@@ -36,7 +36,7 @@ Access, and hit TLS-cert mismatch errors.
 | Portainer | — | via `tailscale serve` | `portainer.luk-homeserver.com.br` | CF Access gated (critical) |
 | n8n | — | via `tailscale serve` | `n8n.luk-homeserver.com.br` | CF Access gated |
 | Nextcloud | — | `cloud.homelab.example.com` | `cloud.luk-homeserver.com.br` | Primary public access via CF |
-| Tinyauth | — | — | `auth.luk-homeserver.com.br` | SSO broker — CF path only |
+| Tinyauth | — | — | `auth.luk-homeserver.com.br` | SSO broker (`compose/auth.yml`), Google and GitHub OAuth, `TINYAUTH_ALLOWED_EMAILS` allowlist; CF path only |
 | Pi-hole admin | `pihole.home` | `pihole.homelab.example.com` | — | Never public |
 | Prometheus | — | `prom.homelab.example.com` | — | Never public |
 | Netdata | — | `netdata.homelab.example.com` | — | Never public; candidate for removal (audit PR #28) |
