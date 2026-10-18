@@ -510,6 +510,32 @@ groups:
           description: "Working set {{ $value | humanizePercentage }} of the 1G mem_limit for 10m — risk of OOMKilled. (Was V8 used/heap_total — broken by design, V8 idles at 92-96%; see Lucky ADR 2026-07-02 resource-hygiene.)"
           runbook: "docs/runbooks/lucky-observability.md#luckybotheaphigh"
 
+      # Zombie bot: the process still answers /metrics (so LuckyBotDown stays
+      # quiet) but its Discord gateway dropped. A failed scrape has no sample
+      # here, so this never doubles up with LuckyBotDown.
+      - alert: LuckyBotGatewayDisconnected
+        expr: lucky_bot_gateway_connected{job="lucky-bot"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: lucky-bot
+        annotations:
+          summary: "Lucky bot is up but disconnected from the Discord gateway"
+          description: "lucky_bot_gateway_connected=0 for 5m while /metrics still answers. The bot is offline for every guild; a restart usually clears it."
+          runbook: "docs/runbooks/lucky-observability.md#luckybotgatewaydisconnected"
+
+      # One music extractor (youtube, spotify) marked unusable; plays fall back.
+      - alert: LuckyMusicExtractorDegraded
+        expr: lucky_music_extractor_degraded{job="lucky-bot"} == 1
+        for: 10m
+        labels:
+          severity: warning
+          service: lucky-bot
+        annotations:
+          summary: "Lucky {{ $labels.extractor }} extractor degraded for 10m"
+          description: "lucky_music_extractor_degraded{extractor=\"{{ $labels.extractor }}\"}=1 for 10m. Plays fall back to another source. Check lucky_bot_extraction_failures_total by type and the bot logs."
+          runbook: "docs/runbooks/lucky-observability.md#luckymusicextractordegraded"
+
   # Deploy drift + deploy-health observability (ADR-0023).
   - name: homelab_deploy_alerts
     interval: 1m
