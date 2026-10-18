@@ -179,6 +179,38 @@ the suspect retainer path.
 
 ---
 
+## LuckyBotGatewayDisconnected
+
+**Means:** the bot process is up and `/metrics` answers, but
+`lucky_bot_gateway_connected` has been 0 for 5 minutes. The Discord
+client is not ready, so the bot is offline in every guild.
+
+**Triage:**
+1. `docker compose logs bot --tail=200` and look for gateway close codes,
+   invalid session or rate limit (429) lines.
+2. Check Discord status (discordstatus.com) before blaming the bot.
+3. Restart to recover service: `docker compose restart bot`.
+
+**Action:** if it comes back after a restart, file an issue with the
+close code and the time window.
+
+---
+
+## LuckyMusicExtractorDegraded
+
+**Means:** `lucky_music_extractor_degraded{extractor="..."}` has been 1
+for 10 minutes. That extractor is unusable and plays fall back to
+another source.
+
+**Triage:**
+1. `sum by (type) (increase(lucky_bot_extraction_failures_total[30m]))`
+   in Grafana Explore: `forbidden` or `botcheck` means YouTube is
+   blocking yt-dlp; the block breaker reopens on its own.
+2. Startup failure: `docker compose logs bot | grep -i "extractor unavailable"`.
+3. If yt-dlp is outdated, rebuild the bot image to pull a newer one.
+
+---
+
 ## Adding a new alert
 
 1. Add the alert to `lucky_alerts` in `config/prometheus/alerts.yml`.
