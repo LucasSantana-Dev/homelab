@@ -199,5 +199,5 @@ sudo systemctl status homelab-docker
 ## Related Documentation
 
 - **BIOS Setup**: `docs/bios-power-on-setup.md`
-- **Service Management**: `README.md#auto-start-services`
+- **Service Management**: `README.md#first-time-setup` (auto-start note)
 - **Changelog**: `CHANGELOG.md`

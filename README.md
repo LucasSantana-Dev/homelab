@@ -20,7 +20,7 @@ Homelab infrastructure with zero-trust networking, full observability and one-co
 ### Trust Model
 - Services are **Tailscale-first by default**, bound to localhost and the private network
 - Public exposure is **opt-in via Cloudflare Tunnel**, restricted to selected hostnames
-- All public traffic gates through **Authentik SSO** with GitHub OAuth + break-glass fallback
+- All public traffic gates through **Tinyauth SSO** with Google and GitHub OAuth (email allowlist)
 - DNS filtering via **Pi-hole** (LAN) and Tailscale MagicDNS (remote)
 
 Full details: [Security Policy](.github/SECURITY.md) | [Hardening Guide](docs/public-release-hardening.md) | [Network Architecture](docs/network-architecture.md)
@@ -71,7 +71,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
                      │
          ┌───────────▼──────────────┐
          │  Cloudflared Container   │  (Phase-1 Public Edge)
-         │  Edge Rules + Auth Gate  │  Authentik SSO → GitHub OAuth
+         │  Edge Rules + Auth Gate  │  Tinyauth SSO → Google/GitHub OAuth
          └───────────┬──────────────┘
                      │
       ┌──────────────┼──────────────┐
@@ -105,7 +105,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
   │                                    │
   │  ┌─ Security ──────────────────┐  │
   │  │ • Pi-hole (DNS filtering)    │  │
-  │  │ • Authentik (SSO/Identity)   │  │
+  │  │ • Tinyauth (SSO/OAuth gate)  │  │
   │  └────────────────────────────────┘ │
   │                                    │
   │  ┌─ Applications ──────────────┐  │
@@ -118,8 +118,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
   │                                    │
   │  ┌─ Databases & Caches ────────┐  │
   │  │ • MariaDB (Nextcloud)        │  │
-  │  │ • PostgreSQL (Authentik)     │  │
-  │  │ • Redis (cache/broker)       │  │
+    │  │ • Redis (cache/broker)       │  │
   │  └────────────────────────────────┘ │
   │                                    │
   └────────────────────────────────────┘
@@ -162,7 +161,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 | Service | Port | Purpose | Access |
 |---------|------|---------|--------|
 | **Pi-hole** | 8054 | DNS filtering & ad-blocking | Localhost + LAN |
-| **Authentik** | 9100 | SSO & identity provider | Public via Tunnel |
+| **Tinyauth** | 3030 | SSO / OAuth gate | Localhost only (published via Caddy + Tunnel) |
 
 ### Applications
 | Service | Port | Purpose | Access |
@@ -175,8 +174,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 
 ### Support Services (Databases & Caches)
 - **MariaDB** (Nextcloud), internal
-- **PostgreSQL** (Authentik), internal
-- **Redis** (Nextcloud, Authentik caches), internal
+- **Redis** (Nextcloud cache), internal
 
 ---
 
@@ -198,13 +196,12 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
    - Public domains routed through Cloudflare's edge
    - Eliminates port forwarding
    - DDoS protection, WAF, and rate limiting at Cloudflare
-   - **Homepage, Authentik, Nextcloud, Jellyfin** (configurable)
+   - **Homepage, Tinyauth, Nextcloud, Jellyfin** (configurable)
 
 ### Authentication & Authorization
-- **Public services** gate through **Authentik SSO**
-- Primary auth: **GitHub OAuth** (company/team gating)
-- Fallback: Local username/password (break-glass)
-- Session timeout & MFA configurable per service
+- **Public services** gate through **Tinyauth SSO**
+- Providers: **Google and GitHub OAuth**
+- Access limited to the emails in `TINYAUTH_ALLOWED_EMAILS`
 
 ### DNS & IP Management
 - **Pi-hole** blocks malware/tracking domains (internal DNS)
@@ -218,7 +215,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 - Database passwords rotated via `Makefile` targets
 - Audit trail via [SOPS](https://github.com/mozilla/sops) (encrypted secrets file support)
 
-Details: [Authentik SSO Setup](docs/tinyauth-sso-setup.md) | [Cloudflare Tunnel](docs/cloudflare-tunnel-phase1.md) | [Network Architecture](docs/network-architecture.md)
+Details: [Access Layers & Tinyauth](docs/access-layers.md) | [Cloudflare Tunnel](docs/cloudflare-tunnel-phase1.md) | [Network Architecture](docs/network-architecture.md)
 
 ---
 
@@ -233,7 +230,7 @@ Container and service events trigger alerts to Discord via the **Lucky bot**:
 | **Update Available** | Docker image update detected | What's Up Docker → Lucky → #homelab |
 | **Deploy Status** | Service deploy succeeds/fails | CLI → Lucky → #homelab |
 | **Log Anomalies** | Errors in container logs | Loki rules → Alertmanager → Lucky |
-| **Security Events** | Failed auth, SSH attempts (if enabled) | Pi-hole/Authentik → Lucky → #homelab |
+| **Security Events** | Failed auth, SSH attempts (if enabled) | Pi-hole/Tinyauth → Lucky → #homelab |
 
 ### Configuration
 Set in `.env`:
@@ -264,7 +261,7 @@ homelab/
 │   ├── monitoring.yml    # Prometheus, Grafana, Loki, Alertmanager
 │   ├── apps.yml          # Nextcloud, n8n
 │   ├── media.yml         # Jellyfin, Stremio
-│   ├── security.yml      # Pi-hole, Authentik
+│   ├── security.yml      # Pi-hole, CrowdSec
 │   └── automation.yml    # Home Assistant
 │
 ├── homelab_manager/       # Python CLI (main entry point)
@@ -294,7 +291,7 @@ homelab/
 │   ├── specs/            # Feature specs
 │   ├── network-architecture.md
 │   ├── cloudflare-tunnel-phase1.md
-│   ├── authentik-sso-setup.md
+│   ├── access-layers.md
 │   ├── bios-power-on-setup.md
 │   └── [more...]
 │
@@ -332,7 +329,6 @@ make update-dry-run      # Preview updates (no apply)
 make health              # Service health summary
 make logs                # Tail container logs
 make power-restore-check # Validate post-power-loss recovery
-make sso-status          # Check Authentik edge runtime
 make ssl-renew           # Renew wildcard TLS cert
 ```
 
@@ -389,7 +385,7 @@ Existing `make deploy` callers are unaffected beyond this new post-step;
 |----------|---------|
 | [Network Architecture](docs/network-architecture.md) | Trust model, network layers, IP scheme |
 | [Cloudflare Tunnel Phase 1](docs/cloudflare-tunnel-phase1.md) | Public edge routing & domain setup |
-| [Authentik SSO Setup](docs/authentik-sso-setup.md) | OAuth, GitHub integration, break-glass |
+| [Access Layers](docs/access-layers.md) | Service x layer matrix, Tinyauth SSO broker |
 | [BIOS Power-On Setup](docs/bios-power-on-setup.md) | AC-loss recovery, auto-start config |
 | [DNS Setup](docs/dns-setup.md) | Tailscale MagicDNS, Pi-hole, DoH |
 | [Architecture Decision Records](docs/adr/) | Design choices & rationale |
