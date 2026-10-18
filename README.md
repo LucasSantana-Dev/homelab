@@ -1,6 +1,6 @@
-# 🏠 Homelab Manager
+# Homelab Manager
 
-Production-grade homelab infrastructure — zero-trust networking, full observability, one-command deploys.
+Homelab infrastructure with zero-trust networking, full observability and one-command deploys.
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-Available-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
@@ -9,7 +9,7 @@ Production-grade homelab infrastructure — zero-trust networking, full observab
 
 ---
 
-## 🔒 Security First
+## Security First
 
 **This repository contains NO secrets or credentials.** All sensitive data is configured locally via `.env` (gitignored).
 
@@ -18,16 +18,16 @@ Production-grade homelab infrastructure — zero-trust networking, full observab
 2. **Never commit `.env` to version control**
 
 ### Trust Model
-- Services are **Tailscale-first by default** — bound to localhost and private network
+- Services are **Tailscale-first by default**, bound to localhost and the private network
 - Public exposure is **opt-in via Cloudflare Tunnel**, restricted to selected hostnames
-- All public traffic gates through **Authentik SSO** with GitHub OAuth + break-glass fallback
+- Public hostnames gate through **Tinyauth SSO** (Google and GitHub OAuth, email allowlist) by default. Exceptions use another control: Cloudflare Access (Homepage), the service's own auth (Home Assistant, Nextcloud), or an app token (stats, brain). CoJam and the static rclone OAuth pages are open by design
 - DNS filtering via **Pi-hole** (LAN) and Tailscale MagicDNS (remote)
 
-📖 Full details: [Security Policy](.github/SECURITY.md) | [Hardening Guide](docs/public-release-hardening.md) | [Network Architecture](docs/network-architecture.md)
+Full details: [Security Policy](.github/SECURITY.md) | [Hardening Guide](docs/public-release-hardening.md) | [Network Architecture](docs/network-architecture.md)
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Install CLI + dependencies
@@ -61,7 +61,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 
 ---
 
-## 🏗️ Infrastructure Overview
+## Infrastructure Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -71,7 +71,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
                      │
          ┌───────────▼──────────────┐
          │  Cloudflared Container   │  (Phase-1 Public Edge)
-         │  Edge Rules + Auth Gate  │  Authentik SSO → GitHub OAuth
+         │  Edge Rules + Auth Gate  │  Tinyauth SSO → Google/GitHub OAuth
          └───────────┬──────────────┘
                      │
       ┌──────────────┼──────────────┐
@@ -105,7 +105,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
   │                                    │
   │  ┌─ Security ──────────────────┐  │
   │  │ • Pi-hole (DNS filtering)    │  │
-  │  │ • Authentik (SSO/Identity)   │  │
+  │  │ • Tinyauth (SSO/OAuth gate)  │  │
   │  └────────────────────────────────┘ │
   │                                    │
   │  ┌─ Applications ──────────────┐  │
@@ -118,7 +118,6 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
   │                                    │
   │  ┌─ Databases & Caches ────────┐  │
   │  │ • MariaDB (Nextcloud)        │  │
-  │  │ • PostgreSQL (Authentik)     │  │
   │  │ • Redis (cache/broker)       │  │
   │  └────────────────────────────────┘ │
   │                                    │
@@ -132,7 +131,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 
 ---
 
-## 📊 Service Stack
+## Service Stack
 
 ### Core Infrastructure
 | Service | Port | Purpose | Access |
@@ -162,7 +161,7 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 | Service | Port | Purpose | Access |
 |---------|------|---------|--------|
 | **Pi-hole** | 8054 | DNS filtering & ad-blocking | Localhost + LAN |
-| **Authentik** | 9100 | SSO & identity provider | Public via Tunnel |
+| **Tinyauth** | 3030 | SSO / OAuth gate | Localhost only (published via Caddy + Tunnel) |
 
 ### Applications
 | Service | Port | Purpose | Access |
@@ -174,37 +173,35 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 | **Home Assistant** | 8123 | Home automation | Tailscale only |
 
 ### Support Services (Databases & Caches)
-- **MariaDB** (Nextcloud) — internal
-- **PostgreSQL** (Authentik) — internal
-- **Redis** (Nextcloud, Authentik caches) — internal
+- **MariaDB** (Nextcloud), internal
+- **Redis** (Nextcloud cache), internal
 
 ---
 
-## 🔐 Security Model
+## Security Model
 
 ### Network Layers
-1. **Layer 1 — Localhost Binding** (Default)
+1. **Layer 1: Localhost Binding** (Default)
    - Services listen on `127.0.0.1` only
    - Accessible only within the host
    - Zero external attack surface
 
-2. **Layer 2 — Tailscale VPN** (Private)
+2. **Layer 2: Tailscale VPN** (Private)
    - Services bridged over Tailscale mesh
    - Access from remote devices via VPN
    - Encrypted point-to-point tunnels
    - MagicDNS for service discovery
 
-3. **Layer 3 — Cloudflare Tunnel** (Selected Services)
+3. **Layer 3: Cloudflare Tunnel** (Selected Services)
    - Public domains routed through Cloudflare's edge
-   - Not a traditional reverse proxy — eliminates port forwarding
+   - Eliminates port forwarding
    - DDoS protection, WAF, and rate limiting at Cloudflare
-   - **Homepage, Authentik, Nextcloud, Jellyfin** (configurable)
+   - **Homepage, Tinyauth, Nextcloud** and other hostnames in `config/cloudflared/edge-snapshot.json`
 
 ### Authentication & Authorization
-- **Public services** gate through **Authentik SSO**
-- Primary auth: **GitHub OAuth** (company/team gating)
-- Fallback: Local username/password (break-glass)
-- Session timeout & MFA configurable per service
+- **Public services** gate through **Tinyauth SSO** unless listed in `config/caddy/public-no-auth.txt`
+- Providers: **Google and GitHub OAuth**
+- Access limited to the emails in `TINYAUTH_ALLOWED_EMAILS`
 
 ### DNS & IP Management
 - **Pi-hole** blocks malware/tracking domains (internal DNS)
@@ -213,16 +210,16 @@ For **auto-start on boot** after AC loss, see [BIOS Power-On Setup](docs/bios-po
 - No dynamic DNS, no leaked IPs to WHOIS
 
 ### Secrets Management
-- `.env` file (git-ignored) — local only
+- `.env` file (git-ignored), local only
 - No hardcoded credentials in images
 - Database passwords rotated via `Makefile` targets
 - Audit trail via [SOPS](https://github.com/mozilla/sops) (encrypted secrets file support)
 
-📖 Details: [Authentik SSO Setup](docs/tinyauth-sso-setup.md) | [Cloudflare Tunnel](docs/cloudflare-tunnel-phase1.md) | [Network Architecture](docs/network-architecture.md)
+Details: [Access Layers & Tinyauth](docs/access-layers.md) | [Cloudflare Tunnel](docs/cloudflare-tunnel-phase1.md) | [Network Architecture](docs/network-architecture.md)
 
 ---
 
-## 🔔 Discord Notifications
+## Discord Notifications
 
 Container and service events trigger alerts to Discord via the **Lucky bot**:
 
@@ -233,7 +230,6 @@ Container and service events trigger alerts to Discord via the **Lucky bot**:
 | **Update Available** | Docker image update detected | What's Up Docker → Lucky → #homelab |
 | **Deploy Status** | Service deploy succeeds/fails | CLI → Lucky → #homelab |
 | **Log Anomalies** | Errors in container logs | Loki rules → Alertmanager → Lucky |
-| **Security Events** | Failed auth, SSH attempts (if enabled) | Pi-hole/Authentik → Lucky → #homelab |
 
 ### Configuration
 Set in `.env`:
@@ -255,7 +251,7 @@ Expect HTTP `204`.
 
 ---
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 homelab/
@@ -264,7 +260,7 @@ homelab/
 │   ├── monitoring.yml    # Prometheus, Grafana, Loki, Alertmanager
 │   ├── apps.yml          # Nextcloud, n8n
 │   ├── media.yml         # Jellyfin, Stremio
-│   ├── security.yml      # Pi-hole, Authentik
+│   ├── security.yml      # Pi-hole, CrowdSec
 │   └── automation.yml    # Home Assistant
 │
 ├── homelab_manager/       # Python CLI (main entry point)
@@ -294,7 +290,7 @@ homelab/
 │   ├── specs/            # Feature specs
 │   ├── network-architecture.md
 │   ├── cloudflare-tunnel-phase1.md
-│   ├── authentik-sso-setup.md
+│   ├── access-layers.md
 │   ├── bios-power-on-setup.md
 │   └── [more...]
 │
@@ -308,7 +304,7 @@ homelab/
 
 ---
 
-## 🛠️ Development & Operations
+## Development & Operations
 
 ### Install (Dev)
 ```bash
@@ -332,7 +328,6 @@ make update-dry-run      # Preview updates (no apply)
 make health              # Service health summary
 make logs                # Tail container logs
 make power-restore-check # Validate post-power-loss recovery
-make sso-status          # Check Authentik edge runtime
 make ssl-renew           # Renew wildcard TLS cert
 ```
 
@@ -347,29 +342,29 @@ three manual deploys hit on 2026-09-27:
    tracked file, or the directory containing one, is not writable by the
    deploy user (root-owned dirs from an old `sudo` edit, e.g.
    `observability/`, `tailscale/`), `git pull` can stop halfway with
-   "unable to unlink old ... Permission denied", leaving HEAD stale while
+   "unable to unlink old ... Permission denied". That leaves HEAD stale while
    some files are already new. The preflight check fails loudly first and
-   prints the exact `sudo chown -R <user>:<group> <paths>` fix, but never
+   prints the exact `sudo chown -R <user>:<group> <paths>` fix. It never
    runs `sudo` itself.
-2. `git pull --ff-only` runs as before.
-3. **`make deploy`** now also runs
+2. `git pull --ff-only` runs.
+3. **`make deploy`** runs
    **`scripts/deployment/apply-config-changes.sh`** after `docker compose up
-   -d --build`. Some config isn't picked up by a rebuild alone:
+   -d --build`. A rebuild alone does not pick up some config:
    - `config/caddy/Caddyfile` is bind-mounted as a single file, so git
      swapping the inode doesn't change what the running `caddy-lan`
-     container serves. The script restarts `caddy-lan` and verifies (via
-     sha256) that it is actually serving the new file.
-   - `config/prometheus/` and `config/alertmanager/` are directory mounts;
-     the new files are visible inside the containers but neither process
+     container serves. The script restarts `caddy-lan`. It then verifies
+     (via sha256) that the container is serving the new file.
+   - `config/prometheus/` and `config/alertmanager/` are directory mounts.
+     The new files are visible inside the containers, but neither process
      re-reads them without a signal. The script sends the container a
-     SIGHUP and verifies the reload succeeded from its logs.
+     SIGHUP and verifies from its logs that the reload succeeded.
    - The comparison base is the SHA of the last successful deploy
-     (`scripts/deployment/deployed-sha.sh`, state file at
-     `/var/lib/homelab/deployed-sha` by default, same root-owned-directory
-     fallback pattern as the ADR-0023 deploy-health textfile under
-     `/var/lib/node_exporter/textfile/`, falling back gracefully without
-     root). If there's no recorded SHA yet, every managed config path is
-     treated as changed.
+     (`scripts/deployment/deployed-sha.sh`). The state file is at
+     `/var/lib/homelab/deployed-sha` by default. It uses the same
+     root-owned-directory fallback pattern as the ADR-0023 deploy-health
+     textfile under `/var/lib/node_exporter/textfile/`, and falls back
+     gracefully without root. If there's no recorded SHA yet, every managed
+     config path is treated as changed.
 
 Existing `make deploy` callers are unaffected beyond this new post-step;
 `make pull-deploy` is the only new entry point.
@@ -383,13 +378,13 @@ Existing `make deploy` callers are unaffected beyond this new post-step;
 
 ---
 
-## 📚 Documentation & References
+## Documentation & References
 
 | Document | Purpose |
 |----------|---------|
 | [Network Architecture](docs/network-architecture.md) | Trust model, network layers, IP scheme |
 | [Cloudflare Tunnel Phase 1](docs/cloudflare-tunnel-phase1.md) | Public edge routing & domain setup |
-| [Authentik SSO Setup](docs/authentik-sso-setup.md) | OAuth, GitHub integration, break-glass |
+| [Access Layers](docs/access-layers.md) | Service x layer matrix, Tinyauth SSO broker |
 | [BIOS Power-On Setup](docs/bios-power-on-setup.md) | AC-loss recovery, auto-start config |
 | [DNS Setup](docs/dns-setup.md) | Tailscale MagicDNS, Pi-hole, DoH |
 | [Architecture Decision Records](docs/adr/) | Design choices & rationale |
@@ -400,7 +395,7 @@ Existing `make deploy` callers are unaffected beyond this new post-step;
 
 ---
 
-## 🔄 Status & Health
+## Status & Health
 
 Check service health:
 ```bash
@@ -422,18 +417,18 @@ docker compose exec [service] sh           # Container shell
 
 ---
 
-## 📄 License
+## License
 
-MIT License — see [LICENSE](LICENSE) file for details.
+MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🎯 What's Next
+## Next steps
 
-- **Monitor & Iterate**: Use Grafana dashboards to understand resource usage
-- **Set Alerts**: Configure Alertmanager rules for your use case
-- **Backup Strategy**: Configure automated backups (docs/backup.md)
-- **Scale Up**: Add services as needed; modular compose files support growth
-- **Secure Further**: Review [Security Policy](.github/SECURITY.md) and audit logs quarterly
+- Use Grafana dashboards to understand resource usage.
+- Configure Alertmanager rules for your use case.
+- Configure automated backups (docs/backup.md).
+- Add services as needed; modular compose files support growth.
+- Review [Security Policy](.github/SECURITY.md) and audit logs quarterly.
 
-Questions? Check the [docs](docs/), [ADRs](docs/adr/), or open an issue.
+For questions, see the [docs](docs/) and [ADRs](docs/adr/), or open an issue.

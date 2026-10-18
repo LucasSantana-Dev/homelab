@@ -20,6 +20,7 @@ wrappers. The agent-box hooks are an extra layer.
 - PRs stuck on pending or red CI with no activity for `stale_days` (5) are closed (never ones waiting on the owner or labelled `needs-human`) and the issue gets `agent-failed`, so it is not picked again.
 - Any PR or issue another human authored, commented on or pushed to is never touched.
 - Pause everything: `touch ~/agent-paused` inside agent-box (resume: `rm ~/agent-paused`).
+- The worker and the gate refuse to run claude in a workdir that is not clean (the alert lists the first paths, or says the check failed). Each claude run gets a scratch dir on agent-box (`mktemp -d /tmp/agent-run.XXXXXXXX`, passed with `--add-dir`, removed after the run) for the commit message, PR body and thread replies, never files in the repo: dontAsk refuses Write into `.git/`, and an untracked file left in the work tree blocks every later run. The Discord session uses a fixed `/tmp/discord-scratch` instead (allowed in its settings file), recreated empty at each session start and removed when claude exits or the supervisor stops the session.
 
 ## Issue selection
 
@@ -50,7 +51,7 @@ loaded, the PR is skipped for that run.
 
 Thread autofix: the worker verifies each bot claim against the code (at most 20 threads per run),
 fixes the valid ones (adding or updating a test when behaviour changes), and writes
-`.git/agent-thread-replies.json`
+`thread-replies.json` in the run's scratch dir
 (`[{"id", "fixed", "reply"}]`). The model may not call `gh api` (a GraphQL mutation could merge),
 so the gate posts the replies itself, after checking the tree is clean, `origin/<branch>` has every
 local commit, and (reloading the PR and the issue) no human joined and the owner did not join a
