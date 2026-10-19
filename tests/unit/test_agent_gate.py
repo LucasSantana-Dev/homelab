@@ -2005,7 +2005,9 @@ def test_automerge_replies_report_a_failed_recheck_load(tmp_path):
         tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
     )
     assert res.returncode == 1
-    assert "could not reload the PR before replying to thread T1" in res.stdout
+    assert (
+        "could not reload or re-check the PR before replying to thread T1" in res.stdout
+    )
     assert _mutations(tmp_path) == [] and _merge_calls(log) == []
 
 

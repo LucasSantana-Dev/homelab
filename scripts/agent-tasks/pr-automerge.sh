@@ -127,14 +127,14 @@ handle() {  # mode(queue|sweep) repo pr
 }
 
 # 0 when a fresh load still plans this exact action (same id, reply and resolve), 2 when the
-# reload failed, 1 otherwise.
+# reload or the re-check failed to run, 1 otherwise.
 still_ok() {  # repo pr action
-    local fresh entry
+    local fresh entry plan
     fresh=$(load "$1" "$2") || return 2
-    entry=$(jq -c '[{id, fixed: .resolve, reply}]' <<<"$3") || return 1
-    jq -c --argjson r "$entry" '. + {replies: $r}' <<<"$fresh" \
-        | python3 -I "$GATE_PY" thread-replies --config "$CONFIG" --repo "$1" \
-        | jq -e --argjson a "$3" '.ok == true and .actions == [$a]' >/dev/null
+    entry=$(jq -c '[{id, fixed: .resolve, reply}]' <<<"$3") || return 2
+    plan=$(jq -c --argjson r "$entry" '. + {replies: $r}' <<<"$fresh" \
+        | python3 -I "$GATE_PY" thread-replies --config "$CONFIG" --repo "$1") || return 2
+    jq -e --argjson a "$3" '.ok == true and .actions == [$a]' <<<"$plan" >/dev/null
 }
 
 # Post the replies agent_gate.py allows. Returns 1 when it refused or could not run.
@@ -170,7 +170,7 @@ answer() {  # repo pr file
         rc=0
         still_ok "$repo" "$n" "$a" || rc=$?
         if (( rc == 2 )); then
-            say "$repo#$n: could not reload the PR before replying to thread $id, nothing posted to it"
+            say "$repo#$n: could not reload or re-check the PR before replying to thread $id, nothing posted to it"
             continue
         elif (( rc != 0 )); then
             say "$repo#$n: thread $id changed since the check, nothing posted to it"
