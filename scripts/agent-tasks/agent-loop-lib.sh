@@ -245,7 +245,7 @@ session_prs() {  # repo workdir
     local heads all loop n b
     heads=$(run_on_agent "git -C $2 for-each-ref --format='%(refname:short) %(objectname)' refs/heads/" \
         | jq -Rsc 'split("\n") | map(select(length > 0) | split(" ") | {(.[0]): .[1]}) | add // {}') || return 1
-    all=$(run_on_agent "gh pr list --repo $1 --state open --limit 1000 --author $(cfg "$1" owner) --json number,headRefName,headRefOid,isCrossRepository,labels") || return 1
+    all=$(run_on_agent "gh pr list --repo $1 --state open --limit 1000 --author $(printf '%q' "$(cfg "$1" owner)") --json number,headRefName,headRefOid,isCrossRepository,labels") || return 1
     loop=$(only_agent_prs "$1" <<<"$all" | jq -c '[.[].number]') || return 1
     while read -r n b; do
         [[ "$b" =~ $BRANCH_RE && ! "$b" =~ ^(fix/issue-[0-9]+|agent/.*)$ ]] && echo "$n"
