@@ -51,24 +51,32 @@ FIELD_FLAGS = {"-f", "--raw-field", "-F", "--field"}
 
 def api_opens_pr(args):
     """args after `gh api`: True when the call can open a PR or its target cannot be read."""
-    pos, fields, i = [], [], 0
+    pos, fields, method, i = [], [], "", 0
     while i < len(args):
         a = args[i]
         name, eq, val = a.partition("=")
         if a in VALUE_FLAGS:
             val = args[i + 1] if i + 1 < len(args) else ""
+            method = val.upper() if a in ("-X", "--method") else method
             fields += [val] if a in FIELD_FLAGS else ["@"] if a == "--input" else []
             i += 1
         elif a.startswith("--") and eq:
+            method = val.upper() if name == "--method" else method
             fields += [val] if name in FIELD_FLAGS else ["@"] if name == "--input" else []
         elif a[:2] in ("-f", "-F") and len(a) > 2:
             fields.append(a[2:])
+        elif a[:2] == "-X" and len(a) > 2:
+            method = a[2:].upper()
         elif not a.startswith("-"):
             pos.append(a)
         i += 1
     ep = pos[0] if pos else ""
-    if not ep or re.search(r"[$\x60]", ep) or ep.split("?", 1)[0].rstrip("/").endswith("/pulls"):
+    if not ep or re.search(r"[$\x60]", ep):
         return True
+    # gh api sends GET unless a field, --input or -X asks for another method; listing PRs is fine.
+    writes = method != "GET" and bool(method or fields)
+    if ep.split("?", 1)[0].rstrip("/").endswith("/pulls"):
+        return writes
     if ep != "graphql":
         return False
     for f in fields:

@@ -2439,6 +2439,8 @@ def test_loop_auto_merge_holds_a_pr_closing_an_unchecked_issue(cfg):
         'gh api "$ENDPOINT" -f base=main -f head=fix/a',
         "bash -c 'gh api graphql -f query=@q'",
         "gh api repos/LucasSantana-Dev/Lucky/pulls?x=1 -f base=main -f head=fix/a",
+        "gh api -XPOST repos/LucasSantana-Dev/Lucky/pulls --input body.json",
+        'gh api --method="$M" repos/LucasSantana-Dev/Lucky/pulls',
         "gh api graphql -f query='mutation { createPullRequest(input: {}) { clientMutationId } }'",
     ],
 )
@@ -2457,6 +2459,8 @@ def test_pr_guard_blocks_hidden_pr_creation(tmp_path, command):
         "gh api graphql -f query='mutation($t: ID!) { resolveReviewThread(input: {threadId: $t})"
         " { thread { isResolved } } }' -f t=abc",
         "gh pr view 5 -R LucasSantana-Dev/Lucky\ngh pr checks 5 -R LucasSantana-Dev/Lucky",
+        "gh api repos/LucasSantana-Dev/Lucky/pulls?state=open",
+        "gh api -X GET repos/LucasSantana-Dev/Lucky/pulls -f state=open",
     ],
 )
 def test_pr_guard_lets_pr_reads_and_replies_through(tmp_path, command):
