@@ -129,7 +129,8 @@ GitHub keeps a queued auto-merge through later pushes, so the `automerge-push-gu
 (PreToolUse, user settings, every session on agent-box) turns auto-merge off on the pushed
 branch's PR before any `git push`, and blocks the push when it cannot. After the push the session
 runs pr-automerge again. The merge check also refuses a stacked branch (a commit shared with
-another open PR). Before that, the `pr-create-guard.sh` hook blocks `gh pr create` when `--base`
+another open PR). Open PRs load in one GraphQL page (100 PRs, 100 commits each); a repo past
+that fails closed: nothing auto-merges and the sweep alerts until the count drops. Before that, the `pr-create-guard.sh` hook blocks `gh pr create` when `--base`
 is not the repo's base or the branch, checked against a freshly fetched `origin/<base>`, has no
 commits of its own or sits on another branch. Every gate run (also while the loop is paused) calls
 `pr-automerge --sweep`, which re-checks each recorded PR and turns auto-merge off on any that no
