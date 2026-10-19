@@ -7,6 +7,12 @@ echo "[$(date)] Starting Lucky music-first gates report..."
 # shellcheck source=./common.sh
 source "$(dirname "$0")/common.sh"
 
+# The gates decide on 2026-12-20; after that the report has nothing to say.
+if [[ "$(date +%Y-%m-%d)" > "2026-12-20" ]]; then
+    echo "[$(date)] Decision date passed, nothing to report. Disable lucky-music-gates.timer."
+    exit 0
+fi
+
 # Definitions follow Lucky scripts/music-first-gates.sql (source of truth):
 # test-named guilds are excluded by substring, as the ADR requires, and day 8
 # means any activity at or after join + 7 days.
@@ -25,9 +31,10 @@ trap 'rm -f "$WAG_SQL" "$COHORT_SQL"' EXIT
 cat > "$WAG_SQL" << 'EOSQL'
 WITH excluded AS (
     SELECT unnest('{110373943822540800,333949691962195969,1541452011466268704}'::text[]) AS g
-    UNION SELECT "discordId" FROM guilds WHERE name ILIKE '%test%'
+    UNION SELECT "discordId" FROM guilds
+          WHERE name ILIKE '%test%' AND "discordId" IS NOT NULL
     UNION SELECT "guildDiscordId" FROM guild_membership_events
-          WHERE "guildName" ILIKE '%test%'
+          WHERE "guildName" ILIKE '%test%' AND "guildDiscordId" IS NOT NULL
 ),
 wag_windows AS (
     SELECT week_start
@@ -58,9 +65,10 @@ EOSQL
 cat > "$COHORT_SQL" << 'EOSQL'
 WITH excluded AS (
     SELECT unnest('{110373943822540800,333949691962195969,1541452011466268704}'::text[]) AS g
-    UNION SELECT "discordId" FROM guilds WHERE name ILIKE '%test%'
+    UNION SELECT "discordId" FROM guilds
+          WHERE name ILIKE '%test%' AND "discordId" IS NOT NULL
     UNION SELECT "guildDiscordId" FROM guild_membership_events
-          WHERE "guildName" ILIKE '%test%'
+          WHERE "guildName" ILIKE '%test%' AND "guildDiscordId" IS NOT NULL
 ),
 counted_joins AS (
     SELECT g, t FROM (
@@ -154,17 +162,23 @@ REMOVAL_PCT="${REMOVAL_PCT:-?}"
 # one decimal. meets_goal 34.95 ge 35 fails.
 meets_goal() {
     awk -v v="$1" -v op="$2" -v goal="$3" \
-        'BEGIN { exit !((op == "ge") ? (v + 0 >= goal) : (v + 0 < goal)) }'
+        'BEGIN {
+            if (op == "ge") exit !(v + 0 >= goal)
+            if (op == "lt") exit !(v + 0 < goal)
+            exit 2
+        }'
 }
 
 # Truncates a percentage to one decimal for the report, so the shown number
-# agrees with its mark (34.95 shows 34.9, not 35.0); ? and N/A pass through.
+# agrees with its mark (34.95 shows 34.9%, not 35.0%); ? and N/A get no %.
 fmt_pct() {
-    if [[ "$1" == *.* ]]; then
-        local frac="${1#*.}"
-        echo "${1%%.*}.${frac:0:1}"
-    else
+    if [[ "$1" == "?" || "$1" == "N/A" ]]; then
         echo "$1"
+    elif [[ "$1" == *.* ]]; then
+        local frac="${1#*.}"
+        echo "${1%%.*}.${frac:0:1}%"
+    else
+        echo "$1%"
     fi
 }
 
@@ -203,9 +217,9 @@ BODY="Music-First Gates, ${TODAY}
 WAG (goal ≥20/week, decision on 2026-12-20):
 $(printf '%b' "$WAG_LINES")
 Cohort: ${JOINS} new guilds (last 28 days):
-  1st-hour play:  $(fmt_pct "$H1_PCT")%  (goal ≥35%) ${h1_mark}
-  Day-8 return:   $(fmt_pct "$D8_PCT")%  (goal ≥15%) ${d8_mark}
-  Removal <5 min: $(fmt_pct "$REMOVAL_PCT")%  (goal <15%) ${rm_mark}"
+  1st-hour play:  $(fmt_pct "$H1_PCT")  (goal ≥35%) ${h1_mark}
+  Day-8 return:   $(fmt_pct "$D8_PCT")  (goal ≥15%) ${d8_mark}
+  Removal <5 min: $(fmt_pct "$REMOVAL_PCT")  (goal <15%) ${rm_mark}"
 
 echo "$BODY"
 $NOTIFY --title "📊 Lucky Music-First Gates" --body "$BODY" --urgency "$URGENCY" || true
