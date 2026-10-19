@@ -1,0 +1,11 @@
+[Unit]
+Description=Lucky: weekly music-first gates report (Monday 08:00 BRT)
+Requires=lucky-music-gates.service
+
+[Timer]
+OnCalendar=Mon *-*-* 11:00:00
+Persistent=true
+AccuracySec=15m
+
+[Install]
+WantedBy=timers.target

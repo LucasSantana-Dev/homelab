@@ -1,0 +1,11 @@
+[Unit]
+Description=Lucky: weekly music-first gates report
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=luk-server
+ExecStart=/opt/homelab/scripts/agent-tasks/lucky-music-gates.sh
+StandardOutput=journal
+StandardError=journal
