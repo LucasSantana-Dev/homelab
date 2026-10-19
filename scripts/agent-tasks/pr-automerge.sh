@@ -135,6 +135,8 @@ still_ok() {  # repo pr action
     entry=$(jq -c '[{id, fixed: .resolve, reply}]' <<<"$3") || return 2
     plan=$(jq -c --argjson r "$entry" '. + {replies: $r}' <<<"$fresh" \
         | python3 -I "$GATE_PY" thread-replies --config "$CONFIG" --repo "$1") || return 2
+    # jq -e also returns 1 for false, so an unreadable plan is caught first.
+    jq -e 'type == "object"' <<<"$plan" >/dev/null 2>&1 || return 2
     jq -e --argjson a "$3" '.ok == true and .actions == [$a]' <<<"$plan" >/dev/null
 }
 
