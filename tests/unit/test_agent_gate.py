@@ -1222,7 +1222,10 @@ def _fake_bin(tmp_path, threads=None, issue=None, open_prs=None):
         '      [[ -z "${GH_OPEN_RC:-}" ]] || exit "$GH_OPEN_RC"\n'
         f'      cat "{tmp_path}/open.json"; exit 0\n'
         "    fi\n"
-        f'    cat "{tmp_path}/threads.json" ;;\n'
+        # threads.next replaces the threads after the first read: a change mid-run.
+        f'    [[ -f "{tmp_path}/threads.next" && -f "{tmp_path}/threads.read" ]] '
+        f'&& mv "{tmp_path}/threads.next" "{tmp_path}/threads.json"\n'
+        f'    touch "{tmp_path}/threads.read"; cat "{tmp_path}/threads.json" ;;\n'
         f'  "issue view") [[ "$3" == "{ISSUE_URL}" ]] && cat "{tmp_path}/issue.json" ;;\n'
         f'  "pr list") cat "{tmp_path}/list.txt" ;;\n'
         '  "pr merge") exit "${GH_MERGE_RC:-0}" ;;\n'
@@ -1922,7 +1925,9 @@ def test_automerge_reports_a_failed_resolve(tmp_path):
     assert _merge_calls(log) == []
 
 
-@pytest.mark.parametrize("content", ["not json", "[1] [2]", "x" * 70000, None])
+@pytest.mark.parametrize(
+    "content", ["not json", "[1] [2]", "x" * 70000, "[]" + "\n" * 70000, None]
+)
 def test_automerge_bad_replies_file_posts_nothing(tmp_path, content):
     path = (
         str(tmp_path / "missing.json")
@@ -1939,6 +1944,7 @@ def test_automerge_bad_replies_file_posts_nothing(tmp_path, content):
         threads=_threads_conn(review_thread("T1", "cubic-dev-ai")),
     )
     assert res.returncode == 1
+    assert "replies file missing" in res.stdout or "replies refused" in res.stdout
     assert _mutations(tmp_path) == []
     assert _merge_calls(log) == []
 
@@ -1959,6 +1965,32 @@ def test_automerge_lists_open_threads(tmp_path):
     assert res.returncode == 0, res.stderr
     out = json.loads(res.stdout)
     assert [(t["id"], t["bot_only"]) for t in out] == [("T1", True)]
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_threads_listing_refuses_a_truncated_list(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    threads["pageInfo"]["hasNextPage"] = True
+    res, _ = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--threads",
+        prs={7: _pushed_pr()},
+        threads=threads,
+    )
+    assert res.returncode == 1
+    assert res.stdout == "" and "not fully loaded" in res.stderr
+
+
+def test_automerge_replies_recheck_each_thread_before_posting(tmp_path):
+    t1 = review_thread("T1", "cubic-dev-ai")
+    joined = review_thread("T1", "cubic-dev-ai", "someone")
+    (tmp_path / "threads.next").write_text(json.dumps(_threads_conn(joined)))
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    res, log = _answer(tmp_path, replies, _threads_conn(t1))
+    assert res.returncode == 1
+    assert "changed since the check" in res.stdout
     assert _mutations(tmp_path) == [] and _merge_calls(log) == []
 
 

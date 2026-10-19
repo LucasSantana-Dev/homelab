@@ -575,6 +575,10 @@ def main(argv=None):
         reasons = merge_check(data["pr"], cfg, data.get("issues"))
         out = {"ok": not reasons, "reasons": reasons}
     elif args.command == "open-threads":
+        if threads_truncated(data["pr"]) or "reviewThreads" not in data["pr"]:
+            # A partial list would read as complete and hide blocking threads.
+            print("review threads not fully loaded, no list printed", file=sys.stderr)
+            return 1
         out = list_open_threads(data["pr"], cfg)
     elif args.command == "thread-replies":
         reasons, actions, skipped = thread_replies(
