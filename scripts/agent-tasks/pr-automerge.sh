@@ -126,10 +126,11 @@ handle() {  # mode(queue|sweep) repo pr
     say "$repo#$n: auto-merge queued on $sha; GitHub merges it when the required checks pass"
 }
 
-# 0 when a fresh load still plans this exact action (same id, reply and resolve).
+# 0 when a fresh load still plans this exact action (same id, reply and resolve), 2 when the
+# reload failed, 1 otherwise.
 still_ok() {  # repo pr action
     local fresh entry
-    fresh=$(load "$1" "$2") || return 1
+    fresh=$(load "$1" "$2") || return 2
     entry=$(jq -c '[{id, fixed: .resolve, reply}]' <<<"$3") || return 1
     jq -c --argjson r "$entry" '. + {replies: $r}' <<<"$fresh" \
         | python3 -I "$GATE_PY" thread-replies --config "$CONFIG" --repo "$1" \
@@ -138,9 +139,10 @@ still_ok() {  # repo pr action
 
 # Post the replies agent_gate.py allows. Returns 1 when it refused or could not run.
 answer() {  # repo pr file
-    local repo="$1" n="$2" file="$3" raw replies data plan actions a id body posted=0 total
-    # Read once, so the size cap holds for what is parsed. $( ) strips trailing newlines: the
-    # x keeps them, so newline padding still counts toward the cap.
+    local repo="$1" n="$2" file="$3" raw replies data plan actions a id body posted=0 total rc
+    # The session writes this file from untrusted bot text, so the cap bounds what reaches jq
+    # and the gate. Read once, so the cap holds for what is parsed. $( ) strips trailing
+    # newlines: the x keeps them, so newline padding still counts toward the cap.
     if ! { raw=$(head -c $((MAX_REPLIES_BYTES + 1)) -- "$file" 2>/dev/null && printf x) \
         && raw=${raw%x} \
         && (( $(printf %s "$raw" | wc -c) <= MAX_REPLIES_BYTES )) \
@@ -165,7 +167,12 @@ answer() {  # repo pr file
         body=$(jq -r .reply <<<"$a")
         # The plan can be minutes old: reload and re-plan this one entry, so a human who joined
         # the PR or the thread since the check never gets an owner reply or resolve.
-        if ! still_ok "$repo" "$n" "$a"; then
+        rc=0
+        still_ok "$repo" "$n" "$a" || rc=$?
+        if (( rc == 2 )); then
+            say "$repo#$n: could not reload the PR before replying to thread $id, nothing posted to it"
+            continue
+        elif (( rc != 0 )); then
             say "$repo#$n: thread $id changed since the check, nothing posted to it"
             continue
         fi

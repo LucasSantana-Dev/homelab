@@ -1925,8 +1925,12 @@ def test_automerge_reports_a_failed_resolve(tmp_path):
     assert _merge_calls(log) == []
 
 
+# Short ids: pytest puts the test id in PYTEST_CURRENT_TEST, and a 70000-char id breaks
+# exec on Linux ("Argument list too long").
 @pytest.mark.parametrize(
-    "content", ["not json", "[1] [2]", "x" * 70000, "[]" + "\n" * 70000, None]
+    "content",
+    ["not json", "[1] [2]", "x" * 70000, "[]" + "\n" * 70000, None],
+    ids=["not-json", "two-values", "oversized", "newline-padded", "missing"],
 )
 def test_automerge_bad_replies_file_posts_nothing(tmp_path, content):
     path = (
@@ -1991,6 +1995,17 @@ def test_automerge_replies_recheck_each_thread_before_posting(tmp_path):
     res, log = _answer(tmp_path, replies, _threads_conn(t1))
     assert res.returncode == 1
     assert "changed since the check" in res.stdout
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_replies_report_a_failed_recheck_load(tmp_path):
+    (tmp_path / "threads.next").write_text("{}")  # no nodes array: load fails
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    res, log = _answer(
+        tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    )
+    assert res.returncode == 1
+    assert "could not reload the PR before replying to thread T1" in res.stdout
     assert _mutations(tmp_path) == [] and _merge_calls(log) == []
 
 
