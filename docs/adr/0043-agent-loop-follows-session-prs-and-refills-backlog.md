@@ -45,8 +45,9 @@ Measured the same day:
    stale-closed or split. Thread replies go through `pr-automerge --replies`, so its thread
    check decides what is posted as the owner. The whole path is off until
    `command -v pr-automerge` succeeds on agent-box. An autofix waits an hour after the PR last
-   changed and skips while the clone has a branch checked out (the loop leaves it detached on
-   `origin/<base>`; a branch there means a chat is or was last working in it).
+   changed. Every loop step that switches the clone (worker run, autofix, backlog round) skips
+   while it has a branch checked out: `workdir_clean` refuses it (the loop leaves the clone
+   detached on `origin/<base>`; a branch there means a chat is or was last working in it).
 3. **Conflicts are fixed by merging the base in.** Both scorers send `mergeable == CONFLICTING`
    to `autofix` (fix `conflict`) before looking at checks. The gate checks out the branch, runs
    `git merge --no-edit origin/<base>` and hands only a real conflict (unmerged paths) to the

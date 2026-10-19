@@ -262,13 +262,7 @@ autofix_pr() {
         echo "#$N: session PR changed in the last hour, autofix next run"
         return 0
     fi
-    # The loop leaves the clone detached on origin/<base>; a branch checked out there means a
-    # chat is (or was last) working in it. Switching under it would mix two runs in one tree.
-    if [[ "$KIND" == "session" && "$AGENT_DRY_RUN" != "1" ]] \
-        && run_on_agent "git -C $WORKDIR symbolic-ref -q HEAD" >/dev/null; then
-        echo "#$N: $WORKDIR has a branch checked out (a chat may be using it), autofix next run"
-        return 0
-    fi
+    # Also refuses a clone with a branch checked out (a chat may be working in it).
     if [[ "$AGENT_DRY_RUN" != "1" ]] && ! DIRTY=$(workdir_clean "$WORKDIR"); then
         echo "workdir $WORKDIR is not clean ($DIRTY), skipping autofix of #$N"
         notify_once "$REPO" "$N" "$SHA" dirty-workdir "agent: dirty workdir" "$REPO $WORKDIR is not clean ($DIRTY); autofix of #$N skipped" warn

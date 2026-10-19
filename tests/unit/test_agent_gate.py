@@ -918,7 +918,7 @@ def test_workdir_clean_lists_offending_paths():
         ]
     )
     res = _lib(
-        f"run_on_agent() {{ printf '{status}\\n'; }}; "
+        f"run_on_agent() {{ printf '## HEAD (no branch)\\n{status}\\n'; }}; "
         'if out=$(workdir_clean /w); then echo clean; else echo "dirty: $out"; fi'
     )
     assert res.stdout.strip() == (
@@ -926,7 +926,8 @@ def test_workdir_clean_lists_offending_paths():
         " telemetry.test.ts.commitmsg, renamed.ts, odd -> name.md, a.ts and 4 more"
     )
     clean = _lib(
-        'run_on_agent() { :; }; out=$(workdir_clean /w) && echo "clean [$out]"'
+        "run_on_agent() { printf '## HEAD (no branch)\\n'; }; "
+        'out=$(workdir_clean /w) && echo "clean [$out]"'
     )
     assert clean.stdout.strip() == "clean []"
     down = _lib(
@@ -3004,8 +3005,25 @@ def test_gate_pr_survives_set_e_on_every_decision():
 
 def test_gate_autofix_leaves_a_clone_a_chat_has_checked_out():
     body = _gate_fn("autofix_pr")
-    guard = body.index("symbolic-ref -q HEAD")
-    assert body.index('"$KIND" == "session"') < guard < body.index("budget_take")
+    assert body.index("workdir_clean") < body.index("budget_take")
+    assert body.index("workdir_clean") < body.index("git switch")
+
+
+def test_workdir_clean_refuses_a_checked_out_branch():
+    on_branch = _lib(
+        "run_on_agent() { printf '## feat/x...origin/feat/x [ahead 1]\\n'; }; "
+        'out=$(workdir_clean /w) || echo "no: $out"'
+    )
+    assert on_branch.stdout.strip() == (
+        "no: branch feat/x is checked out (a chat may be using it)"
+    )
+    no_line = _lib(
+        "run_on_agent() { printf ' M a.ts\\n'; }; "
+        'out=$(workdir_clean /w) || echo "no: $out"'
+    )
+    assert (
+        no_line.stdout.strip() == "no: could not check: no branch line from git status"
+    )
 
 
 def test_worker_backlog_prompt_is_owner_titles_cut_inside_jq():

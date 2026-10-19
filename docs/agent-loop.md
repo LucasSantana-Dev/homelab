@@ -169,8 +169,9 @@ list, an unchecked closing issue or owner paths (the merge check's list) -> `own
 conflict, red CI or bot-only threads -> `autofix`; pending -> `wait`; else `queue`
 (`pr-automerge <repo> <n>`, one Discord message per head commit). Never closed or split. Thread
 replies go through `pr-automerge --replies`. The path stays off until pr-automerge is on the
-image. An autofix waits an hour after the PR last changed and skips while the clone has a branch
-checked out (the loop leaves it detached on `origin/<base>`).
+image. An autofix waits an hour after the PR last changed. `workdir_clean` also refuses a clone with
+a branch checked out, so the worker, autofix and the backlog round all leave a chat's branch alone
+(the loop leaves the clone detached on `origin/<base>`).
 
 Conflict autofix, loop and session PRs: the gate checks out the branch, runs
 `git merge --no-edit origin/<base>`, and the model resolves the unmerged paths, tests,

@@ -228,6 +228,7 @@
     "Read(~/.claude.json)",
     "Read(~/.config/gh/**)",
     "Read(//run/secrets/**)",
+    "Read(//proc/**)",
     "Read(//etc/profile.d/**)",
     "Bash(env*)",
     "Bash(printenv*)",

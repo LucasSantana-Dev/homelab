@@ -60,8 +60,9 @@ backlog_round() {
         return 0
     fi
     if ! existing=$(run_on_agent "gh issue list --repo $REPO --state all --limit 2000 --json number,title,state,author") \
-        || ! jq -e 'type == "array"' <<<"$existing" >/dev/null 2>&1; then
-        echo "gh issue list failed, no backlog round"
+        || ! jq -e 'type == "array" and length < 2000' <<<"$existing" >/dev/null 2>&1; then
+        # A full page may be cut off, and the dedupe needs every title.
+        echo "gh issue list failed or hit its limit, no backlog round"
         return 0
     fi
     budget_take || return 0

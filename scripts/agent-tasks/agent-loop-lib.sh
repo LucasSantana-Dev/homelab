@@ -145,14 +145,29 @@ scratch_rm() {
     try_act "rm -rf -- $1"
 }
 
-# Silent and 0 when the workdir is clean. Otherwise prints why, for the alert, and returns 1.
-# Fail closed: an unreachable box or a git error counts as not clean.
+# Silent and 0 when the workdir is clean and detached (where the loop leaves it). Otherwise
+# prints why, for the alert, and returns 1. A branch checked out means a Discord chat is (or
+# was last) working there: switching under it would mix two runs in one tree.
+# Fail closed: an unreachable box, a git error or no branch line counts as not clean.
 workdir_clean() {
-    local out
-    if ! out=$(run_on_agent "cd $1 && git status --porcelain"); then
+    local out head
+    if ! out=$(run_on_agent "cd $1 && git status --porcelain --branch"); then
         echo "could not check: agent-box or git unreachable"
         return 1
     fi
+    head=${out%%$'\n'*}
+    if [[ "$head" != "## "* ]]; then
+        echo "could not check: no branch line from git status"
+        return 1
+    fi
+    # Porcelain output is not translated, so this label is stable.
+    if [[ "$head" != "## HEAD (no branch)" ]]; then
+        head=${head#\#\# }
+        echo "branch ${head%%...*} is checked out (a chat may be using it)"
+        return 1
+    fi
+    [[ "$out" == *$'\n'* ]] || return 0
+    out=${out#*$'\n'}
     [[ -z "$out" ]] && return 0
     echo "in the way: $(dirty_summary <<<"$out")"
     return 1
