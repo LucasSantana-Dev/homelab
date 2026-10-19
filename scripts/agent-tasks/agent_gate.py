@@ -302,6 +302,17 @@ def _auto_merge_ok(pillars, cfg):
     return False
 
 
+def _unloaded_issues(pr, issue):
+    """The loop loads only its own issue; any other issue the PR closes was not checked."""
+    own = (issue or {}).get("number")
+    extra = sorted(
+        r.get("number")
+        for r in pr.get("closingIssuesReferences", [])
+        if r.get("number") != own
+    )
+    return [f"closes issue(s) the gate did not check: {extra}"] if extra else []
+
+
 def score(pr, issue, cfg):
     if foreign_activity(pr, issue, cfg):
         return {
@@ -353,7 +364,7 @@ def score(pr, issue, cfg):
     elif threads:
         decision = "owner-review"
     elif _auto_merge_ok(pillars, cfg) and not (
-        blocked := merge_check(pr, cfg, [issue])
+        blocked := merge_check(pr, cfg, [issue]) + _unloaded_issues(pr, issue)
     ):
         decision = "auto-merge"
     else:

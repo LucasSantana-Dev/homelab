@@ -104,6 +104,11 @@ handle() {  # mode(queue|sweep) repo pr
     [[ "$mode" == "sweep" ]] && return 0
     sha=$(jq -r .pr.headRefOid <<<"$data")
     [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { say "$repo#$n: unexpected head sha"; return 1; }
+    # Queued on an older commit (a push from outside agent-box skips the push hook): re-pin.
+    if [[ "$queued" == "true" && "$(cat "$(entry "$repo" "$n")" 2>/dev/null)" != "$sha" ]]; then
+        gh pr merge "$n" -R "$repo" --disable-auto || { say "$repo#$n: could not re-pin auto-merge, it is STILL QUEUED"; return 1; }
+        queued=false
+    fi
     if [[ "$queued" != "true" ]]; then
         gh pr merge "$n" -R "$repo" --squash --auto --match-head-commit "$sha" || { say "$repo#$n: gh pr merge failed"; return 1; }
     fi

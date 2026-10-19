@@ -1268,10 +1268,24 @@ def test_automerge_queues_a_clean_pr_on_the_checked_head(tmp_path):
 
 
 def test_automerge_does_not_queue_twice(tmp_path):
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "LucasSantana-Dev_Lucky-7").write_text(HEAD + "\n")
     pr = _gh_pr(queued=True)
     res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
     assert res.returncode == 0, res.stdout + res.stderr
     assert _merge_calls(log) == []
+
+
+def test_automerge_re_pins_a_merge_queued_on_another_commit(tmp_path):
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "LucasSantana-Dev_Lucky-7").write_text("b" * 40 + "\n")
+    pr = _gh_pr(queued=True)
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _merge_calls(log) == [
+        "pr merge 7 -R LucasSantana-Dev/Lucky --disable-auto",
+        f"pr merge 7 -R LucasSantana-Dev/Lucky --squash --auto --match-head-commit {HEAD}",
+    ]
 
 
 def test_automerge_refuses_without_merging(tmp_path):
@@ -1342,7 +1356,7 @@ def test_automerge_merge_calls_are_only_queue_or_disable():
         for ln in AUTOMERGE.read_text().splitlines()
         if "gh pr merge" in ln and not ln.lstrip().startswith("#")
     ]
-    assert len(calls) == 3, calls
+    assert len(calls) == 4, calls
     assert all("--admin" not in c for c in calls)
     assert all(
         "--disable-auto" in c or '--squash --auto --match-head-commit "$sha"' in c
@@ -1974,3 +1988,11 @@ def test_pr_guard_lets_branch_names_with_api_through(tmp_path):
     clone = _guard_repo(tmp_path)
     _branch(clone, "fix/api-error", "origin/main")
     assert _pr_guard(tmp_path, CREATE).returncode == 0
+
+
+def test_loop_auto_merge_holds_a_pr_closing_an_unchecked_issue(cfg):
+    cfg["auto_merge"] = "no-red"
+    pr = make_pr(["docs/a.md"], closes=(1, 2))
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "owner-review"
+    assert any("did not check: [2]" in r for r in out["reasons"])
