@@ -86,7 +86,9 @@ Option 3, and the loop gate moves to `auto_merge: "no-red"`.
   `agent_gate.py`) refuses a wrong base or a PR that shares a commit with another open PR:
   pr-automerge refuses it and the loop gate sends it to `needs-human`. Missing data fails closed.
   The hook parses the command with shell quoting (a `--base` inside a title does not count),
-  matches repo names without case, and blocks `gh api .../pulls` and two PRs in one command.
+  matches repo names without case, and blocks two PRs in one command and a `gh api .../pulls`
+  write (a non-GET method, or a field or `--input` without `-X GET`); a GET that lists PRs
+  passes.
   The gate check is the backstop for anything the hook misses. Limit: once the lower PR of a
   stack squash-merges and closes, its old commits in the upper PR no longer match an open PR;
   the hook is what stops that stack from being opened in the first place.
