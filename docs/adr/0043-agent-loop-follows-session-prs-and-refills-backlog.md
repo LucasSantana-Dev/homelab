@@ -71,10 +71,14 @@ Measured the same day:
    neither title nor body has a picker skip word; everything else is `ready-for-human`. A
    planning run that leaves the clone dirty creates nothing. The worker creates the issues as
    the owner and sends one Discord summary.
-6. **Secrets are unreadable for every loop run.** `claude_disallowed_tools` now carries the
-   Read denies the Discord session already had (`/etc/profile.d/agent-env.sh`, `~/.config/gh`,
-   `~/.claude.json`, credentials, `/run/secrets`) plus `env`, `printenv` and `cat` of those
-   paths.
+6. **Loop runs cannot read secret files with their file tools.** `claude_disallowed_tools` now
+   carries the Read denies the Discord session already had (`/etc/profile.d/agent-env.sh`,
+   `~/.config/gh`, `~/.claude.json`, credentials, `/run/secrets`, `/proc`) plus `env`,
+   `printenv` and `cat` of those paths. Other readers (`head`, `less`) are not in the allow
+   list, so dontAsk refuses them. This is defense in depth, not a boundary: a fix run must run
+   `python3`, `node` and `npm` to test its change, and code it writes can read whatever the
+   process can, the GitHub token in its environment included (it needs it for `gh`). The
+   planning run (decision 5) has no Bash and no token, so there the denies are the boundary.
 
 ## Options considered
 
