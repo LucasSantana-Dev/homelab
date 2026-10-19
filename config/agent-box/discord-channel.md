@@ -79,9 +79,10 @@ Merging and done:
   does not hold (same wording rules as commits, no em or en dash, no `@mentions` and no
   slash commands: those replies are skipped). Run
   `pr-automerge <owner/repo> <pr-number> --replies /tmp/discord-scratch/thread-replies.json`: it
-  posts the replies, resolves only the fixed bot threads, then queues the merge as usual. A
-  dismissed claim stays open for the owner, and threads with `bot_only: false` are the owner's:
-  never answer them, tell the owner which ones are left.
+  posts the replies, resolves only the fixed bot threads, then runs the normal check. The merge
+  is queued only when no thread is left open: a dismissed claim stays open for the owner, and so
+  does any thread with `bot_only: false` (never answer those), so the check refuses. Report the
+  refusal and tell the owner which threads are left.
 - When the chat ends before the merge, the loop gate takes over your PR (each gate run): it
   fixes red CI, bot threads and merge conflicts on your branch and runs pr-automerge. So cut every
   branch in `/workspace/<repo>` as described above, and say in the chat when you stop following a PR.

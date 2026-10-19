@@ -1232,7 +1232,10 @@ def _fake_bin(tmp_path, threads=None, issue=None, open_prs=None):
         '      [[ -z "${GH_OPEN_RC:-}" ]] || exit "$GH_OPEN_RC"\n'
         f'      cat "{tmp_path}/open.json"; exit 0\n'
         "    fi\n"
-        f'    cat "{tmp_path}/threads.json" ;;\n'
+        # threads.next replaces the threads after the first read: a change mid-run.
+        f'    [[ -f "{tmp_path}/threads.next" && -f "{tmp_path}/threads.read" ]] '
+        f'&& mv "{tmp_path}/threads.next" "{tmp_path}/threads.json"\n'
+        f'    touch "{tmp_path}/threads.read"; cat "{tmp_path}/threads.json" ;;\n'
         f'  "issue view") [[ "$3" == "{ISSUE_URL}" ]] && cat "{tmp_path}/issue.json" ;;\n'
         f'  "pr list") cat "{tmp_path}/list.txt" ;;\n'
         '  "pr merge") exit "${GH_MERGE_RC:-0}" ;;\n'
@@ -1932,7 +1935,13 @@ def test_automerge_reports_a_failed_resolve(tmp_path):
     assert _merge_calls(log) == []
 
 
-@pytest.mark.parametrize("content", ["not json", "[1] [2]", "x" * 70000, None])
+# Short ids: pytest puts the test id in PYTEST_CURRENT_TEST, and a 70000-char id breaks
+# exec on Linux ("Argument list too long").
+@pytest.mark.parametrize(
+    "content",
+    ["not json", "[1] [2]", "x" * 70000, "[]" + "\n" * 70000, None],
+    ids=["not-json", "two-values", "oversized", "newline-padded", "missing"],
+)
 def test_automerge_bad_replies_file_posts_nothing(tmp_path, content):
     path = (
         str(tmp_path / "missing.json")
@@ -1949,6 +1958,7 @@ def test_automerge_bad_replies_file_posts_nothing(tmp_path, content):
         threads=_threads_conn(review_thread("T1", "cubic-dev-ai")),
     )
     assert res.returncode == 1
+    assert "replies file missing" in res.stdout or "replies refused" in res.stdout
     assert _mutations(tmp_path) == []
     assert _merge_calls(log) == []
 
@@ -1969,6 +1979,74 @@ def test_automerge_lists_open_threads(tmp_path):
     assert res.returncode == 0, res.stderr
     out = json.loads(res.stdout)
     assert [(t["id"], t["bot_only"]) for t in out] == [("T1", True)]
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_threads_listing_refuses_a_truncated_list(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    threads["pageInfo"]["hasNextPage"] = True
+    res, _ = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--threads",
+        prs={7: _pushed_pr()},
+        threads=threads,
+    )
+    assert res.returncode == 1
+    assert res.stdout == "" and "not fully loaded" in res.stderr
+
+
+def test_automerge_replies_recheck_each_thread_before_posting(tmp_path):
+    t1 = review_thread("T1", "cubic-dev-ai")
+    joined = review_thread("T1", "cubic-dev-ai", "someone")
+    (tmp_path / "threads.next").write_text(json.dumps(_threads_conn(joined)))
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    res, log = _answer(tmp_path, replies, _threads_conn(t1))
+    assert res.returncode == 1
+    assert "changed since the check" in res.stdout
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_replies_recheck_skips_only_the_changed_thread(tmp_path):
+    t1, t2 = review_thread("T1", "cubic-dev-ai"), review_thread("T2", "cubic-dev-ai")
+    # T1 was resolved since the check (a human joining would stop the whole PR).
+    done = review_thread("T1", "cubic-dev-ai", resolved=True)
+    (tmp_path / "threads.next").write_text(json.dumps(_threads_conn(done, t2)))
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "Fixed."},
+        {"id": "T2", "fixed": True, "reply": "Fixed too."},
+    ]
+    res, log = _answer(tmp_path, replies, _threads_conn(t1, t2))
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "thread T1 changed since the check" in res.stdout
+    assert _mutations(tmp_path) == ["reply T2 Fixed too.", "resolve T2 "]
+    assert len(_merge_calls(log)) == 1  # no thread left open
+
+
+def test_automerge_replies_recheck_accepts_a_normalized_reply(tmp_path):
+    # The re-check re-plans the already normalized reply: normalization must be idempotent.
+    reply = "Fixed — the guard runs first–always. " + "y" * 3000
+    replies = [{"id": "T1", "fixed": True, "reply": reply}]
+    res, _ = _answer(
+        tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    )
+    assert res.returncode == 0, res.stdout + res.stderr
+    posted = _mutations(tmp_path)
+    assert posted[0].startswith("reply T1 Fixed, the guard runs first, always. y")
+    assert posted[1] == "resolve T1 "
+
+
+def test_automerge_replies_report_a_failed_recheck_load(tmp_path):
+    (tmp_path / "threads.next").write_text("{}")  # no nodes array: load fails
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    res, log = _answer(
+        tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    )
+    assert res.returncode == 1
+    assert (
+        "could not reload or re-check the PR before replying to thread T1" in res.stdout
+    )
     assert _mutations(tmp_path) == [] and _merge_calls(log) == []
 
 
