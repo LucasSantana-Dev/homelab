@@ -6,6 +6,9 @@ Subcommands (JSON on stdin, JSON on stdout):
           -> {"pillars": {size, impact, value, security}, "reasons": [...], "decision": ...}
   select  {"issues": [<gh issue list json>], "open_prs": [<gh pr list json, all open PRs>]}
           -> {"issue": <number> | null, "skipped": {number: reason}}
+  merge-check  {"pr": <gh pr view json + reviewThreads>, "issues": [<gh issue view json>]}
+               (needs --repo)
+          -> {"ok": bool, "reasons": [...]}: may pr-automerge queue this PR?
 
 Grades are green < yellow < red. Mechanical signals only: diff size, paths,
 labels, checks, review threads (pr.reviewThreads, the GraphQL connection).
@@ -213,6 +216,57 @@ def grade_security(pr, cfg, checks):
     return "green", "clean"
 
 
+def merge_check(pr, cfg, issues):
+    """Reasons pr-automerge must not queue an auto-merge for this PR ([] means it may).
+
+    issues: the issues the PR closes (None when they could not be loaded). Fails closed:
+    a missing field counts against the PR. CI is not checked here: the base ruleset
+    holds a queued merge until the required checks pass.
+    """
+    reasons = []
+    if issues is None:
+        reasons.append("linked issues not loaded")
+    if pr.get("state") != "OPEN":
+        reasons.append("not open")
+    if pr.get("isDraft") is not False:
+        reasons.append("draft")
+    if pr.get("isCrossRepository") is not False:
+        reasons.append("head branch is in a fork")
+    base = cfg.get("base")
+    if not base or pr.get("baseRefName") != base:
+        reasons.append(f"base is {pr.get('baseRefName')}, must be {base}")
+    if any(foreign_activity(pr, issue, cfg) for issue in [None, *(issues or [])]):
+        reasons.append("another human authored, commented on or pushed to it")
+    if threads_truncated(pr) or "reviewThreads" not in pr:
+        reasons.append("review threads not fully loaded")
+    if open_threads(pr):
+        reasons.append(f"{len(open_threads(pr))} unresolved review thread(s)")
+    paths = [f["path"] for f in pr.get("files", [])]
+    if not paths or pr.get("changedFiles") != len(paths):
+        reasons.append("file list missing or truncated")
+    owner_paths = (
+        cfg["high_impact_paths"]
+        + cfg["sensitive_paths"]
+        + cfg["dependency_files"]
+        + cfg["merge_block_paths"]
+        + cfg.get("repo_merge_block_paths", [])
+    )
+    blocked = [p for p in paths if _match(p, owner_paths)]
+    if blocked:
+        reasons.append("owner-review paths: " + ", ".join(blocked[:3]))
+    return reasons
+
+
+def _auto_merge_ok(pillars, cfg):
+    """auto_merge: true merges only four greens; "no-red" also takes yellow pillars."""
+    mode = cfg["auto_merge"]
+    if mode is True:
+        return all(g == "green" for g in pillars.values())
+    if mode == "no-red":
+        return "red" not in pillars.values()
+    return False
+
+
 def score(pr, issue, cfg):
     if foreign_activity(pr, issue, cfg):
         return {
@@ -259,10 +313,14 @@ def score(pr, issue, cfg):
         decision, fix = "autofix", "threads"
     elif threads:
         decision = "owner-review"
-    elif all(g == "green" for g in pillars.values()) and cfg["auto_merge"] is True:
+    elif _auto_merge_ok(pillars, cfg) and not (
+        blocked := merge_check(pr, cfg, [issue])
+    ):
         decision = "auto-merge"
     else:
         decision = "owner-review"
+        if _auto_merge_ok(pillars, cfg):
+            reasons.append("merge check: " + "; ".join(blocked))
     out = {
         "decision": decision,
         "pillars": pillars,
@@ -338,12 +396,14 @@ def select(issues, open_prs, cfg, repo=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("command", choices=["score", "select", "get"])
+    ap.add_argument("command", choices=["score", "select", "get", "merge-check"])
     ap.add_argument("--config", default=str(DEFAULT_CONFIG))
     ap.add_argument("--repo", help="owner/name; merges repos.<repo> over the defaults")
     ap.add_argument("--key", help="for get: config key to print")
     args = ap.parse_args(argv)
     cfg = load_config(args.config)
+    if args.command == "merge-check" and args.repo not in cfg.get("repos", {}):
+        ap.error(f"merge-check needs --repo from the allowlist, got: {args.repo}")
     if args.repo:
         cfg = {**cfg, **cfg.get("repos", {}).get(args.repo, {})}
     if args.command == "get":
@@ -357,6 +417,9 @@ def main(argv=None):
     data = json.load(sys.stdin)
     if args.command == "score":
         out = score(data["pr"], data.get("issue"), cfg)
+    elif args.command == "merge-check":
+        reasons = merge_check(data["pr"], cfg, data.get("issues"))
+        out = {"ok": not reasons, "reasons": reasons}
     else:
         out = select(data.get("issues", []), data.get("open_prs", []), cfg, args.repo)
     json.dump(out, sys.stdout)

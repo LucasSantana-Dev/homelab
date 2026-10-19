@@ -9,6 +9,8 @@ wrappers. The agent-box hooks are an extra layer.
 | Policy and thresholds | `config/agent-box/agent-gate.json` |
 | Gate and issue picker (stdlib Python, tested) | `scripts/agent-tasks/agent_gate.py`, `tests/unit/test_agent_gate.py` |
 | PR gate (runs first) | `scripts/agent-tasks/agent-pr-gate.sh` |
+| Merge path for agent-box sessions | `scripts/agent-tasks/pr-automerge.sh` (image: `/usr/local/bin/pr-automerge`) |
+| Auto-merge off before every push | `config/agent-box/automerge-push-guard.sh` (PreToolUse hook) |
 | Worker (runs second) | `scripts/agent-tasks/agent-worker.sh` |
 | Schedule | `systemd/agent-loop.{service,timer}` (04, 10, 15, 20h) |
 
@@ -41,8 +43,9 @@ Decision order (pillars before CI, so a risky PR never gets an autofix run): val
 security or impact red -> `needs-human`; size red -> `split`; failing checks -> `autofix` (CI);
 pending or no checks yet -> `wait`; unresolved review threads only from `bots` listed in
 `agent-gate.json` -> `autofix`
-(threads); an unresolved thread the owner joined -> `owner-review`; 4 greens and `auto_merge: true`
--> `auto-merge`; else `owner-review`. A PR or linked issue authored, commented on or pushed to by
+(threads); an unresolved thread the owner joined -> `owner-review`; pillars allowed by `auto_merge`
+(`true`: 4 greens; `"no-red"`: no red) and the pr-automerge check passing -> `auto-merge`; else
+`owner-review`. A PR or linked issue authored, commented on or pushed to by
 another human (or a deleted account), including inside a review thread -> `halt`. In threads only a
 GitHub App (`__typename: Bot`) on that list counts as a bot (another App's thread waits for the
 owner), and more than 100 threads or 50 replies in one
@@ -69,8 +72,9 @@ commit and decision with the grades (the autofix cap and dirty-workdir alerts ar
 
 - Phase 1: `auto_merge: false`. The gate grades and notifies; the owner merges. Compare the grade with your merge decision.
 - Phase 2 (now, owner decision 2026-10-13, before the 10-PR criterion below was met): `auto_merge: true`. The gate merges at once with `gh pr merge --squash --match-head-commit`, never a queued `--auto` merge, so required checks still gate and every merge follows a fresh score. Only PRs with all four pillars green qualify, which in practice means docs, tests or ESLint/Prettier config only, closing an owner `ready-for-agent` P1 or bug issue with a test file that gains lines (edit-only or delete-only test changes are yellow); runtime code stays `owner-review`. A PR behind `release` (up-to-date branches are required) or with checks rerunning fails the merge and is re-scored on the next run. Accepted risk: the seconds between loading the PR and the merge call; `--match-head-commit` covers a push in that window, a human comment is not re-checked.
+- Phase 3 (now, owner decision 2026-10-19, "auto merge em tudo"): `auto_merge: "no-red"`. Yellow pillars (runtime code, a linked issue without a new test, a dependency manifest) merge too, once checks are green and no thread is open. Red still never merges: sensitive or infra paths go to `needs-human`, oversized PRs to `split`. The same immediate `--match-head-commit` merge as Phase 2. ADR 0042.
 - Original Phase 2 criterion: after 10 agent PRs merged without rework and the grade matching your decision in at least 9 of 10.
-- Brake: if an auto-merged PR is reverted or breaks the base branch, set `auto_merge: false` and tighten the pillar that missed.
+- Brake: if an auto-merged PR is reverted or breaks the base branch, step `auto_merge` back (`"no-red"` -> `true` -> `false`) and tighten the pillar that missed.
 
 ## Worker permissions
 
@@ -92,11 +96,50 @@ sourced, so a run (or a prompt injection through issue text, or review-bot text,
 autofix prompt since #489) can read the GitHub PAT and the Claude login, and can use the PAT
 directly instead of going through `gh` or `git push`. What limits the damage: the PAT is
 fine-grained to the agent repos (contents, pull requests, issues; no workflows, no admin), base
-branches require a PR plus CI and Sonar, and the owner merges everything except all-green PRs (docs, tests, ESLint/Prettier config) once `auto_merge: true`. Scoping the
+branches require a PR plus CI and Sonar, and only PRs without a sensitive or infra path merge without the owner (gate `auto-merge`, pr-automerge). Scoping the
 allow list to named scripts would not help much, since `npm test` runs repo-controlled scripts the
 agent can edit. The real fix is the Claude Code Bash sandbox, which agent-box cannot run (see the
 Discord section). If the PAT leaks: revoke it, issue a new fine-grained token and replace
 `AGENT_GITHUB_TOKEN`.
+
+## pr-automerge (Discord session PRs)
+
+The Discord session opens PRs the loop does not track (branches like `fix/<slug>`, often no
+linked issue). Before 2026-10-19 they all waited for the owner. Now the session runs
+`pr-automerge <owner/repo> <n>` after opening a PR and after every push to it (ADR 0042):
+
+1. Loads the PR, its review threads and the issues it closes, then runs
+   `agent_gate.py merge-check`: repo in `repos` of `agent-gate.json`, open, not a draft, not from
+   a fork, base is the repo's `base` (`release` for homelab), author is the owner and no other
+   human authored, commented, reviewed or pushed (PR and linked issues), no unresolved or
+   unfetched review thread, file list complete, and no file matching `high_impact_paths`,
+   `sensitive_paths`, `dependency_files`, `merge_block_paths` (lockfiles, go.mod) or the repo's
+   `repo_merge_block_paths` (homelab: host config, scripts, dotfiles; docs and tests pass).
+   Missing data fails closed.
+2. Passing: `gh pr merge <n> --squash --auto --match-head-commit <sha>`, and records the PR under
+   `~/.local/state/pr-automerge/` on agent-box. GitHub merges when the base ruleset is met (gh
+   merges at once when nothing is pending; the check already passed on that commit).
+3. Failing: prints the reasons, and turns auto-merge off if it was on. If turning it off fails,
+   it says the PR is still queued and keeps it on record for the next sweep.
+
+GitHub keeps a queued auto-merge through later pushes, so the `automerge-push-guard.sh` hook
+(PreToolUse, user settings, every session on agent-box) turns auto-merge off on the pushed
+branch's PR before any `git push`, and blocks the push when it cannot. After the push the session
+runs pr-automerge again. Every gate run (also while the loop is paused) calls
+`pr-automerge --sweep`, which re-checks each recorded PR and turns auto-merge off on any that no
+longer passes (a Discord alert lists them).
+
+The tool, its gate and its config are root-owned copies in the image. The image copy ignores
+`AGENT_GATE_CONFIG`, `PR_AUTOMERGE_STATE` and the caller's `PATH`, so the session cannot point it
+at a looser config. `gh pr merge` itself stays denied in both permission files, and the tool
+never passes `--admin`.
+
+What a queued merge still relies on is the base ruleset: required checks on all three repos,
+review threads resolved on Lucky. cojam and homelab `release` do not require thread
+resolution yet (owner action in ADR 0042). Accepted risk: a human comment that lands after the
+last check is caught only by the next sweep (four a day), and a push from outside agent-box
+(the owner) does not pass the hook. Same uid caveat as everywhere here: code running as `agent`
+can call `gh` with the PAT directly, so this is the sanctioned path, not a boundary.
 
 ## Install (host, as luk-server)
 
@@ -122,8 +165,8 @@ homelab (PRs target `release`) and cojam. cojam needs issues labeled `ready-for-
 
 Bot `luk-agent` (app 1557913205966246039, not Lucky) talks to the owner by DM through the official
 Claude Code channel plugin, in a tmux session on agent-box. The channel reports queue status,
-creates `ready-for-agent` issues and pauses/resumes the loop. It never merges. Session rules:
-`config/agent-box/discord-channel.md`.
+creates `ready-for-agent` issues and pauses/resumes the loop. It merges only through
+`pr-automerge` (next section). Session rules: `config/agent-box/discord-channel.md`.
 
 Pieces. The image carries the supervisor, the session settings and rules; the SOPS values and
 the plugin install are runtime state:

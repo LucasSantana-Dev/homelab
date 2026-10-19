@@ -2,8 +2,8 @@
 # agent-pr-gate.sh: triage every open agent PR before the worker starts new work.
 # Grades size, impact, value and security (agent_gate.py) and acts on the decision:
 # close, needs-human, split, autofix (capped; failing CI, or unresolved review-bot threads),
-# wait, owner-review or auto-merge (only when auto_merge=true in agent-gate.json). PRs or issues another human touched are
-# never acted on. AGENT_DRY_RUN=1 only reports.
+# wait, owner-review or auto-merge (auto_merge in agent-gate.json: true or "no-red"). PRs or issues
+# another human touched are never acted on. AGENT_DRY_RUN=1 only reports.
 set -euo pipefail
 LOG_FILE="/home/luk-server/agent-logs/agent-pr-gate-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -17,6 +17,26 @@ source "$(dirname "$0")/agent-loop-lib.sh"
 
 exec 9>/tmp/agent-worker.lock
 flock -n 9 || { echo "worker run is active, exiting"; exit 0; }
+
+# Merges queued by pr-automerge (Discord session) fire later without a new check: re-check
+# each one, and turn auto-merge off where a human joined or a push made the PR sensitive.
+# Runs even while the loop is paused: the Discord session keeps queueing. Silent until the
+# agent-box image ships the tool.
+sweep_automerge() {
+    local out
+    if [[ "$AGENT_DRY_RUN" == "1" ]]; then
+        echo "DRY-RUN: pr-automerge --sweep"
+        return
+    fi
+    out=$(run_on_agent "command -v pr-automerge >/dev/null || exit 0; pr-automerge --sweep") && return
+    if [[ -z "$out" ]]; then
+        echo "pr-automerge sweep: agent-box unreachable, skipped"
+        return
+    fi
+    echo "$out"
+    notify_once pr-automerge 0 "$(sha256sum <<<"$out" | cut -c1-40)" sweep "agent: auto-merge sweep" "$out" warn
+}
+sweep_automerge
 
 if agent_paused; then
     echo "paused (~/agent-paused on agent-box, or agent-box unreachable), exiting"
@@ -44,7 +64,7 @@ has_label() { jq -e --arg l "$1" 'any(.labels[]; .name == $l)' <<<"$PR_JSON" >/d
 # read as "none", they could hide a human reply.
 load_pr() {  # repo n
     local pr threads
-    pr=$(run_on_agent "gh pr view $2 --repo $1 --json number,author,commits,files,additions,deletions,closingIssuesReferences,statusCheckRollup,labels,comments,reviews,updatedAt,headRefName,headRefOid") || return 1
+    pr=$(run_on_agent "gh pr view $2 --repo $1 --json number,state,isDraft,isCrossRepository,baseRefName,changedFiles,author,commits,files,additions,deletions,closingIssuesReferences,statusCheckRollup,labels,comments,reviews,updatedAt,headRefName,headRefOid") || return 1
     threads=$(run_on_agent "gh api graphql -f query=$(printf '%q' "$THREADS_QUERY") -F owner=${1%/*} -F name=${1#*/} -F number=$2 --jq .data.repository.pullRequest.reviewThreads") || return 1
     jq -e '.nodes | type == "array"' <<<"$threads" >/dev/null 2>&1 || return 1
     jq --argjson t "$threads" '.reviewThreads = $t' <<<"$pr"
