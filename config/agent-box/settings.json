@@ -89,6 +89,16 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/agent/.claude/hooks/pr-create-guard.sh",
+            "timeout": 60
+          }
+        ]
+      },
+      {
         "matcher": "Bash(git push*)",
         "hooks": [
           {

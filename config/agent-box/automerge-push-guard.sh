@@ -6,10 +6,10 @@
 set -uo pipefail
 
 input=$(cat)
-cmd=$(jq -r '.tool_input.command // empty' <<<"$input" 2>/dev/null) || exit 0
-dir=$(jq -r '.cwd // "."' <<<"$input" 2>/dev/null) || dir=.
-
 block() { echo "BLOCK: $* (automerge-push-guard)" >&2; exit 2; }
+
+cmd=$(jq -r '.tool_input.command // empty' <<<"$input" 2>/dev/null) || block "cannot read the hook input"
+dir=$(jq -r '.cwd // "."' <<<"$input" 2>/dev/null) || block "cannot read the hook input"
 
 # Pushes look like `git -C <repo> push origin <branch>` here (discord-channel.md).
 re='(^|[;&|[:space:]])git[[:space:]]+(-C[[:space:]]+([^[:space:];&|]+)[[:space:]]+)?push([[:space:]]+([^;&|]*))?'
@@ -28,7 +28,7 @@ if [[ "$branch" == HEAD ]]; then
         || block "cannot tell which branch is pushed; use git -C <repo> push origin <branch>"
 fi
 
-url=$(git -C "$dir" remote get-url "$remote" 2>/dev/null) || block "unknown remote $remote in $dir"
+url=$(git -C "$dir" remote get-url --push "$remote" 2>/dev/null) || block "unknown remote $remote in $dir"
 [[ "$url" =~ github\.com[:/]([A-Za-z0-9-]+/[A-Za-z0-9_.-]+)$ ]] || exit 0
 repo=${BASH_REMATCH[1]%.git}
 

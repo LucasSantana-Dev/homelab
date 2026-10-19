@@ -223,6 +223,38 @@ def grade_security(pr, cfg, checks):
     return "green", "clean"
 
 
+def branch_problems(pr, cfg):
+    """Wrong base or a stacked branch: nothing an autofix run can repair.
+
+    pr["openPrs"] lists the repo's open PRs as {"number", "oids"} (their commit ids). A
+    commit shared with another open PR means this branch was cut from that PR's branch
+    instead of origin/<base>, so one bad commit would red both. Missing data fails closed.
+    """
+    reasons = []
+    base = cfg.get("base")
+    if not base or pr.get("baseRefName") != base:
+        reasons.append(f"base is {pr.get('baseRefName')}, must be {base}")
+    others = pr.get("openPrs")
+    if others is None or "commits" not in pr:
+        reasons.append(
+            "open PRs or commits not loaded, cannot rule out a stacked branch"
+        )
+        return reasons
+    own = {c.get("oid") for c in pr["commits"]}
+    stacked = sorted(
+        o["number"]
+        for o in others
+        if o.get("number") != pr.get("number") and own & set(o.get("oids", []))
+    )
+    if stacked:
+        reasons.append(
+            "stacked on open PR(s) "
+            + ", ".join(f"#{n}" for n in stacked)
+            + f": rebuild the branch from origin/{base}"
+        )
+    return reasons
+
+
 def merge_check(pr, cfg, issues):
     """Reasons pr-automerge must not queue an auto-merge for this PR ([] means it may).
 
@@ -239,15 +271,13 @@ def merge_check(pr, cfg, issues):
         reasons.append("draft")
     if pr.get("isCrossRepository") is not False:
         reasons.append("head branch is in a fork")
-    base = cfg.get("base")
-    if not base or pr.get("baseRefName") != base:
-        reasons.append(f"base is {pr.get('baseRefName')}, must be {base}")
+    reasons += branch_problems(pr, cfg)
     if any(foreign_activity(pr, issue, cfg) for issue in [None, *(issues or [])]):
         reasons.append("another human authored, commented on or pushed to it")
     if threads_truncated(pr) or "reviewThreads" not in pr:
         reasons.append("review threads not fully loaded")
-    if open_threads(pr):
-        reasons.append(f"{len(open_threads(pr))} unresolved review thread(s)")
+    if threads := open_threads(pr):
+        reasons.append(f"{len(threads)} unresolved review thread(s)")
     paths = [f["path"] for f in pr.get("files", [])]
     if not paths or pr.get("changedFiles") != len(paths):
         reasons.append("file list missing or truncated")
@@ -258,7 +288,12 @@ def merge_check(pr, cfg, issues):
         + cfg["merge_block_paths"]
         + cfg.get("repo_merge_block_paths", [])
     )
-    blocked = [p for p in paths if _match(p, owner_paths)]
+    allow = cfg.get("repo_merge_allow_paths")
+    blocked = [
+        p
+        for p in paths
+        if _match(p, owner_paths) or (allow is not None and not _match(p, allow))
+    ]
     if blocked:
         reasons.append("owner-review paths: " + ", ".join(blocked[:3]))
     return reasons
@@ -367,6 +402,17 @@ def _auto_merge_ok(pillars, cfg):
     return False
 
 
+def _unloaded_issues(pr, issue):
+    """The loop loads only its own issue; any other issue the PR closes was not checked."""
+    own = (issue or {}).get("number")
+    extra = sorted(
+        r.get("number")
+        for r in pr.get("closingIssuesReferences", [])
+        if r.get("number") != own
+    )
+    return [f"closes issue(s) the gate did not check: {extra}"] if extra else []
+
+
 def score(pr, issue, cfg):
     if foreign_activity(pr, issue, cfg):
         return {
@@ -398,8 +444,12 @@ def score(pr, issue, cfg):
             + ("" if bot_only else ", owner involved")
         )
     fix = None
+    problems = branch_problems(pr, cfg)
+    reasons += problems
     # Pillars first: a sensitive, oversized or pointless PR never gets an autofix run.
-    if pillars["value"] == "red":
+    if problems:
+        decision = "needs-human"
+    elif pillars["value"] == "red":
         decision = "close"
     elif "red" in (pillars["security"], pillars["impact"]):
         decision = "needs-human"
@@ -414,7 +464,8 @@ def score(pr, issue, cfg):
     elif threads:
         decision = "owner-review"
     elif _auto_merge_ok(pillars, cfg) and not (
-        blocked := merge_check(pr, cfg, [issue])
+        blocked := merge_check(pr, cfg, [issue] if issue else [])
+        + _unloaded_issues(pr, issue)
     ):
         decision = "auto-merge"
     else:

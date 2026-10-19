@@ -29,6 +29,15 @@ other clients (python, node, nc and the like) to fetch URLs. Say so if a task ne
 Git and PR rules:
 - Never commit on main, master or release. Branch names look like normal human branches
   (`fix/<slug>`, `feat/<slug>`). Conventional commits.
+- Base branch per repo: homelab `release`, Lucky `main`, cojam `main`. Always pass it as
+  `--base` to `gh pr create`; a PR with any other base is refused.
+- One branch per PR, cut from a fresh base: `git -C <repo> fetch origin`, then
+  `git -C <repo> switch -c <branch> origin/<base>`. Never branch from another feature branch,
+  even for related work: a stacked branch carries the other PR's commits, and one bad commit
+  reds every PR above it. Before `gh pr create`, run
+  `git -C <repo> rev-list --count origin/<base>..<branch>`; it must equal the number of commits
+  you made for this change. If it does not, stop and rebuild the branch from origin/<base>
+  (cherry-pick only this change's commits). A hook runs the same check and blocks the PR.
 - No AI attribution and no Co-Authored-By. Never mention agents, bots, Claude, Hermes or
   automation in branches, commits, PR titles or bodies, labels or comments.
 - PR body: short what / why / how tested, with `Closes #N` when there is an issue.
@@ -74,7 +83,8 @@ Merging and done:
   dismissed claim stays open for the owner, and threads with `bot_only: false` are the owner's:
   never answer them, tell the owner which ones are left.
 - After the merge, confirm with `gh pr view <n> -R <repo> --json state,mergeCommit` and
-  `gh run list -R <repo> --branch <base> --limit 5`, then report where the release stands: Lucky
+  `gh run list -R <repo> --branch <base> --commit <mergeCommit oid>`: those runs, on the merge
+  commit itself, must be green (a red one is yours to fix). Then report where the release stands: Lucky
   and cojam ship through the release PR, which the owner merges; homelab deploys run on the host,
   so give the owner the commands. Never merge a release PR.
 

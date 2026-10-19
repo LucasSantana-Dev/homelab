@@ -11,6 +11,7 @@ wrappers. The agent-box hooks are an extra layer.
 | PR gate (runs first) | `scripts/agent-tasks/agent-pr-gate.sh` |
 | Merge path for agent-box sessions | `scripts/agent-tasks/pr-automerge.sh` (image: `/usr/local/bin/pr-automerge`) |
 | Auto-merge off before every push | `config/agent-box/automerge-push-guard.sh` (PreToolUse hook) |
+| Base and stacked branch check on `gh pr create` | `config/agent-box/pr-create-guard.sh` (PreToolUse hook) |
 | Worker (runs second) | `scripts/agent-tasks/agent-worker.sh` |
 | Schedule | `systemd/agent-loop.{service,timer}` (04, 10, 15, 20h) |
 
@@ -39,7 +40,9 @@ workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 | Value | closes an owner `ready-for-agent` issue that is P1 or bug, with a new test | closes an owner issue | no linked issue, or issue not owner/ready-for-agent |
 | Security | no sensitive path, no manifest change, checks green | dependency manifest changed, checks pending or failing | a `sensitive_paths` match: auth, oauth, secret, token, credential, password, session, jwt, permission, payment, billing, crypto, env files, certificate and `.key` files, npm config (`agent-gate.json` is the source of truth) |
 
-Decision order (pillars before CI, so a risky PR never gets an autofix run): value red -> `close`;
+Decision order (pillars before CI, so a risky PR never gets an autofix run): a base other than
+the repo's `base`, or a commit shared with another open PR (stacked branch) -> `needs-human`;
+value red -> `close`;
 security or impact red -> `needs-human`; size red -> `split`; failing checks -> `autofix` (CI);
 pending or no checks yet -> `wait`; unresolved review threads only from `bots` listed in
 `agent-gate.json` -> `autofix`
@@ -72,7 +75,7 @@ commit and decision with the grades (the autofix cap and dirty-workdir alerts ar
 
 - Phase 1: `auto_merge: false`. The gate grades and notifies; the owner merges. Compare the grade with your merge decision.
 - Phase 2 (now, owner decision 2026-10-13, before the 10-PR criterion below was met): `auto_merge: true`. The gate merges at once with `gh pr merge --squash --match-head-commit`, never a queued `--auto` merge, so required checks still gate and every merge follows a fresh score. Only PRs with all four pillars green qualify, which in practice means docs, tests or ESLint/Prettier config only, closing an owner `ready-for-agent` P1 or bug issue with a test file that gains lines (edit-only or delete-only test changes are yellow); runtime code stays `owner-review`. A PR behind `release` (up-to-date branches are required) or with checks rerunning fails the merge and is re-scored on the next run. Accepted risk: the seconds between loading the PR and the merge call; `--match-head-commit` covers a push in that window, a human comment is not re-checked.
-- Phase 3 (now, owner decision 2026-10-19, "auto merge em tudo"): `auto_merge: "no-red"`. Yellow pillars (runtime code, a linked issue without a new test, a dependency manifest) merge too, once checks are green and no thread is open. Red still never merges: sensitive or infra paths go to `needs-human`, oversized PRs to `split`. The same immediate `--match-head-commit` merge as Phase 2. ADR 0042.
+- Phase 3 (now, owner decision 2026-10-19, "auto merge em tudo"): `auto_merge: "no-red"`. Yellow pillars (runtime code, a linked issue without a new test) merge too, once checks are green and no thread is open. Red still never merges: sensitive or infra paths go to `needs-human`, oversized PRs to `split`. Dependency manifests and lockfiles fail the merge check and go to `owner-review`. The same immediate `--match-head-commit` merge as Phase 2. ADR 0042.
 - Original Phase 2 criterion: after 10 agent PRs merged without rework and the grade matching your decision in at least 9 of 10.
 - Brake: if an auto-merged PR is reverted or breaks the base branch, step `auto_merge` back (`"no-red"` -> `true` -> `false`) and tighten the pillar that missed.
 
@@ -114,8 +117,8 @@ linked issue). Before 2026-10-19 they all waited for the owner. Now the session 
    human authored, commented, reviewed or pushed (PR and linked issues), no unresolved or
    unfetched review thread, file list complete, and no file matching `high_impact_paths`,
    `sensitive_paths`, `dependency_files`, `merge_block_paths` (lockfiles, go.mod) or the repo's
-   `repo_merge_block_paths` (homelab: host config, scripts, dotfiles; docs and tests pass).
-   Missing data fails closed.
+   `repo_merge_block_paths`; with `repo_merge_allow_paths` only those paths pass (homelab:
+   `docs/`, `tests/`, Markdown). Missing data fails closed.
 2. Passing: `gh pr merge <n> --squash --auto --match-head-commit <sha>`, and records the PR under
    `~/.local/state/pr-automerge/` on agent-box. GitHub merges when the base ruleset is met (gh
    merges at once when nothing is pending; the check already passed on that commit).
@@ -133,7 +136,11 @@ skipped. Then the normal check and queue run. Dismissed claims stay open for the
 GitHub keeps a queued auto-merge through later pushes, so the `automerge-push-guard.sh` hook
 (PreToolUse, user settings, every session on agent-box) turns auto-merge off on the pushed
 branch's PR before any `git push`, and blocks the push when it cannot. After the push the session
-runs pr-automerge again. Every gate run (also while the loop is paused) calls
+runs pr-automerge again. The merge check also refuses a stacked branch (a commit shared with
+another open PR). Open PRs load in one GraphQL page (100 PRs, 100 commits each); a repo past
+that fails closed: nothing auto-merges and the sweep alerts until the count drops. Before that, the `pr-create-guard.sh` hook blocks `gh pr create` when `--base`
+is not the repo's base or the branch, checked against a freshly fetched `origin/<base>`, has no
+commits of its own or sits on another branch. Every gate run (also while the loop is paused) calls
 `pr-automerge --sweep`, which re-checks each recorded PR and turns auto-merge off on any that no
 longer passes (a Discord alert lists them).
 
