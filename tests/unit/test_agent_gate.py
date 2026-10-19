@@ -1206,9 +1206,23 @@ def _fake_bin(tmp_path, threads=None, issue=None, open_prs=None):
         f'echo "$*" >> "{tmp_path}/gh.log"\n'
         'case "$1 $2" in\n'
         f'  "pr view") cat "{tmp_path}/pr-$3.json" ;;\n'
-        '  "api graphql") if [[ "$*" == *"pullRequests(states"* ]]; then\n'
+        '  "api graphql")\n'
+        '    if [[ "$*" == *mutation* ]]; then\n'
+        '      for a in "$@"; do case "$a" in id=*) id=${a#id=} ;; body=*) body=${a#body=} ;; esac; done\n'
+        '      kind=reply; [[ "$*" == *resolveReviewThread* ]] && kind=resolve\n'
+        '      [[ "$kind" == reply ]] && rc=${GH_REPLY_RC:-0} || rc=${GH_RESOLVE_RC:-0}\n'
+        f'      echo "$kind $id $body" >> "{tmp_path}/mutations.log"\n'
+        '      if [[ "$kind" == resolve && "$rc" == 0 ]]; then\n'
+        "        jq --arg id \"$id\" '(.nodes[] | select(.id == $id) | .isResolved) = true' "
+        f'"{tmp_path}/threads.json" > "{tmp_path}/t.json"\n'
+        f'        mv "{tmp_path}/t.json" "{tmp_path}/threads.json"\n'
+        "      fi\n"
+        '      exit "$rc"\n'
+        '    elif [[ "$*" == *"pullRequests(states"* ]]; then\n'
         '      [[ -z "${GH_OPEN_RC:-}" ]] || exit "$GH_OPEN_RC"\n'
-        f'      cat "{tmp_path}/open.json"; else cat "{tmp_path}/threads.json"; fi ;;\n'
+        f'      cat "{tmp_path}/open.json"; exit 0\n'
+        "    fi\n"
+        f'    cat "{tmp_path}/threads.json" ;;\n'
         f'  "issue view") [[ "$3" == "{ISSUE_URL}" ]] && cat "{tmp_path}/issue.json" ;;\n'
         f'  "pr list") cat "{tmp_path}/list.txt" ;;\n'
         '  "pr merge") exit "${GH_MERGE_RC:-0}" ;;\n'
@@ -1575,6 +1589,419 @@ def test_push_guard_is_installed_and_registered():
         if h["type"] == "command"
     ]
     assert "/home/agent/.claude/hooks/automerge-push-guard.sh" in commands
+
+
+# --- pr-automerge thread replies (ADR 0042, amendment) --------------------
+
+REVIEWED = "b" * 40  # the commit the bot reviewed; HEAD is a later push
+
+
+def review_thread(tid, *logins, commit=REVIEWED, resolved=False):
+    t = thread(*logins, resolved=resolved)
+    t["id"] = tid
+    for c in t["comments"]["nodes"]:
+        c["originalCommit"] = {"oid": commit}
+    return t
+
+
+def pr_for_replies(*threads, commits=(REVIEWED, HEAD), more=False):
+    pr = pr_with_threads(*threads, files=("src/x.ts",), more=more)
+    pr["headRefOid"] = HEAD
+    pr["commits"] = [{"oid": c, "authors": [{"login": OWNER}]} for c in commits]
+    return pr
+
+
+def _plan(pr, cfg, replies, issues=()):
+    return gate.thread_replies(pr, cfg, list(issues), replies)
+
+
+def test_thread_replies_resolve_a_fixed_bot_thread(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed in the last commit."}]
+    assert _plan(pr, cfg, replies) == (
+        [],
+        [{"id": "T1", "reply": "Fixed in the last commit.", "resolve": True}],
+        {},
+    )
+
+
+def test_thread_replies_leave_a_dismissed_claim_open(cfg):
+    pr = pr_for_replies(review_thread("T1", "coderabbitai"))
+    replies = [{"id": "T1", "fixed": False, "reply": "The value is never null here."}]
+    _, actions, _ = _plan(pr, cfg, replies)
+    assert actions == [
+        {"id": "T1", "reply": "The value is never null here.", "resolve": False}
+    ]
+
+
+@pytest.mark.parametrize(
+    "commits",
+    [
+        (REVIEWED,),  # nothing pushed after the review
+        ("c" * 40, HEAD),  # reviewed commit not in the PR (unknown)
+        (REVIEWED, HEAD, "d" * 40),  # list does not end at the head
+        (),
+    ],
+)
+def test_thread_replies_skip_a_fix_that_is_not_pushed(cfg, commits):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"), commits=commits)
+    if commits == (REVIEWED,):
+        pr["headRefOid"] = REVIEWED
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    reasons, actions, skipped = _plan(pr, cfg, replies)
+    assert (reasons, actions) == ([], [])
+    assert "push first" in skipped["T1"]
+
+
+def test_thread_replies_fail_closed_on_missing_oids(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai", commit=None))
+    pr["headRefOid"] = None
+    pr["commits"] = [{"authors": [{"login": OWNER}]}, {"authors": [{"login": OWNER}]}]
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and "push first" in skipped["T1"]
+
+
+def test_thread_replies_need_a_push_after_the_last_bot_comment(cfg):
+    t = review_thread("T1", "cubic-dev-ai", "cubic-dev-ai")
+    t["comments"]["nodes"][1]["originalCommit"] = {"oid": HEAD}  # re-review on HEAD
+    pr = pr_for_replies(t)
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and "push first" in skipped["T1"]
+
+
+def test_thread_replies_never_touch_owner_or_app_threads(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai", OWNER),  # the owner joined
+        review_thread("T2", "cubic-dev-ai"),
+    )
+    # An App outside the bot list: not human, but not the session's to answer.
+    pr["reviewThreads"]["nodes"][1]["comments"]["nodes"][0]["author"] = {
+        "__typename": "Bot",
+        "login": "some-app",
+    }
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "x"},
+        {"id": "T2", "fixed": True, "reply": "x"},
+    ]
+    _, actions, skipped = _plan(pr, cfg, replies)
+    assert actions == []
+    assert set(skipped) == {"T1", "T2"}
+    assert all("bot-only" in why for why in skipped.values())
+
+
+def test_thread_replies_refuse_a_human_thread_outright(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai"), review_thread("T2", "someone")
+    )
+    reasons, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == []
+    assert any("another human" in r for r in reasons)
+
+
+@pytest.mark.parametrize(
+    "entry,key,why",
+    [
+        ({"id": "T9", "fixed": True, "reply": "x"}, "T9", "not an open thread"),
+        ({"id": "T1", "fixed": True, "reply": "  "}, "T1", "empty reply"),
+        ({"id": "T1", "fixed": True}, "T1", "empty reply"),
+        ({"id": "T1;x", "reply": "x"}, "#0", "no valid thread id"),
+        ({"id": 5, "reply": "x"}, "#0", "no valid thread id"),
+        ("T1", "#0", "no valid thread id"),
+    ],
+)
+def test_thread_replies_skip_bad_entries(cfg, entry, key, why):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    _, actions, skipped = _plan(pr, cfg, [entry])
+    assert actions == []
+    assert why in skipped[key]
+
+
+def test_thread_replies_skip_resolved_and_doubled_threads(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai", resolved=True),
+        review_thread("T2", "cubic-dev-ai"),
+    )
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "x"},
+        {"id": "T2", "fixed": True, "reply": "first"},
+        {"id": "T2", "fixed": False, "reply": "second"},
+    ]
+    _, actions, skipped = _plan(pr, cfg, replies)
+    assert actions == []
+    assert skipped == {"T1": "not an open thread of this PR", "T2": "named twice"}
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "@claude fix the rest",
+        "Fixed. cc @coderabbitai",
+        "/review",
+        "Fixed.\n  /ask why",
+    ],
+)
+def test_thread_replies_skip_mentions_and_slash_commands(cfg, reply):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": reply}])
+    assert actions == [] and "mentions" in skipped["T1"]
+
+
+def test_thread_replies_allow_plain_text_with_slashes(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    reply = "Fixed in src/a.ts and the and/or check, see x @ line 3."
+    _, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": reply}])
+    assert actions[0]["resolve"] is True
+
+
+def test_thread_replies_resolve_only_on_a_real_true(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    _, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": "true", "reply": "x"}])
+    assert actions == [{"id": "T1", "reply": "x", "resolve": False}]
+
+
+def test_thread_replies_owner_reply_hands_the_thread_to_the_owner(cfg):
+    """After a dismissed claim the thread holds the owner's reply: never answered again."""
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai", OWNER))
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and "bot-only" in skipped["T1"]
+
+
+def test_thread_replies_cap_text_and_drop_dashes(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    reply = "Fixed — the guard runs first–always. " + "y" * 3000
+    _, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": reply}])
+    out = actions[0]["reply"]
+    assert out.startswith("Fixed, the guard runs first, always. ")
+    assert "—" not in out and "–" not in out
+    assert len(out) <= 2000
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"state": "MERGED"}, "not open"),
+        ({"isCrossRepository": True}, "fork"),
+        ({"author": {"login": "someone"}}, "another human"),
+    ],
+)
+def test_thread_replies_refuse_unsafe_prs(cfg, change, reason):
+    pr = {**pr_for_replies(review_thread("T1", "cubic-dev-ai")), **change}
+    reasons, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and any(reason in r for r in reasons)
+
+
+def test_thread_replies_fail_closed(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"), more=True)
+    ok = [{"id": "T1", "fixed": True, "reply": "x"}]
+    assert "review threads not fully loaded" in _plan(pr, cfg, ok)[0]
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    assert _plan(pr, cfg, {"T1": "x"})[0] == ["replies file is not a JSON array"]
+    assert gate.thread_replies(pr, cfg, None, ok)[0] == ["linked issues not loaded"]
+    foreign = make_issue(author="someone")
+    assert any("another human" in r for r in _plan(pr, cfg, ok, issues=[foreign])[0])
+
+
+def test_open_threads_lists_ids_and_marks_bot_only(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai"),
+        review_thread("T2", "cubic-dev-ai", OWNER),
+        review_thread("T3", "coderabbitai", resolved=True),
+    )
+    out = gate.list_open_threads(pr, cfg)
+    assert [(t["id"], t["bot_only"]) for t in out] == [("T1", True), ("T2", False)]
+    assert out[0]["comments"] == [{"author": "cubic-dev-ai", "body": "b"}]
+
+
+def test_cli_thread_commands_need_an_allowlisted_repo():
+    for cmd in ("open-threads", "thread-replies"):
+        assert _cli_raw(cmd).returncode == 2
+        assert _cli_raw(cmd, "--repo", "someone/else").returncode == 2
+
+
+def _replies_file(tmp_path, replies):
+    f = tmp_path / "replies.json"
+    f.write_text(replies if isinstance(replies, str) else json.dumps(replies))
+    return str(f)
+
+
+def _threads_conn(*threads):
+    return {"pageInfo": {"hasNextPage": False}, "nodes": list(threads)}
+
+
+def _pushed_pr(**extra):
+    commits = [{"oid": c, "authors": [{"login": OWNER}]} for c in (REVIEWED, HEAD)]
+    return _gh_pr(commits=commits, **extra)
+
+
+def _mutations(tmp_path):
+    log = tmp_path / "mutations.log"
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def _answer(tmp_path, replies, threads, env=None):
+    return _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--replies",
+        _replies_file(tmp_path, replies),
+        prs={7: _pushed_pr()},
+        threads=threads,
+        env=env,
+    )
+
+
+def test_automerge_replies_resolve_then_queue(tmp_path):
+    threads = _threads_conn(
+        review_thread("T1", "cubic-dev-ai"), review_thread("T2", "coderabbitai")
+    )
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "Fixed, guard added."},
+        {"id": "T2", "fixed": True, "reply": "Fixed too."},
+    ]
+    res, log = _answer(tmp_path, replies, threads)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _mutations(tmp_path) == [
+        "reply T1 Fixed, guard added.",
+        "resolve T1 ",
+        "reply T2 Fixed too.",
+        "resolve T2 ",
+    ]
+    assert len(_merge_calls(log)) == 1
+    assert "--squash --auto --match-head-commit" in _merge_calls(log)[0]
+
+
+def test_automerge_dismissed_claim_stays_open_and_blocks_the_merge(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    replies = [{"id": "T1", "fixed": False, "reply": "Not reachable: x is checked."}]
+    res, log = _answer(tmp_path, replies, threads)
+    assert res.returncode == 1
+    assert _mutations(tmp_path) == ["reply T1 Not reachable: x is checked."]
+    assert "left open for the owner" in res.stdout
+    assert "1 unresolved review thread(s)" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_replies_never_post_on_a_pr_with_a_human_thread(tmp_path):
+    threads = _threads_conn(
+        review_thread("T1", "cubic-dev-ai"), review_thread("T2", "someone")
+    )
+    res, log = _answer(tmp_path, [{"id": "T1", "fixed": True, "reply": "x"}], threads)
+    assert res.returncode == 1
+    assert "replies refused: another human" in res.stdout
+    assert _mutations(tmp_path) == []
+    assert _merge_calls(log) == []
+
+
+def test_automerge_does_not_resolve_when_the_reply_fails(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    res, log = _answer(
+        tmp_path,
+        [{"id": "T1", "fixed": True, "reply": "x"}],
+        threads,
+        env={"GH_REPLY_RC": "1"},
+    )
+    assert res.returncode == 1
+    assert _mutations(tmp_path) == ["reply T1 x"]
+    assert "failed, left open" in res.stdout
+    assert "0 of 1 replies posted" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_reports_a_failed_resolve(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    res, log = _answer(
+        tmp_path,
+        [{"id": "T1", "fixed": True, "reply": "x"}],
+        threads,
+        env={"GH_RESOLVE_RC": "1"},
+    )
+    assert res.returncode == 1
+    assert "could not resolve it" in res.stdout
+    assert "1 of 1 replies posted" in res.stdout
+    assert _merge_calls(log) == []
+
+
+@pytest.mark.parametrize("content", ["not json", "[1] [2]", "x" * 70000, None])
+def test_automerge_bad_replies_file_posts_nothing(tmp_path, content):
+    path = (
+        str(tmp_path / "missing.json")
+        if content is None
+        else _replies_file(tmp_path, content)
+    )
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--replies",
+        path,
+        prs={7: _pushed_pr()},
+        threads=_threads_conn(review_thread("T1", "cubic-dev-ai")),
+    )
+    assert res.returncode == 1
+    assert _mutations(tmp_path) == []
+    assert _merge_calls(log) == []
+
+
+def test_automerge_lists_open_threads(tmp_path):
+    threads = _threads_conn(
+        review_thread("T1", "cubic-dev-ai"),
+        review_thread("T2", "coderabbitai", resolved=True),
+    )
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--threads",
+        prs={7: _pushed_pr()},
+        threads=threads,
+    )
+    assert res.returncode == 0, res.stderr
+    out = json.loads(res.stdout)
+    assert [(t["id"], t["bot_only"]) for t in out] == [("T1", True)]
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("LucasSantana-Dev/Lucky", "7", "--replies"),
+        ("LucasSantana-Dev/Lucky", "7", "--threads", "x"),
+        ("LucasSantana-Dev/Lucky", "7", "--admin", "x"),
+        ("--sweep", "--replies", "x"),
+    ],
+)
+def test_automerge_bad_thread_arguments_do_nothing(tmp_path, args):
+    res, log = _automerge(tmp_path, *args, prs={7: _pushed_pr()})
+    assert res.returncode != 0
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_only_mutations_are_reply_and_resolve():
+    src = AUTOMERGE.read_text()
+    mutations = [ln for ln in src.splitlines() if "mutation(" in ln]
+    assert [m.split("=", 1)[0] for m in mutations] == [
+        "REPLY_MUTATION",
+        "RESOLVE_MUTATION",
+    ]
+    api_calls = [
+        ln.strip()
+        for ln in src.splitlines()
+        if "gh api" in ln and not ln.lstrip().startswith("#")
+    ]
+    # Two reads (threads, open PRs) and the two mutations.
+    assert len(api_calls) == 4, api_calls
+    assert all("gh api graphql" in c for c in api_calls)
+
+
+def test_discord_session_answers_threads_through_pr_automerge():
+    conf = REPO / "config" / "agent-box"
+    discord = json.loads((conf / "discord-channel-settings.json").read_text())
+    assert "Bash(gh api*)" in discord["permissions"]["deny"]
+    assert "Bash(gh * api*)" in discord["permissions"]["deny"]
+    rules = (conf / "discord-channel.md").read_text()
+    assert "pr-automerge <owner/repo> <pr-number> --threads" in rules
+    assert "--replies /tmp/discord-scratch/thread-replies.json" in rules
 
 
 # Stacked branches and wrong bases (Lucky #2886-#2890, homelab #522).

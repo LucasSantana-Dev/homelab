@@ -9,6 +9,11 @@ Subcommands (JSON on stdin, JSON on stdout):
   merge-check  {"pr": <gh pr view json + reviewThreads>, "issues": [<gh issue view json>]}
                (needs --repo)
           -> {"ok": bool, "reasons": [...]}: may pr-automerge queue this PR?
+  open-threads  {"pr": ...} (needs --repo) -> [open threads with id, bot_only, comments]
+  thread-replies  {"pr": ..., "issues": [...], "replies": [<session's replies file>]}
+               (needs --repo)
+          -> {"ok": bool, "reasons": [...], "actions": [{id, reply, resolve}],
+              "skipped": {id: reason}}: what pr-automerge may post and resolve
 
 Grades are green < yellow < red. Mechanical signals only: diff size, paths,
 labels, checks, review threads (pr.reviewThreads, the GraphQL connection).
@@ -26,6 +31,8 @@ DEFAULT_CONFIG = (
     Path(__file__).resolve().parents[2] / "config" / "agent-box" / "agent-gate.json"
 )
 RANK = {"green": 0, "yellow": 1, "red": 2}
+# Subcommands pr-automerge runs on a PR: each needs an allowlisted --repo.
+PR_COMMANDS = ("merge-check", "open-threads", "thread-replies")
 
 
 def load_config(path):
@@ -292,6 +299,99 @@ def merge_check(pr, cfg, issues):
     return reasons
 
 
+def list_open_threads(pr, cfg):
+    """Open review threads for the session to answer; it cannot read thread ids itself.
+    bot_only marks the threads a replies file may answer."""
+    return [
+        {
+            "id": t.get("id"),
+            "path": t.get("path"),
+            "line": t.get("line"),
+            "bot_only": _bot_only_thread(t, cfg),
+            "comments": [
+                {
+                    "author": (c.get("author") or {}).get("login"),
+                    "body": (c.get("body") or "")[:2000],
+                }
+                for c in (t.get("comments") or {}).get("nodes", [])
+            ],
+        }
+        for t in open_threads(pr)
+    ]
+
+
+def _fixed_after_review(thread, pr):
+    """True when the PR head has a commit after every comment of the thread: a fix
+    the reply claims must already be pushed. Unknown commits fail closed."""
+    commits = [c.get("oid") for c in pr.get("commits", [])]
+    if not commits or None in commits or commits[-1] != pr.get("headRefOid"):
+        return False
+    seen = [
+        (c.get("originalCommit") or {}).get("oid")
+        for c in (thread.get("comments") or {}).get("nodes", [])
+    ]
+    if not seen or any(oid not in commits for oid in seen):
+        return False
+    return max(commits.index(oid) for oid in seen) < len(commits) - 1
+
+
+# Posted as the owner, "@claude ..." or "/review" in a reply would start bots or workflows
+# with owner trust; bot text the session read could steer it into writing one.
+MENTION_OR_COMMAND = re.compile(r"@[A-Za-z0-9]|(^|\n)\s*/[A-Za-z]")
+
+
+def thread_replies(pr, cfg, issues, replies):
+    """Plan which replies pr-automerge posts as the owner and which threads it resolves.
+
+    replies: the session's file, [{"id", "fixed", "reply"}]. Returns (reasons, actions,
+    skipped): reasons non-empty means nothing is posted. Only open threads where every
+    comment is a listed bot are answered; "fixed" resolves the thread and needs a commit
+    pushed after its last comment, else the entry is skipped, so the owner never reads a
+    reply about a fix GitHub does not have. A thread named twice, or a reply with an
+    @mention or a slash command, is skipped.
+    """
+    reasons = []
+    if issues is None:
+        reasons.append("linked issues not loaded")
+    if pr.get("state") != "OPEN":
+        reasons.append("not open")
+    if pr.get("isCrossRepository") is not False:
+        reasons.append("head branch is in a fork")
+    if any(foreign_activity(pr, issue, cfg) for issue in [None, *(issues or [])]):
+        reasons.append("another human authored, commented on or pushed to it")
+    if threads_truncated(pr) or "reviewThreads" not in pr:
+        reasons.append("review threads not fully loaded")
+    if not isinstance(replies, list):
+        reasons.append("replies file is not a JSON array")
+    if reasons:
+        return reasons, [], {}
+    by_id = {t.get("id"): t for t in open_threads(pr)}
+    actions, skipped = [], {}
+    for i, r in enumerate(replies):
+        tid = r.get("id") if isinstance(r, dict) else None
+        if not isinstance(tid, str) or not re.fullmatch(r"[A-Za-z0-9_=-]+", tid):
+            skipped[f"#{i}"] = "no valid thread id"
+        elif tid in skipped or any(a["id"] == tid for a in actions):
+            skipped[tid] = "named twice"
+            actions = [a for a in actions if a["id"] != tid]
+        elif not isinstance(r.get("reply"), str) or not r["reply"].strip():
+            skipped[tid] = "empty reply"
+        elif tid not in by_id:
+            skipped[tid] = "not an open thread of this PR"
+        elif not _bot_only_thread(by_id[tid], cfg):
+            skipped[tid] = "not a bot-only thread, the owner answers it"
+        elif MENTION_OR_COMMAND.search(r["reply"]):
+            skipped[tid] = "mentions or slash commands would trigger bots as the owner"
+        elif r.get("fixed") is True and not _fixed_after_review(by_id[tid], pr):
+            skipped[tid] = "fixed, but no commit pushed after the review: push first"
+        else:
+            reply = re.sub(" ?[\u2013\u2014] ?", ", ", r["reply"])[:2000]
+            actions.append(
+                {"id": tid, "reply": reply, "resolve": r.get("fixed") is True}
+            )
+    return [], actions, skipped
+
+
 def _auto_merge_ok(pillars, cfg):
     """auto_merge: true merges only four greens; "no-red" also takes yellow pillars."""
     mode = cfg["auto_merge"]
@@ -447,14 +547,17 @@ def select(issues, open_prs, cfg, repo=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("command", choices=["score", "select", "get", "merge-check"])
+    ap.add_argument(
+        "command",
+        choices=["score", "select", "get", *PR_COMMANDS],
+    )
     ap.add_argument("--config", default=str(DEFAULT_CONFIG))
     ap.add_argument("--repo", help="owner/name; merges repos.<repo> over the defaults")
     ap.add_argument("--key", help="for get: config key to print")
     args = ap.parse_args(argv)
     cfg = load_config(args.config)
-    if args.command == "merge-check" and args.repo not in cfg.get("repos", {}):
-        ap.error(f"merge-check needs --repo from the allowlist, got: {args.repo}")
+    if args.command in PR_COMMANDS and args.repo not in cfg.get("repos", {}):
+        ap.error(f"{args.command} needs --repo from the allowlist, got: {args.repo}")
     if args.repo:
         cfg = {**cfg, **cfg.get("repos", {}).get(args.repo, {})}
     if args.command == "get":
@@ -471,6 +574,18 @@ def main(argv=None):
     elif args.command == "merge-check":
         reasons = merge_check(data["pr"], cfg, data.get("issues"))
         out = {"ok": not reasons, "reasons": reasons}
+    elif args.command == "open-threads":
+        out = list_open_threads(data["pr"], cfg)
+    elif args.command == "thread-replies":
+        reasons, actions, skipped = thread_replies(
+            data["pr"], cfg, data.get("issues"), data.get("replies")
+        )
+        out = {
+            "ok": not reasons,
+            "reasons": reasons,
+            "actions": actions,
+            "skipped": skipped,
+        }
     else:
         out = select(data.get("issues", []), data.get("open_prs", []), cfg, args.repo)
     json.dump(out, sys.stdout)

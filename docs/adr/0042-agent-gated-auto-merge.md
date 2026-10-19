@@ -104,7 +104,8 @@ owner's PAT, so release-please and deploy workflows still fire.
 ## Consequences
 
 - Discord PRs merge without the owner when CI passes and nothing sensitive is touched. PRs with
-  bot review threads still stop, because the session cannot resolve threads (follow-up).
+  bot review threads stopped too, because the session could not resolve threads; the amendment
+  below closes that gap.
 - The ruleset is the last gate for a queued merge. Owner actions to make it hold everywhere:
   turn on review thread resolution on cojam `main` and conversation resolution on homelab
   `release`. Lucky's admin bypass stays; pr-automerge never uses `--admin`.
@@ -118,3 +119,55 @@ owner's PAT, so release-please and deploy workflows still fire.
   sanctioned path that makes the honest flow safe, not a boundary against a compromised session.
 - Brake: if an auto-merged PR breaks a base branch, set `auto_merge` back to `true` (or `false`)
   and remove `pr-automerge` from the Discord rules until the missed check is added.
+
+## Amendment (2026-10-19): bot review threads on Discord PRs
+
+**Context.** Review bots (cubic on Lucky most often, coderabbit) open threads on most Discord
+PRs. `merge-check` refuses any unresolved thread and Lucky's ruleset requires them resolved, but
+the session cannot read thread ids, reply or resolve: all of that is GraphQL, and `gh api` stays
+denied because a mutation can merge. Every such PR waited for the owner. The loop already solves
+this for its own PRs: the model writes a replies file and `agent-pr-gate.sh` posts the replies
+and resolves only threads fixed in a pushed commit.
+
+**Options.**
+
+1. Allow `gh api graphql` for the session with a narrower pattern. A permission pattern cannot
+   tell a reply mutation from `mergePullRequest` or `enablePullRequestAutoMerge`; no.
+2. Let the host gate pick up Discord PRs and run the loop's thread flow. The gate only scores
+   registry PRs on Lucky and cojam, four times a day, and would need a model run of its own to
+   write replies the session already knows. Slow, and a second writer on the same branch.
+3. Extend `pr-automerge` (root-owned, already the session's only merge path): `--threads` prints
+   the open threads with their ids, `--replies <file>` posts the session's replies and resolves
+   the fixed bot threads, then runs the normal merge check and queue.
+
+**Decision.** Option 3. `agent_gate.py thread-replies` decides what is posted; the wrapper only
+runs the two fixed mutations (`addPullRequestReviewThreadReply`, `resolveReviewThread`), so the
+session gets no general GraphQL access. Rules, all fail closed:
+
+- Nothing is posted on a PR that is not open, comes from a fork, has any human activity (PR,
+  linked issues, any thread), has unfetched threads or pages, or whose replies file is not one
+  JSON array (64 KiB cap).
+- Only open threads where every comment is a listed bot (`__typename` Bot and in `bots`) are
+  answered. A thread the owner joined, an unlisted App's thread and any human thread are skipped;
+  the owner answers those.
+- `fixed: true` resolves the thread only when the PR's commit list ends at the head and has a
+  commit after the reviewed commit of every comment in the thread (`originalCommit`). Without
+  that the entry is skipped entirely, so no reply claims a fix GitHub does not have; the session
+  pushes and runs it again.
+- `fixed: false` posts the reply and leaves the thread open. The thread then has an owner
+  comment, so it is no longer bot-only: the session never touches it again and the PR waits for
+  the owner, as in the loop.
+- A thread named twice is skipped, and so is a reply with an `@mention` or a line starting
+  with a slash command: posted as the owner it would start bots or comment-triggered workflows
+  with owner trust, and the bot text the session reads could steer it into writing one.
+  Replies are capped at 2000 characters and em and en dashes become commas.
+
+**Consequences.** Discord PRs whose only blockers are valid bot claims now merge without the
+owner. Replies are posted with the owner's PAT, as the loop's are; the session could already
+comment through `gh pr comment`, so the new capability is resolving bot threads, bounded by the
+pushed-commit rule. Accepted risk: "fixed" is the model's claim, checked only for a later push,
+not for whether that push fixes the thread (same as the loop): an empty commit or a merge of
+the base would satisfy the check. Requiring the later commits to touch the thread's file was
+considered and left out: it needs per-commit file lists, and a valid fix often lives in a
+caller or a test, which would send real fixes back to the owner. The reply stays on the PR for the
+owner to read, and Lucky's own CI and review bots run on the new head.
