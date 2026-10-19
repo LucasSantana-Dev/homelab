@@ -133,8 +133,8 @@ thread where every comment is a listed bot, on a PR with no human activity; `fix
 resolves it and needs a pushed commit after the thread's last reviewed commit, else the entry is
 skipped. Replies post as the PR owner, so a reply with an `@mention` or a slash command is
 skipped: bot text the session read must not start bots or workflows with owner trust. Right
-before each post the wrapper reloads the PR and re-plans that entry, so a human who joined in the
-meantime gets nothing. `--threads` prints nothing when the thread list is truncated. Then the
+before each post the wrapper reloads the PR, its threads and its linked issues and re-plans that
+entry, so a human who joined any of them in the meantime gets nothing. `--threads` prints nothing when the thread list is truncated. Then the
 normal check runs; it queues the merge only when no thread is open, so dismissed claims (left
 open for the owner) keep the PR waiting.
 
