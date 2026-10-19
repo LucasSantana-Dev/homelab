@@ -28,7 +28,10 @@ sweep_automerge() {
         echo "DRY-RUN: pr-automerge --sweep"
         return
     fi
-    out=$(run_on_agent "command -v pr-automerge >/dev/null || exit 0; pr-automerge --sweep") && return
+    if out=$(run_on_agent "command -v pr-automerge >/dev/null || { echo 'pr-automerge sweep: not on the agent-box image, skipped'; exit 0; }; pr-automerge --sweep"); then
+        [[ -z "$out" ]] || echo "$out"
+        return
+    fi
     if [[ -z "$out" ]]; then
         echo "pr-automerge sweep: agent-box unreachable, skipped"
         return

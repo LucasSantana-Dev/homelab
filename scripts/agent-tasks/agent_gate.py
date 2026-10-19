@@ -269,8 +269,8 @@ def merge_check(pr, cfg, issues):
         reasons.append("another human authored, commented on or pushed to it")
     if threads_truncated(pr) or "reviewThreads" not in pr:
         reasons.append("review threads not fully loaded")
-    if open_threads(pr):
-        reasons.append(f"{len(open_threads(pr))} unresolved review thread(s)")
+    if threads := open_threads(pr):
+        reasons.append(f"{len(threads)} unresolved review thread(s)")
     paths = [f["path"] for f in pr.get("files", [])]
     if not paths or pr.get("changedFiles") != len(paths):
         reasons.append("file list missing or truncated")
@@ -364,7 +364,8 @@ def score(pr, issue, cfg):
     elif threads:
         decision = "owner-review"
     elif _auto_merge_ok(pillars, cfg) and not (
-        blocked := merge_check(pr, cfg, [issue]) + _unloaded_issues(pr, issue)
+        blocked := merge_check(pr, cfg, [issue] if issue else [])
+        + _unloaded_issues(pr, issue)
     ):
         decision = "auto-merge"
     else:
