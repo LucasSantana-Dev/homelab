@@ -88,34 +88,38 @@ cohort AS (
         EXISTS (SELECT 1 FROM guild_membership_events l
                 WHERE l."guildDiscordId" = j.g
                   AND l.kind = 'LEAVE'
-                  AND l."occurredAt" BETWEEN j.t AND j.t + interval '5 minutes') AS removed_lt5m
+                  AND l."occurredAt" >= j.t
+                  AND l."occurredAt" < j.t + interval '5 minutes') AS removed_lt5m
     FROM counted_joins j
     WHERE j.t > now() - interval '28 days'
       AND j.g NOT IN (SELECT g FROM excluded)
 )
 SELECT
     count(*)::text,
-    coalesce(round(100.0 * count(*) FILTER (WHERE h1_eligible AND heard_1h)
-        / nullif(count(*) FILTER (WHERE h1_eligible), 0), 1)::text, 'N/A'),
-    coalesce(round(100.0 * count(*) FILTER (WHERE d8_eligible AND active_d8)
-        / nullif(count(*) FILTER (WHERE d8_eligible), 0), 1)::text, 'N/A'),
-    coalesce(round(100.0 * count(*) FILTER (WHERE rm_eligible AND removed_lt5m)
-        / nullif(count(*) FILTER (WHERE rm_eligible), 0), 1)::text, 'N/A')
+    coalesce((100.0 * count(*) FILTER (WHERE h1_eligible AND heard_1h)
+        / nullif(count(*) FILTER (WHERE h1_eligible), 0))::text, 'N/A'),
+    coalesce((100.0 * count(*) FILTER (WHERE d8_eligible AND active_d8)
+        / nullif(count(*) FILTER (WHERE d8_eligible), 0))::text, 'N/A'),
+    coalesce((100.0 * count(*) FILTER (WHERE rm_eligible AND removed_lt5m)
+        / nullif(count(*) FILTER (WHERE rm_eligible), 0))::text, 'N/A')
 FROM cohort;
 EOSQL
 
-WAG_RESULT=$(run_psql < "$WAG_SQL" 2>/dev/null) || WAG_RESULT=""
-COHORT_RESULT=$(run_psql < "$COHORT_SQL" 2>/dev/null) || COHORT_RESULT=""
+# psql errors go to stderr, which the tee above keeps in the log and journal.
+FAILED=""
+WAG_RESULT=$(run_psql < "$WAG_SQL") || FAILED="${FAILED} WAG"
+COHORT_RESULT=$(run_psql < "$COHORT_SQL") || FAILED="${FAILED} cohort"
 
 echo "WAG result: $WAG_RESULT"
 echo "Cohort result: $COHORT_RESULT"
 
-if [[ -z "$WAG_RESULT" && -z "$COHORT_RESULT" ]]; then
-    $NOTIFY --title "⚠️ Music-First Gates: DB unreachable" \
-            --body "psql returned no output. Check lucky-postgres and grafana_ro role." \
+# A partial report would look valid, so any failed query stops the run.
+if [[ -n "$FAILED" ]]; then
+    $NOTIFY --title "⚠️ Music-First Gates: query failed" \
+            --body "psql failed for:${FAILED}. Check lucky-postgres, the grafana_ro role and ${LOG_FILE}." \
             --urgency alert || true
-    echo "[$(date)] No data, alerted."
-    exit 0
+    echo "[$(date)] Query failed:${FAILED}, alerted."
+    exit 1
 fi
 
 # ── Build WAG section ─────────────────────────────────────────────────────────
@@ -146,10 +150,22 @@ H1_PCT="${H1_PCT:-?}"
 D8_PCT="${D8_PCT:-?}"
 REMOVAL_PCT="${REMOVAL_PCT:-?}"
 
-# Compares the unrounded percentage with the goal: meets_goal 34.9 ge 35 fails.
+# SQL returns unrounded percentages: the goals compare those, the report shows
+# one decimal. meets_goal 34.95 ge 35 fails.
 meets_goal() {
     awk -v v="$1" -v op="$2" -v goal="$3" \
         'BEGIN { exit !((op == "ge") ? (v + 0 >= goal) : (v + 0 < goal)) }'
+}
+
+# Truncates a percentage to one decimal for the report, so the shown number
+# agrees with its mark (34.95 shows 34.9, not 35.0); ? and N/A pass through.
+fmt_pct() {
+    if [[ "$1" == *.* ]]; then
+        local frac="${1#*.}"
+        echo "${1%%.*}.${frac:0:1}"
+    else
+        echo "$1"
+    fi
 }
 
 h1_mark="·"; d8_mark="·"; rm_mark="·"
@@ -187,9 +203,9 @@ BODY="Music-First Gates, ${TODAY}
 WAG (goal ≥20/week, decision on 2026-12-20):
 $(printf '%b' "$WAG_LINES")
 Cohort: ${JOINS} new guilds (last 28 days):
-  1st-hour play:  ${H1_PCT}%  (goal ≥35%) ${h1_mark}
-  Day-8 return:   ${D8_PCT}%  (goal ≥15%) ${d8_mark}
-  Removal <5 min: ${REMOVAL_PCT}%  (goal <15%) ${rm_mark}"
+  1st-hour play:  $(fmt_pct "$H1_PCT")%  (goal ≥35%) ${h1_mark}
+  Day-8 return:   $(fmt_pct "$D8_PCT")%  (goal ≥15%) ${d8_mark}
+  Removal <5 min: $(fmt_pct "$REMOVAL_PCT")%  (goal <15%) ${rm_mark}"
 
 echo "$BODY"
 $NOTIFY --title "📊 Lucky Music-First Gates" --body "$BODY" --urgency "$URGENCY" || true

@@ -11,5 +11,7 @@ User=luk-server
 # Runs from the checkout (kept current by git pull), not a copy under /opt
 # that can go stale.
 ExecStart=/home/luk-server/homelab/scripts/agent-tasks/lucky-music-gates.sh
+# A hung docker exec or query must not block the next weekly run.
+TimeoutStartSec=10min
 StandardOutput=journal
 StandardError=journal
