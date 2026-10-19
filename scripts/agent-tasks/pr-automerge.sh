@@ -29,6 +29,9 @@ else
     STATE="${PR_AUTOMERGE_STATE:-$HOME/.local/state/pr-automerge}"
 fi
 THREADS_QUERY='query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { reviewThreads(first: 100) { pageInfo { hasNextPage } nodes { id isResolved comments(first: 50) { totalCount nodes { author { __typename login } } } } } } } }'
+OPEN_PRS_QUERY='query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { pullRequests(states: OPEN, first: 100) { pageInfo { hasNextPage } nodes { number commits(first: 100) { totalCount nodes { commit { oid } } } } } } }'
+# Open PRs as [{number, oids}]; jq error (gh exits 1) when a page is cut, so it fails closed.
+OPEN_PRS_JQ='.data.repository.pullRequests | if .pageInfo.hasNextPage or any(.nodes[]; .commits.totalCount > 100) then error("open PR list truncated") else [.nodes[] | {number, oids: [.commits.nodes[].commit.oid]}] end'
 FIELDS=number,state,isDraft,isCrossRepository,baseRefName,headRefOid,author,commits,files,changedFiles,comments,reviews,autoMergeRequest,closingIssuesReferences
 
 say() { echo "pr-automerge: $*"; }
@@ -36,24 +39,43 @@ die() { echo "pr-automerge: $*" >&2; exit 1; }
 
 entry() { echo "$STATE/${1//\//_}-$2"; }  # repo pr -> registry file
 
-# {"pr": PR JSON with review threads, "issues": [issues it closes]}, or nothing and status 1.
+# {"pr": PR JSON with review threads and open PRs, "issues": [issues it closes]}, or nothing and status 1.
 load() {  # repo pr
-    local pr threads issues="[]" issue url
+    local pr threads open issues="[]" issue url
     pr=$(gh pr view "$2" -R "$1" --json "$FIELDS") || return 1
     threads=$(gh api graphql -f query="$THREADS_QUERY" -F owner="${1%/*}" -F name="${1#*/}" \
         -F number="$2" --jq .data.repository.pullRequest.reviewThreads) || return 1
     jq -e '.nodes | type == "array"' <<<"$threads" >/dev/null 2>&1 || return 1
+    open=$(gh api graphql -f query="$OPEN_PRS_QUERY" -F owner="${1%/*}" -F name="${1#*/}" \
+        --jq "$OPEN_PRS_JQ") || return 1
+    jq -e 'type == "array"' <<<"$open" >/dev/null 2>&1 || return 1
     for url in $(jq -r '.closingIssuesReferences[]?.url' <<<"$pr"); do
         issue=$(gh issue view "$url" --json author,comments) || return 1
         issues=$(jq -c --argjson i "$issue" '. + [$i]' <<<"$issues")
     done
-    jq -c --argjson t "$threads" --argjson i "$issues" '{pr: (.reviewThreads = $t), issues: $i}' <<<"$pr"
+    jq -c --argjson t "$threads" --argjson o "$open" --argjson i "$issues" \
+        '{pr: (.reviewThreads = $t | .openPrs = $o), issues: $i}' <<<"$pr"
+}
+
+# Sweep: a queued PR that cannot be checked must not merge unchecked. Turn auto-merge off (a
+# PR without it just fails the call); keep the entry so the next sweep retries.
+unverified() {  # repo pr
+    if gh pr merge "$2" -R "$1" --disable-auto >/dev/null 2>&1; then
+        say "$1#$2: auto-merge turned off until it can be checked: run pr-automerge $1 $2"
+        rm -f "$(entry "$1" "$2")"
+    else
+        say "$1#$2: could not turn auto-merge off, it may be STILL QUEUED"
+    fi
 }
 
 # Returns 0 when the PR is (still) fine or gone, 1 when it was refused, turned off or not checked.
 handle() {  # mode(queue|sweep) repo pr
     local mode="$1" repo="$2" n="$3" data verdict sha queued
-    data=$(load "$repo" "$n") || { say "$repo#$n: could not load the PR, its review threads or its issues"; return 1; }
+    if ! data=$(load "$repo" "$n"); then
+        say "$repo#$n: could not load the PR, its review threads, open PRs or issues"
+        [[ "$mode" == "sweep" ]] && unverified "$repo" "$n"
+        return 1
+    fi
     queued=$(jq -r '.pr.autoMergeRequest != null' <<<"$data")
     if [[ "$(jq -r .pr.state <<<"$data")" != "OPEN" || ( "$mode" == "sweep" && "$queued" != "true" ) ]]; then
         rm -f "$(entry "$repo" "$n")"
@@ -61,8 +83,11 @@ handle() {  # mode(queue|sweep) repo pr
         say "$repo#$n: not open"
         return 1
     fi
-    verdict=$(python3 -I "$GATE_PY" merge-check --config "$CONFIG" --repo "$repo" <<<"$data") \
-        || { say "$repo#$n: gate check failed to run"; return 1; }
+    if ! verdict=$(python3 -I "$GATE_PY" merge-check --config "$CONFIG" --repo "$repo" <<<"$data"); then
+        say "$repo#$n: gate check failed to run"
+        [[ "$mode" == "sweep" ]] && unverified "$repo" "$n"
+        return 1
+    fi
     if ! jq -e '.ok == true' <<<"$verdict" >/dev/null; then
         say "$repo#$n: refused: $(jq -r '.reasons | join("; ")' <<<"$verdict")"
         if [[ "$queued" == "true" ]]; then

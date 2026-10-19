@@ -85,6 +85,8 @@
     "*-lock.json",
     "*-lock.yaml",
     "*.lock",
+    "*.lockb",
+    "*npm-shrinkwrap.json",
     "go.mod",
     "*/go.mod",
     "go.sum",
@@ -137,6 +139,7 @@
     "LucasSantana-Dev/homelab": {
       "base": "release",
       "workdir": "/workspace/homelab",
+      "repo_merge_allow_paths": ["docs/*", "tests/*", "*.md"],
       "repo_merge_block_paths": [
         ".*",
         "agents/*",
