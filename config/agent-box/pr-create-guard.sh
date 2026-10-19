@@ -18,29 +18,78 @@ dir=$(jq -r '.cwd // "."' <<<"$input" 2>/dev/null) || block "cannot read the hoo
 [[ "$cmd" == *gh* ]] || exit 0
 
 # Shell-aware parse (quoted titles and bodies stay one word). Prints one line per gh call that
-# opens a PR: "create<TAB>repo<TAB>base<TAB>head<TAB>cd-dir", or "api", or "error".
+# opens a PR: "create<TAB>repo<TAB>base<TAB>head<TAB>cd-dir", or "api" (a gh api call that opens
+# a PR or whose endpoint or GraphQL query is not literal), or "error", or "wrapped" when the text
+# runs gh pr create or gh api where the parse cannot see it (bash -c, eval, $(...)).
 parsed=$(python3 -I - "$cmd" <<'PY'
-import shlex, sys
+import re, shlex, sys
 
+raw = sys.argv[1]
+SEP = ";&|()\n"
 try:
-    lex = shlex.shlex(sys.argv[1], posix=True, punctuation_chars=True)
+    lex = shlex.shlex(raw, posix=True, punctuation_chars=SEP + "<>")
+    lex.whitespace = " \t\r"  # a newline separates commands like ;
     lex.whitespace_split = True
     toks = list(lex)
 except ValueError:
-    print("error" if "pr create" in sys.argv[1] or "pulls" in sys.argv[1] else "")
+    print("error" if re.search(r"pr\s+create|pulls|\bapi\b", raw) else "")
     sys.exit()
 
 cmds, cur = [], []
 for t in toks:
-    if t and all(c in ";&|()" for c in t):
+    if t and all(c in SEP for c in t):
         cmds.append(cur)
         cur = []
     else:
         cur.append(t)
 cmds.append(cur)
 
+VALUE_FLAGS = {"-X", "--method", "-f", "--raw-field", "-F", "--field", "-H", "--header", "--input",
+               "-q", "--jq", "-t", "--template", "-p", "--preview", "--hostname", "--cache"}
+FIELD_FLAGS = {"-f", "--raw-field", "-F", "--field"}
+
+
+def api_opens_pr(args):
+    """args after `gh api`: True when the call can open a PR or its target cannot be read."""
+    pos, fields, method, i = [], [], "", 0
+    while i < len(args):
+        a = args[i]
+        name, eq, val = a.partition("=")
+        if a in VALUE_FLAGS:
+            val = args[i + 1] if i + 1 < len(args) else ""
+            method = val.upper() if a in ("-X", "--method") else method
+            fields += [val] if a in FIELD_FLAGS else ["@"] if a == "--input" else []
+            i += 1
+        elif a.startswith("--") and eq:
+            method = val.upper() if name == "--method" else method
+            fields += [val] if name in FIELD_FLAGS else ["@"] if name == "--input" else []
+        elif a[:2] in ("-f", "-F") and len(a) > 2:
+            fields.append(a[2:])
+        elif a[:2] == "-X" and len(a) > 2:
+            method = a[2:].upper()
+        elif not a.startswith("-"):
+            pos.append(a)
+        i += 1
+    ep = pos[0] if pos else ""
+    if not ep or re.search(r"[$\x60]", ep):
+        return True
+    # gh api sends GET unless a field, --input or -X asks for another method; listing PRs is fine.
+    writes = method != "GET" and bool(method or fields)
+    if ep.split("?", 1)[0].rstrip("/").endswith("/pulls"):
+        return writes
+    if ep != "graphql":
+        return False
+    for f in fields:
+        key, _, q = f.partition("=")
+        if f == "@" or key == "query" and (
+            q.startswith("@") or "{" not in q or re.search(r"\$[\x28\x7b]|\x60|createPullRequest", q)
+        ):
+            return True
+    return False
+
+
 FLAGS = {"-R": "repo", "--repo": "repo", "-B": "base", "--base": "base", "-H": "head", "--head": "head"}
-cd = ""
+cd, creates, apis = "", 0, 0
 for c in cmds:
     while c and "=" in c[0] and not c[0].startswith("-"):
         c = c[1:]  # VAR=value prefixes
@@ -48,11 +97,15 @@ for c in cmds:
         continue
     if c[0] == "cd" and len(c) > 1:
         cd = c[1]
-    if c[0].rsplit("/", 1)[-1] != "gh":
+    # gh behind env, xargs, timeout, command and the like is still the command that runs.
+    at = next((k for k, t in enumerate(c) if t.rsplit("/", 1)[-1] == "gh"), None)
+    if at is None:
         continue
-    args = c[1:]
-    if args[:1] == ["api"] and any(a.rstrip("/").endswith("/pulls") for a in args):
-        print("api")
+    args = c[at + 1 :]
+    if args[:1] == ["api"]:
+        apis += 1
+        if api_opens_pr(args[1:]):
+            print("api")
     if args[:2] != ["pr", "create"]:
         continue
     got = {"repo": "", "base": "", "head": ""}
@@ -69,11 +122,21 @@ for c in cmds:
             got[FLAGS[a[:2]]] = a[2:].lstrip("=")
         i += 1
     print("\t".join(["create", got["repo"], got["base"], got["head"], cd]))
+    creates += 1
+
+if len(re.findall(r"\bgh\s+pr\s+create\b", raw)) > creates or len(
+    re.findall(r"\bgh\s+api\b", raw)
+) > apis:
+    print("wrapped")
 PY
 ) || block "cannot parse the command"
 [[ -n "$parsed" ]] || exit 0
 ! grep -qx error <<<"$parsed" || block "cannot parse the command: check its quoting"
-! grep -qx api <<<"$parsed" || block "open PRs with gh pr create -R <repo> --base <base>, not gh api"
+! grep -qx api <<<"$parsed" || block "open PRs with gh pr create -R <repo> --base <base>, not gh" \
+    "api, and write gh api endpoints and GraphQL queries literally (no variables or files)"
+! grep -qx wrapped <<<"$parsed" \
+    || block "run gh pr create and gh api as plain commands (no bash -c, eval or \$(...), and no" \
+        "\"gh pr create\" or \"gh api\" inside other arguments)"
 (( $(grep -c '^create' <<<"$parsed") == 1 )) || block "open one PR per command"
 IFS=$'\t' read -r _ repo base head cd_dir <<<"$parsed"
 [[ -n "$cd_dir" ]] && dir=$cd_dir
@@ -103,20 +166,20 @@ fi
 if [[ -z "$dir" ]] || ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
     block "no checkout of $repo to check the branch in"
 fi
-head=${head##*:}  # owner:branch
+if [[ "$head" == *:* ]]; then  # owner:branch: only branches of this repo, never a fork's
+    same_repo "${head%%:*}" "${repo%%/*}" || block "--head $head is a fork branch: push to $repo"
+    head=${head#*:}
+fi
 [[ -n "$head" ]] || head=$(git -C "$dir" symbolic-ref --short HEAD 2>/dev/null) \
     || block "cannot tell the head branch: pass --head <branch>"
 [[ "$head" =~ ^[A-Za-z0-9._/-]+$ && "$head" != -* ]] || block "bad branch name: $head"
 
-git -C "$dir" fetch -q origin "$want" || block "git fetch origin $want failed, retry"
+# Every branch on origin, so one another session pushed a minute ago counts in the stack check.
+git -C "$dir" fetch -q --prune origin '+refs/heads/*:refs/remotes/origin/*' \
+    || block "git fetch origin failed, retry"
 # gh opens the PR from the pushed branch; the local one counts only when it is not pushed.
-if git -C "$dir" fetch -q origin "$head" 2>/dev/null; then
-    ref=refs/remotes/origin/$head
-else
-    git -C "$dir" ls-remote --exit-code --heads origin "$head" >/dev/null 2>&1
-    [[ $? -eq 2 ]] || block "git fetch origin $head failed, retry"
-    ref=refs/heads/$head
-fi
+ref=refs/remotes/origin/$head
+git -C "$dir" rev-parse -q --verify "$ref" >/dev/null || ref=refs/heads/$head
 tip=$(git -C "$dir" rev-parse -q --verify "$ref^{commit}") || block "branch $head not found in $dir"
 
 own=$(git -C "$dir" rev-list "origin/$want..$tip") || block "git rev-list failed"

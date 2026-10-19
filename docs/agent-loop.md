@@ -19,7 +19,7 @@ wrappers. The agent-box hooks are an extra layer.
 
 - At most `wip_cap` (2) open agent PRs per repo. When full, the worker starts nothing new.
 - One issue and at most `AGENT_MAX_AUTOFIX_PER_RUN` (1) autofix per repo per run, under a lock. Daily budget of `AGENT_MAX_RUNS_PER_DAY` (6) claude runs, shared by worker and autofix.
-- Autofix at most `fix_attempts` (2) per PR, then `needs-human` on the PR. The attempt count lives in `AGENT_STATE_DIR/autofix` (seeded once from legacy `agent-fix-N` labels; losing the state dir resets the counter, since the labels are no longer written).
+- Autofix at most `fix_attempts` (3) per PR (CI, thread and conflict fixes share it), then `needs-human` on the PR and one Discord alert. The attempt count lives in `AGENT_STATE_DIR/autofix` (seeded once from legacy `agent-fix-N` labels; losing the state dir resets the counter, since the labels are no longer written).
 - PRs stuck on pending or red CI with no activity for `stale_days` (5) are closed (never ones waiting on the owner or labelled `needs-human`) and the issue gets `agent-failed`, so it is not picked again.
 - Any PR or issue another human authored, commented on or pushed to is never touched.
 - Pause everything: `touch ~/agent-paused` inside agent-box (resume: `rm ~/agent-paused`).
@@ -44,6 +44,7 @@ Decision order (pillars before CI, so a risky PR never gets an autofix run): a b
 the repo's `base`, or a commit shared with another open PR (stacked branch) -> `needs-human`;
 value red -> `close`;
 security or impact red -> `needs-human`; size red -> `split`; failing checks -> `autofix` (CI);
+a merge conflict with the base (`mergeable: CONFLICTING`, no checks run then) -> `autofix` (conflict);
 pending or no checks yet -> `wait`; unresolved review threads only from `bots` listed in
 `agent-gate.json` -> `autofix`
 (threads); an unresolved thread the owner joined -> `owner-review`; pillars allowed by `auto_merge`
@@ -160,6 +161,40 @@ resolution yet (owner action in ADR 0042). Accepted risk: a human comment that l
 last check is caught only by the next sweep (four a day), and a push from outside agent-box
 (the owner) does not pass the hook. Same uid caveat as everywhere here: code running as `agent`
 can call `gh` with the PAT directly, so this is the sanctioned path, not a boundary.
+
+## Session PRs and conflicts (ADR 0043)
+
+The gate also follows the Discord session's PRs after the chat ends: open owner PRs whose head
+commit is the tip of the same-named local branch of the agent-box clone (the session pushed it from
+there), whose branch `claude_cmd` accepts, and that are not loop PRs. They are scored with
+`agent_gate.py score --session`: release or dependency bot PR (branch in `merge_block_branches`,
+label in `merge_block_labels`) -> `skip`, silently; another human, a fork or unfetched threads ->
+`halt`; draft or `needs-human` -> `wait`; wrong base or stacked -> `needs-human`; truncated file
+list, an unchecked closing issue or owner paths (the merge check's list) -> `owner-review`;
+conflict, red CI or bot-only threads -> `autofix`; pending -> `wait`; else `queue`
+(`pr-automerge <repo> <n>`, one Discord message per head commit). Never closed or split. Thread
+replies go through `pr-automerge --replies`. The path stays off until pr-automerge is on the
+image. An autofix waits an hour after the PR last changed. `workdir_clean` also refuses a clone with
+a branch checked out, so the worker, autofix and the backlog round all leave a chat's branch alone
+(the loop leaves the clone detached on `origin/<base>`).
+
+Conflict autofix, loop and session PRs: the gate checks out the branch, runs
+`git merge --no-edit origin/<base>`, and the model resolves the unmerged paths, tests,
+`git commit --no-edit` and `git push origin <branch>`. Never a rebase or force-push; cleanup runs
+`git merge --abort`. Release-please and dependency bot PRs are refused by the merge check for
+everyone.
+
+## Backlog round (ADR 0043)
+
+When the worker finds no eligible issue it runs `backlog_round`, once a day per repo, if fewer than
+`backlog_round_max` (5) open `ready-for-agent` issues are being skipped. A read-only claude run
+(`claude_plan_cmd`: Read on the workdir, Glob, Grep, Edit only inside the scratch dir; no Bash, and
+no GitHub token or Discord webhook in its environment) writes `backlog.json`. Its prompt holds the
+last 50 commits and the owner's issue titles only. `agent_gate.py backlog-plan` dedupes it against
+every issue title (open and closed), caps it, drops mentions, slash commands and credential shapes,
+and labels `ready-for-agent` + `effort:s` (agent work with no picker skip word in title or body) or
+`ready-for-human`. The worker creates the issues as the owner and sends one Discord summary. A run
+that leaves the clone dirty creates nothing. It spends one claude run from the daily budget.
 
 ## Install (host, as luk-server)
 
