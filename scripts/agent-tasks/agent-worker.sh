@@ -116,7 +116,7 @@ $titles"
         title=$(jq -r .title <<<"$item")
         body=$(jq -r .body <<<"$item")
         labels=$(jq -r '.labels | join(",")' <<<"$item")
-        if url=$(act "gh issue create --repo $REPO --title $(printf '%q' "$title") --body $(printf '%q' "$body") --label $labels"); then
+        if url=$(act "gh issue create --repo $REPO --title $(printf '%q' "$title") --body $(printf '%q' "$body") --label $(printf '%q' "$labels")"); then
             n=$((n + 1))
             created+=$'\n'"- $url [$labels] $title"
         else

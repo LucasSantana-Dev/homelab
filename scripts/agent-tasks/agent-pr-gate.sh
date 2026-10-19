@@ -183,6 +183,9 @@ gate_pr() {  # kind pr
     # waiting on the owner. Old bot threads on a green PR used to be owner-review: not stale.
     # A session PR is never closed: the owner asked for it in the chat.
     UPDATED=$(jq -r '.updatedAt' <<<"$PR_JSON")
+    # Last push, not last activity: a bot comment bumps updatedAt and would hold a thread
+    # fix back forever.
+    PUSHED=$(jq -r '.commits[-1].committedDate // .updatedAt' <<<"$PR_JSON")
     if [[ "$KIND" == "loop" ]] && [[ "$DECISION" == "wait" || ( "$DECISION" == "autofix" && "$FIX" == "ci" ) ]] && ! has_label needs-human \
         && (( $(date +%s) - $(date -d "$UPDATED" +%s) > STALE_DAYS * 86400 )); then
         try_act "gh pr close $N --repo $REPO"
@@ -258,8 +261,8 @@ autofix_pr() {
         return 0
     fi
     # The chat may still be working on its branch in the same clone: give it an hour.
-    if [[ "$KIND" == "session" ]] && (( $(date +%s) - $(date -d "$UPDATED" +%s) < 3600 )); then
-        echo "#$N: session PR changed in the last hour, autofix next run"
+    if [[ "$KIND" == "session" ]] && (( $(date +%s) - $(date -d "$PUSHED" +%s) < 3600 )); then
+        echo "#$N: session PR pushed in the last hour, autofix next run"
         return 0
     fi
     # Also refuses a clone with a branch checked out (a chat may be working in it).

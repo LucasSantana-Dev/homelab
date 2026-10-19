@@ -288,6 +288,8 @@ def merge_check(pr, cfg, issues):
         reasons.append("file list missing or truncated")
     if blocked := owner_path_hits(pr, cfg):
         reasons.append("owner-review paths: " + ", ".join(blocked[:3]))
+    if conflicting(pr):
+        reasons.append("has merge conflicts")
     return reasons
 
 

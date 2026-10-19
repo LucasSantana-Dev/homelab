@@ -1040,6 +1040,7 @@ def test_merge_check_passes_a_clean_owner_pr(cfg):
         ({"comments": [{"author": {"login": "someone"}}]}, "another human"),
         ({"changedFiles": 101}, "truncated"),
         ({"files": []}, "missing"),
+        ({"mergeable": "CONFLICTING"}, "conflicts"),
     ],
 )
 def test_merge_check_refuses(cfg, change, reason):
@@ -2587,7 +2588,16 @@ def test_automerge_loads_branch_and_labels():
     fields = next(
         ln for ln in AUTOMERGE.read_text().splitlines() if ln.startswith("FIELDS=")
     )
-    assert {"headRefName", "labels"} <= set(fields[len("FIELDS=") :].split(","))
+    assert {"headRefName", "labels", "mergeable"} <= set(
+        fields[len("FIELDS=") :].split(",")
+    )
+
+
+def test_gate_session_cooldown_counts_from_the_last_push():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    assert "PUSHED=$(jq -r '.commits[-1].committedDate // .updatedAt'" in text
+    body = _gate_fn("autofix_pr")
+    assert 'date -d "$PUSHED"' in body and 'date -d "$UPDATED"' not in body
 
 
 def _session_pr(files=("src/x.ts",), **extra):

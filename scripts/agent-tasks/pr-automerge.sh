@@ -42,7 +42,7 @@ MAX_REPLIES_BYTES=65536
 OPEN_PRS_QUERY='query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { pullRequests(states: OPEN, first: 100) { pageInfo { hasNextPage } nodes { number commits(first: 100) { totalCount nodes { commit { oid } } } } } } }'
 # Open PRs as [{number, oids}]; jq error (gh exits 1) when a page is cut, so it fails closed.
 OPEN_PRS_JQ='.data.repository.pullRequests | if .pageInfo.hasNextPage or any(.nodes[]; .commits.totalCount > 100) then error("open PR list truncated") else [.nodes[] | {number, oids: [.commits.nodes[].commit.oid]}] end'
-FIELDS=number,state,isDraft,isCrossRepository,baseRefName,headRefName,headRefOid,labels,author,commits,files,changedFiles,comments,reviews,autoMergeRequest,closingIssuesReferences
+FIELDS=number,state,isDraft,isCrossRepository,baseRefName,headRefName,headRefOid,labels,author,commits,files,changedFiles,comments,reviews,autoMergeRequest,closingIssuesReferences,mergeable
 
 say() { echo "pr-automerge: $*"; }
 die() { echo "pr-automerge: $*" >&2; exit 1; }
