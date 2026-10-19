@@ -61,7 +61,10 @@ Option 3, and the loop gate moves to `auto_merge: "no-red"`.
   file list, and no path in `high_impact_paths`, `sensitive_paths`, `dependency_files`,
   `merge_block_paths` (lockfiles, go.mod) or the repo's `repo_merge_block_paths`, and on a repo
   with `repo_merge_allow_paths` only paths on that list (homelab: `docs/`, `tests/`, Markdown).
-  Missing data fails closed. A queued PR the sweep cannot load or check loses its auto-merge.
+  Missing data fails closed. A queued PR the sweep cannot load or check loses its auto-merge;
+  when turning it off fails too, the PR stays queued, the sweep alerts ("STILL QUEUED") and keeps
+  it on its list so the next run tries again. Until then GitHub can merge it on its last checked
+  commit, the one the merge was pinned to.
 - `pr-automerge` (image copy, root-owned, with its own copy of the gate and config) queues the
   merge only after the check passes, never with `--admin`, and turns auto-merge off when a
   re-check fails. The image copy ignores the caller's `AGENT_GATE_CONFIG`, `PR_AUTOMERGE_STATE`
@@ -76,8 +79,10 @@ Option 3, and the loop gate moves to `auto_merge: "no-red"`.
 - Branch checks, deterministic in two places. The `pr-create-guard.sh` hook (PreToolUse, every
   agent-box session) blocks `gh pr create` unless `--base` is the repo's base from
   `agent-gate.json` (homelab `release`, Lucky and cojam `main`) and the branch, after a fresh
-  `git fetch origin <base>`, has commits on top of `origin/<base>` and shares none with another
-  branch that is not its own descendant. After the PR exists, the gate (`branch_problems` in
+  fetch of every branch on origin, has commits on top of `origin/<base>` and shares none with
+  another branch that is not its own descendant. The gate then checks the PR against open PRs
+  only: a branch pushed after that fetch, with no PR yet, is caught by neither check until it
+  has one. After the PR exists, the gate (`branch_problems` in
   `agent_gate.py`) refuses a wrong base or a PR that shares a commit with another open PR:
   pr-automerge refuses it and the loop gate sends it to `needs-human`. Missing data fails closed.
   The hook parses the command with shell quoting (a `--base` inside a title does not count),
