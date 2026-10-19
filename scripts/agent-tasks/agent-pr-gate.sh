@@ -59,7 +59,8 @@ git_rules() {  # scratch
 }
 
 SCRATCH=""
-trap 'scratch_rm "$SCRATCH"' EXIT
+OPEN_PRS_CACHE=$(mktemp -d) || exit 1  # one open-PR snapshot per repo and run
+trap 'scratch_rm "$SCRATCH"; rm -rf "$OPEN_PRS_CACHE"' EXIT
 
 has_label() { jq -e --arg l "$1" 'any(.labels[]; .name == $l)' <<<"$PR_JSON" >/dev/null; }
 
@@ -70,7 +71,7 @@ OPEN_PRS_JQ='.data.repository.pullRequests | if .pageInfo.hasNextPage or any(.no
 # PR plus review threads and the repo's open PRs (stacked branch check). Fails if a fetch
 # fails: missing threads must not read as "none", they could hide a human reply.
 load_pr() {  # repo n
-    local pr threads open cache="$SCRATCH/open-prs-${1//\//_}.json"
+    local pr threads open cache="$OPEN_PRS_CACHE/${1//\//_}.json"
     pr=$(run_on_agent "gh pr view $2 --repo $1 --json number,state,isDraft,isCrossRepository,baseRefName,changedFiles,author,commits,files,additions,deletions,closingIssuesReferences,statusCheckRollup,labels,comments,reviews,updatedAt,headRefName,headRefOid") || return 1
     threads=$(run_on_agent "gh api graphql -f query=$(printf '%q' "$THREADS_QUERY") -F owner=${1%/*} -F name=${1#*/} -F number=$2 --jq .data.repository.pullRequest.reviewThreads") || return 1
     jq -e '.nodes | type == "array"' <<<"$threads" >/dev/null 2>&1 || return 1

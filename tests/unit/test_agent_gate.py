@@ -979,8 +979,11 @@ def test_gate_autofix_writes_outside_the_repo():
 @pytest.mark.parametrize("script", ["agent-worker.sh", "agent-pr-gate.sh"])
 def test_scratch_dir_is_removed_on_exit_and_after_each_run(script):
     text = (TASKS / script).read_text()
-    trap = "trap 'scratch_rm \"$SCRATCH\"' EXIT"
-    assert text.count(trap) == 1
+    traps = [ln for ln in text.splitlines() if ln.startswith("trap ")]
+    assert len(traps) == 1, traps
+    assert traps[0].startswith('trap \'scratch_rm "$SCRATCH"') and traps[0].endswith(
+        "' EXIT"
+    )
     # Plus an explicit removal after the claude run, outside the trap string.
     lines = [ln.strip() for ln in text.splitlines()]
     after_run = [i for i, ln in enumerate(lines) if ln == 'scratch_rm "$SCRATCH"']
@@ -2429,8 +2432,12 @@ def test_loop_auto_merge_holds_a_pr_closing_an_unchecked_issue(cfg):
     "command",
     [
         CREATE + "\ngh pr create -R LucasSantana-Dev/Lucky --base main",
-        "bash -c 'gh pr create -R LucasSantana-Dev/Lucky --base release'",
-        "env gh pr create -R LucasSantana-Dev/Lucky --base release",
+        "bash -c 'gh pr create -R LucasSantana-Dev/Lucky --base main'",
+        'eval "$(echo gh pr create -R LucasSantana-Dev/Lucky --base main)"',
+        'gh api graphql -f query="$MUTATION"',
+        "env gh api graphql -F query=@/tmp/q.graphql",
+        'gh api "$ENDPOINT" -f base=main -f head=fix/a',
+        "bash -c 'gh api graphql -f query=@q'",
         "gh api repos/LucasSantana-Dev/Lucky/pulls?x=1 -f base=main -f head=fix/a",
         "gh api graphql -f query='mutation { createPullRequest(input: {}) { clientMutationId } }'",
     ],
@@ -2445,6 +2452,10 @@ def test_pr_guard_blocks_hidden_pr_creation(tmp_path, command):
     "command",
     [
         "gh api repos/LucasSantana-Dev/Lucky/pulls/5/comments/1/replies -f body=ok",
+        "gh api repos/LucasSantana-Dev/Lucky/pulls/5/comments/1/replies"
+        " -f body='createPullRequest is blocked now'",
+        "gh api graphql -f query='mutation($t: ID!) { resolveReviewThread(input: {threadId: $t})"
+        " { thread { isResolved } } }' -f t=abc",
         "gh pr view 5 -R LucasSantana-Dev/Lucky\ngh pr checks 5 -R LucasSantana-Dev/Lucky",
     ],
 )
@@ -2492,3 +2503,21 @@ def test_push_guard_blocks_more_than_one_push_url(tmp_path):
     res, _ = _push_guard(tmp_path, "git -C {repo} push origin fix/x", listed="12\n")
     assert res.returncode == 2
     assert "more than one push URL" in res.stderr
+
+
+def test_pr_guard_checks_gh_behind_a_wrapper(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    res = _pr_guard(
+        tmp_path, "env gh pr create -R LucasSantana-Dev/Lucky --base release"
+    )
+    assert res.returncode == 2
+    assert "pass --base main" in res.stderr
+    assert _pr_guard(tmp_path, "timeout 60 " + CREATE).returncode == 0
+
+
+def test_pr_guard_allows_pr_create_in_a_title(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    cmd = 'gh pr create -R LucasSantana-Dev/Lucky --base main --title "fix: pr create guard"'
+    assert _pr_guard(tmp_path, cmd).returncode == 0

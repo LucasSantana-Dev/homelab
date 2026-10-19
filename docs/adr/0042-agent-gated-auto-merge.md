@@ -80,8 +80,9 @@ Option 3, and the loop gate moves to `auto_merge: "no-red"`.
   agent-box session) blocks `gh pr create` unless `--base` is the repo's base from
   `agent-gate.json` (homelab `release`, Lucky and cojam `main`) and the branch, after a fresh
   fetch of every branch on origin, has commits on top of `origin/<base>` and shares none with
-  another branch that is not its own descendant. A branch pushed after that fetch is the gate's
-  to catch. After the PR exists, the gate (`branch_problems` in
+  another branch that is not its own descendant. The gate then checks the PR against open PRs
+  only: a branch pushed after that fetch, with no PR yet, is caught by neither check until it
+  has one. After the PR exists, the gate (`branch_problems` in
   `agent_gate.py`) refuses a wrong base or a PR that shares a commit with another open PR:
   pr-automerge refuses it and the loop gate sends it to `needs-human`. Missing data fails closed.
   The hook parses the command with shell quoting (a `--base` inside a title does not count),
