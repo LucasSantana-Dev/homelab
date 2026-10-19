@@ -1,11 +1,15 @@
 [Unit]
 Description=Lucky: weekly music-first gates report
-After=docker.service
+Documentation=file:///home/luk-server/homelab/scripts/agent-tasks/lucky-music-gates.sh
+After=docker.service network-online.target
 Requires=docker.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot
 User=luk-server
-ExecStart=/opt/homelab/scripts/agent-tasks/lucky-music-gates.sh
+# Runs from the checkout (kept current by git pull), not a copy under /opt
+# that can go stale.
+ExecStart=/home/luk-server/homelab/scripts/agent-tasks/lucky-music-gates.sh
 StandardOutput=journal
 StandardError=journal

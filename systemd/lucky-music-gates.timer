@@ -1,9 +1,9 @@
 [Unit]
 Description=Lucky: weekly music-first gates report (Monday 08:00 BRT)
-Requires=lucky-music-gates.service
 
 [Timer]
-OnCalendar=Mon *-*-* 11:00:00
+# Pinned to UTC so the run is 08:00 BRT whatever the host timezone is.
+OnCalendar=Mon *-*-* 11:00:00 UTC
 Persistent=true
 AccuracySec=15m
 
