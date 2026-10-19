@@ -15,8 +15,18 @@
   ],
   "auto_merge": "no-red",
   "wip_cap": 2,
-  "fix_attempts": 2,
+  "fix_attempts": 3,
   "stale_days": 5,
+  "backlog_round_max": 5,
+  "merge_block_branches": [
+    "release-please--*",
+    "dependabot/*",
+    "renovate/*"
+  ],
+  "merge_block_labels": [
+    "autorelease: pending",
+    "autorelease: tagged"
+  ],
   "size": {
     "green_lines": 150,
     "green_files": 5,
@@ -198,6 +208,10 @@
     "Bash(ls*)",
     "Bash(cat *)"
   ],
+  "claude_backlog_tools": [
+    "Glob",
+    "Grep"
+  ],
   "claude_disallowed_tools": [
     "Bash(gh pr merge*)",
     "Bash(git push --force*)",
@@ -210,6 +224,17 @@
     "Bash(gh api*)",
     "Read(~/.claude/channels/**)",
     "Edit(~/.claude/channels/**)",
+    "Read(~/.claude/.credentials.json)",
+    "Read(~/.claude.json)",
+    "Read(~/.config/gh/**)",
+    "Read(//run/secrets/**)",
+    "Read(//etc/profile.d/**)",
+    "Bash(env*)",
+    "Bash(printenv*)",
+    "Bash(cat ~/.c*)",
+    "Bash(cat /home/agent/.c*)",
+    "Bash(cat /etc/profile.d*)",
+    "Bash(cat /run/secrets*)",
     "Edit(/.github/**)",
     "WebFetch",
     "WebSearch"
