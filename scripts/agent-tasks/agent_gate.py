@@ -289,7 +289,7 @@ def _fixed_after_review(thread, pr):
     """True when the PR head has a commit after every comment of the thread: a fix
     the reply claims must already be pushed. Unknown commits fail closed."""
     commits = [c.get("oid") for c in pr.get("commits", [])]
-    if not commits or commits[-1] != pr.get("headRefOid"):
+    if not commits or None in commits or commits[-1] != pr.get("headRefOid"):
         return False
     seen = [
         (c.get("originalCommit") or {}).get("oid")
@@ -350,7 +350,7 @@ def thread_replies(pr, cfg, issues, replies):
         elif r.get("fixed") is True and not _fixed_after_review(by_id[tid], pr):
             skipped[tid] = "fixed, but no commit pushed after the review: push first"
         else:
-            reply = re.sub(" ?[\u2013\u2014]", ",", r["reply"][:2000])
+            reply = re.sub(" ?[\u2013\u2014] ?", ", ", r["reply"])[:2000]
             actions.append(
                 {"id": tid, "reply": reply, "resolve": r.get("fixed") is True}
             )

@@ -1618,6 +1618,14 @@ def test_thread_replies_skip_a_fix_that_is_not_pushed(cfg, commits):
     assert "push first" in skipped["T1"]
 
 
+def test_thread_replies_fail_closed_on_missing_oids(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai", commit=None))
+    pr["headRefOid"] = None
+    pr["commits"] = [{"authors": [{"login": OWNER}]}, {"authors": [{"login": OWNER}]}]
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and "push first" in skipped["T1"]
+
+
 def test_thread_replies_need_a_push_after_the_last_bot_comment(cfg):
     t = review_thread("T1", "cubic-dev-ai", "cubic-dev-ai")
     t["comments"]["nodes"][1]["originalCommit"] = {"oid": HEAD}  # re-review on HEAD
@@ -1728,7 +1736,7 @@ def test_thread_replies_cap_text_and_drop_dashes(cfg):
     reply = "Fixed — the guard runs first–always. " + "y" * 3000
     _, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": reply}])
     out = actions[0]["reply"]
-    assert out.startswith("Fixed, the guard runs first,always. ")
+    assert out.startswith("Fixed, the guard runs first, always. ")
     assert "—" not in out and "–" not in out
     assert len(out) <= 2000
 
