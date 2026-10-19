@@ -157,6 +157,9 @@ session gets no general GraphQL access. Rules, all fail closed:
   with a slash command: posted as the owner it would start bots or comment-triggered workflows
   with owner trust, and the bot text the session reads could steer it into writing one.
   Replies are capped at 2000 characters and em and en dashes become commas.
+- Right before each post the wrapper reloads the PR and re-plans that one entry; if the plan
+  changed (a human joined, the thread was resolved), nothing is posted to it. `--threads`
+  prints nothing when the thread list is truncated, so a partial list never reads as complete.
 
 **Consequences.** Discord PRs whose only blockers are valid bot claims now merge without the
 owner. Replies are posted with the owner's PAT, as the loop's are; the session could already
