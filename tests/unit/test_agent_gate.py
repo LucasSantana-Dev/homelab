@@ -2008,6 +2008,7 @@ def test_automerge_replies_recheck_skips_only_the_changed_thread(tmp_path):
         {"id": "T2", "fixed": True, "reply": "Fixed too."},
     ]
     res, log = _answer(tmp_path, replies, _threads_conn(t1, t2))
+    assert res.returncode == 0, res.stdout + res.stderr
     assert "thread T1 changed since the check" in res.stdout
     assert _mutations(tmp_path) == ["reply T2 Fixed too.", "resolve T2 "]
     assert len(_merge_calls(log)) == 1  # no thread left open
@@ -2020,7 +2021,7 @@ def test_automerge_replies_recheck_accepts_a_normalized_reply(tmp_path):
     res, _ = _answer(
         tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
     )
-    assert "changed since the check" not in res.stdout, res.stdout
+    assert res.returncode == 0, res.stdout + res.stderr
     posted = _mutations(tmp_path)
     assert posted[0].startswith("reply T1 Fixed, the guard runs first, always. y")
     assert posted[1] == "resolve T1 "
