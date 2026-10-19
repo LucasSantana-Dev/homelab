@@ -60,32 +60,65 @@ budget_take() {
 # a later change to the box's global settings cannot widen what the worker may do.
 # The prompt goes in on stdin so the variadic tool flags cannot swallow it.
 # Push is allowed only as the exact `git push [-u] origin <branch>` (no globs, so no
-# refspec, --force or --delete variants); a branch outside fix/ or agent/ gets no run at all.
+# refspec, --force or --delete variants). Branches: the loop's fix/issue-N (legacy agent/...)
+# and the plain <type>/<slug> branches a Discord session opens its PRs from; any other
+# branch gets no run at all.
 # The scratch dir (from scratch_new) is added with --add-dir so the Write tool may use it.
+BRANCH_RE='^(agent/[A-Za-z0-9._/-]+|fix/issue-[0-9]+|(fix|feat|refactor|test|docs|chore|perf|ci|build|style|revert)/[A-Za-z0-9._-]+)$'
+
 claude_cmd() {
-    local repo="$1" workdir="$2" prompt="$3" branch="$4" scratch="$5" qprompt mode allowed denied t
-    if ! [[ "$branch" =~ ^(agent/[A-Za-z0-9._/-]+|fix/issue-[0-9]+)$ ]]; then
-        echo "claude_cmd: refusing branch '$branch' (must be fix/issue-N or agent/...)" >&2
+    local repo="$1" workdir="$2" prompt="$3" branch="$4" scratch="$5" allowed t
+    if ! [[ "$branch" =~ $BRANCH_RE ]]; then
+        echo "claude_cmd: refusing branch '$branch' (must be fix/issue-N, agent/... or <type>/<slug>)" >&2
         return 1
     fi
     if ! scratch_ok "$scratch"; then
         echo "claude_cmd: refusing scratch dir '$scratch' (must come from scratch_new)" >&2
         return 1
     fi
-    printf -v qprompt '%q' "$prompt"
-    mode=$(cfg "$repo" claude_permission_mode)
-    allowed="" denied=""
+    allowed=""
     for t in "Bash(git push origin $branch)" "Bash(git push -u origin $branch)"; do
         printf -v t '%q' "$t"; allowed+=" $t"
     done
     while IFS= read -r t; do printf -v t '%q' "$t"; allowed+=" $t"; done \
         < <(cfg "$repo" claude_allowed_tools | jq -r '.[]')
+    _claude_line "$repo" "$workdir" "$prompt" "$scratch" "$allowed" 60
+}
+
+# Read-only planning run (backlog round): it reads only the repo and writes only inside the
+# scratch dir. No Bash at all (git grep -O and git log --output run or write anything), no
+# GitHub or Discord credential in its environment: the prompt holds issue titles, and the
+# worker creates the issues itself.
+claude_plan_cmd() {
+    local repo="$1" workdir="$2" prompt="$3" scratch="$4" allowed t
+    if ! scratch_ok "$scratch"; then
+        echo "claude_plan_cmd: refusing scratch dir '$scratch' (must come from scratch_new)" >&2
+        return 1
+    fi
+    [[ "$workdir" =~ ^/workspace/[A-Za-z0-9_-][A-Za-z0-9._-]*$ ]] || {
+        echo "claude_plan_cmd: refusing workdir '$workdir'" >&2
+        return 1
+    }
+    # Absolute path rules (//...): Edit rules also cover the Write tool.
+    allowed=""
+    for t in "Read(/$workdir/**)" "Edit(/$scratch/**)"; do printf -v t '%q' "$t"; allowed+=" $t"; done
+    while IFS= read -r t; do printf -v t '%q' "$t"; allowed+=" $t"; done \
+        < <(cfg "$repo" claude_backlog_tools | jq -r '.[]')
+    _claude_line "$repo" "$workdir" "$prompt" "$scratch" "$allowed" 30 \
+        "-u GITHUB_TOKEN -u AGENT_GITHUB_TOKEN -u GH_TOKEN -u AGENT_DISCORD_WEBHOOK -u DISCORD_WEBHOOK"
+}
+
+# repo workdir prompt scratch allowed(quoted, space-led) max_turns [extra env -u flags]
+_claude_line() {
+    local qprompt mode denied="" t
+    printf -v qprompt '%q' "$3"
+    mode=$(cfg "$1" claude_permission_mode)
     while IFS= read -r t; do printf -v t '%q' "$t"; denied+=" $t"; done \
-        < <(cfg "$repo" claude_disallowed_tools | jq -r '.[]')
-    echo "cd $workdir && printf '%s' $qprompt | env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY" \
+        < <(cfg "$1" claude_disallowed_tools | jq -r '.[]')
+    echo "cd $2 && printf '%s' $qprompt | env -u ANTHROPIC_API_KEY -u CLAUDE_API_KEY" \
         "-u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL -u CLAUDE_CODE_USE_BEDROCK" \
-        "-u CLAUDE_CODE_USE_VERTEX timeout 45m claude -p --max-turns 60 --add-dir $scratch" \
-        "--permission-mode $mode --allowedTools$allowed --disallowedTools$denied"
+        "-u CLAUDE_CODE_USE_VERTEX ${7:+$7 }timeout 45m claude -p --max-turns $6 --add-dir $4" \
+        "--permission-mode $mode --allowedTools$5 --disallowedTools$denied"
 }
 
 # Per-run scratch dir on agent-box for commit messages, PR bodies and thread replies.
@@ -112,14 +145,29 @@ scratch_rm() {
     try_act "rm -rf -- $1"
 }
 
-# Silent and 0 when the workdir is clean. Otherwise prints why, for the alert, and returns 1.
-# Fail closed: an unreachable box or a git error counts as not clean.
+# Silent and 0 when the workdir is clean and detached (where the loop leaves it). Otherwise
+# prints why, for the alert, and returns 1. A branch checked out means a Discord chat is (or
+# was last) working there: switching under it would mix two runs in one tree.
+# Fail closed: an unreachable box, a git error or no branch line counts as not clean.
 workdir_clean() {
-    local out
-    if ! out=$(run_on_agent "cd $1 && git status --porcelain"); then
+    local out head
+    if ! out=$(run_on_agent "cd $1 && git status --porcelain --branch"); then
         echo "could not check: agent-box or git unreachable"
         return 1
     fi
+    head=${out%%$'\n'*}
+    if [[ "$head" != "## "* ]]; then
+        echo "could not check: no branch line from git status"
+        return 1
+    fi
+    # Porcelain output is not translated, so this label is stable.
+    if [[ "$head" != "## HEAD (no branch)" ]]; then
+        head=${head#\#\# }
+        echo "branch ${head%%...*} is checked out (a chat may be using it)"
+        return 1
+    fi
+    [[ "$out" == *$'\n'* ]] || return 0
+    out=${out#*$'\n'}
     [[ -z "$out" ]] && return 0
     echo "in the way: $(dirty_summary <<<"$out")"
     return 1
@@ -188,10 +236,30 @@ open_agent_prs() {
     open_prs "$1" | only_agent_prs "$1"
 }
 
+# PRs a Discord session opened: owner-authored, same repo, not a loop PR, and the head commit
+# is the tip of the local branch of the same name in the agent-box clone (the session pushed it
+# from there). A branch the clone only has an old copy of, or that someone pushed to from
+# elsewhere since, does not count. Nothing else follows these PRs once the chat ends. Prints PR
+# numbers whose branch claude_cmd would accept; fails when either listing fails.
+session_prs() {  # repo workdir
+    local heads all loop n b
+    heads=$(run_on_agent "git -C $2 for-each-ref --format='%(refname:short) %(objectname)' refs/heads/" \
+        | jq -Rsc 'split("\n") | map(select(length > 0) | split(" ") | {(.[0]): .[1]}) | add // {}') || return 1
+    all=$(run_on_agent "gh pr list --repo $1 --state open --limit 1000 --author $(printf '%q' "$(cfg "$1" owner)") --json number,headRefName,headRefOid,isCrossRepository,labels") || return 1
+    loop=$(only_agent_prs "$1" <<<"$all" | jq -c '[.[].number]') || return 1
+    while read -r n b; do
+        [[ "$b" =~ $BRANCH_RE && ! "$b" =~ ^(fix/issue-[0-9]+|agent/.*)$ ]] && echo "$n"
+    done < <(jq -r --argjson heads "$heads" --argjson loop "$loop" '.[]
+        | select(.isCrossRepository == false and (.number as $n | $loop | index($n) | not))
+        | select($heads[.headRefName] == .headRefOid)
+        | "\(.number) \(.headRefName)"' <<<"$all")
+    return 0
+}
+
 ensure_labels() {
     local repo="$1" have
     have=$(run_on_agent "gh label list --repo $repo --limit 200 --json name -q '.[].name'") || return 0
-    for l in agent-failed needs-human needs-split; do
+    for l in agent-failed needs-human needs-split ready-for-agent ready-for-human effort:s; do
         grep -qx "$l" <<<"$have" || try_act "gh label create $l --repo $repo --color BFD4F2"
     done
 }

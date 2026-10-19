@@ -82,6 +82,11 @@ Merging and done:
   posts the replies, resolves only the fixed bot threads, then queues the merge as usual. A
   dismissed claim stays open for the owner, and threads with `bot_only: false` are the owner's:
   never answer them, tell the owner which ones are left.
+- When the chat ends before the merge, the loop gate takes over your PR (each gate run): it
+  fixes red CI, bot threads and merge conflicts on your branch and runs pr-automerge. So cut every
+  branch in `/workspace/<repo>` as described above, and say in the chat when you stop following a PR.
+  When you are done in a clone, leave it clean and detached (`git -C /workspace/<repo> switch
+  --detach origin/<base>`): the loop does not touch a clone with a branch checked out.
 - After the merge, confirm with `gh pr view <n> -R <repo> --json state,mergeCommit` and
   `gh run list -R <repo> --branch <base> --commit <mergeCommit oid>`: those runs, on the merge
   commit itself, must be green (a red one is yours to fix). Then report where the release stands: Lucky

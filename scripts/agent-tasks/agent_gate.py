@@ -4,6 +4,10 @@
 Subcommands (JSON on stdin, JSON on stdout):
   score   {"pr": <gh pr view json>, "issue": <gh issue view json> | null}
           -> {"pillars": {size, impact, value, security}, "reasons": [...], "decision": ...}
+          --session: a PR an agent-box session opened; no pillars, never closed or split,
+          "queue" means run pr-automerge
+  backlog-plan  {"proposals": [<model's backlog file>], "existing": [<every issue>]}
+          -> {"create": [{title, body, labels}], "skipped": {key: reason}}
   select  {"issues": [<gh issue list json>], "open_prs": [<gh pr list json, all open PRs>]}
           -> {"issue": <number> | null, "skipped": {number: reason}}
   merge-check  {"pr": <gh pr view json + reviewThreads>, "issues": [<gh issue view json>]}
@@ -272,6 +276,7 @@ def merge_check(pr, cfg, issues):
     if pr.get("isCrossRepository") is not False:
         reasons.append("head branch is in a fork")
     reasons += branch_problems(pr, cfg)
+    reasons += release_or_bot_pr(pr, cfg)
     if any(foreign_activity(pr, issue, cfg) for issue in [None, *(issues or [])]):
         reasons.append("another human authored, commented on or pushed to it")
     if threads_truncated(pr) or "reviewThreads" not in pr:
@@ -281,6 +286,16 @@ def merge_check(pr, cfg, issues):
     paths = [f["path"] for f in pr.get("files", [])]
     if not paths or pr.get("changedFiles") != len(paths):
         reasons.append("file list missing or truncated")
+    if blocked := owner_path_hits(pr, cfg):
+        reasons.append("owner-review paths: " + ", ".join(blocked[:3]))
+    if conflicting(pr):
+        reasons.append("has merge conflicts")
+    return reasons
+
+
+def owner_path_hits(pr, cfg):
+    """Changed paths only the owner merges: infra, sensitive, dependencies, lockfiles,
+    the repo's own block list, and on a repo with an allow list anything outside it."""
     owner_paths = (
         cfg["high_impact_paths"]
         + cfg["sensitive_paths"]
@@ -289,14 +304,26 @@ def merge_check(pr, cfg, issues):
         + cfg.get("repo_merge_block_paths", [])
     )
     allow = cfg.get("repo_merge_allow_paths")
-    blocked = [
-        p
-        for p in paths
-        if _match(p, owner_paths) or (allow is not None and not _match(p, allow))
+    return [
+        f["path"]
+        for f in pr.get("files", [])
+        if _match(f["path"], owner_paths)
+        or (allow is not None and not _match(f["path"], allow))
     ]
-    if blocked:
-        reasons.append("owner-review paths: " + ", ".join(blocked[:3]))
-    return reasons
+
+
+def release_or_bot_pr(pr, cfg):
+    """A release PR (merging it ships a release and starts the deploy) or a dependency bot
+    PR is never the agent's to merge, whoever the author is: release-please opens its PR
+    with the owner's token. Fails closed when the head branch or labels are missing."""
+    head = pr.get("headRefName")
+    if not isinstance(head, str) or not head or "labels" not in pr:
+        return ["head branch or labels not loaded"]
+    if _match(head, cfg["merge_block_branches"]):
+        return [f"release or dependency bot branch: {head}"]
+    if hit := sorted(_labels(pr) & set(cfg["merge_block_labels"])):
+        return ["release label: " + ", ".join(hit)]
+    return []
 
 
 def list_open_threads(pr, cfg):
@@ -413,6 +440,72 @@ def _unloaded_issues(pr, issue):
     return [f"closes issue(s) the gate did not check: {extra}"] if extra else []
 
 
+def conflicting(pr):
+    """GitHub runs no pull_request checks on a PR with conflicts, so it would sit on
+    pending forever. UNKNOWN (not computed yet) is not a conflict: next run sees it."""
+    return pr.get("mergeable") == "CONFLICTING"
+
+
+def score_session(pr, issue, cfg):
+    """A PR an agent-box session opened (Discord, fix/<slug>). The loop follows it to the
+    merge but never closes or splits it: the owner asked for it in the chat. The merge goes
+    through pr-automerge ("queue"), whose merge check is the gate; paths that check refuses
+    go to the owner before any autofix run is spent on them. A release or dependency bot PR
+    is skipped without a label or an alert: it is not the agent's to fix or merge."""
+    if skip := release_or_bot_pr(pr, cfg):
+        return {"decision": "skip", "pillars": {}, "reasons": skip}
+    if (
+        foreign_activity(pr, issue, cfg)
+        or threads_truncated(pr)
+        or pr.get("isCrossRepository") is not False
+    ):
+        return {
+            "decision": "halt",
+            "pillars": {},
+            "reasons": ["another human, a fork or unfetched threads"],
+        }
+    if pr.get("isDraft") is not False or "needs-human" in _labels(pr):
+        return {
+            "decision": "wait",
+            "pillars": {},
+            "reasons": ["draft or needs-human: the owner moves it on"],
+        }
+    checks = checks_state(pr)
+    threads = open_threads(pr)
+    bot_only = bool(threads) and all(_bot_only_thread(t, cfg) for t in threads)
+    reasons = branch_problems(pr, cfg)
+    paths = [f.get("path") for f in pr.get("files", [])]
+    fix = None
+    if reasons:
+        decision = "needs-human"
+    elif not paths or pr.get("changedFiles") != len(paths):
+        decision = "owner-review"
+        reasons.append("file list missing or truncated")
+    elif unloaded := _unloaded_issues(pr, issue):
+        decision = "owner-review"
+        reasons += unloaded
+    elif blocked := owner_path_hits(pr, cfg):
+        decision = "owner-review"
+        reasons.append("owner-review paths: " + ", ".join(blocked[:3]))
+    elif conflicting(pr):
+        decision, fix = "autofix", "conflict"
+    elif checks == "failing":
+        decision, fix = "autofix", "ci"
+    elif checks == "pending":
+        decision = "wait"
+    elif bot_only:
+        decision, fix = "autofix", "threads"
+    elif threads:
+        decision = "owner-review"
+        reasons.append(f"review: {len(threads)} unresolved thread(s), owner involved")
+    else:
+        decision = "queue"
+    out = {"decision": decision, "pillars": {}, "reasons": reasons, "checks": checks}
+    if fix:
+        out["fix"] = fix
+    return out
+
+
 def score(pr, issue, cfg):
     if foreign_activity(pr, issue, cfg):
         return {
@@ -455,6 +548,8 @@ def score(pr, issue, cfg):
         decision = "needs-human"
     elif pillars["size"] == "red":
         decision = "split"
+    elif conflicting(pr):
+        decision, fix = "autofix", "conflict"
     elif checks == "failing":
         decision, fix = "autofix", "ci"
     elif checks == "pending":
@@ -545,14 +640,101 @@ def select(issues, open_prs, cfg, repo=None):
     return {"issue": eligible[0]["number"] if eligible else None, "skipped": skipped}
 
 
+# Issues are public and posted as the owner: anything shaped like a token, a key or a
+# webhook URL the planning run might have read is never created.
+SECRET_SHAPE = re.compile(
+    r"\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_|\bsk-ant-|\bAKIA[0-9A-Z]{16}\b"
+    r"|discord(?:app)?\.com/api/webhooks/|-----BEGIN [A-Z ]*PRIVATE KEY"
+    r"|\b(?:ANTHROPIC_API_KEY|GITHUB_TOKEN|AGENT_GITHUB_TOKEN|DISCORD_WEBHOOK)\s*="
+)
+
+CONVENTIONAL_PREFIX = re.compile(r"^\s*[a-z]+(\([^)]*\))?!?:\s*", re.I)
+
+
+def _title_words(title):
+    t = CONVENTIONAL_PREFIX.sub("", title.lower())
+    return frozenset(re.findall(r"[a-z0-9]+", t))
+
+
+def _duplicate(words, seen):
+    """Same words, or at least 80% overlap (Jaccard) with a known title."""
+    return any(
+        words == s or (words and s and len(words & s) / len(words | s) >= 0.8)
+        for s in seen
+    )
+
+
+def backlog_plan(proposals, existing, cfg):
+    """Turn the model's backlog proposals into issues the worker may create as the owner.
+
+    proposals: the model's file, [{"title", "body", "agent": bool}]. existing: every issue
+    of the repo, open and closed ({"title"}). Returns (create, skipped): at most
+    cfg["backlog_round_max"] issues, none duplicating an existing title or another
+    proposal. agent: true becomes ready-for-agent + the picker's effort label unless the
+    title hits a picker skip word (the picker would never take it); everything else is
+    ready-for-human. A title or body with an @mention or a slash command is dropped: posted
+    as the owner it would start bots or workflows with owner trust."""
+    if not isinstance(proposals, list):
+        return [], {"#all": "proposals file is not a JSON array"}
+    seen = [_title_words(i.get("title") or "") for i in existing]
+    create, skipped = [], {}
+    cap = cfg["backlog_round_max"]
+    for i, p in enumerate(proposals):
+        key = f"#{i}"
+        title = p.get("title") if isinstance(p, dict) else None
+        body = p.get("body") if isinstance(p, dict) else None
+        if not isinstance(title, str) or not 10 <= len(title.strip()) <= 120:
+            skipped[key] = "title missing or not 10-120 characters"
+            continue
+        title = re.sub(r"\s+", " ", title).strip()
+        if not isinstance(body, str) or not body.strip() or len(body) > 4000:
+            skipped[key] = f"{title}: body missing or over 4000 characters"
+            continue
+        if MENTION_OR_COMMAND.search(title) or MENTION_OR_COMMAND.search(body):
+            skipped[key] = f"{title}: mentions or slash commands"
+            continue
+        if SECRET_SHAPE.search(title) or SECRET_SHAPE.search(body):
+            skipped[key] = f"{title}: looks like it holds a credential"
+            continue
+        words = _title_words(title)
+        if _duplicate(words, seen):
+            skipped[key] = f"{title}: duplicates an existing issue"
+            continue
+        if len(create) >= cap:
+            skipped[key] = f"{title}: over the round cap of {cap}"
+            continue
+        seen.append(words)
+        lower = (title + " " + body).lower()
+        word = next((w for w in cfg["issue_skip_words"] if w in lower), None)
+        agent = p.get("agent") is True and word is None
+        dash = " ?[\u2013\u2014] ?"
+        create.append(
+            {
+                "title": re.sub(dash, ", ", title),
+                "body": re.sub(dash, ", ", body.strip()),
+                "labels": (
+                    ["ready-for-agent", *cfg["required_effort"][:1]]
+                    if agent
+                    else ["ready-for-human"]
+                ),
+            }
+        )
+    return create, skipped
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument(
         "command",
-        choices=["score", "select", "get", *PR_COMMANDS],
+        choices=["score", "select", "get", "backlog-plan", *PR_COMMANDS],
     )
     ap.add_argument("--config", default=str(DEFAULT_CONFIG))
     ap.add_argument("--repo", help="owner/name; merges repos.<repo> over the defaults")
+    ap.add_argument(
+        "--session",
+        action="store_true",
+        help="for score: a PR an agent-box session opened (followed to the merge)",
+    )
     ap.add_argument("--key", help="for get: config key to print")
     args = ap.parse_args(argv)
     cfg = load_config(args.config)
@@ -570,7 +752,13 @@ def main(argv=None):
         return 0
     data = json.load(sys.stdin)
     if args.command == "score":
-        out = score(data["pr"], data.get("issue"), cfg)
+        scorer = score_session if args.session else score
+        out = scorer(data["pr"], data.get("issue"), cfg)
+    elif args.command == "backlog-plan":
+        create, skipped = backlog_plan(
+            data.get("proposals"), data.get("existing", []), cfg
+        )
+        out = {"create": create, "skipped": skipped}
     elif args.command == "merge-check":
         reasons = merge_check(data["pr"], cfg, data.get("issues"))
         out = {"ok": not reasons, "reasons": reasons}

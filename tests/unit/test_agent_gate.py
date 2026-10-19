@@ -56,6 +56,8 @@ def make_pr(
         "isDraft": False,
         "isCrossRepository": False,
         "baseRefName": "main",
+        "headRefName": "fix/x",
+        "labels": [],
         "changedFiles": len(files),
         "reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": []},
         "commits": [{"oid": OWN_OID}],
@@ -551,7 +553,7 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
 
 def test_claude_cmd_accepts_new_and_legacy_prefix():
     lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
-    for branch in ("fix/issue-7", "agent/issue-7"):
+    for branch in ("fix/issue-7", "agent/issue-7", "feat/x", "fix/thread-replies"):
         res = subprocess.run(
             [
                 "bash",
@@ -593,7 +595,10 @@ def test_notify_once_dedups_per_sha(tmp_path):
         "agent/+x",
         "agent/x y",
         "fix/x:main",
-        "feat/x",
+        "feat/x/y",
+        "release-please--branches--main",
+        "dependabot/npm/x",
+        "hotfix/x",
     ],
 )
 def test_claude_cmd_refuses_non_agent_branch(branch):
@@ -913,7 +918,7 @@ def test_workdir_clean_lists_offending_paths():
         ]
     )
     res = _lib(
-        f"run_on_agent() {{ printf '{status}\\n'; }}; "
+        f"run_on_agent() {{ printf '## HEAD (no branch)\\n{status}\\n'; }}; "
         'if out=$(workdir_clean /w); then echo clean; else echo "dirty: $out"; fi'
     )
     assert res.stdout.strip() == (
@@ -921,7 +926,8 @@ def test_workdir_clean_lists_offending_paths():
         " telemetry.test.ts.commitmsg, renamed.ts, odd -> name.md, a.ts and 4 more"
     )
     clean = _lib(
-        'run_on_agent() { :; }; out=$(workdir_clean /w) && echo "clean [$out]"'
+        "run_on_agent() { printf '## HEAD (no branch)\\n'; }; "
+        'out=$(workdir_clean /w) && echo "clean [$out]"'
     )
     assert clean.stdout.strip() == "clean []"
     down = _lib(
@@ -1034,6 +1040,7 @@ def test_merge_check_passes_a_clean_owner_pr(cfg):
         ({"comments": [{"author": {"login": "someone"}}]}, "another human"),
         ({"changedFiles": 101}, "truncated"),
         ({"files": []}, "missing"),
+        ({"mergeable": "CONFLICTING"}, "conflicts"),
     ],
 )
 def test_merge_check_refuses(cfg, change, reason):
@@ -2526,3 +2533,514 @@ def test_pr_guard_allows_pr_create_in_a_title(tmp_path):
     _branch(clone, "fix/a", "origin/main")
     cmd = 'gh pr create -R LucasSantana-Dev/Lucky --base main --title "fix: pr create guard"'
     assert _pr_guard(tmp_path, cmd).returncode == 0
+
+
+# --- release and bot PRs, session PRs, conflicts, backlog round -----------
+
+RELEASE_BRANCH = "release-please--branches--main--components--lucky"
+
+
+@pytest.mark.parametrize(
+    "extra,why",
+    [
+        ({"headRefName": RELEASE_BRANCH}, "release or dependency bot branch"),
+        ({"headRefName": "dependabot/npm_and_yarn/x-1.2.3"}, "dependency bot branch"),
+        ({"headRefName": "renovate/x"}, "dependency bot branch"),
+        ({"labels": [{"name": "autorelease: pending"}]}, "release label"),
+        ({"headRefName": None}, "head branch or labels not loaded"),
+        ({"labels": None}, "head branch or labels not loaded"),
+    ],
+)
+def test_merge_check_refuses_release_and_bot_prs(cfg, extra, why):
+    pr = make_pr(["src/x.ts"])
+    for k, v in extra.items():
+        if v is None:
+            del pr[k]
+        else:
+            pr[k] = v
+    reasons = gate.merge_check(pr, cfg, [make_issue()])
+    assert any(why in r for r in reasons), reasons
+
+
+def test_merge_check_passes_a_clean_session_branch(cfg):
+    pr = make_pr(["src/x.ts"])
+    pr["headRefName"] = "feat/queue-tracks"
+    assert gate.merge_check(pr, cfg, [make_issue()]) == []
+
+
+def test_automerge_refuses_a_release_please_pr(tmp_path):
+    pr = _gh_pr(headRefName=RELEASE_BRANCH, labels=[{"name": "autorelease: pending"}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "release or dependency bot branch" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_refuses_a_pr_another_human_commented_on(tmp_path):
+    pr = _gh_pr(comments=[{"author": {"login": "someone"}}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "another human" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_loads_branch_and_labels():
+    fields = next(
+        ln for ln in AUTOMERGE.read_text().splitlines() if ln.startswith("FIELDS=")
+    )
+    assert {"headRefName", "labels", "mergeable"} <= set(
+        fields[len("FIELDS=") :].split(",")
+    )
+
+
+def test_gate_session_cooldown_counts_from_the_last_push():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    assert "PUSHED=$(jq -r '.commits[-1].committedDate // .updatedAt'" in text
+    body = _gate_fn("autofix_pr")
+    assert 'date -d "$PUSHED"' in body and 'date -d "$UPDATED"' not in body
+
+
+def _session_pr(files=("src/x.ts",), **extra):
+    pr = make_pr(list(files))
+    pr["headRefName"] = "feat/queue-tracks"
+    pr["mergeable"] = "MERGEABLE"
+    pr.update(extra)
+    return pr
+
+
+def test_score_session_queues_a_clean_green_pr(cfg):
+    res = gate.score_session(_session_pr(), make_issue(), cfg)
+    assert res["decision"] == "queue", res
+
+
+def test_score_session_skips_release_prs_silently(cfg):
+    pr = _session_pr(
+        headRefName=RELEASE_BRANCH, comments=[{"author": {"login": "someone"}}]
+    )
+    assert gate.score_session(pr, None, cfg)["decision"] == "skip"
+
+
+def test_score_session_halts_on_another_human(cfg):
+    pr = _session_pr(comments=[{"author": {"login": "someone"}}])
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == "halt"
+    issue = make_issue(comments=["someone"])
+    assert gate.score_session(_session_pr(), issue, cfg)["decision"] == "halt"
+
+
+@pytest.mark.parametrize(
+    "extra,decision,fix",
+    [
+        ({"mergeable": "CONFLICTING", "statusCheckRollup": []}, "autofix", "conflict"),
+        (
+            {"statusCheckRollup": [{"conclusion": "FAILURE", "status": "COMPLETED"}]},
+            "autofix",
+            "ci",
+        ),
+        (
+            {"statusCheckRollup": [{"conclusion": None, "status": "IN_PROGRESS"}]},
+            "wait",
+            None,
+        ),
+        ({"mergeable": "UNKNOWN"}, "queue", None),
+    ],
+)
+def test_score_session_flow(cfg, extra, decision, fix):
+    res = gate.score_session(_session_pr(**extra), make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == (decision, fix), res
+
+
+def test_score_session_fixes_bot_threads_and_leaves_owner_threads(cfg):
+    pr = _session_pr()
+    pr["reviewThreads"] = _threads_conn(thread("cubic-dev-ai"))
+    res = gate.score_session(pr, make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == ("autofix", "threads")
+    pr["reviewThreads"] = _threads_conn(thread("cubic-dev-ai", OWNER))
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_score_session_sends_owner_paths_to_the_owner_before_any_fix(cfg):
+    pr = _session_pr(
+        files=("src/x.ts", "package-lock.json"),
+        statusCheckRollup=[{"conclusion": "FAILURE", "status": "COMPLETED"}],
+    )
+    res = gate.score_session(pr, make_issue(), cfg)
+    assert res["decision"] == "owner-review"
+    assert "package-lock.json" in res["reasons"][-1]
+
+
+def test_score_session_wants_a_human_for_a_stacked_branch(cfg):
+    pr = _session_pr(openPrs=[{"number": 99, "oids": [OWN_OID]}], number=5)
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == "needs-human"
+
+
+def test_loop_score_fixes_a_conflict_before_waiting_on_checks(cfg):
+    pr = make_pr(["src/x.ts"])
+    pr["mergeable"] = "CONFLICTING"
+    pr["statusCheckRollup"] = []
+    res = gate.score(pr, make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == ("autofix", "conflict")
+
+
+def test_score_cli_session_flag(cfg):
+    data = json.dumps({"pr": _session_pr(), "issue": make_issue()})
+    out = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "score",
+            "--session",
+            "--repo",
+            "LucasSantana-Dev/Lucky",
+        ],
+        input=data,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert json.loads(out)["decision"] == "queue"
+
+
+def _proposal(title, agent=True, body="What is wrong in src/x.ts:10, how to test it."):
+    return {"title": title, "body": body, "agent": agent}
+
+
+def test_backlog_plan_dedupes_caps_and_labels(cfg):
+    existing = [{"title": "fix(queue): skip tracks that fail to load"}]
+    proposals = [
+        _proposal(
+            "fix: skip tracks that fail to load"
+        ),  # same words as an existing issue
+        _proposal("test: cover the shuffle edge cases"),
+        _proposal("test: cover the shuffle edge cases"),  # dup inside the round
+        _proposal("docs: README install step is wrong", agent=False),
+        _proposal(
+            "fix: refresh the oauth token on 401"
+        ),  # skip word, the picker would never take it
+        _proposal("refactor: share the embed builder"),
+        _proposal("fix: dedupe autoplay picks by artist key"),
+        _proposal("test: one over the round cap here"),
+    ]
+    create, skipped = gate.backlog_plan(proposals, existing, cfg)
+    assert [c["title"] for c in create] == [
+        "test: cover the shuffle edge cases",
+        "docs: README install step is wrong",
+        "fix: refresh the oauth token on 401",
+        "refactor: share the embed builder",
+        "fix: dedupe autoplay picks by artist key",
+    ]
+    labels = {c["title"]: c["labels"] for c in create}
+    assert labels["test: cover the shuffle edge cases"] == [
+        "ready-for-agent",
+        "effort:s",
+    ]
+    assert labels["docs: README install step is wrong"] == ["ready-for-human"]
+    assert labels["fix: refresh the oauth token on 401"] == ["ready-for-human"]
+    assert "duplicates an existing issue" in skipped["#0"]
+    assert "duplicates an existing issue" in skipped["#2"]
+    assert "over the round cap" in skipped["#7"]
+
+
+@pytest.mark.parametrize(
+    "proposal,why",
+    [
+        (_proposal("short"), "title missing"),
+        (_proposal("x" * 121), "title missing"),
+        (_proposal("fix: a fine title here", body=""), "body missing"),
+        (_proposal("fix: a fine title here", body="x" * 4001), "body missing"),
+        (_proposal("fix: ping @someone about this"), "mentions"),
+        (_proposal("fix: a fine title here", body="ok\n/review now"), "mentions"),
+        ("not an object", "title missing"),
+    ],
+)
+def test_backlog_plan_drops_bad_proposals(cfg, proposal, why):
+    create, skipped = gate.backlog_plan([proposal], [], cfg)
+    assert create == []
+    assert why in skipped["#0"]
+
+
+def test_backlog_plan_needs_a_list_and_strips_dashes(cfg):
+    assert gate.backlog_plan(None, [], cfg) == (
+        [],
+        {"#all": "proposals file is not a JSON array"},
+    )
+    create, _ = gate.backlog_plan(
+        [_proposal("fix: retry \u2014 then give up", body="a \u2013 b")], [], cfg
+    )
+    assert create[0]["title"] == "fix: retry, then give up"
+    assert create[0]["body"] == "a, b"
+    assert create[0]["labels"] == ["ready-for-agent", "effort:s"]
+
+
+def test_backlog_plan_cli(tmp_path):
+    data = json.dumps(
+        {"proposals": [_proposal("test: cover the shuffle edge cases")], "existing": []}
+    )
+    out = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "backlog-plan",
+            "--repo",
+            "LucasSantana-Dev/Lucky",
+        ],
+        input=data,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert [c["title"] for c in json.loads(out)["create"]] == [
+        "test: cover the shuffle edge cases"
+    ]
+
+
+def test_claude_plan_cmd_is_read_only_plus_the_scratch_dir():
+    res = _lib(f"claude_plan_cmd LucasSantana-Dev/Lucky /workspace/Lucky p {SCRATCH}")
+    assert res.returncode == 0, res.stderr
+    out = res.stdout
+    assert "Edit\\(//tmp/agent-run.Ab3dEf9h/\\*\\*\\)" in out
+    assert "Read\\(//workspace/Lucky/\\*\\*\\)" in out
+    assert f"--add-dir {SCRATCH}" in out
+    assert "--permission-mode dontAsk" in out
+    allowed = out.split("--allowedTools", 1)[1].split("--disallowedTools", 1)[0]
+    # No Bash at all: git grep -O runs a command and git log --output writes a file.
+    for word in ("Bash", "push", "commit", "Write", " Read ", " Edit "):
+        assert word not in allowed, word
+    assert allowed.split() == [
+        "Read\\(//workspace/Lucky/\\*\\*\\)",
+        "Edit\\(//tmp/agent-run.Ab3dEf9h/\\*\\*\\)",
+        "Glob",
+        "Grep",
+    ]
+    denied = out.split("--disallowedTools", 1)[1]
+    assert "Bash\\(gh\\ pr\\ merge\\*\\)" in denied
+    assert "Read\\(//etc/profile.d/\\*\\*\\)" in denied
+    # The prompt carries issue titles anyone can write: no credential in the environment.
+    env = out.split("timeout 45m", 1)[0]
+    for var in (
+        "GITHUB_TOKEN",
+        "AGENT_GITHUB_TOKEN",
+        "GH_TOKEN",
+        "AGENT_DISCORD_WEBHOOK",
+    ):
+        assert f"-u {var} " in env, var
+
+
+def test_claude_cmd_keeps_the_token_for_gh():
+    res = _lib(f"claude_cmd LucasSantana-Dev/Lucky /w p fix/issue-7 {SCRATCH}")
+    assert res.returncode == 0, res.stderr
+    assert "-u GITHUB_TOKEN" not in res.stdout
+    assert (
+        "Read\\(//etc/profile.d/\\*\\*\\)" in res.stdout.split("--disallowedTools")[1]
+    )
+
+
+def test_claude_plan_cmd_refuses_a_foreign_scratch_dir():
+    res = _lib('claude_plan_cmd LucasSantana-Dev/Lucky /w p "$1"', "/workspace/Lucky")
+    assert (res.returncode, res.stdout) == (1, "")
+
+
+@pytest.mark.parametrize(
+    "workdir", ["/w", "/workspace/../etc", "/workspace/..", "/workspace/a b", ""]
+)
+def test_claude_plan_cmd_refuses_a_workdir_outside_workspace(workdir):
+    res = _lib(f'claude_plan_cmd LucasSantana-Dev/Lucky "$1" p {SCRATCH}', workdir)
+    assert (res.returncode, res.stdout) == (1, "")
+
+
+def test_session_prs_lists_owner_prs_from_local_branches(tmp_path):
+    sha = "a" * 40
+
+    def pr(n, branch, oid=sha, fork=False):
+        return {
+            "number": n,
+            "headRefName": branch,
+            "headRefOid": oid,
+            "isCrossRepository": fork,
+            "labels": [],
+        }
+
+    prs = [
+        pr(1, "feat/a"),
+        pr(2, "feat/not-local"),
+        pr(3, "fix/issue-9"),
+        pr(4, "agent/x"),
+        pr(5, "feat/b", fork=True),
+        pr(6, "main"),
+        pr(7, "fix/b"),
+        # The clone has an old copy, or someone pushed from elsewhere: not the session's.
+        pr(8, "fix/stale"),
+        # claude_cmd would refuse these branches: listing them would only burn fix attempts.
+        pr(9, "hotfix/x"),
+        pr(10, "feat/a/b"),
+    ]
+    (tmp_path / "prs.json").write_text(json.dumps(prs))
+    local = ["feat/a", "fix/issue-9", "agent/x", "feat/b", "main", "fix/b"]
+    local += ["hotfix/x", "feat/a/b"]
+    heads = "".join(f"{b} {sha}\n" for b in local) + f"fix/stale {'c' * 40}\n"
+    res = _lib(
+        f'AGENT_STATE_DIR="{tmp_path}"; '
+        'run_on_agent() { case "$1" in '
+        f"git*) printf '{heads}' ;; "
+        f'gh*) [[ "$1" == *"--author LucasSantana-Dev"* ]] && cat "{tmp_path}/prs.json" ;; esac; }}; '
+        "session_prs o/r /w"
+    )
+    assert res.returncode == 0, res.stderr
+    assert res.stdout.split() == ["1", "7"]
+    down = _lib("run_on_agent() { return 255; }; session_prs o/r /w")
+    assert down.returncode == 1
+
+
+def test_gate_queues_session_prs_only_through_pr_automerge():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    assert 'OUT=$(act "pr-automerge $REPO $N")' in text
+    assert 'act "pr-automerge $REPO $N --replies $REPLIES"' in text
+    merges = [ln for ln in text.splitlines() if "gh pr merge" in ln and "act" in ln]
+    assert all("--auto" not in ln and "--admin" not in ln for ln in merges), merges
+    # Session PRs are never stale-closed.
+    assert '[[ "$KIND" == "loop" ]] && [[ "$DECISION" == "wait"' in text
+
+
+def test_gate_conflict_fix_merges_the_base_and_never_rebases():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    assert "git merge --no-edit -q origin/$BASE" in text
+    assert "git merge --abort" in text
+    assert "git rebase" not in text and "push --force" not in text
+
+
+def test_worker_backlog_round_runs_once_a_day_and_only_reads():
+    text = (TASKS / "agent-worker.sh").read_text()
+    body = text[text.index("backlog_round() {") : text.index("\nfor REPO in")]
+    assert "claude_plan_cmd" in body and "claude_cmd " not in body
+    assert body.index('date +%s > "$marker"') < body.index('act "$PLAN_CMD"')
+    assert body.index("budget_take") < body.index('act "$PLAN_CMD"')
+    # A planning run that changed the clone creates nothing.
+    assert (
+        body.index('act "$PLAN_CMD"')
+        < body.rindex("workdir_clean")
+        < body.index("gh issue create")
+    )
+    assert "backlog-plan --repo" in body
+
+
+@pytest.mark.parametrize(
+    "extra,decision",
+    [
+        ({"isDraft": True}, "wait"),
+        ({"labels": [{"name": "needs-human"}]}, "wait"),
+        ({"isCrossRepository": True}, "halt"),
+        ({"isCrossRepository": None}, "halt"),
+        ({"changedFiles": 101}, "owner-review"),
+        ({"files": []}, "owner-review"),
+        (
+            {"closingIssuesReferences": [{"number": 1}, {"number": 99}]},
+            "owner-review",
+        ),
+    ],
+)
+def test_score_session_fails_closed(cfg, extra, decision):
+    pr = _session_pr(**extra)
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == decision
+
+
+def test_score_session_does_not_fix_a_truncated_file_list(cfg):
+    pr = _session_pr(
+        changedFiles=101,
+        statusCheckRollup=[{"conclusion": "FAILURE", "status": "COMPLETED"}],
+    )
+    res = gate.score_session(pr, make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == ("owner-review", None)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "Found " + "gh" + "p_" + "A" * 36 + " in src/x.ts:10.",
+        "The hook posts to https://discord.com/api/" + "webhooks/1/abc in x.ts.",
+        "In /etc/profile.d: export GITHUB" + "_TOKEN='x', see src/x.ts:1.",
+        "-----BEGIN OPENSSH " + "PRIVATE KEY----- in a fixture, src/x.ts:2.",
+    ],
+)
+def test_backlog_plan_never_posts_credential_shapes(cfg, body):
+    create, skipped = gate.backlog_plan(
+        [_proposal("fix: drop the leaked value from the fixture", body=body)], [], cfg
+    )
+    assert create == [] and "credential" in skipped["#0"]
+
+
+def test_backlog_plan_reads_skip_words_in_the_body_too(cfg):
+    body = "The deploy script in scripts/x.sh:3 skips the health check."
+    create, _ = gate.backlog_plan(
+        [_proposal("fix: wait for the health check", body=body)], [], cfg
+    )
+    assert create[0]["labels"] == ["ready-for-human"]
+
+
+def _gate_fn(name):
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    start = text.index(f"\n{name}() {{") + 1
+    return text[start : text.index("\n}\n", start) + 3]
+
+
+def test_gate_pr_survives_set_e_on_every_decision():
+    """gate_pr runs once per PR under set -euo pipefail: a trailing skipped `[[ ]] && cmd`
+    (close with no linked issue) must not end the run before the other PRs and repos."""
+    pr = {
+        "number": 1,
+        "headRefOid": "a" * 40,
+        "headRefName": "feat/x",
+        "closingIssuesReferences": [],
+        "labels": [],
+        "updatedAt": "2026-10-19T00:00:00Z",
+    }
+    for decision in ("close", "wait", "skip", "owner-review", "split", "needs-human"):
+        res = {"decision": decision, "pillars": {}, "reasons": []}
+        script = (
+            "set -euo pipefail\n"
+            + _gate_fn("gate_pr")
+            + 'load_pr() { echo "$PRJ"; }; score_pr() { echo "$RES"; }\n'
+            + "try_act() { :; }; notify_once() { :; }; has_label() { return 1; }\n"
+            + 'date() { [[ "${1:-}" == -d ]] && echo 0 || command date "$@"; }\n'
+            + "REPO=o/r STALE_DAYS=5 AGENT_DRY_RUN=1\n"
+            + 'for N in 1 2; do gate_pr loop "$N"; echo "done $N"; done\n'
+        )
+        out = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PRJ": json.dumps(pr), "RES": json.dumps(res)},
+        )
+        assert out.returncode == 0, (decision, out.stderr)
+        assert "done 2" in out.stdout, decision
+
+
+def test_gate_autofix_leaves_a_clone_a_chat_has_checked_out():
+    body = _gate_fn("autofix_pr")
+    assert body.index("workdir_clean") < body.index("budget_take")
+    assert body.index("workdir_clean") < body.index("git switch")
+
+
+def test_workdir_clean_refuses_a_checked_out_branch():
+    on_branch = _lib(
+        "run_on_agent() { printf '## feat/x...origin/feat/x [ahead 1]\\n'; }; "
+        'out=$(workdir_clean /w) || echo "no: $out"'
+    )
+    assert on_branch.stdout.strip() == (
+        "no: branch feat/x is checked out (a chat may be using it)"
+    )
+    no_line = _lib(
+        "run_on_agent() { printf ' M a.ts\\n'; }; "
+        'out=$(workdir_clean /w) || echo "no: $out"'
+    )
+    assert (
+        no_line.stdout.strip() == "no: could not check: no branch line from git status"
+    )
+
+
+def test_worker_backlog_prompt_is_owner_titles_cut_inside_jq():
+    text = (TASKS / "agent-worker.sh").read_text()
+    body = text[text.index("backlog_round() {") : text.index("\nfor REPO in")]
+    assert "head -c 30000" not in body and ".[0:30000]" in body
+    assert "select(.author.login == $o)" in body
+    assert "number,title,state,author" in body
+    # No Bash in the planning run: the history comes in the prompt.
+    assert "git -C $WORKDIR log --oneline" in body
