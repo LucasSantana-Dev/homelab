@@ -125,6 +125,14 @@ linked issue). Before 2026-10-19 they all waited for the owner. Now the session 
 3. Failing: prints the reasons, and turns auto-merge off if it was on. If turning it off fails,
    it says the PR is still queued and keeps it on record for the next sweep.
 
+Review-bot threads (ADR 0042 amendment): the session cannot call `gh api`, so
+`pr-automerge <repo> <n> --threads` prints the open threads (id, path, line, `bot_only`,
+comments), and `pr-automerge <repo> <n> --replies <file>` takes the session's
+`[{"id", "fixed", "reply"}]` file. `agent_gate.py thread-replies` allows a reply only on an open
+thread where every comment is a listed bot, on a PR with no human activity; `fixed: true`
+resolves it and needs a pushed commit after the thread's last reviewed commit, else the entry is
+skipped. Then the normal check and queue run. Dismissed claims stay open for the owner.
+
 GitHub keeps a queued auto-merge through later pushes, so the `automerge-push-guard.sh` hook
 (PreToolUse, user settings, every session on agent-box) turns auto-merge off on the pushed
 branch's PR before any `git push`, and blocks the push when it cannot. After the push the session
