@@ -18,12 +18,16 @@ dir=$(jq -r '.cwd // "."' <<<"$input" 2>/dev/null) || block "cannot read the hoo
 [[ "$cmd" == *gh* ]] || exit 0
 
 # Shell-aware parse (quoted titles and bodies stay one word). Prints one line per gh call that
-# opens a PR: "create<TAB>repo<TAB>base<TAB>head<TAB>cd-dir", or "api", or "error".
+# opens a PR: "create<TAB>repo<TAB>base<TAB>head<TAB>cd-dir", or "api", or "error", or "wrapped"
+# when the text opens a PR in a way the parse cannot see (bash -c, eval, env, xargs).
 parsed=$(python3 -I - "$cmd" <<'PY'
-import shlex, sys
+import re, shlex, sys
 
+raw = sys.argv[1]
+SEP = ";&|()\n"
 try:
-    lex = shlex.shlex(sys.argv[1], posix=True, punctuation_chars=True)
+    lex = shlex.shlex(raw, posix=True, punctuation_chars=SEP + "<>")
+    lex.whitespace = " \t\r"  # a newline separates commands like ;
     lex.whitespace_split = True
     toks = list(lex)
 except ValueError:
@@ -32,15 +36,19 @@ except ValueError:
 
 cmds, cur = [], []
 for t in toks:
-    if t and all(c in ";&|()" for c in t):
+    if t and all(c in SEP for c in t):
         cmds.append(cur)
         cur = []
     else:
         cur.append(t)
 cmds.append(cur)
 
+def opens_pr(a):
+    return a.split("?", 1)[0].rstrip("/").endswith("/pulls") or "createPullRequest" in a
+
+
 FLAGS = {"-R": "repo", "--repo": "repo", "-B": "base", "--base": "base", "-H": "head", "--head": "head"}
-cd = ""
+cd, creates, apis = "", 0, 0
 for c in cmds:
     while c and "=" in c[0] and not c[0].startswith("-"):
         c = c[1:]  # VAR=value prefixes
@@ -51,8 +59,9 @@ for c in cmds:
     if c[0].rsplit("/", 1)[-1] != "gh":
         continue
     args = c[1:]
-    if args[:1] == ["api"] and any(a.rstrip("/").endswith("/pulls") for a in args):
+    if args[:1] == ["api"] and any(opens_pr(a) for a in args):
         print("api")
+        apis += 1
     if args[:2] != ["pr", "create"]:
         continue
     got = {"repo": "", "base": "", "head": ""}
@@ -69,11 +78,21 @@ for c in cmds:
             got[FLAGS[a[:2]]] = a[2:].lstrip("=")
         i += 1
     print("\t".join(["create", got["repo"], got["base"], got["head"], cd]))
+    creates += 1
+
+if re.search(r"\bgh\b", raw) and (
+    len(re.findall(r"\bpr\s+create\b", raw)) > creates
+    or (apis == 0 and re.search(r"/pulls(\?|[\s'\"]|$)|createPullRequest", raw))
+):
+    print("wrapped")
 PY
 ) || block "cannot parse the command"
 [[ -n "$parsed" ]] || exit 0
 ! grep -qx error <<<"$parsed" || block "cannot parse the command: check its quoting"
 ! grep -qx api <<<"$parsed" || block "open PRs with gh pr create -R <repo> --base <base>, not gh api"
+! grep -qx wrapped <<<"$parsed" \
+    || block "run gh pr create as its own plain command (no bash -c, eval, env or xargs, and no" \
+        "\"pr create\" in other arguments)"
 (( $(grep -c '^create' <<<"$parsed") == 1 )) || block "open one PR per command"
 IFS=$'\t' read -r _ repo base head cd_dir <<<"$parsed"
 [[ -n "$cd_dir" ]] && dir=$cd_dir
@@ -103,20 +122,20 @@ fi
 if [[ -z "$dir" ]] || ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
     block "no checkout of $repo to check the branch in"
 fi
-head=${head##*:}  # owner:branch
+if [[ "$head" == *:* ]]; then  # owner:branch: only branches of this repo, never a fork's
+    same_repo "${head%%:*}" "${repo%%/*}" || block "--head $head is a fork branch: push to $repo"
+    head=${head#*:}
+fi
 [[ -n "$head" ]] || head=$(git -C "$dir" symbolic-ref --short HEAD 2>/dev/null) \
     || block "cannot tell the head branch: pass --head <branch>"
 [[ "$head" =~ ^[A-Za-z0-9._/-]+$ && "$head" != -* ]] || block "bad branch name: $head"
 
-git -C "$dir" fetch -q origin "$want" || block "git fetch origin $want failed, retry"
+# Every branch on origin, so one another session pushed a minute ago counts in the stack check.
+git -C "$dir" fetch -q --prune origin '+refs/heads/*:refs/remotes/origin/*' \
+    || block "git fetch origin failed, retry"
 # gh opens the PR from the pushed branch; the local one counts only when it is not pushed.
-if git -C "$dir" fetch -q origin "$head" 2>/dev/null; then
-    ref=refs/remotes/origin/$head
-else
-    git -C "$dir" ls-remote --exit-code --heads origin "$head" >/dev/null 2>&1
-    [[ $? -eq 2 ]] || block "git fetch origin $head failed, retry"
-    ref=refs/heads/$head
-fi
+ref=refs/remotes/origin/$head
+git -C "$dir" rev-parse -q --verify "$ref" >/dev/null || ref=refs/heads/$head
 tip=$(git -C "$dir" rev-parse -q --verify "$ref^{commit}") || block "branch $head not found in $dir"
 
 own=$(git -C "$dir" rev-list "origin/$want..$tip") || block "git rev-list failed"

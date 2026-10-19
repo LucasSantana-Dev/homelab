@@ -1996,3 +1996,72 @@ def test_loop_auto_merge_holds_a_pr_closing_an_unchecked_issue(cfg):
     out = gate.score(pr, make_issue(), cfg)
     assert out["decision"] == "owner-review"
     assert any("did not check: [2]" in r for r in out["reasons"])
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        CREATE + "\ngh pr create -R LucasSantana-Dev/Lucky --base main",
+        "bash -c 'gh pr create -R LucasSantana-Dev/Lucky --base release'",
+        "env gh pr create -R LucasSantana-Dev/Lucky --base release",
+        "gh api repos/LucasSantana-Dev/Lucky/pulls?x=1 -f base=main -f head=fix/a",
+        "gh api graphql -f query='mutation { createPullRequest(input: {}) { clientMutationId } }'",
+    ],
+)
+def test_pr_guard_blocks_hidden_pr_creation(tmp_path, command):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    assert _pr_guard(tmp_path, command).returncode == 2
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh api repos/LucasSantana-Dev/Lucky/pulls/5/comments/1/replies -f body=ok",
+        "gh pr view 5 -R LucasSantana-Dev/Lucky\ngh pr checks 5 -R LucasSantana-Dev/Lucky",
+    ],
+)
+def test_pr_guard_lets_pr_reads_and_replies_through(tmp_path, command):
+    _guard_repo(tmp_path)
+    assert _pr_guard(tmp_path, command).returncode == 0
+
+
+def test_pr_guard_blocks_a_fork_head(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    res = _pr_guard(tmp_path, CREATE + " --head someone:fix/a")
+    assert res.returncode == 2
+    assert "fork branch" in res.stderr
+    assert (
+        _pr_guard(tmp_path, CREATE + " --head lucassantana-dev:fix/a").returncode == 0
+    )
+
+
+def test_pr_guard_sees_a_branch_it_had_not_fetched(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    _branch(clone, "fix/b", "fix/a", push=False)
+    _git("-C", str(clone), "branch", "-q", "-D", "fix/a")
+    _git("-C", str(clone), "update-ref", "-d", "refs/remotes/origin/fix/a")
+    res = _pr_guard(tmp_path, CREATE)
+    assert res.returncode == 2
+    assert "origin/fix/a" in res.stderr
+
+
+def test_push_guard_blocks_more_than_one_push_url(tmp_path):
+    _push_guard(tmp_path, "git -C {repo} status")
+    repo = tmp_path / "Lucky"
+    url = "https://github.com/LucasSantana-Dev/Lucky.git"
+    _git(
+        "-C",
+        str(repo),
+        "remote",
+        "set-url",
+        "--push",
+        "origin",
+        "/elsewhere/mirror.git",
+    )
+    _git("-C", str(repo), "remote", "set-url", "--add", "--push", "origin", url)
+    res, _ = _push_guard(tmp_path, "git -C {repo} push origin fix/x", listed="12\n")
+    assert res.returncode == 2
+    assert "more than one push URL" in res.stderr

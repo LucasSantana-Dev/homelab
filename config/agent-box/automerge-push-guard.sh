@@ -28,7 +28,9 @@ if [[ "$branch" == HEAD ]]; then
         || block "cannot tell which branch is pushed; use git -C <repo> push origin <branch>"
 fi
 
-url=$(git -C "$dir" remote get-url --push "$remote" 2>/dev/null) || block "unknown remote $remote in $dir"
+urls=$(git -C "$dir" remote get-url --push --all "$remote" 2>/dev/null) || block "unknown remote $remote in $dir"
+(( $(wc -l <<<"$urls") == 1 )) || block "$remote has more than one push URL; push to a remote with one"
+url=$urls
 [[ "$url" =~ github\.com[:/]([A-Za-z0-9-]+/[A-Za-z0-9_.-]+)$ ]] || exit 0
 repo=${BASH_REMATCH[1]%.git}
 

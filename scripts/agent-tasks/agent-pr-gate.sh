@@ -70,12 +70,16 @@ OPEN_PRS_JQ='.data.repository.pullRequests | if .pageInfo.hasNextPage or any(.no
 # PR plus review threads and the repo's open PRs (stacked branch check). Fails if a fetch
 # fails: missing threads must not read as "none", they could hide a human reply.
 load_pr() {  # repo n
-    local pr threads open
+    local pr threads open cache="$SCRATCH/open-prs-${1//\//_}.json"
     pr=$(run_on_agent "gh pr view $2 --repo $1 --json number,state,isDraft,isCrossRepository,baseRefName,changedFiles,author,commits,files,additions,deletions,closingIssuesReferences,statusCheckRollup,labels,comments,reviews,updatedAt,headRefName,headRefOid") || return 1
     threads=$(run_on_agent "gh api graphql -f query=$(printf '%q' "$THREADS_QUERY") -F owner=${1%/*} -F name=${1#*/} -F number=$2 --jq .data.repository.pullRequest.reviewThreads") || return 1
     jq -e '.nodes | type == "array"' <<<"$threads" >/dev/null 2>&1 || return 1
-    open=$(run_on_agent "gh api graphql -f query=$(printf '%q' "$OPEN_PRS_QUERY") -F owner=${1%/*} -F name=${1#*/} --jq $(printf '%q' "$OPEN_PRS_JQ")") || return 1
-    jq -e 'type == "array"' <<<"$open" >/dev/null 2>&1 || return 1
+    # One open-PR snapshot per repo and run (load_pr runs in a subshell, so it is kept in a file).
+    if ! open=$(cat "$cache" 2>/dev/null); then
+        open=$(run_on_agent "gh api graphql -f query=$(printf '%q' "$OPEN_PRS_QUERY") -F owner=${1%/*} -F name=${1#*/} --jq $(printf '%q' "$OPEN_PRS_JQ")") || return 1
+        jq -e 'type == "array"' <<<"$open" >/dev/null 2>&1 || return 1
+        printf '%s\n' "$open" >"$cache"
+    fi
     jq --argjson t "$threads" --argjson o "$open" '.reviewThreads = $t | .openPrs = $o' <<<"$pr"
 }
 
