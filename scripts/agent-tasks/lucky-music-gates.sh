@@ -15,7 +15,8 @@ fi
 
 # Definitions follow Lucky scripts/music-first-gates.sql (source of truth):
 # test-named guilds are excluded by substring, as the ADR requires, and day 8
-# means any activity at or after join + 7 days.
+# means any activity at or after join + 7 days. Every guild id column is text
+# (Prisma String) and track_history.guildId references guilds.discordId.
 
 # grafana_ro: read-only Postgres role used by Grafana dashboards (per issue #2869)
 run_psql() {
@@ -23,12 +24,9 @@ run_psql() {
     docker exec -i lucky-postgres sh -c 'psql -U grafana_ro -d "$POSTGRES_DB" -t -A -F","'
 }
 
-WAG_SQL=$(mktemp)
-COHORT_SQL=$(mktemp)
-trap 'rm -f "$WAG_SQL" "$COHORT_SQL"' EXIT
-
-# ── WAG gate (3 fixed decision weeks) ─────────────────────────────────────────
-cat > "$WAG_SQL" << 'EOSQL'
+# Shared by both queries: listing/operator guild ids plus test-named guilds.
+# NULL ids are dropped so NOT IN cannot empty the result.
+EXCLUDED_CTE=$(cat << 'EOSQL'
 WITH excluded AS (
     SELECT unnest('{110373943822540800,333949691962195969,1541452011466268704}'::text[]) AS g
     UNION SELECT "discordId" FROM guilds
@@ -36,6 +34,15 @@ WITH excluded AS (
     UNION SELECT "guildDiscordId" FROM guild_membership_events
           WHERE "guildName" ILIKE '%test%' AND "guildDiscordId" IS NOT NULL
 ),
+EOSQL
+)
+
+WAG_SQL=$(mktemp)
+COHORT_SQL=$(mktemp)
+trap 'rm -f "$WAG_SQL" "$COHORT_SQL"' EXIT
+
+# ── WAG gate (3 fixed decision weeks) ─────────────────────────────────────────
+{ echo "$EXCLUDED_CTE"; cat << 'EOSQL'; } > "$WAG_SQL"
 wag_windows AS (
     SELECT week_start
     FROM (VALUES (DATE '2026-11-23'), (DATE '2026-11-30'), (DATE '2026-12-07')) AS v(week_start)
@@ -62,14 +69,7 @@ ORDER BY w.week_start;
 EOSQL
 
 # ── Cohort gates: 1st-hour play, day-8 return, removal <5 min ────────────────
-cat > "$COHORT_SQL" << 'EOSQL'
-WITH excluded AS (
-    SELECT unnest('{110373943822540800,333949691962195969,1541452011466268704}'::text[]) AS g
-    UNION SELECT "discordId" FROM guilds
-          WHERE name ILIKE '%test%' AND "discordId" IS NOT NULL
-    UNION SELECT "guildDiscordId" FROM guild_membership_events
-          WHERE "guildName" ILIKE '%test%' AND "guildDiscordId" IS NOT NULL
-),
+{ echo "$EXCLUDED_CTE"; cat << 'EOSQL'; } > "$COHORT_SQL"
 counted_joins AS (
     SELECT g, t FROM (
         SELECT "guildDiscordId" AS g, "occurredAt" AS t,
