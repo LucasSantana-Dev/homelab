@@ -3,6 +3,8 @@
 
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +27,7 @@ SCRATCH = "/tmp/agent-run.Ab3dEf9h"
 def cfg():
     # Pin Phase 1 so scoring tests do not follow the live auto_merge flag.
     c = gate.load_config(CONFIG)
+    c = {**c, **c["repos"]["LucasSantana-Dev/Lucky"]}
     c["auto_merge"] = False
     return c
 
@@ -48,6 +51,12 @@ def make_pr(
         "statusCheckRollup": [{"conclusion": checks, "status": "COMPLETED"}],
         "comments": [{"author": {"login": c}} for c in comments],
         "reviews": [{"author": {"login": r}} for r in reviews],
+        "state": "OPEN",
+        "isDraft": False,
+        "isCrossRepository": False,
+        "baseRefName": "main",
+        "changedFiles": len(files),
+        "reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": []},
     }
 
 
@@ -994,3 +1003,541 @@ def test_discord_scratch_dir_agrees_across_files():
     assert f"commit -F {path}/commit-msg" in md
     assert f"--body-file {path}/pr-body.md" in md
     assert ".git/agent-" not in md
+
+
+# --- merge-check and pr-automerge (ADR 0042) ------------------------------
+
+TASKS = REPO / "scripts" / "agent-tasks"
+AUTOMERGE = TASKS / "pr-automerge.sh"
+HEAD = "a" * 40
+
+
+def test_merge_check_passes_a_clean_owner_pr(cfg):
+    assert gate.merge_check(make_pr(["packages/bot/src/x.ts"]), cfg, []) == []
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"isDraft": True}, "draft"),
+        ({"isDraft": None}, "draft"),
+        ({"state": "MERGED"}, "not open"),
+        ({"isCrossRepository": True}, "fork"),
+        ({"baseRefName": "release"}, "base is release, must be main"),
+        ({"author": {"login": "someone"}}, "another human"),
+        ({"comments": [{"author": {"login": "someone"}}]}, "another human"),
+        ({"changedFiles": 101}, "truncated"),
+        ({"files": []}, "missing"),
+    ],
+)
+def test_merge_check_refuses(cfg, change, reason):
+    pr = {**make_pr(["src/x.ts"]), **change}
+    assert any(reason in r for r in gate.merge_check(pr, cfg, []))
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "state",
+        "isDraft",
+        "isCrossRepository",
+        "baseRefName",
+        "changedFiles",
+        "reviewThreads",
+    ],
+)
+def test_merge_check_fails_closed_on_missing_fields(cfg, key):
+    pr = make_pr(["src/x.ts"])
+    del pr[key]
+    assert gate.merge_check(pr, cfg, [])
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".github/workflows/ci.yml",
+        "compose/agent-box.yml",
+        "config/agent-box/agent-gate.json",
+        "scripts/agent-tasks/pr-automerge.sh",
+        "packages/backend/src/auth/x.ts",
+        ".env.production",
+        "infra/main.tf",
+        "scripts/deploy.sh",
+        "CLAUDE.md",
+        "Dockerfile.agent-box",
+        "prisma/migrations/1/migration.sql",
+        "package.json",
+        "pnpm-lock.yaml",
+        "server/go.mod",
+        "server/go.sum",
+    ],
+)
+def test_merge_check_refuses_sensitive_and_infra_paths(cfg, path):
+    reasons = gate.merge_check(make_pr(["src/x.ts", path]), cfg, [])
+    assert any("owner-review paths" in r for r in reasons)
+
+
+def test_merge_check_needs_the_linked_issues(cfg):
+    pr = make_pr(["src/x.ts"])
+    assert gate.merge_check(pr, cfg, None) == ["linked issues not loaded"]
+    foreign = make_issue()
+    foreign["author"] = {"login": "someone"}
+    assert any("another human" in r for r in gate.merge_check(pr, cfg, [foreign]))
+    assert gate.merge_check(pr, cfg, [make_issue()]) == []
+
+
+@pytest.mark.parametrize(
+    "path,ok",
+    [
+        ("docs/a.md", True),
+        ("tests/unit/test_x.py", True),
+        ("config/caddy/Caddyfile", False),
+        ("scripts/backup/run.sh", False),
+        ("tailscale/acl.json", False),
+        ("observability/prometheus.yml", False),
+        (".sops.yaml", False),
+        ("homelab_manager/cli.py", False),
+    ],
+)
+def test_merge_check_homelab_blocks_host_infra(path, ok):
+    c = gate.load_config(CONFIG)
+    c = {**c, **c["repos"]["LucasSantana-Dev/homelab"]}
+    pr = make_pr([path])
+    pr["baseRefName"] = "release"
+    assert (gate.merge_check(pr, c, []) == []) is ok
+
+
+def test_merge_check_refuses_open_threads_even_from_bots(cfg):
+    pr = pr_with_threads(thread("cubic-dev-ai"), files=("src/x.ts",))
+    assert gate.merge_check(pr, cfg, []) == ["1 unresolved review thread(s)"]
+
+
+def test_merge_check_refuses_unfetched_thread_pages(cfg):
+    pr = pr_with_threads(files=("src/x.ts",), more=True)
+    assert "review threads not fully loaded" in gate.merge_check(pr, cfg, [])
+
+
+def test_merge_check_homelab_needs_release_base():
+    c = gate.load_config(CONFIG)
+    c = {**c, **c["repos"]["LucasSantana-Dev/homelab"]}
+    pr = make_pr(["docs/a.md"])
+    assert gate.merge_check(pr, c, []) == ["base is main, must be release"]
+    pr["baseRefName"] = "release"
+    assert gate.merge_check(pr, c, []) == []
+
+
+def test_no_red_mode_merges_yellow_pillars(cfg):
+    cfg["auto_merge"] = "no-red"
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    out = gate.score(pr, make_issue(), cfg)
+    assert "yellow" in out["pillars"].values()
+    assert out["decision"] == "auto-merge"
+
+
+def test_no_red_mode_never_merges_red(cfg):
+    cfg["auto_merge"] = "no-red"
+    out = gate.score(make_pr(["packages/backend/src/auth/a.ts"]), make_issue(), cfg)
+    assert out["decision"] != "auto-merge"
+
+
+def test_green_mode_still_holds_yellow(cfg):
+    cfg["auto_merge"] = True
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_auto_merge_waits_for_the_owner_when_merge_check_fails(cfg):
+    cfg["auto_merge"] = "no-red"
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    pr["isDraft"] = True
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "owner-review"
+    assert "merge check: draft" in out["reasons"]
+
+
+def test_cli_merge_check_needs_an_allowlisted_repo():
+    assert _cli_raw("merge-check").returncode == 2
+    assert _cli_raw("merge-check", "--repo", "someone/else").returncode == 2
+
+
+def test_cli_merge_check_roundtrip():
+    pr = make_pr(["docs/a.md"])
+    pr["baseRefName"] = "release"
+    out = _cli(
+        "merge-check",
+        "--repo",
+        "LucasSantana-Dev/homelab",
+        stdin=json.dumps({"pr": pr, "issues": []}),
+    )
+    assert json.loads(out.stdout) == {"ok": True, "reasons": []}
+
+
+ISSUE_URL = "https://github.com/LucasSantana-Dev/Lucky/issues/1"
+
+
+def _gh_pr(files=("src/x.ts",), queued=False, **extra):
+    pr = make_pr(list(files))
+    del pr["reviewThreads"]  # gh pr view has none; the wrapper adds them
+    pr["headRefOid"] = HEAD
+    pr["autoMergeRequest"] = {"mergeMethod": "SQUASH"} if queued else None
+    pr["closingIssuesReferences"] = [{"number": 1, "url": ISSUE_URL}]
+    pr.update(extra)
+    return pr
+
+
+def _fake_bin(tmp_path, threads=None, issue=None):
+    """A bin dir with a fake gh that logs its args and serves pr-<n>.json files."""
+    (tmp_path / "threads.json").write_text(
+        json.dumps(threads or {"pageInfo": {"hasNextPage": False}, "nodes": []})
+    )
+    (tmp_path / "issue.json").write_text(json.dumps(issue or make_issue()))
+    bindir = tmp_path / "bin"
+    bindir.mkdir(exist_ok=True)
+    gh = bindir / "gh"
+    gh.write_text(
+        "#!/bin/bash\n"
+        f'echo "$*" >> "{tmp_path}/gh.log"\n'
+        'case "$1 $2" in\n'
+        f'  "pr view") cat "{tmp_path}/pr-$3.json" ;;\n'
+        f'  "api graphql") cat "{tmp_path}/threads.json" ;;\n'
+        f'  "issue view") [[ "$3" == "{ISSUE_URL}" ]] && cat "{tmp_path}/issue.json" ;;\n'
+        f'  "pr list") cat "{tmp_path}/list.txt" ;;\n'
+        '  "pr merge") exit "${GH_MERGE_RC:-0}" ;;\n'
+        "  *) exit 9 ;;\n"
+        "esac\n"
+    )
+    gh.chmod(0o755)
+    for tool in ("jq", "python3", "git"):
+        link = bindir / tool
+        if not link.exists():
+            link.symlink_to(shutil.which(tool))
+    return bindir
+
+
+def _automerge(
+    tmp_path, *args, prs=None, threads=None, issue=None, env=None, script=None
+):
+    """Run pr-automerge with a fake gh. prs maps PR number to gh pr view JSON."""
+    for n, pr in (prs or {}).items():
+        (tmp_path / f"pr-{n}.json").write_text(json.dumps(pr))
+    bindir = _fake_bin(tmp_path, threads, issue)
+    full_env = {
+        **os.environ,
+        "PATH": f"{bindir}:{os.environ['PATH']}",
+        "PR_AUTOMERGE_STATE": str(tmp_path / "state"),
+        **(env or {}),
+    }
+    res = subprocess.run(
+        ["/bin/bash", str(script or AUTOMERGE), *args],
+        env=full_env,
+        capture_output=True,
+        text=True,
+    )
+    log = tmp_path / "gh.log"
+    return res, (log.read_text() if log.exists() else "")
+
+
+def _merge_calls(log):
+    return [ln for ln in log.splitlines() if ln.startswith("pr merge")]
+
+
+def test_automerge_queues_a_clean_pr_on_the_checked_head(tmp_path):
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: _gh_pr()})
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _merge_calls(log) == [
+        f"pr merge 7 -R LucasSantana-Dev/Lucky --squash --auto --match-head-commit {HEAD}"
+    ]
+    entry = tmp_path / "state" / "LucasSantana-Dev_Lucky-7"
+    assert entry.read_text().strip() == HEAD
+
+
+def test_automerge_does_not_queue_twice(tmp_path):
+    pr = _gh_pr(queued=True)
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _merge_calls(log) == []
+
+
+def test_automerge_refuses_without_merging(tmp_path):
+    pr = _gh_pr(files=("src/x.ts", ".github/workflows/ci.yml"))
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "refused: owner-review paths" in res.stdout
+    assert _merge_calls(log) == []
+    assert not (tmp_path / "state").exists()
+
+
+def test_automerge_turns_off_a_queued_merge_that_fails(tmp_path):
+    pr = _gh_pr(queued=True, comments=[{"author": {"login": "someone"}}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert _merge_calls(log) == ["pr merge 7 -R LucasSantana-Dev/Lucky --disable-auto"]
+
+
+def test_automerge_refuses_bot_threads(tmp_path):
+    threads = {"pageInfo": {"hasNextPage": False}, "nodes": [thread("cubic-dev-ai")]}
+    res, log = _automerge(
+        tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: _gh_pr()}, threads=threads
+    )
+    assert res.returncode == 1
+    assert _merge_calls(log) == []
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("someone/else", "7"),
+        ("LucasSantana-Dev/Lucky", "7; rm -rf /"),
+        ("LucasSantana-Dev/Lucky", "--admin"),
+        ("LucasSantana-Dev/Lucky",),
+        ("--sweep", "x"),
+    ],
+)
+def test_automerge_bad_arguments_never_merge(tmp_path, args):
+    res, log = _automerge(tmp_path, *args, prs={7: _gh_pr()})
+    assert res.returncode != 0
+    assert _merge_calls(log) == []
+
+
+def test_automerge_sweep(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    for n in (1, 2, 3, 4):
+        (state / f"LucasSantana-Dev_Lucky-{n}").write_text(HEAD)
+    (state / "junk name").write_text("")
+    prs = {
+        1: _gh_pr(queued=True),  # still fine: kept
+        2: _gh_pr(queued=True, files=("src/x.ts", "compose/x.yml")),  # turned off
+        3: _gh_pr(queued=True, state="MERGED"),  # done: forgotten
+        4: _gh_pr(queued=False),  # turned off by someone: forgotten
+    }
+    res, log = _automerge(tmp_path, "--sweep", prs=prs)
+    assert res.returncode == 3
+    assert _merge_calls(log) == ["pr merge 2 -R LucasSantana-Dev/Lucky --disable-auto"]
+    assert sorted(p.name for p in state.iterdir()) == [
+        "LucasSantana-Dev_Lucky-1",
+        "junk name",
+    ]
+
+
+def test_automerge_merge_calls_are_only_queue_or_disable():
+    calls = [
+        ln.strip()
+        for ln in AUTOMERGE.read_text().splitlines()
+        if "gh pr merge" in ln and not ln.lstrip().startswith("#")
+    ]
+    assert len(calls) == 2, calls
+    assert all("--admin" not in c for c in calls)
+    assert any('--squash --auto --match-head-commit "$sha"' in c for c in calls)
+    assert any("--disable-auto" in c for c in calls)
+
+
+def test_automerge_ships_root_owned_in_the_image():
+    df = (REPO / "Dockerfile.agent-box").read_text()
+    for src, dst in [
+        ("scripts/agent-tasks/pr-automerge.sh", "/opt/agent-config/pr-automerge.sh"),
+        ("scripts/agent-tasks/agent_gate.py", "/opt/agent-config/agent_gate.py"),
+        ("config/agent-box/agent-gate.json", "/opt/agent-config/agent-gate.json"),
+    ]:
+        assert f"COPY {src} {dst}" in df
+    assert "ln -s /opt/agent-config/pr-automerge.sh /usr/local/bin/pr-automerge" in df
+
+
+def test_model_still_cannot_run_gh_pr_merge(cfg):
+    conf = REPO / "config" / "agent-box"
+    discord = json.loads((conf / "discord-channel-settings.json").read_text())
+    user = json.loads((conf / "settings.json").read_text())
+    assert "Bash(gh pr merge*)" in discord["permissions"]["deny"]
+    assert "Bash(gh * pr merge*)" in discord["permissions"]["deny"]
+    assert "Bash(gh pr merge*)" in user["permissions"]["deny"]
+    assert "Bash(gh pr merge*)" in cfg["claude_disallowed_tools"]
+    rules = (conf / "discord-channel.md").read_text()
+    assert "pr-automerge <owner/repo> <pr-number>" in rules
+
+
+def test_gate_sweeps_queued_merges():
+    gate_sh = (TASKS / "agent-pr-gate.sh").read_text()
+    assert "pr-automerge --sweep" in gate_sh
+    view = next(ln for ln in gate_sh.splitlines() if "gh pr view $2" in ln)
+    for f in ("state", "isDraft", "isCrossRepository", "baseRefName", "changedFiles"):
+        assert f in view
+
+
+def test_automerge_refuses_a_pr_closing_a_foreign_issue(tmp_path):
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        prs={7: _gh_pr()},
+        issue=make_issue(author="someone"),
+    )
+    assert res.returncode == 1
+    assert "another human" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_refuses_when_a_linked_issue_cannot_load(tmp_path):
+    pr = _gh_pr(closingIssuesReferences=[{"number": 9, "url": None}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "could not load" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_keeps_tracking_when_disable_fails(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "LucasSantana-Dev_Lucky-2").write_text(HEAD)
+    pr = _gh_pr(queued=True, files=("src/x.ts", "compose/x.yml"))
+    res, log = _automerge(tmp_path, "--sweep", prs={2: pr}, env={"GH_MERGE_RC": "1"})
+    assert res.returncode == 3
+    assert "STILL QUEUED" in res.stdout
+    assert (state / "LucasSantana-Dev_Lucky-2").exists()
+
+
+def test_image_copy_ignores_the_callers_environment(tmp_path):
+    """Installed under /opt/agent-config, the wrapper pins its config, registry and PATH."""
+    opt = (tmp_path / "opt").resolve()
+    opt.mkdir()
+    bindir = _fake_bin(tmp_path)
+    locked_state = tmp_path / "locked-state"
+    src = AUTOMERGE.read_text()
+    src = src.replace("/opt/agent-config", str(opt))
+    src = src.replace(
+        "PATH=/usr/local/bin:/usr/bin:/bin", f"PATH={bindir}:/usr/bin:/bin"
+    )
+    src = src.replace("/home/agent/.local/state/pr-automerge", str(locked_state))
+    (opt / "pr-automerge.sh").write_text(src)
+    shutil.copy(SCRIPT, opt / "agent_gate.py")
+    shutil.copy(CONFIG, opt / "agent-gate.json")
+    loose = json.loads(CONFIG.read_text())
+    for key in ("high_impact_paths", "sensitive_paths", "repo_merge_block_paths"):
+        loose[key] = []
+    (tmp_path / "loose.json").write_text(json.dumps(loose))
+    env = {
+        "AGENT_GATE_CONFIG": str(tmp_path / "loose.json"),
+        "PR_AUTOMERGE_STATE": str(tmp_path / "hidden"),
+        "PATH": "/nonexistent",
+    }
+    bad = _gh_pr(files=("src/x.ts", ".github/workflows/ci.yml"))
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        prs={7: bad},
+        env=env,
+        script=opt / "pr-automerge.sh",
+    )
+    assert res.returncode == 1, res.stdout + res.stderr
+    assert "owner-review paths" in res.stdout
+    assert _merge_calls(log) == []
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "8",
+        prs={8: _gh_pr()},
+        env=env,
+        script=opt / "pr-automerge.sh",
+    )
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert (locked_state / "LucasSantana-Dev_Lucky-8").exists()
+    assert not (tmp_path / "hidden").exists()
+
+
+# --- automerge-push-guard (hook) ------------------------------------------
+
+PUSH_GUARD = REPO / "config" / "agent-box" / "automerge-push-guard.sh"
+
+
+def _push_guard(tmp_path, command, listed="", merge_rc="0", list_ok=True):
+    repo = tmp_path / "Lucky"
+    if not repo.exists():
+        subprocess.run(["git", "init", "-q", "-b", "fix/x", str(repo)], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo),
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/LucasSantana-Dev/Lucky.git",
+            ],
+            check=True,
+        )
+    bindir = _fake_bin(tmp_path)
+    (tmp_path / "list.txt").write_text(listed)
+    if not list_ok:
+        (tmp_path / "list.txt").unlink()
+    payload = {"tool_input": {"command": command.format(repo=repo)}, "cwd": "/"}
+    res = subprocess.run(
+        ["bash", str(PUSH_GUARD)],
+        input=json.dumps(payload),
+        env={
+            **os.environ,
+            "PATH": f"{bindir}:{os.environ['PATH']}",
+            "GH_MERGE_RC": merge_rc,
+        },
+        capture_output=True,
+        text=True,
+    )
+    log = tmp_path / "gh.log"
+    return res, (log.read_text() if log.exists() else "")
+
+
+def test_push_guard_ignores_other_commands(tmp_path):
+    res, log = _push_guard(tmp_path, "git -C {repo} status")
+    assert res.returncode == 0
+    assert log == ""
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git -C {repo} push origin fix/x",
+        "git -C {repo} push -u origin fix/x",
+        "git -C {repo} push origin HEAD",
+        "git -C {repo} push",
+        "git -C {repo} add -A && git -C {repo} push origin fix/x 2>&1",
+    ],
+)
+def test_push_guard_turns_off_a_queued_merge_before_the_push(tmp_path, command):
+    res, log = _push_guard(tmp_path, command, listed="12\n")
+    assert res.returncode == 0, res.stderr
+    assert "pr list -R LucasSantana-Dev/Lucky --head fix/x --state open" in log
+    assert "pr merge 12 -R LucasSantana-Dev/Lucky --disable-auto" in log
+    assert "run pr-automerge LucasSantana-Dev/Lucky 12" in res.stderr
+
+
+def test_push_guard_lets_a_push_without_queued_merge_through(tmp_path):
+    res, log = _push_guard(tmp_path, "git -C {repo} push origin fix/x")
+    assert res.returncode == 0
+    assert "pr merge" not in log
+
+
+@pytest.mark.parametrize(
+    "kwargs", [{"list_ok": False}, {"listed": "12\n", "merge_rc": "1"}]
+)
+def test_push_guard_blocks_when_it_cannot_turn_auto_merge_off(tmp_path, kwargs):
+    res, _ = _push_guard(tmp_path, "git -C {repo} push origin fix/x", **kwargs)
+    assert res.returncode == 2
+    assert "BLOCK" in res.stderr
+
+
+def test_push_guard_is_installed_and_registered():
+    df = (REPO / "Dockerfile.agent-box").read_text()
+    entry = (REPO / "config" / "agent-box" / "entrypoint.sh").read_text()
+    settings = json.loads((REPO / "config" / "agent-box" / "settings.json").read_text())
+    assert (
+        "COPY config/agent-box/automerge-push-guard.sh "
+        "/opt/agent-config/hooks/automerge-push-guard.sh" in df
+    )
+    assert "automerge-push-guard; do" in entry
+    commands = [
+        h["command"]
+        for m in settings["hooks"]["PreToolUse"]
+        if m["matcher"] == "Bash"
+        for h in m["hooks"]
+        if h["type"] == "command"
+    ]
+    assert "/home/agent/.claude/hooks/automerge-push-guard.sh" in commands

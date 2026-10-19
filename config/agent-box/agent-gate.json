@@ -13,7 +13,7 @@
     "socket-security",
     "github-advanced-security"
   ],
-  "auto_merge": true,
+  "auto_merge": "no-red",
   "wip_cap": 2,
   "fix_attempts": 2,
   "stale_days": 5,
@@ -81,6 +81,15 @@
     "*session*",
     "*.npmrc"
   ],
+  "merge_block_paths": [
+    "*-lock.json",
+    "*-lock.yaml",
+    "*.lock",
+    "go.mod",
+    "*/go.mod",
+    "go.sum",
+    "*/go.sum"
+  ],
   "dependency_files": [
     "package.json",
     "*/package.json",
@@ -127,7 +136,21 @@
     },
     "LucasSantana-Dev/homelab": {
       "base": "release",
-      "workdir": "/workspace/homelab"
+      "workdir": "/workspace/homelab",
+      "repo_merge_block_paths": [
+        ".*",
+        "agents/*",
+        "config/*",
+        "dockerfiles/*",
+        "homelab",
+        "homelab_manager/*",
+        "observability/*",
+        "release-please-config.json",
+        "renovate.json",
+        "scripts/*",
+        "security/*",
+        "tailscale/*"
+      ]
     },
     "LucasSantana-Dev/cojam": {
       "base": "main",

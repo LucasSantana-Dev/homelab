@@ -76,9 +76,16 @@ COPY config/agent-box/discord-channel.sh /opt/agent-config/discord-channel.sh
 COPY config/agent-box/discord-channel.md /opt/agent-config/discord-channel.md
 COPY config/agent-box/discord-channel-settings.json /opt/agent-config/discord-channel-settings.json
 COPY config/agent-box/bash-secret-guard.sh /opt/agent-config/hooks/bash-secret-guard.sh
+COPY config/agent-box/automerge-push-guard.sh /opt/agent-config/hooks/automerge-push-guard.sh
 COPY config/agent-box/wud-server.py /opt/agent-config/wud-server.py
 COPY scripts/agent-tasks/hermes-wud-classify.sh /opt/agent-config/hermes-wud-classify.sh
-RUN chmod +x /entrypoint.sh /opt/agent-config/discord-channel.sh /opt/agent-config/hooks/bash-secret-guard.sh
+# pr-automerge: root-owned, so the agent uid cannot loosen its check or its config.
+COPY scripts/agent-tasks/pr-automerge.sh /opt/agent-config/pr-automerge.sh
+COPY scripts/agent-tasks/agent_gate.py /opt/agent-config/agent_gate.py
+COPY config/agent-box/agent-gate.json /opt/agent-config/agent-gate.json
+RUN chmod +x /entrypoint.sh /opt/agent-config/discord-channel.sh /opt/agent-config/hooks/bash-secret-guard.sh \
+        /opt/agent-config/hooks/automerge-push-guard.sh /opt/agent-config/pr-automerge.sh && \
+    ln -s /opt/agent-config/pr-automerge.sh /usr/local/bin/pr-automerge
 
 EXPOSE 22
 CMD ["/entrypoint.sh"]
