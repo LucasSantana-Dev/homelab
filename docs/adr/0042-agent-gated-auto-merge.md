@@ -23,6 +23,10 @@ On 2026-10-19 the owner asked the Discord agent for "auto merge em tudo" on 11 o
 For the owner a parked PR is not finished work: done means merged on the base branch and green
 there.
 
+Two branch mistakes showed up in the same batch. Lucky #2886-#2890 were stacked: each branch was
+cut from the previous one, all with base `main`, so one broken spec turned all five red. homelab
+#522 was opened against `main`, while homelab PRs go to `release` (base-guard).
+
 Measured rulesets (2026-10-19):
 
 | Repo, branch | Required checks | Threads resolved | Notes |
@@ -55,9 +59,9 @@ Option 3, and the loop gate moves to `auto_merge: "no-red"`.
   base is the repo's configured base (`release` for homelab), owner-authored with no other human
   activity on the PR or the issues it closes, no unresolved or unfetched review thread, complete
   file list, and no path in `high_impact_paths`, `sensitive_paths`, `dependency_files`,
-  `merge_block_paths` (lockfiles, go.mod) or the repo's `repo_merge_block_paths` (homelab blocks
-  its host config, scripts and dotfiles, so only docs and tests merge there). Missing data fails
-  closed.
+  `merge_block_paths` (lockfiles, go.mod) or the repo's `repo_merge_block_paths`, and on a repo
+  with `repo_merge_allow_paths` only paths on that list (homelab: `docs/`, `tests/`, Markdown).
+  Missing data fails closed. A queued PR the sweep cannot load or check loses its auto-merge.
 - `pr-automerge` (image copy, root-owned, with its own copy of the gate and config) queues the
   merge only after the check passes, never with `--admin`, and turns auto-merge off when a
   re-check fails. The image copy ignores the caller's `AGENT_GATE_CONFIG`, `PR_AUTOMERGE_STATE`
@@ -69,10 +73,24 @@ Option 3, and the loop gate moves to `auto_merge: "no-red"`.
   session runs pr-automerge again after the push.
 - `agent-pr-gate.sh` runs `pr-automerge --sweep` on every run (four a day, also while the loop is
   paused) to re-check queued PRs.
+- Branch checks, deterministic in two places. The `pr-create-guard.sh` hook (PreToolUse, every
+  agent-box session) blocks `gh pr create` unless `--base` is the repo's base from
+  `agent-gate.json` (homelab `release`, Lucky and cojam `main`) and the branch, after a fresh
+  `git fetch origin <base>`, has commits on top of `origin/<base>` and shares none with another
+  branch that is not its own descendant. After the PR exists, the gate (`branch_problems` in
+  `agent_gate.py`) refuses a wrong base or a PR that shares a commit with another open PR:
+  pr-automerge refuses it and the loop gate sends it to `needs-human`. Missing data fails closed.
+  The hook parses the command with shell quoting (a `--base` inside a title does not count),
+  matches repo names without case, and blocks `gh api .../pulls` and two PRs in one command.
+  The gate check is the backstop for anything the hook misses. Limit: once the lower PR of a
+  stack squash-merges and closes, its old commits in the upper PR no longer match an open PR;
+  the hook is what stops that stack from being opened in the first place.
 - Loop PRs keep the immediate `--match-head-commit` merge; yellow pillars now qualify, red never,
   and the same merge check applies (dependency and lockfile changes go to the owner).
 - Prompts: a task is done when the PR is merged and the base is green after it; until then the
-  agent follows CI and fixes it, and re-runs pr-automerge after every push.
+  agent follows CI and fixes it, and re-runs pr-automerge after every push. Each branch is cut
+  from a freshly fetched `origin/<base>`, and `git rev-list --count origin/<base>..<branch>` must
+  equal the change's own commits before the PR is opened.
 
 Why not the Action: it adds a merge-capable secret per repo or loses downstream workflows, and the
 label it keys on is something the agent can set. Why not the bare command: no check at all. The

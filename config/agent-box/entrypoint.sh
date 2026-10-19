@@ -127,7 +127,7 @@ else
 fi
 
 for h in protect-homelab secret-write-guard tag-deploy-guard bash-secret-guard \
-         automerge-push-guard; do
+         automerge-push-guard pr-create-guard; do
     install -D -m 755 "$C/hooks/$h.sh" ".claude/hooks/$h.sh"
 done
 log "Guardrail hooks installed."
