@@ -190,6 +190,11 @@ client is not ready, so the bot is offline in every guild.
    invalid session or rate limit (429) lines.
 2. Check Discord status (discordstatus.com) before blaming the bot.
 3. Restart to recover service: `docker compose restart bot`.
+4. Still 0 a few minutes after one restart: the bot is being refused, not
+   flaking. Look for close code 4004 (invalid token, rotate
+   `DISCORD_TOKEN`) or 4014 (disallowed intents, enable them in the
+   Discord developer portal). Do not restart in a loop: repeated logins
+   can get the token rate limited.
 
 **Action:** if it comes back after a restart, file an issue with the
 close code and the time window.
