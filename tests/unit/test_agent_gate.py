@@ -1998,6 +1998,34 @@ def test_automerge_replies_recheck_each_thread_before_posting(tmp_path):
     assert _mutations(tmp_path) == [] and _merge_calls(log) == []
 
 
+def test_automerge_replies_recheck_skips_only_the_changed_thread(tmp_path):
+    t1, t2 = review_thread("T1", "cubic-dev-ai"), review_thread("T2", "cubic-dev-ai")
+    # T1 was resolved since the check (a human joining would stop the whole PR).
+    done = review_thread("T1", "cubic-dev-ai", resolved=True)
+    (tmp_path / "threads.next").write_text(json.dumps(_threads_conn(done, t2)))
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "Fixed."},
+        {"id": "T2", "fixed": True, "reply": "Fixed too."},
+    ]
+    res, log = _answer(tmp_path, replies, _threads_conn(t1, t2))
+    assert "thread T1 changed since the check" in res.stdout
+    assert _mutations(tmp_path) == ["reply T2 Fixed too.", "resolve T2 "]
+    assert len(_merge_calls(log)) == 1  # no thread left open
+
+
+def test_automerge_replies_recheck_accepts_a_normalized_reply(tmp_path):
+    # The re-check re-plans the already normalized reply: normalization must be idempotent.
+    reply = "Fixed — the guard runs first–always. " + "y" * 3000
+    replies = [{"id": "T1", "fixed": True, "reply": reply}]
+    res, _ = _answer(
+        tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    )
+    assert "changed since the check" not in res.stdout, res.stdout
+    posted = _mutations(tmp_path)
+    assert posted[0].startswith("reply T1 Fixed, the guard runs first, always. y")
+    assert posted[1] == "resolve T1 "
+
+
 def test_automerge_replies_report_a_failed_recheck_load(tmp_path):
     (tmp_path / "threads.next").write_text("{}")  # no nodes array: load fails
     replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]

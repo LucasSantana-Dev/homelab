@@ -127,7 +127,8 @@ handle() {  # mode(queue|sweep) repo pr
 }
 
 # 0 when a fresh load still plans this exact action (same id, reply and resolve), 2 when the
-# reload or the re-check failed to run, 1 otherwise.
+# reload or the re-check failed to run, 1 otherwise. The action's reply is already normalized,
+# so thread-replies must normalize idempotently (covered by a test).
 still_ok() {  # repo pr action
     local fresh entry plan
     fresh=$(load "$1" "$2") || return 2
