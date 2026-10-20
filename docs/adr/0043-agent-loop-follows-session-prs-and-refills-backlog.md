@@ -48,6 +48,10 @@ Measured the same day:
    changed. Every loop step that switches the clone (worker run, autofix, backlog round) skips
    while it has a branch checked out: `workdir_clean` refuses it (the loop leaves the clone
    detached on `origin/<base>`; a branch there means a chat is or was last working in it).
+   Amended 2026-10-20 (loop stalled for 13 hours on 10-19): the cleanup after a worker run or
+   autofix stashes leftovers before detaching and alerts when it cannot detach, and a clean,
+   pushed chat branch idle for 3 hours is detached by the gate. Unregistered `fix/issue-N`
+   branches count as session PRs (Lucky #2878 was followed by nothing).
 3. **Conflicts are fixed by merging the base in.** Both scorers send `mergeable == CONFLICTING`
    to `autofix` (fix `conflict`) before looking at checks. The gate checks out the branch, runs
    `git merge --no-edit origin/<base>` and hands only a real conflict (unmerged paths) to the

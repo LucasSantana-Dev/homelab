@@ -87,7 +87,9 @@ Merging and done:
   fixes red CI, bot threads and merge conflicts on your branch and runs pr-automerge. So cut every
   branch in `/workspace/<repo>` as described above, and say in the chat when you stop following a PR.
   When you are done in a clone, leave it clean and detached (`git -C /workspace/<repo> switch
-  --detach origin/<base>`): the loop does not touch a clone with a branch checked out.
+  --detach origin/<base>`): the loop does not touch a clone with a branch checked out, except
+  that a clean, pushed branch idle for 3 hours is detached by the gate (with a Discord notice).
+  After any pause, run `git -C /workspace/<repo> branch --show-current` before editing or committing.
 - After the merge, confirm with `gh pr view <n> -R <repo> --json state,mergeCommit` and
   `gh run list -R <repo> --branch <base> --commit <mergeCommit oid>`: those runs, on the merge
   commit itself, must be green (a red one is yours to fix). Then report where the release stands: Lucky

@@ -28,7 +28,7 @@ wrappers. The agent-box hooks are an extra layer.
 ## Issue selection
 
 Open, `ready-for-agent`, `effort:s`, authored by the owner, no foreign comments, no open PR closing it
-(agent or hand-opened; an open PR on a `fix/issue-N` branch, or a legacy `agent/issue-N` one, also counts (a `fix/issue-N` PR is tracked only after the worker registers it in `AGENT_STATE_DIR/prs`, so a hand-opened one is never touched)), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
+(agent or hand-opened; an open PR on a `fix/issue-N` branch, or a legacy `agent/issue-N` one, also counts (a `fix/issue-N` PR is tracked only after the worker registers it in `AGENT_STATE_DIR/prs`, so a hand-opened one is never handled as a loop PR; the gate can still follow it as a session PR)), no skip label, no sensitive word in title or labels (auth, oauth, payment, billing, deploy, migration,
 workflow, secret). Ranked: bug/docs/ci/test first, then P1, then oldest.
 
 ## Merge gate: 4 pillars
@@ -177,6 +177,17 @@ replies go through `pr-automerge --replies`. The path stays off until pr-automer
 image. An autofix waits an hour after the PR last changed. `workdir_clean` also refuses a clone with
 a branch checked out, so the worker, autofix and the backlog round all leave a chat's branch alone
 (the loop leaves the clone detached on `origin/<base>`).
+
+Releasing the clone (2026-10-20): every worker run and autofix ends in `release_workdir`, which
+aborts a half-done merge, stashes leftovers (`agent-loop leftover: <what>`, kept, never dropped,
+with a Discord notice naming the files) and detaches. If that fails it sends a Discord alert,
+since `workdir_clean` will skip the repo from then on. Each gate run also calls
+`release_idle_checkout`: a chat branch that is clean, already on an origin branch and untouched
+(`.git/logs/HEAD` and `.git/index` mtimes) for `AGENT_CHAT_IDLE_MIN` minutes (default 180, at
+least 60) is detached with a Discord notice, so a chat that forgot to detach does not hold the
+clone for good. A `fix/issue-N` PR that is not in the registry is a session PR like any other;
+the worker alerts when it cannot register its PR, since the session path skips the pillars.
+Known gap: a squash-merged chat branch whose remote branch was pruned is not released.
 
 Conflict autofix, loop and session PRs: the gate checks out the branch, runs
 `git merge --no-edit origin/<base>`, and the model resolves the unmerged paths, tests,

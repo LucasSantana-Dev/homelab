@@ -189,12 +189,16 @@ for REPO in $AGENT_REPOS; do
     else
         echo "git checkout failed for $BRANCH"
     fi
-    try_act "cd $WORKDIR && git switch -q --detach origin/$BASE"
+    release_workdir "$WORKDIR" "$BASE" "issue #$ISSUE" || true
 
     [[ "$AGENT_DRY_RUN" == "1" ]] && continue
     PR=$(run_on_agent "gh pr list --repo $REPO --head $BRANCH --state open --json number -q '.[0].number'") || PR=""
     if [[ "$PR" =~ ^[0-9]+$ ]]; then
-        register_pr "$REPO" "$PR" || echo "WARN: could not register PR #$PR, the gate will not track it"
+        if ! register_pr "$REPO" "$PR"; then
+            # Unregistered, it looks like a session PR to the gate: no size/impact/value pillars.
+            echo "WARN: could not register PR #$PR, the gate will treat it as a session PR"
+            notify --title "agent: PR not registered" --body "https://github.com/$REPO/pull/$PR: the gate will treat it as a session PR (no pillar checks); review it by hand" --urgency alert || true
+        fi
         # A failed unclaim leaves the issue skipped for good if this PR is later
         # closed unmerged, so say so in the alert instead of only in the log.
         BODY="https://github.com/$REPO/pull/$PR" URGENCY=info
