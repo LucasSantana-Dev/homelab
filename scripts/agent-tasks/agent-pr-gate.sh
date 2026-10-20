@@ -327,7 +327,7 @@ autofix_pr() {
     else
         echo "git checkout or base merge failed for $BRANCH"
     fi
-    try_act "cd $WORKDIR && { git merge --abort 2>/dev/null || true; } && git switch -q --detach origin/$BASE"
+    release_workdir "$WORKDIR" "$BASE" "autofix #$N" || true
     scratch_rm "$SCRATCH"
     SCRATCH=""
 }
@@ -340,6 +340,12 @@ for REPO in $AGENT_REPOS; do
     FIX_MAX=$(cfg "$REPO" fix_attempts)
     STALE_DAYS=$(cfg "$REPO" stale_days)
     AUTOFIX_LEFT="${AGENT_MAX_AUTOFIX_PER_RUN:-1}"
+    if FREED=$(release_idle_checkout "$WORKDIR" "$BASE") && [[ -n "$FREED" ]]; then
+        echo "$WORKDIR: released idle chat checkout of $FREED (pushed, clean)"
+        # One message per release: the clone is detached afterwards, so it cannot repeat.
+        notify_once "$REPO" chat "$(date +%s)" released "agent: idle chat branch released" \
+            "$WORKDIR was on $FREED (clean, pushed, idle); now detached on origin/$BASE. A chat still on it: switch back before editing" info
+    fi
 
     if NUMS=$(open_agent_prs "$REPO" | jq -r '.[].number'); then
         for N in $NUMS; do gate_pr loop "$N"; done

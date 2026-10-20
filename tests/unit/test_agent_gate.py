@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -2950,9 +2951,21 @@ def test_session_prs_lists_owner_prs_from_local_branches(tmp_path):
         # claude_cmd would refuse these branches: listing them would only burn fix attempts.
         pr(9, "hotfix/x"),
         pr(10, "feat/a/b"),
+        # A worker PR (registered) stays a loop PR.
+        pr(11, "fix/issue-12"),
     ]
     (tmp_path / "prs.json").write_text(json.dumps(prs))
-    local = ["feat/a", "fix/issue-9", "agent/x", "feat/b", "main", "fix/b"]
+    (tmp_path / "prs").mkdir()
+    (tmp_path / "prs" / "o_r-11").write_text("1\n")
+    local = [
+        "feat/a",
+        "fix/issue-9",
+        "agent/x",
+        "feat/b",
+        "main",
+        "fix/b",
+        "fix/issue-12",
+    ]
     local += ["hotfix/x", "feat/a/b"]
     heads = "".join(f"{b} {sha}\n" for b in local) + f"fix/stale {'c' * 40}\n"
     res = _lib(
@@ -2963,7 +2976,8 @@ def test_session_prs_lists_owner_prs_from_local_branches(tmp_path):
         "session_prs o/r /w"
     )
     assert res.returncode == 0, res.stderr
-    assert res.stdout.split() == ["1", "7"]
+    # fix/issue-9 is not in the registry: a session named it (Lucky #2878), so it is followed.
+    assert res.stdout.split() == ["1", "3", "7"]
     down = _lib("run_on_agent() { return 255; }; session_prs o/r /w")
     assert down.returncode == 1
 
@@ -2981,7 +2995,9 @@ def test_gate_queues_session_prs_only_through_pr_automerge():
 def test_gate_conflict_fix_merges_the_base_and_never_rebases():
     text = (TASKS / "agent-pr-gate.sh").read_text()
     assert "git merge --no-edit -q origin/$BASE" in text
-    assert "git merge --abort" in text
+    # The cleanup (release_workdir) aborts a half-done merge before detaching.
+    assert 'release_workdir "$WORKDIR" "$BASE" "autofix #$N"' in text
+    assert "git merge --abort" in LIB.read_text()
     assert "git rebase" not in text and "push --force" not in text
 
 
@@ -3112,6 +3128,162 @@ def test_workdir_clean_refuses_a_checked_out_branch():
     assert (
         no_line.stdout.strip() == "no: could not check: no branch line from git status"
     )
+
+
+def test_release_workdir_stashes_leftovers_before_detaching():
+    res = _lib(
+        "AGENT_DRY_RUN=0; "
+        'run_on_agent() { case "$1" in *"status --porcelain") ;; *) echo "RUN $1" ;; esac; }; '
+        'notify() { echo "N $*"; }; release_workdir /w main "autofix #5"'
+    )
+    assert res.returncode == 0
+    (cmd,) = res.stdout.splitlines()  # clean tree: no notice
+    assert (
+        "git stash push -q --include-untracked -m 'agent-loop leftover: autofix #5'"
+        in cmd
+    )
+    assert cmd.index("git stash push") < cmd.index("git switch -q --detach origin/main")
+    assert (
+        "stash drop" not in cmd and "reset --hard" not in cmd and "clean -" not in cmd
+    )
+
+
+def test_release_workdir_reports_leftovers_it_stashes():
+    res = _lib(
+        "AGENT_DRY_RUN=0; "
+        'run_on_agent() { case "$1" in *"status --porcelain") printf \' M a.ts\\n?? b.ts\\n\' ;; esac; }; '
+        'notify() { echo "N $*"; }; release_workdir /w main "autofix #5"'
+    )
+    lines = res.stdout.splitlines()
+    assert lines[0] == "/w: stashing leftovers of autofix #5: a.ts, b.ts"
+    assert lines[1].startswith("N --title agent: leftovers stashed")
+    assert "agent-loop leftover: autofix #5" in lines[1]
+
+
+def test_release_workdir_alerts_when_the_clone_stays_on_a_branch():
+    res = _lib(
+        "AGENT_DRY_RUN=0; run_on_agent() { return 1; }; "
+        'notify() { echo "N $*"; }; release_workdir /w main "issue #7" || echo rc=$?'
+    )
+    lines = res.stdout.splitlines()
+    assert lines[0] == "WARN: could not return /w to origin/main after issue #7"
+    assert lines[1].startswith("N --title agent: clone stuck on a branch")
+    assert "--urgency alert" in lines[1]
+    assert lines[-1] == "rc=1"
+
+
+@pytest.mark.parametrize(
+    ("value", "idle"), [("240", 14400), ("5", 10800), ("3h", 10800), ("", 10800)]
+)
+def test_release_idle_checkout_clamps_the_idle_minutes(value, idle):
+    res = _lib(
+        f'AGENT_DRY_RUN=0; AGENT_CHAT_IDLE_MIN="{value}"; '
+        'run_on_agent() { echo "$1"; }; release_idle_checkout /w main'
+    )
+    assert res.returncode == 0, res.stderr
+    assert f"-ge {idle} " in res.stdout
+
+
+def _idle_git(cwd, *args):
+    subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
+
+
+def _idle_repo(tmp_path):
+    origin, clone = tmp_path / "origin.git", tmp_path / "clone"
+    subprocess.run(
+        ["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True
+    )
+    subprocess.run(
+        ["git", "clone", "-q", str(origin), str(clone)], check=True, capture_output=True
+    )
+    _idle_git(
+        clone,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "c",
+    )
+    _idle_git(clone, "push", "-q", "origin", "HEAD:main", "HEAD:feat/x")
+    _idle_git(clone, "fetch", "-q", "origin")
+    _idle_git(clone, "switch", "-q", "-c", "feat/x", "--track", "origin/feat/x")
+    return clone
+
+
+def _age(path, seconds):
+    t = time.time() - seconds
+    os.utime(path, (t, t))
+
+
+# The remote command runs for real on a temp clone; GNU `stat -c %Y` is shimmed on macOS.
+STAT_SHIM = (
+    'stat -c %Y / >/dev/null 2>&1 || { stat() { [[ "$1" == -c ]] && shift 2; '
+    'command stat -f %m "$@"; }; export -f stat; }; '
+)
+
+
+def test_release_idle_checkout_runs_on_a_real_clone(tmp_path):
+    clone = _idle_repo(tmp_path)
+    run = (
+        STAT_SHIM
+        + 'AGENT_DRY_RUN=0; run_on_agent() { bash -c "$1"; }; release_idle_checkout "$1" main'
+    )
+    # HEAD just moved (fresh switch), index old: a chat may be working, keep it.
+    _age(clone / ".git" / "index", 4 * 3600)
+    busy = _lib(run, str(clone))
+    assert (busy.returncode, busy.stdout) == (1, "")
+    # Both old: released and detached on origin/main.
+    _age(clone / ".git" / "logs" / "HEAD", 4 * 3600)
+    _age(clone / ".git" / "index", 4 * 3600)
+    freed = _lib(run, str(clone))
+    assert (freed.returncode, freed.stdout.strip()) == (0, "feat/x"), freed.stderr
+    head = subprocess.run(
+        ["git", "-C", str(clone), "symbolic-ref", "-q", "HEAD"], capture_output=True
+    )
+    assert head.returncode == 1
+
+
+def test_release_idle_checkout_keeps_a_dirty_or_unpushed_branch(tmp_path):
+    clone = _idle_repo(tmp_path)
+    run = (
+        STAT_SHIM
+        + 'AGENT_DRY_RUN=0; run_on_agent() { bash -c "$1"; }; release_idle_checkout "$1" main'
+    )
+    (clone / "new.txt").write_text("x")
+    for p in (clone / ".git" / "logs" / "HEAD", clone / ".git" / "index"):
+        _age(p, 4 * 3600)
+    assert _lib(run, str(clone)).returncode == 1
+    (clone / "new.txt").unlink()
+    _idle_git(
+        clone,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "local",
+    )
+    for p in (clone / ".git" / "logs" / "HEAD", clone / ".git" / "index"):
+        _age(p, 4 * 3600)
+    assert _lib(run, str(clone)).returncode == 1
+    _idle_git(clone, "symbolic-ref", "-q", "HEAD")  # still on the branch
+
+
+def test_gate_and_worker_release_the_clone_through_release_workdir():
+    gate = (TASKS / "agent-pr-gate.sh").read_text()
+    worker = (TASKS / "agent-worker.sh").read_text()
+    assert 'release_workdir "$WORKDIR" "$BASE" "autofix #$N"' in gate
+    assert 'release_workdir "$WORKDIR" "$BASE" "issue #$ISSUE"' in worker
+    assert 'release_idle_checkout "$WORKDIR" "$BASE"' in gate
+    for text in (gate, worker):
+        assert 'try_act "cd $WORKDIR && git switch -q --detach' not in text
 
 
 def test_worker_backlog_prompt_is_owner_titles_cut_inside_jq():

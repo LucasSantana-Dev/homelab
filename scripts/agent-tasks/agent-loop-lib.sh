@@ -173,6 +173,42 @@ workdir_clean() {
     return 1
 }
 
+# Puts the clone back where every loop step expects it: detached on origin/<base>. A run that
+# edits and stops without committing (Lucky #2885 thread fix, 2026-10-19) leaves changes the
+# switch refuses to carry: the failed switch kept the branch checked out and workdir_clean then
+# skipped every later run for 13 hours. Leftovers go to a named stash (kept, never dropped)
+# and a failure alerts instead of only logging.
+release_workdir() {  # workdir base what
+    local left
+    if [[ "$AGENT_DRY_RUN" != "1" ]] && left=$(run_on_agent "cd $1 && git status --porcelain") && [[ -n "$left" ]]; then
+        echo "$1: stashing leftovers of $3: $(dirty_summary <<<"$left")"
+        notify --title "agent: leftovers stashed" --body "$1 after $3: $(dirty_summary <<<"$left") (stash 'agent-loop leftover: $3')" --urgency info || true
+    fi
+    act "cd $1 && { git merge --abort 2>/dev/null || true; } && git stash push -q --include-untracked -m 'agent-loop leftover: $3' && git switch -q --detach origin/$2" && return 0
+    echo "WARN: could not return $1 to origin/$2 after $3"
+    notify --title "agent: clone stuck on a branch" --body "$1 could not go back to origin/$2 after $3; the loop skips this repo until it does" --urgency alert || true
+    return 1
+}
+
+# A chat that ends without detaching (discord-channel.md asks it to) holds the clone for good:
+# workdir_clean refuses a checked-out branch (cojam, 2026-10-19 05:10 to 10-20). Hand it back
+# only when nothing can be lost: no change or untracked file, HEAD already on an origin branch
+# (pushed), and neither HEAD (its reflog file) nor the index changed for AGENT_CHAT_IDLE_MIN
+# minutes (at least 60). Prints the released branch; returns 1 and leaves the clone alone
+# otherwise (dry run included). The caller tells the chat on Discord.
+AGENT_CHAT_IDLE_MIN="${AGENT_CHAT_IDLE_MIN:-180}"
+release_idle_checkout() {  # workdir base
+    [[ "$AGENT_DRY_RUN" == "1" ]] && return 1
+    local min="$AGENT_CHAT_IDLE_MIN"
+    [[ "$min" =~ ^[0-9]+$ ]] && (( 10#$min >= 60 )) || min=180
+    local idle=$((10#$min * 60))
+    run_on_agent "cd $1 && b=\$(git symbolic-ref -q --short HEAD) && test -z \"\$(git status --porcelain)\" \
+&& test -n \"\$(git for-each-ref --count=1 --contains HEAD refs/remotes/origin)\" \
+&& now=\$(date +%s) && test \$((now - \$(stat -c %Y .git/logs/HEAD))) -ge $idle \
+&& test \$((now - \$(stat -c %Y .git/index))) -ge $idle \
+&& git switch -q --detach origin/$2 && echo \"\$b\""
+}
+
 # `git status --porcelain` on stdin -> "a, b, c and 2 more" (first 5 paths; a rename
 # shows its new path).
 dirty_summary() {
@@ -236,7 +272,8 @@ open_agent_prs() {
     open_prs "$1" | only_agent_prs "$1"
 }
 
-# PRs a Discord session opened: owner-authored, same repo, not a loop PR, and the head commit
+# PRs a Discord session opened: owner-authored, same repo, not a loop PR (registry, agent/
+# branch or label; a session may name its branch fix/issue-N too, Lucky #2878), and the head commit
 # is the tip of the local branch of the same name in the agent-box clone (the session pushed it
 # from there). A branch the clone only has an old copy of, or that someone pushed to from
 # elsewhere since, does not count. Nothing else follows these PRs once the chat ends. Prints PR
@@ -248,7 +285,7 @@ session_prs() {  # repo workdir
     all=$(run_on_agent "gh pr list --repo $1 --state open --limit 1000 --author $(printf '%q' "$(cfg "$1" owner)") --json number,headRefName,headRefOid,isCrossRepository,labels") || return 1
     loop=$(only_agent_prs "$1" <<<"$all" | jq -c '[.[].number]') || return 1
     while read -r n b; do
-        [[ "$b" =~ $BRANCH_RE && ! "$b" =~ ^(fix/issue-[0-9]+|agent/.*)$ ]] && echo "$n"
+        [[ "$b" =~ $BRANCH_RE ]] && echo "$n"
     done < <(jq -r --argjson heads "$heads" --argjson loop "$loop" '.[]
         | select(.isCrossRepository == false and (.number as $n | $loop | index($n) | not))
         | select($heads[.headRefName] == .headRefOid)
