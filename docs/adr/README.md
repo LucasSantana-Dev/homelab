@@ -25,3 +25,5 @@ file in this directory.
 | [0037](0037-agent-box-resilient-boot-and-deploy-runbook.md) | Agent-box: non-fatal repo clones + SOPS/compose/deploy runbook (post-incident) | Accepted |
 | [0038](0038-reaffirm-compose-over-kubernetes-2026.md) | Reaffirm Compose over Kubernetes (2026 re-eval) + growth trigger | Accepted |
 | [0041](0041-retire-terraform-phase1-edge-snapshot.md) | Retire Terraform Phase-1; the Cloudflare edge is recorded by a read-only snapshot | Accepted |
+| [0042](0042-agent-gated-auto-merge.md) | Agent PRs merge through a checked auto-merge (pr-automerge), not through the owner | Accepted |
+| [0043](0043-agent-loop-follows-session-prs-and-refills-backlog.md) | The loop follows session PRs to the merge, fixes conflicts and refills the backlog | Accepted |

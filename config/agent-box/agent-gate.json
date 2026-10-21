@@ -13,10 +13,20 @@
     "socket-security",
     "github-advanced-security"
   ],
-  "auto_merge": true,
+  "auto_merge": "no-red",
   "wip_cap": 2,
-  "fix_attempts": 2,
+  "fix_attempts": 3,
   "stale_days": 5,
+  "backlog_round_max": 5,
+  "merge_block_branches": [
+    "release-please--*",
+    "dependabot/*",
+    "renovate/*"
+  ],
+  "merge_block_labels": [
+    "autorelease: pending",
+    "autorelease: tagged"
+  ],
   "size": {
     "green_lines": 150,
     "green_files": 5,
@@ -81,6 +91,17 @@
     "*session*",
     "*.npmrc"
   ],
+  "merge_block_paths": [
+    "*-lock.json",
+    "*-lock.yaml",
+    "*.lock",
+    "*.lockb",
+    "*npm-shrinkwrap.json",
+    "go.mod",
+    "*/go.mod",
+    "go.sum",
+    "*/go.sum"
+  ],
   "dependency_files": [
     "package.json",
     "*/package.json",
@@ -127,7 +148,22 @@
     },
     "LucasSantana-Dev/homelab": {
       "base": "release",
-      "workdir": "/workspace/homelab"
+      "workdir": "/workspace/homelab",
+      "repo_merge_allow_paths": ["docs/*", "tests/*", "*.md"],
+      "repo_merge_block_paths": [
+        ".*",
+        "agents/*",
+        "config/*",
+        "dockerfiles/*",
+        "homelab",
+        "homelab_manager/*",
+        "observability/*",
+        "release-please-config.json",
+        "renovate.json",
+        "scripts/*",
+        "security/*",
+        "tailscale/*"
+      ]
     },
     "LucasSantana-Dev/cojam": {
       "base": "main",
@@ -172,6 +208,10 @@
     "Bash(ls*)",
     "Bash(cat *)"
   ],
+  "claude_backlog_tools": [
+    "Glob",
+    "Grep"
+  ],
   "claude_disallowed_tools": [
     "Bash(gh pr merge*)",
     "Bash(git push --force*)",
@@ -184,6 +224,18 @@
     "Bash(gh api*)",
     "Read(~/.claude/channels/**)",
     "Edit(~/.claude/channels/**)",
+    "Read(~/.claude/.credentials.json)",
+    "Read(~/.claude.json)",
+    "Read(~/.config/gh/**)",
+    "Read(//run/secrets/**)",
+    "Read(//proc/**)",
+    "Read(//etc/profile.d/**)",
+    "Bash(env*)",
+    "Bash(printenv*)",
+    "Bash(cat ~/.c*)",
+    "Bash(cat /home/agent/.c*)",
+    "Bash(cat /etc/profile.d*)",
+    "Bash(cat /run/secrets*)",
     "Edit(/.github/**)",
     "WebFetch",
     "WebSearch"

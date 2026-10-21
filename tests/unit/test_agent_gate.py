@@ -3,8 +3,11 @@
 
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -19,12 +22,14 @@ _spec.loader.exec_module(gate)
 
 OWNER = "LucasSantana-Dev"
 SCRATCH = "/tmp/agent-run.Ab3dEf9h"
+OWN_OID = "c" * 40
 
 
 @pytest.fixture
 def cfg():
     # Pin Phase 1 so scoring tests do not follow the live auto_merge flag.
     c = gate.load_config(CONFIG)
+    c = {**c, **c["repos"]["LucasSantana-Dev/Lucky"]}
     c["auto_merge"] = False
     return c
 
@@ -48,6 +53,16 @@ def make_pr(
         "statusCheckRollup": [{"conclusion": checks, "status": "COMPLETED"}],
         "comments": [{"author": {"login": c}} for c in comments],
         "reviews": [{"author": {"login": r}} for r in reviews],
+        "state": "OPEN",
+        "isDraft": False,
+        "isCrossRepository": False,
+        "baseRefName": "main",
+        "headRefName": "fix/x",
+        "labels": [],
+        "changedFiles": len(files),
+        "reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+        "commits": [{"oid": OWN_OID}],
+        "openPrs": [],
     }
 
 
@@ -539,7 +554,7 @@ def test_claude_cmd_pins_permissions_and_feeds_prompt_on_stdin():
 
 def test_claude_cmd_accepts_new_and_legacy_prefix():
     lib = REPO / "scripts" / "agent-tasks" / "agent-loop-lib.sh"
-    for branch in ("fix/issue-7", "agent/issue-7"):
+    for branch in ("fix/issue-7", "agent/issue-7", "feat/x", "fix/thread-replies"):
         res = subprocess.run(
             [
                 "bash",
@@ -581,7 +596,10 @@ def test_notify_once_dedups_per_sha(tmp_path):
         "agent/+x",
         "agent/x y",
         "fix/x:main",
-        "feat/x",
+        "feat/x/y",
+        "release-please--branches--main",
+        "dependabot/npm/x",
+        "hotfix/x",
     ],
 )
 def test_claude_cmd_refuses_non_agent_branch(branch):
@@ -901,7 +919,7 @@ def test_workdir_clean_lists_offending_paths():
         ]
     )
     res = _lib(
-        f"run_on_agent() {{ printf '{status}\\n'; }}; "
+        f"run_on_agent() {{ printf '## HEAD (no branch)\\n{status}\\n'; }}; "
         'if out=$(workdir_clean /w); then echo clean; else echo "dirty: $out"; fi'
     )
     assert res.stdout.strip() == (
@@ -909,7 +927,8 @@ def test_workdir_clean_lists_offending_paths():
         " telemetry.test.ts.commitmsg, renamed.ts, odd -> name.md, a.ts and 4 more"
     )
     clean = _lib(
-        'run_on_agent() { :; }; out=$(workdir_clean /w) && echo "clean [$out]"'
+        "run_on_agent() { printf '## HEAD (no branch)\\n'; }; "
+        'out=$(workdir_clean /w) && echo "clean [$out]"'
     )
     assert clean.stdout.strip() == "clean []"
     down = _lib(
@@ -967,8 +986,11 @@ def test_gate_autofix_writes_outside_the_repo():
 @pytest.mark.parametrize("script", ["agent-worker.sh", "agent-pr-gate.sh"])
 def test_scratch_dir_is_removed_on_exit_and_after_each_run(script):
     text = (TASKS / script).read_text()
-    trap = "trap 'scratch_rm \"$SCRATCH\"' EXIT"
-    assert text.count(trap) == 1
+    traps = [ln for ln in text.splitlines() if ln.startswith("trap ")]
+    assert len(traps) == 1, traps
+    assert traps[0].startswith('trap \'scratch_rm "$SCRATCH"') and traps[0].endswith(
+        "' EXIT"
+    )
     # Plus an explicit removal after the claude run, outside the trap string.
     lines = [ln.strip() for ln in text.splitlines()]
     after_run = [i for i, ln in enumerate(lines) if ln == 'scratch_rm "$SCRATCH"']
@@ -994,3 +1016,2281 @@ def test_discord_scratch_dir_agrees_across_files():
     assert f"commit -F {path}/commit-msg" in md
     assert f"--body-file {path}/pr-body.md" in md
     assert ".git/agent-" not in md
+
+
+# --- merge-check and pr-automerge (ADR 0042) ------------------------------
+
+TASKS = REPO / "scripts" / "agent-tasks"
+AUTOMERGE = TASKS / "pr-automerge.sh"
+HEAD = "a" * 40
+
+
+def test_merge_check_passes_a_clean_owner_pr(cfg):
+    assert gate.merge_check(make_pr(["packages/bot/src/x.ts"]), cfg, []) == []
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"isDraft": True}, "draft"),
+        ({"isDraft": None}, "draft"),
+        ({"state": "MERGED"}, "not open"),
+        ({"isCrossRepository": True}, "fork"),
+        ({"baseRefName": "release"}, "base is release, must be main"),
+        ({"author": {"login": "someone"}}, "another human"),
+        ({"comments": [{"author": {"login": "someone"}}]}, "another human"),
+        ({"changedFiles": 101}, "truncated"),
+        ({"files": []}, "missing"),
+        ({"mergeable": "CONFLICTING"}, "conflicts"),
+    ],
+)
+def test_merge_check_refuses(cfg, change, reason):
+    pr = {**make_pr(["src/x.ts"]), **change}
+    assert any(reason in r for r in gate.merge_check(pr, cfg, []))
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "state",
+        "isDraft",
+        "isCrossRepository",
+        "baseRefName",
+        "changedFiles",
+        "reviewThreads",
+        "commits",
+        "openPrs",
+    ],
+)
+def test_merge_check_fails_closed_on_missing_fields(cfg, key):
+    pr = make_pr(["src/x.ts"])
+    del pr[key]
+    assert gate.merge_check(pr, cfg, [])
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".github/workflows/ci.yml",
+        "compose/agent-box.yml",
+        "config/agent-box/agent-gate.json",
+        "scripts/agent-tasks/pr-automerge.sh",
+        "packages/backend/src/auth/x.ts",
+        ".env.production",
+        "infra/main.tf",
+        "scripts/deploy.sh",
+        "CLAUDE.md",
+        "Dockerfile.agent-box",
+        "prisma/migrations/1/migration.sql",
+        "package.json",
+        "pnpm-lock.yaml",
+        "server/go.mod",
+        "server/go.sum",
+    ],
+)
+def test_merge_check_refuses_sensitive_and_infra_paths(cfg, path):
+    reasons = gate.merge_check(make_pr(["src/x.ts", path]), cfg, [])
+    assert any("owner-review paths" in r for r in reasons)
+
+
+def test_merge_check_needs_the_linked_issues(cfg):
+    pr = make_pr(["src/x.ts"])
+    assert gate.merge_check(pr, cfg, None) == ["linked issues not loaded"]
+    foreign = make_issue()
+    foreign["author"] = {"login": "someone"}
+    assert any("another human" in r for r in gate.merge_check(pr, cfg, [foreign]))
+    assert gate.merge_check(pr, cfg, [make_issue()]) == []
+
+
+@pytest.mark.parametrize(
+    "path,ok",
+    [
+        ("docs/a.md", True),
+        ("tests/unit/test_x.py", True),
+        ("config/caddy/Caddyfile", False),
+        ("scripts/backup/run.sh", False),
+        ("tailscale/acl.json", False),
+        ("observability/prometheus.yml", False),
+        (".sops.yaml", False),
+        ("homelab_manager/cli.py", False),
+    ],
+)
+def test_merge_check_homelab_blocks_host_infra(path, ok):
+    c = gate.load_config(CONFIG)
+    c = {**c, **c["repos"]["LucasSantana-Dev/homelab"]}
+    pr = make_pr([path])
+    pr["baseRefName"] = "release"
+    assert (gate.merge_check(pr, c, []) == []) is ok
+
+
+def test_merge_check_refuses_open_threads_even_from_bots(cfg):
+    pr = pr_with_threads(thread("cubic-dev-ai"), files=("src/x.ts",))
+    assert gate.merge_check(pr, cfg, []) == ["1 unresolved review thread(s)"]
+
+
+def test_merge_check_refuses_unfetched_thread_pages(cfg):
+    pr = pr_with_threads(files=("src/x.ts",), more=True)
+    assert "review threads not fully loaded" in gate.merge_check(pr, cfg, [])
+
+
+def test_merge_check_homelab_needs_release_base():
+    c = gate.load_config(CONFIG)
+    c = {**c, **c["repos"]["LucasSantana-Dev/homelab"]}
+    pr = make_pr(["docs/a.md"])
+    assert gate.merge_check(pr, c, []) == ["base is main, must be release"]
+    pr["baseRefName"] = "release"
+    assert gate.merge_check(pr, c, []) == []
+
+
+def test_no_red_mode_merges_yellow_pillars(cfg):
+    cfg["auto_merge"] = "no-red"
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    out = gate.score(pr, make_issue(), cfg)
+    assert "yellow" in out["pillars"].values()
+    assert out["decision"] == "auto-merge"
+
+
+def test_no_red_mode_never_merges_red(cfg):
+    cfg["auto_merge"] = "no-red"
+    out = gate.score(make_pr(["packages/backend/src/auth/a.ts"]), make_issue(), cfg)
+    assert out["decision"] != "auto-merge"
+
+
+def test_green_mode_still_holds_yellow(cfg):
+    cfg["auto_merge"] = True
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_auto_merge_waits_for_the_owner_when_merge_check_fails(cfg):
+    cfg["auto_merge"] = "no-red"
+    pr = make_pr(["packages/bot/src/x.ts", "packages/bot/src/x.test.ts"])
+    pr["isDraft"] = True
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "owner-review"
+    assert "merge check: draft" in out["reasons"]
+
+
+def test_cli_merge_check_needs_an_allowlisted_repo():
+    assert _cli_raw("merge-check").returncode == 2
+    assert _cli_raw("merge-check", "--repo", "someone/else").returncode == 2
+
+
+def test_cli_merge_check_roundtrip():
+    pr = make_pr(["docs/a.md"])
+    pr["baseRefName"] = "release"
+    out = _cli(
+        "merge-check",
+        "--repo",
+        "LucasSantana-Dev/homelab",
+        stdin=json.dumps({"pr": pr, "issues": []}),
+    )
+    assert json.loads(out.stdout) == {"ok": True, "reasons": []}
+
+
+ISSUE_URL = "https://github.com/LucasSantana-Dev/Lucky/issues/1"
+
+
+def _gh_pr(files=("src/x.ts",), queued=False, **extra):
+    pr = make_pr(list(files))
+    del pr["reviewThreads"]  # gh pr view has neither; the wrapper adds them
+    del pr["openPrs"]
+    pr["headRefOid"] = HEAD
+    pr["autoMergeRequest"] = {"mergeMethod": "SQUASH"} if queued else None
+    pr["closingIssuesReferences"] = [{"number": 1, "url": ISSUE_URL}]
+    pr.update(extra)
+    return pr
+
+
+def _fake_bin(tmp_path, threads=None, issue=None, open_prs=None):
+    """A bin dir with a fake gh that logs its args and serves pr-<n>.json files."""
+    (tmp_path / "open.json").write_text(json.dumps(open_prs or []))
+    (tmp_path / "threads.json").write_text(
+        json.dumps(threads or {"pageInfo": {"hasNextPage": False}, "nodes": []})
+    )
+    (tmp_path / "issue.json").write_text(json.dumps(issue or make_issue()))
+    bindir = tmp_path / "bin"
+    bindir.mkdir(exist_ok=True)
+    gh = bindir / "gh"
+    gh.write_text(
+        "#!/bin/bash\n"
+        f'echo "$*" >> "{tmp_path}/gh.log"\n'
+        'case "$1 $2" in\n'
+        f'  "pr view") cat "{tmp_path}/pr-$3.json" ;;\n'
+        '  "api graphql")\n'
+        '    if [[ "$*" == *mutation* ]]; then\n'
+        '      for a in "$@"; do case "$a" in id=*) id=${a#id=} ;; body=*) body=${a#body=} ;; esac; done\n'
+        '      kind=reply; [[ "$*" == *resolveReviewThread* ]] && kind=resolve\n'
+        '      [[ "$kind" == reply ]] && rc=${GH_REPLY_RC:-0} || rc=${GH_RESOLVE_RC:-0}\n'
+        f'      echo "$kind $id $body" >> "{tmp_path}/mutations.log"\n'
+        '      if [[ "$kind" == resolve && "$rc" == 0 ]]; then\n'
+        "        jq --arg id \"$id\" '(.nodes[] | select(.id == $id) | .isResolved) = true' "
+        f'"{tmp_path}/threads.json" > "{tmp_path}/t.json"\n'
+        f'        mv "{tmp_path}/t.json" "{tmp_path}/threads.json"\n'
+        "      fi\n"
+        '      exit "$rc"\n'
+        '    elif [[ "$*" == *"pullRequests(states"* ]]; then\n'
+        '      [[ -z "${GH_OPEN_RC:-}" ]] || exit "$GH_OPEN_RC"\n'
+        f'      cat "{tmp_path}/open.json"; exit 0\n'
+        "    fi\n"
+        # threads.next replaces the threads after the first read: a change mid-run.
+        f'    [[ -f "{tmp_path}/threads.next" && -f "{tmp_path}/threads.read" ]] '
+        f'&& mv "{tmp_path}/threads.next" "{tmp_path}/threads.json"\n'
+        f'    touch "{tmp_path}/threads.read"; cat "{tmp_path}/threads.json" ;;\n'
+        f'  "issue view") [[ "$3" == "{ISSUE_URL}" ]] && cat "{tmp_path}/issue.json" ;;\n'
+        f'  "pr list") cat "{tmp_path}/list.txt" ;;\n'
+        '  "pr merge") exit "${GH_MERGE_RC:-0}" ;;\n'
+        "  *) exit 9 ;;\n"
+        "esac\n"
+    )
+    gh.chmod(0o755)
+    for tool in ("jq", "python3", "git"):
+        link = bindir / tool
+        if not link.exists():
+            link.symlink_to(shutil.which(tool))
+    return bindir
+
+
+def _automerge(
+    tmp_path,
+    *args,
+    prs=None,
+    threads=None,
+    issue=None,
+    env=None,
+    script=None,
+    open_prs=None,
+):
+    """Run pr-automerge with a fake gh. prs maps PR number to gh pr view JSON."""
+    for n, pr in (prs or {}).items():
+        (tmp_path / f"pr-{n}.json").write_text(json.dumps(pr))
+    bindir = _fake_bin(tmp_path, threads, issue, open_prs)
+    full_env = {
+        **os.environ,
+        "PATH": f"{bindir}:{os.environ['PATH']}",
+        "PR_AUTOMERGE_STATE": str(tmp_path / "state"),
+        **(env or {}),
+    }
+    res = subprocess.run(
+        ["/bin/bash", str(script or AUTOMERGE), *args],
+        env=full_env,
+        capture_output=True,
+        text=True,
+    )
+    log = tmp_path / "gh.log"
+    return res, (log.read_text() if log.exists() else "")
+
+
+def _merge_calls(log):
+    return [ln for ln in log.splitlines() if ln.startswith("pr merge")]
+
+
+def test_automerge_queues_a_clean_pr_on_the_checked_head(tmp_path):
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: _gh_pr()})
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _merge_calls(log) == [
+        f"pr merge 7 -R LucasSantana-Dev/Lucky --squash --auto --match-head-commit {HEAD}"
+    ]
+    entry = tmp_path / "state" / "LucasSantana-Dev_Lucky-7"
+    assert entry.read_text().strip() == HEAD
+
+
+def test_automerge_does_not_queue_twice(tmp_path):
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "LucasSantana-Dev_Lucky-7").write_text(HEAD + "\n")
+    pr = _gh_pr(queued=True)
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _merge_calls(log) == []
+
+
+def test_automerge_re_pins_a_merge_queued_on_another_commit(tmp_path):
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "LucasSantana-Dev_Lucky-7").write_text("b" * 40 + "\n")
+    pr = _gh_pr(queued=True)
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _merge_calls(log) == [
+        "pr merge 7 -R LucasSantana-Dev/Lucky --disable-auto",
+        f"pr merge 7 -R LucasSantana-Dev/Lucky --squash --auto --match-head-commit {HEAD}",
+    ]
+
+
+def test_automerge_refuses_without_merging(tmp_path):
+    pr = _gh_pr(files=("src/x.ts", ".github/workflows/ci.yml"))
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "refused: owner-review paths" in res.stdout
+    assert _merge_calls(log) == []
+    assert not (tmp_path / "state").exists()
+
+
+def test_automerge_turns_off_a_queued_merge_that_fails(tmp_path):
+    pr = _gh_pr(queued=True, comments=[{"author": {"login": "someone"}}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert _merge_calls(log) == ["pr merge 7 -R LucasSantana-Dev/Lucky --disable-auto"]
+
+
+def test_automerge_refuses_bot_threads(tmp_path):
+    threads = {"pageInfo": {"hasNextPage": False}, "nodes": [thread("cubic-dev-ai")]}
+    res, log = _automerge(
+        tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: _gh_pr()}, threads=threads
+    )
+    assert res.returncode == 1
+    assert _merge_calls(log) == []
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("someone/else", "7"),
+        ("LucasSantana-Dev/Lucky", "7; rm -rf /"),
+        ("LucasSantana-Dev/Lucky", "--admin"),
+        ("LucasSantana-Dev/Lucky",),
+        ("--sweep", "x"),
+    ],
+)
+def test_automerge_bad_arguments_never_merge(tmp_path, args):
+    res, log = _automerge(tmp_path, *args, prs={7: _gh_pr()})
+    assert res.returncode != 0
+    assert _merge_calls(log) == []
+
+
+def test_automerge_sweep(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    for n in (1, 2, 3, 4):
+        (state / f"LucasSantana-Dev_Lucky-{n}").write_text(HEAD)
+    (state / "junk name").write_text("")
+    prs = {
+        1: _gh_pr(queued=True),  # still fine: kept
+        2: _gh_pr(queued=True, files=("src/x.ts", "compose/x.yml")),  # turned off
+        3: _gh_pr(queued=True, state="MERGED"),  # done: forgotten
+        4: _gh_pr(queued=False),  # turned off by someone: forgotten
+    }
+    res, log = _automerge(tmp_path, "--sweep", prs=prs)
+    assert res.returncode == 3
+    assert _merge_calls(log) == ["pr merge 2 -R LucasSantana-Dev/Lucky --disable-auto"]
+    assert sorted(p.name for p in state.iterdir()) == [
+        "LucasSantana-Dev_Lucky-1",
+        "junk name",
+    ]
+
+
+def test_automerge_merge_calls_are_only_queue_or_disable():
+    calls = [
+        ln.strip()
+        for ln in AUTOMERGE.read_text().splitlines()
+        if "gh pr merge" in ln and not ln.lstrip().startswith("#")
+    ]
+    assert len(calls) == 4, calls
+    assert all("--admin" not in c for c in calls)
+    assert all(
+        "--disable-auto" in c or '--squash --auto --match-head-commit "$sha"' in c
+        for c in calls
+    )
+    assert any('--squash --auto --match-head-commit "$sha"' in c for c in calls)
+    assert any("--disable-auto" in c for c in calls)
+
+
+def test_automerge_ships_root_owned_in_the_image():
+    df = (REPO / "Dockerfile.agent-box").read_text()
+    for src, dst in [
+        ("scripts/agent-tasks/pr-automerge.sh", "/opt/agent-config/pr-automerge.sh"),
+        ("scripts/agent-tasks/agent_gate.py", "/opt/agent-config/agent_gate.py"),
+        ("config/agent-box/agent-gate.json", "/opt/agent-config/agent-gate.json"),
+    ]:
+        assert f"COPY {src} {dst}" in df
+    assert "ln -s /opt/agent-config/pr-automerge.sh /usr/local/bin/pr-automerge" in df
+
+
+def test_model_still_cannot_run_gh_pr_merge(cfg):
+    conf = REPO / "config" / "agent-box"
+    discord = json.loads((conf / "discord-channel-settings.json").read_text())
+    user = json.loads((conf / "settings.json").read_text())
+    assert "Bash(gh pr merge*)" in discord["permissions"]["deny"]
+    assert "Bash(gh * pr merge*)" in discord["permissions"]["deny"]
+    assert "Bash(gh pr merge*)" in user["permissions"]["deny"]
+    assert "Bash(gh pr merge*)" in cfg["claude_disallowed_tools"]
+    rules = (conf / "discord-channel.md").read_text()
+    assert "pr-automerge <owner/repo> <pr-number>" in rules
+
+
+def test_gate_sweeps_queued_merges():
+    gate_sh = (TASKS / "agent-pr-gate.sh").read_text()
+    assert "pr-automerge --sweep" in gate_sh
+    view = next(ln for ln in gate_sh.splitlines() if "gh pr view $2" in ln)
+    for f in ("state", "isDraft", "isCrossRepository", "baseRefName", "changedFiles"):
+        assert f in view
+
+
+def test_automerge_refuses_a_pr_closing_a_foreign_issue(tmp_path):
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        prs={7: _gh_pr()},
+        issue=make_issue(author="someone"),
+    )
+    assert res.returncode == 1
+    assert "another human" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_refuses_when_a_linked_issue_cannot_load(tmp_path):
+    pr = _gh_pr(closingIssuesReferences=[{"number": 9, "url": None}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "could not load" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_keeps_tracking_when_disable_fails(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "LucasSantana-Dev_Lucky-2").write_text(HEAD)
+    pr = _gh_pr(queued=True, files=("src/x.ts", "compose/x.yml"))
+    res, log = _automerge(tmp_path, "--sweep", prs={2: pr}, env={"GH_MERGE_RC": "1"})
+    assert res.returncode == 3
+    assert "STILL QUEUED" in res.stdout
+    assert (state / "LucasSantana-Dev_Lucky-2").exists()
+
+
+def test_image_copy_ignores_the_callers_environment(tmp_path):
+    """Installed under /opt/agent-config, the wrapper pins its config, registry and PATH."""
+    opt = (tmp_path / "opt").resolve()
+    opt.mkdir()
+    bindir = _fake_bin(tmp_path)
+    locked_state = tmp_path / "locked-state"
+    src = AUTOMERGE.read_text()
+    src = src.replace("/opt/agent-config", str(opt))
+    src = src.replace(
+        "PATH=/usr/local/bin:/usr/bin:/bin", f"PATH={bindir}:/usr/bin:/bin"
+    )
+    src = src.replace("/home/agent/.local/state/pr-automerge", str(locked_state))
+    (opt / "pr-automerge.sh").write_text(src)
+    shutil.copy(SCRIPT, opt / "agent_gate.py")
+    shutil.copy(CONFIG, opt / "agent-gate.json")
+    loose = json.loads(CONFIG.read_text())
+    for key in ("high_impact_paths", "sensitive_paths", "repo_merge_block_paths"):
+        loose[key] = []
+    (tmp_path / "loose.json").write_text(json.dumps(loose))
+    env = {
+        "AGENT_GATE_CONFIG": str(tmp_path / "loose.json"),
+        "PR_AUTOMERGE_STATE": str(tmp_path / "hidden"),
+        "PATH": "/nonexistent",
+    }
+    bad = _gh_pr(files=("src/x.ts", ".github/workflows/ci.yml"))
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        prs={7: bad},
+        env=env,
+        script=opt / "pr-automerge.sh",
+    )
+    assert res.returncode == 1, res.stdout + res.stderr
+    assert "owner-review paths" in res.stdout
+    assert _merge_calls(log) == []
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "8",
+        prs={8: _gh_pr()},
+        env=env,
+        script=opt / "pr-automerge.sh",
+    )
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert (locked_state / "LucasSantana-Dev_Lucky-8").exists()
+    assert not (tmp_path / "hidden").exists()
+
+
+# --- automerge-push-guard (hook) ------------------------------------------
+
+PUSH_GUARD = REPO / "config" / "agent-box" / "automerge-push-guard.sh"
+
+
+def _push_guard(tmp_path, command, listed="", merge_rc="0", list_ok=True):
+    repo = tmp_path / "Lucky"
+    if not repo.exists():
+        subprocess.run(["git", "init", "-q", "-b", "fix/x", str(repo)], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo),
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/LucasSantana-Dev/Lucky.git",
+            ],
+            check=True,
+        )
+    bindir = _fake_bin(tmp_path)
+    (tmp_path / "list.txt").write_text(listed)
+    if not list_ok:
+        (tmp_path / "list.txt").unlink()
+    payload = {"tool_input": {"command": command.format(repo=repo)}, "cwd": "/"}
+    res = subprocess.run(
+        ["bash", str(PUSH_GUARD)],
+        input=json.dumps(payload),
+        env={
+            **os.environ,
+            "PATH": f"{bindir}:{os.environ['PATH']}",
+            "GH_MERGE_RC": merge_rc,
+        },
+        capture_output=True,
+        text=True,
+    )
+    log = tmp_path / "gh.log"
+    return res, (log.read_text() if log.exists() else "")
+
+
+def test_push_guard_ignores_other_commands(tmp_path):
+    res, log = _push_guard(tmp_path, "git -C {repo} status")
+    assert res.returncode == 0
+    assert log == ""
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git -C {repo} push origin fix/x",
+        "git -C {repo} push -u origin fix/x",
+        "git -C {repo} push origin HEAD",
+        "git -C {repo} push",
+        "git -C {repo} add -A && git -C {repo} push origin fix/x 2>&1",
+    ],
+)
+def test_push_guard_turns_off_a_queued_merge_before_the_push(tmp_path, command):
+    res, log = _push_guard(tmp_path, command, listed="12\n")
+    assert res.returncode == 0, res.stderr
+    assert "pr list -R LucasSantana-Dev/Lucky --head fix/x --state open" in log
+    assert "pr merge 12 -R LucasSantana-Dev/Lucky --disable-auto" in log
+    assert "run pr-automerge LucasSantana-Dev/Lucky 12" in res.stderr
+
+
+def test_push_guard_lets_a_push_without_queued_merge_through(tmp_path):
+    res, log = _push_guard(tmp_path, "git -C {repo} push origin fix/x")
+    assert res.returncode == 0
+    assert "pr merge" not in log
+
+
+@pytest.mark.parametrize(
+    "kwargs", [{"list_ok": False}, {"listed": "12\n", "merge_rc": "1"}]
+)
+def test_push_guard_blocks_when_it_cannot_turn_auto_merge_off(tmp_path, kwargs):
+    res, _ = _push_guard(tmp_path, "git -C {repo} push origin fix/x", **kwargs)
+    assert res.returncode == 2
+    assert "BLOCK" in res.stderr
+
+
+def test_push_guard_is_installed_and_registered():
+    df = (REPO / "Dockerfile.agent-box").read_text()
+    entry = (REPO / "config" / "agent-box" / "entrypoint.sh").read_text()
+    settings = json.loads((REPO / "config" / "agent-box" / "settings.json").read_text())
+    assert (
+        "COPY config/agent-box/automerge-push-guard.sh "
+        "/opt/agent-config/hooks/automerge-push-guard.sh" in df
+    )
+    assert "automerge-push-guard pr-create-guard; do" in entry
+    commands = [
+        h["command"]
+        for m in settings["hooks"]["PreToolUse"]
+        if m["matcher"] == "Bash"
+        for h in m["hooks"]
+        if h["type"] == "command"
+    ]
+    assert "/home/agent/.claude/hooks/automerge-push-guard.sh" in commands
+
+
+# --- pr-automerge thread replies (ADR 0042, amendment) --------------------
+
+REVIEWED = "b" * 40  # the commit the bot reviewed; HEAD is a later push
+
+
+def review_thread(tid, *logins, commit=REVIEWED, resolved=False):
+    t = thread(*logins, resolved=resolved)
+    t["id"] = tid
+    for c in t["comments"]["nodes"]:
+        c["originalCommit"] = {"oid": commit}
+    return t
+
+
+def pr_for_replies(*threads, commits=(REVIEWED, HEAD), more=False):
+    pr = pr_with_threads(*threads, files=("src/x.ts",), more=more)
+    pr["headRefOid"] = HEAD
+    pr["commits"] = [{"oid": c, "authors": [{"login": OWNER}]} for c in commits]
+    return pr
+
+
+def _plan(pr, cfg, replies, issues=()):
+    return gate.thread_replies(pr, cfg, list(issues), replies)
+
+
+def test_thread_replies_resolve_a_fixed_bot_thread(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed in the last commit."}]
+    assert _plan(pr, cfg, replies) == (
+        [],
+        [{"id": "T1", "reply": "Fixed in the last commit.", "resolve": True}],
+        {},
+    )
+
+
+def test_thread_replies_leave_a_dismissed_claim_open(cfg):
+    pr = pr_for_replies(review_thread("T1", "coderabbitai"))
+    replies = [{"id": "T1", "fixed": False, "reply": "The value is never null here."}]
+    _, actions, _ = _plan(pr, cfg, replies)
+    assert actions == [
+        {"id": "T1", "reply": "The value is never null here.", "resolve": False}
+    ]
+
+
+@pytest.mark.parametrize(
+    "commits",
+    [
+        (REVIEWED,),  # nothing pushed after the review
+        ("c" * 40, HEAD),  # reviewed commit not in the PR (unknown)
+        (REVIEWED, HEAD, "d" * 40),  # list does not end at the head
+        (),
+    ],
+)
+def test_thread_replies_skip_a_fix_that_is_not_pushed(cfg, commits):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"), commits=commits)
+    if commits == (REVIEWED,):
+        pr["headRefOid"] = REVIEWED
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    reasons, actions, skipped = _plan(pr, cfg, replies)
+    assert (reasons, actions) == ([], [])
+    assert "push first" in skipped["T1"]
+
+
+def test_thread_replies_fail_closed_on_missing_oids(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai", commit=None))
+    pr["headRefOid"] = None
+    pr["commits"] = [{"authors": [{"login": OWNER}]}, {"authors": [{"login": OWNER}]}]
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and "push first" in skipped["T1"]
+
+
+def test_thread_replies_need_a_push_after_the_last_bot_comment(cfg):
+    t = review_thread("T1", "cubic-dev-ai", "cubic-dev-ai")
+    t["comments"]["nodes"][1]["originalCommit"] = {"oid": HEAD}  # re-review on HEAD
+    pr = pr_for_replies(t)
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and "push first" in skipped["T1"]
+
+
+def test_thread_replies_never_touch_owner_or_app_threads(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai", OWNER),  # the owner joined
+        review_thread("T2", "cubic-dev-ai"),
+    )
+    # An App outside the bot list: not human, but not the session's to answer.
+    pr["reviewThreads"]["nodes"][1]["comments"]["nodes"][0]["author"] = {
+        "__typename": "Bot",
+        "login": "some-app",
+    }
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "x"},
+        {"id": "T2", "fixed": True, "reply": "x"},
+    ]
+    _, actions, skipped = _plan(pr, cfg, replies)
+    assert actions == []
+    assert set(skipped) == {"T1", "T2"}
+    assert all("bot-only" in why for why in skipped.values())
+
+
+def test_thread_replies_refuse_a_human_thread_outright(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai"), review_thread("T2", "someone")
+    )
+    reasons, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == []
+    assert any("another human" in r for r in reasons)
+
+
+@pytest.mark.parametrize(
+    "entry,key,why",
+    [
+        ({"id": "T9", "fixed": True, "reply": "x"}, "T9", "not an open thread"),
+        ({"id": "T1", "fixed": True, "reply": "  "}, "T1", "empty reply"),
+        ({"id": "T1", "fixed": True}, "T1", "empty reply"),
+        ({"id": "T1;x", "reply": "x"}, "#0", "no valid thread id"),
+        ({"id": 5, "reply": "x"}, "#0", "no valid thread id"),
+        ("T1", "#0", "no valid thread id"),
+    ],
+)
+def test_thread_replies_skip_bad_entries(cfg, entry, key, why):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    _, actions, skipped = _plan(pr, cfg, [entry])
+    assert actions == []
+    assert why in skipped[key]
+
+
+def test_thread_replies_skip_resolved_and_doubled_threads(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai", resolved=True),
+        review_thread("T2", "cubic-dev-ai"),
+    )
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "x"},
+        {"id": "T2", "fixed": True, "reply": "first"},
+        {"id": "T2", "fixed": False, "reply": "second"},
+    ]
+    _, actions, skipped = _plan(pr, cfg, replies)
+    assert actions == []
+    assert skipped == {"T1": "not an open thread of this PR", "T2": "named twice"}
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "@claude fix the rest",
+        "Fixed. cc @coderabbitai",
+        "/review",
+        "Fixed.\n  /ask why",
+    ],
+)
+def test_thread_replies_skip_mentions_and_slash_commands(cfg, reply):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": reply}])
+    assert actions == [] and "mentions" in skipped["T1"]
+
+
+def test_thread_replies_allow_plain_text_with_slashes(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    reply = "Fixed in src/a.ts and the and/or check, see x @ line 3."
+    _, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": reply}])
+    assert actions[0]["resolve"] is True
+
+
+def test_thread_replies_resolve_only_on_a_real_true(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    _, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": "true", "reply": "x"}])
+    assert actions == [{"id": "T1", "reply": "x", "resolve": False}]
+
+
+def test_thread_replies_owner_reply_hands_the_thread_to_the_owner(cfg):
+    """After a dismissed claim the thread holds the owner's reply: never answered again."""
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai", OWNER))
+    _, actions, skipped = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and "bot-only" in skipped["T1"]
+
+
+def test_thread_replies_cap_text_and_drop_dashes(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    reply = "Fixed — the guard runs first–always. " + "y" * 3000
+    _, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": reply}])
+    out = actions[0]["reply"]
+    assert out.startswith("Fixed, the guard runs first, always. ")
+    assert "—" not in out and "–" not in out
+    assert len(out) <= 2000
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"state": "MERGED"}, "not open"),
+        ({"isCrossRepository": True}, "fork"),
+        ({"author": {"login": "someone"}}, "another human"),
+    ],
+)
+def test_thread_replies_refuse_unsafe_prs(cfg, change, reason):
+    pr = {**pr_for_replies(review_thread("T1", "cubic-dev-ai")), **change}
+    reasons, actions, _ = _plan(pr, cfg, [{"id": "T1", "fixed": True, "reply": "x"}])
+    assert actions == [] and any(reason in r for r in reasons)
+
+
+def test_thread_replies_fail_closed(cfg):
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"), more=True)
+    ok = [{"id": "T1", "fixed": True, "reply": "x"}]
+    assert "review threads not fully loaded" in _plan(pr, cfg, ok)[0]
+    pr = pr_for_replies(review_thread("T1", "cubic-dev-ai"))
+    assert _plan(pr, cfg, {"T1": "x"})[0] == ["replies file is not a JSON array"]
+    assert gate.thread_replies(pr, cfg, None, ok)[0] == ["linked issues not loaded"]
+    foreign = make_issue(author="someone")
+    assert any("another human" in r for r in _plan(pr, cfg, ok, issues=[foreign])[0])
+
+
+def test_open_threads_lists_ids_and_marks_bot_only(cfg):
+    pr = pr_for_replies(
+        review_thread("T1", "cubic-dev-ai"),
+        review_thread("T2", "cubic-dev-ai", OWNER),
+        review_thread("T3", "coderabbitai", resolved=True),
+    )
+    out = gate.list_open_threads(pr, cfg)
+    assert [(t["id"], t["bot_only"]) for t in out] == [("T1", True), ("T2", False)]
+    assert out[0]["comments"] == [{"author": "cubic-dev-ai", "body": "b"}]
+
+
+def test_cli_thread_commands_need_an_allowlisted_repo():
+    for cmd in ("open-threads", "thread-replies"):
+        assert _cli_raw(cmd).returncode == 2
+        assert _cli_raw(cmd, "--repo", "someone/else").returncode == 2
+
+
+def _replies_file(tmp_path, replies):
+    f = tmp_path / "replies.json"
+    f.write_text(replies if isinstance(replies, str) else json.dumps(replies))
+    return str(f)
+
+
+def _threads_conn(*threads):
+    return {"pageInfo": {"hasNextPage": False}, "nodes": list(threads)}
+
+
+def _pushed_pr(**extra):
+    commits = [{"oid": c, "authors": [{"login": OWNER}]} for c in (REVIEWED, HEAD)]
+    return _gh_pr(commits=commits, **extra)
+
+
+def _mutations(tmp_path):
+    log = tmp_path / "mutations.log"
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def _answer(tmp_path, replies, threads, env=None):
+    return _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--replies",
+        _replies_file(tmp_path, replies),
+        prs={7: _pushed_pr()},
+        threads=threads,
+        env=env,
+    )
+
+
+def test_automerge_replies_resolve_then_queue(tmp_path):
+    threads = _threads_conn(
+        review_thread("T1", "cubic-dev-ai"), review_thread("T2", "coderabbitai")
+    )
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "Fixed, guard added."},
+        {"id": "T2", "fixed": True, "reply": "Fixed too."},
+    ]
+    res, log = _answer(tmp_path, replies, threads)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert _mutations(tmp_path) == [
+        "reply T1 Fixed, guard added.",
+        "resolve T1 ",
+        "reply T2 Fixed too.",
+        "resolve T2 ",
+    ]
+    assert len(_merge_calls(log)) == 1
+    assert "--squash --auto --match-head-commit" in _merge_calls(log)[0]
+
+
+def test_automerge_dismissed_claim_stays_open_and_blocks_the_merge(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    replies = [{"id": "T1", "fixed": False, "reply": "Not reachable: x is checked."}]
+    res, log = _answer(tmp_path, replies, threads)
+    assert res.returncode == 1
+    assert _mutations(tmp_path) == ["reply T1 Not reachable: x is checked."]
+    assert "left open for the owner" in res.stdout
+    assert "1 unresolved review thread(s)" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_replies_never_post_on_a_pr_with_a_human_thread(tmp_path):
+    threads = _threads_conn(
+        review_thread("T1", "cubic-dev-ai"), review_thread("T2", "someone")
+    )
+    res, log = _answer(tmp_path, [{"id": "T1", "fixed": True, "reply": "x"}], threads)
+    assert res.returncode == 1
+    assert "replies refused: another human" in res.stdout
+    assert _mutations(tmp_path) == []
+    assert _merge_calls(log) == []
+
+
+def test_automerge_does_not_resolve_when_the_reply_fails(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    res, log = _answer(
+        tmp_path,
+        [{"id": "T1", "fixed": True, "reply": "x"}],
+        threads,
+        env={"GH_REPLY_RC": "1"},
+    )
+    assert res.returncode == 1
+    assert _mutations(tmp_path) == ["reply T1 x"]
+    assert "failed, left open" in res.stdout
+    assert "0 of 1 replies posted" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_reports_a_failed_resolve(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    res, log = _answer(
+        tmp_path,
+        [{"id": "T1", "fixed": True, "reply": "x"}],
+        threads,
+        env={"GH_RESOLVE_RC": "1"},
+    )
+    assert res.returncode == 1
+    assert "could not resolve it" in res.stdout
+    assert "1 of 1 replies posted" in res.stdout
+    assert _merge_calls(log) == []
+
+
+# Short ids: pytest puts the test id in PYTEST_CURRENT_TEST, and a 70000-char id breaks
+# exec on Linux ("Argument list too long").
+@pytest.mark.parametrize(
+    "content",
+    ["not json", "[1] [2]", "x" * 70000, "[]" + "\n" * 70000, None],
+    ids=["not-json", "two-values", "oversized", "newline-padded", "missing"],
+)
+def test_automerge_bad_replies_file_posts_nothing(tmp_path, content):
+    path = (
+        str(tmp_path / "missing.json")
+        if content is None
+        else _replies_file(tmp_path, content)
+    )
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--replies",
+        path,
+        prs={7: _pushed_pr()},
+        threads=_threads_conn(review_thread("T1", "cubic-dev-ai")),
+    )
+    assert res.returncode == 1
+    assert "replies file missing" in res.stdout or "replies refused" in res.stdout
+    assert _mutations(tmp_path) == []
+    assert _merge_calls(log) == []
+
+
+def test_automerge_lists_open_threads(tmp_path):
+    threads = _threads_conn(
+        review_thread("T1", "cubic-dev-ai"),
+        review_thread("T2", "coderabbitai", resolved=True),
+    )
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--threads",
+        prs={7: _pushed_pr()},
+        threads=threads,
+    )
+    assert res.returncode == 0, res.stderr
+    out = json.loads(res.stdout)
+    assert [(t["id"], t["bot_only"]) for t in out] == [("T1", True)]
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_threads_listing_refuses_a_truncated_list(tmp_path):
+    threads = _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    threads["pageInfo"]["hasNextPage"] = True
+    res, _ = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        "--threads",
+        prs={7: _pushed_pr()},
+        threads=threads,
+    )
+    assert res.returncode == 1
+    assert res.stdout == "" and "not fully loaded" in res.stderr
+
+
+def test_automerge_replies_recheck_each_thread_before_posting(tmp_path):
+    t1 = review_thread("T1", "cubic-dev-ai")
+    joined = review_thread("T1", "cubic-dev-ai", "someone")
+    (tmp_path / "threads.next").write_text(json.dumps(_threads_conn(joined)))
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    res, log = _answer(tmp_path, replies, _threads_conn(t1))
+    assert res.returncode == 1
+    assert "changed since the check" in res.stdout
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_replies_recheck_skips_only_the_changed_thread(tmp_path):
+    t1, t2 = review_thread("T1", "cubic-dev-ai"), review_thread("T2", "cubic-dev-ai")
+    # T1 was resolved since the check (a human joining would stop the whole PR).
+    done = review_thread("T1", "cubic-dev-ai", resolved=True)
+    (tmp_path / "threads.next").write_text(json.dumps(_threads_conn(done, t2)))
+    replies = [
+        {"id": "T1", "fixed": True, "reply": "Fixed."},
+        {"id": "T2", "fixed": True, "reply": "Fixed too."},
+    ]
+    res, log = _answer(tmp_path, replies, _threads_conn(t1, t2))
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "thread T1 changed since the check" in res.stdout
+    assert _mutations(tmp_path) == ["reply T2 Fixed too.", "resolve T2 "]
+    assert len(_merge_calls(log)) == 1  # no thread left open
+
+
+def test_automerge_replies_recheck_accepts_a_normalized_reply(tmp_path):
+    # The re-check re-plans the already normalized reply: normalization must be idempotent.
+    reply = "Fixed — the guard runs first–always. " + "y" * 3000
+    replies = [{"id": "T1", "fixed": True, "reply": reply}]
+    res, _ = _answer(
+        tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    )
+    assert res.returncode == 0, res.stdout + res.stderr
+    posted = _mutations(tmp_path)
+    assert posted[0].startswith("reply T1 Fixed, the guard runs first, always. y")
+    assert posted[1] == "resolve T1 "
+
+
+def test_automerge_replies_report_a_failed_recheck_load(tmp_path):
+    (tmp_path / "threads.next").write_text("{}")  # no nodes array: load fails
+    replies = [{"id": "T1", "fixed": True, "reply": "Fixed."}]
+    res, log = _answer(
+        tmp_path, replies, _threads_conn(review_thread("T1", "cubic-dev-ai"))
+    )
+    assert res.returncode == 1
+    assert (
+        "could not reload or re-check the PR before replying to thread T1" in res.stdout
+    )
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("LucasSantana-Dev/Lucky", "7", "--replies"),
+        ("LucasSantana-Dev/Lucky", "7", "--threads", "x"),
+        ("LucasSantana-Dev/Lucky", "7", "--admin", "x"),
+        ("--sweep", "--replies", "x"),
+    ],
+)
+def test_automerge_bad_thread_arguments_do_nothing(tmp_path, args):
+    res, log = _automerge(tmp_path, *args, prs={7: _pushed_pr()})
+    assert res.returncode != 0
+    assert _mutations(tmp_path) == [] and _merge_calls(log) == []
+
+
+def test_automerge_only_mutations_are_reply_and_resolve():
+    src = AUTOMERGE.read_text()
+    mutations = [ln for ln in src.splitlines() if "mutation(" in ln]
+    assert [m.split("=", 1)[0] for m in mutations] == [
+        "REPLY_MUTATION",
+        "RESOLVE_MUTATION",
+    ]
+    api_calls = [
+        ln.strip()
+        for ln in src.splitlines()
+        if "gh api" in ln and not ln.lstrip().startswith("#")
+    ]
+    # Two reads (threads, open PRs) and the two mutations.
+    assert len(api_calls) == 4, api_calls
+    assert all("gh api graphql" in c for c in api_calls)
+
+
+def test_discord_session_answers_threads_through_pr_automerge():
+    conf = REPO / "config" / "agent-box"
+    discord = json.loads((conf / "discord-channel-settings.json").read_text())
+    assert "Bash(gh api*)" in discord["permissions"]["deny"]
+    assert "Bash(gh * api*)" in discord["permissions"]["deny"]
+    rules = (conf / "discord-channel.md").read_text()
+    assert "pr-automerge <owner/repo> <pr-number> --threads" in rules
+    assert "--replies /tmp/discord-scratch/thread-replies.json" in rules
+
+
+# Stacked branches and wrong bases (Lucky #2886-#2890, homelab #522).
+
+
+def test_branch_problems_flags_a_pr_stacked_on_another_open_pr(cfg):
+    pr = make_pr(["src/x.ts"])
+    pr["number"] = 2887
+    pr["commits"] = [{"oid": "b" * 40}, {"oid": OWN_OID}]
+    pr["openPrs"] = [
+        {"number": 2886, "oids": ["b" * 40]},
+        {"number": 2887, "oids": ["b" * 40, OWN_OID]},
+    ]
+    assert gate.branch_problems(pr, cfg) == [
+        "stacked on open PR(s) #2886: rebuild the branch from origin/main"
+    ]
+    assert any("stacked" in r for r in gate.merge_check(pr, cfg, []))
+
+
+def test_branch_problems_lets_the_bottom_of_a_stack_through(cfg):
+    pr = make_pr(["src/x.ts"])
+    pr["number"] = 2886
+    pr["commits"] = [{"oid": "b" * 40}]
+    pr["openPrs"] = [
+        {"number": 2886, "oids": ["b" * 40]},
+        {"number": 2890, "oids": ["d" * 40]},
+    ]
+    assert gate.branch_problems(pr, cfg) == []
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"baseRefName": "release"}, "base is release, must be main"),
+        ({"openPrs": [{"number": 99, "oids": [OWN_OID]}]}, "stacked on open PR(s) #99"),
+        ({"openPrs": None}, "not loaded"),
+    ],
+)
+def test_score_sends_wrong_base_and_stacks_to_a_human(cfg, change, reason):
+    cfg["auto_merge"] = "no-red"
+    pr = {**make_pr(["docs/a.md"]), **change}
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "needs-human"
+    assert any(reason in r for r in out["reasons"])
+
+
+def test_score_keeps_a_clean_branch_mergeable(cfg):
+    cfg["auto_merge"] = "no-red"
+    pr = make_pr(["docs/a.md"])
+    pr["openPrs"] = [{"number": 5, "oids": ["e" * 40]}]
+    assert gate.score(pr, make_issue(), cfg)["decision"] == "auto-merge"
+
+
+def test_automerge_refuses_a_stacked_pr(tmp_path):
+    pr = _gh_pr(number=8, commits=[{"oid": "b" * 40}, {"oid": OWN_OID}])
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "8",
+        prs={8: pr},
+        open_prs=[{"number": 7, "oids": ["b" * 40]}, {"number": 8, "oids": []}],
+    )
+    assert res.returncode == 1
+    assert "stacked on open PR(s) #7" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_fails_closed_when_open_prs_cannot_load(tmp_path):
+    res, log = _automerge(
+        tmp_path,
+        "LucasSantana-Dev/Lucky",
+        "7",
+        prs={7: _gh_pr()},
+        env={"GH_OPEN_RC": "1"},
+    )
+    assert res.returncode == 1
+    assert "could not load" in res.stdout
+    assert _merge_calls(log) == []
+
+
+PR_GUARD = REPO / "config" / "agent-box" / "pr-create-guard.sh"
+
+
+def _git(*args):
+    return subprocess.run(
+        ["git", *args], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _guard_repo(tmp_path, base="main"):
+    """origin (bare) with one commit on base, and a clone at tmp/clone; the guard and a
+    config whose Lucky workdir is that clone sit in tmp/hook."""
+    origin = tmp_path / "origin.git"
+    clone = tmp_path / "clone"
+    _git("init", "-q", "--bare", "-b", base, str(origin))
+    _git("clone", "-q", str(origin), str(clone))
+    for k, v in (
+        ("user.name", "t"),
+        ("user.email", "t@t"),
+        ("commit.gpgsign", "false"),
+    ):
+        _git("-C", str(clone), "config", k, v)
+    _git("-C", str(clone), "commit", "-q", "--allow-empty", "-m", "base")
+    _git("-C", str(clone), "push", "-q", "origin", f"HEAD:{base}")
+    hook = tmp_path / "hook"
+    hook.mkdir()
+    shutil.copy(PR_GUARD, hook / "pr-create-guard.sh")
+    conf = json.loads(CONFIG.read_text())
+    conf["repos"]["LucasSantana-Dev/Lucky"]["workdir"] = str(clone)
+    (hook / "agent-gate.json").write_text(json.dumps(conf))
+    return clone
+
+
+def _branch(clone, name, start, commits=1, push=True):
+    _git("-C", str(clone), "switch", "-q", "-c", name, start)
+    for i in range(commits):
+        _git("-C", str(clone), "commit", "-q", "--allow-empty", "-m", f"{name} {i}")
+    if push:
+        _git("-C", str(clone), "push", "-q", "origin", name)
+
+
+def _pr_guard(tmp_path, command, cwd="/"):
+    payload = {"tool_input": {"command": command}, "cwd": cwd}
+    return subprocess.run(
+        ["/bin/bash", str(tmp_path / "hook" / "pr-create-guard.sh")],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+    )
+
+
+CREATE = 'gh pr create -R LucasSantana-Dev/Lucky --base main --title "fix: x" --body-file /tmp/b.md'
+
+
+def test_pr_guard_ignores_other_commands(tmp_path):
+    _guard_repo(tmp_path)
+    assert _pr_guard(tmp_path, "gh pr view 3 -R LucasSantana-Dev/Lucky").returncode == 0
+
+
+def test_pr_guard_passes_a_branch_cut_from_the_base(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main", commits=2)
+    res = _pr_guard(tmp_path, CREATE)
+    assert res.returncode == 0, res.stderr
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        CREATE.replace(" --base main", ""),
+        CREATE.replace("--base main", "--base release"),
+        CREATE.replace("--base main", "-B develop"),
+    ],
+)
+def test_pr_guard_blocks_a_wrong_or_missing_base(tmp_path, command):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    res = _pr_guard(tmp_path, command)
+    assert res.returncode == 2
+    assert "PRs target main: pass --base main" in res.stderr
+
+
+def test_pr_guard_blocks_homelab_prs_to_main(tmp_path):
+    _guard_repo(tmp_path)
+    cmd = CREATE.replace("LucasSantana-Dev/Lucky", "LucasSantana-Dev/homelab")
+    res = _pr_guard(tmp_path, cmd)
+    assert res.returncode == 2
+    assert "pass --base release" in res.stderr
+
+
+def test_pr_guard_blocks_a_stacked_branch_but_not_its_bottom(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    _branch(clone, "fix/b", "fix/a")
+    res = _pr_guard(tmp_path, CREATE)
+    assert res.returncode == 2
+    assert "fix/b shares commits with" in res.stderr
+    assert "origin/fix/a" in res.stderr
+    _git("-C", str(clone), "switch", "-q", "fix/a")
+    assert _pr_guard(tmp_path, CREATE).returncode == 0
+
+
+def test_pr_guard_blocks_a_stack_on_an_unpushed_branch(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main", push=False)
+    _branch(clone, "fix/b", "fix/a", push=False)
+    res = _pr_guard(tmp_path, CREATE + " --head fix/b")
+    assert res.returncode == 2
+    assert "shares commits with fix/a" in res.stderr
+
+
+def test_pr_guard_blocks_a_branch_without_commits(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main", commits=0)
+    res = _pr_guard(tmp_path, CREATE)
+    assert res.returncode == 2
+    assert "no commits on top of origin/main" in res.stderr
+
+
+def test_pr_guard_sees_a_base_that_moved_after_the_branch(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    # Someone merges to main; the stale local origin/main is refreshed by the guard.
+    other = tmp_path / "other"
+    _git("clone", "-q", str(tmp_path / "origin.git"), str(other))
+    for k, v in (
+        ("user.name", "t"),
+        ("user.email", "t@t"),
+        ("commit.gpgsign", "false"),
+    ):
+        _git("-C", str(other), "config", k, v)
+    _git("-C", str(other), "commit", "-q", "--allow-empty", "-m", "merged")
+    _git("-C", str(other), "push", "-q", "origin", "HEAD:main")
+    assert _pr_guard(tmp_path, CREATE).returncode == 0
+
+
+def test_pr_guard_fails_closed_without_a_checkout(tmp_path):
+    clone = _guard_repo(tmp_path)
+    shutil.rmtree(clone)
+    res = _pr_guard(tmp_path, CREATE)
+    assert res.returncode == 2
+    assert "no checkout" in res.stderr
+
+
+def test_pr_guard_rejects_option_like_branch_names(tmp_path):
+    _guard_repo(tmp_path)
+    res = _pr_guard(tmp_path, CREATE + " --head=--upload-pack=x")
+    assert res.returncode == 2
+    assert "bad branch name" in res.stderr
+
+
+def test_pr_guard_leaves_other_repos_alone(tmp_path):
+    _guard_repo(tmp_path)
+    cmd = CREATE.replace("LucasSantana-Dev/Lucky", "someone/else")
+    assert _pr_guard(tmp_path, cmd).returncode == 0
+
+
+def test_pr_guard_is_installed_and_registered():
+    df = (REPO / "Dockerfile.agent-box").read_text()
+    entry = (REPO / "config" / "agent-box" / "entrypoint.sh").read_text()
+    settings = json.loads((REPO / "config" / "agent-box" / "settings.json").read_text())
+    assert (
+        "COPY config/agent-box/pr-create-guard.sh "
+        "/opt/agent-config/hooks/pr-create-guard.sh" in df
+    )
+    assert "automerge-push-guard pr-create-guard; do" in entry
+    commands = [
+        h["command"]
+        for m in settings["hooks"]["PreToolUse"]
+        if m["matcher"] == "Bash"
+        for h in m["hooks"]
+        if h["type"] == "command"
+    ]
+    assert "/home/agent/.claude/hooks/pr-create-guard.sh" in commands
+
+
+def test_open_pr_query_matches_in_both_loaders():
+    def grab(path, name):
+        line = next(
+            ln for ln in path.read_text().splitlines() if ln.startswith(name + "=")
+        )
+        return line
+
+    for name in ("OPEN_PRS_QUERY", "OPEN_PRS_JQ"):
+        assert grab(AUTOMERGE, name) == grab(TASKS / "agent-pr-gate.sh", name)
+
+
+@pytest.mark.parametrize(
+    "path,ok",
+    [
+        ("README.md", True),
+        ("docs/runbooks/x.md", True),
+        ("install.sh", False),
+        ("setup.py", False),
+        ("Makefile", False),
+    ],
+)
+def test_merge_check_homelab_allows_only_docs_and_tests(path, ok):
+    c = gate.load_config(CONFIG)
+    c = {**c, **c["repos"]["LucasSantana-Dev/homelab"]}
+    pr = make_pr([path])
+    pr["baseRefName"] = "release"
+    assert (gate.merge_check(pr, c, []) == []) is ok
+
+
+@pytest.mark.parametrize("path", ["bun.lockb", "npm-shrinkwrap.json", "web/bun.lockb"])
+def test_merge_check_blocks_other_lockfiles(cfg, path):
+    assert any(
+        "owner-review paths" in r for r in gate.merge_check(make_pr([path]), cfg, [])
+    )
+
+
+def test_sweep_turns_off_a_pr_it_cannot_check(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "LucasSantana-Dev_Lucky-5").write_text(HEAD)
+    res, log = _automerge(
+        tmp_path, "--sweep", prs={5: _gh_pr(queued=True)}, env={"GH_OPEN_RC": "1"}
+    )
+    assert res.returncode == 3
+    assert _merge_calls(log) == ["pr merge 5 -R LucasSantana-Dev/Lucky --disable-auto"]
+    assert "turned off until it can be checked" in res.stdout
+    assert list(state.iterdir()) == []
+
+
+def test_sweep_keeps_the_entry_when_it_cannot_turn_off(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "LucasSantana-Dev_Lucky-5").write_text(HEAD)
+    res, _ = _automerge(
+        tmp_path,
+        "--sweep",
+        prs={5: _gh_pr(queued=True)},
+        env={"GH_OPEN_RC": "1", "GH_MERGE_RC": "1"},
+    )
+    assert res.returncode == 3
+    assert "STILL QUEUED" in res.stdout
+    assert (state / "LucasSantana-Dev_Lucky-5").exists()
+
+
+def test_push_guard_blocks_on_unreadable_input(tmp_path):
+    res = subprocess.run(
+        ["bash", str(PUSH_GUARD)], input="not json", capture_output=True, text=True
+    )
+    assert res.returncode == 2
+
+
+def test_push_guard_uses_the_push_url(tmp_path):
+    _push_guard(tmp_path, "git -C {repo} status")
+    repo = tmp_path / "Lucky"
+    _git("-C", str(repo), "remote", "set-url", "origin", "/elsewhere/mirror.git")
+    _git(
+        "-C",
+        str(repo),
+        "remote",
+        "set-url",
+        "--push",
+        "origin",
+        "https://github.com/LucasSantana-Dev/Lucky.git",
+    )
+    res, log = _push_guard(tmp_path, "git -C {repo} push origin fix/x", listed="12\n")
+    assert res.returncode == 0, res.stderr
+    assert "pr merge 12 -R LucasSantana-Dev/Lucky --disable-auto" in log
+
+
+def test_pr_guard_reads_flags_not_title_text(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    cmd = (
+        'gh pr create -R LucasSantana-Dev/Lucky --base release --title "x --base main"'
+    )
+    res = _pr_guard(tmp_path, cmd)
+    assert res.returncode == 2
+    assert "pass --base main" in res.stderr
+    ok = 'gh pr create -R LucasSantana-Dev/Lucky --title "fix: a & b; c" --base main'
+    assert _pr_guard(tmp_path, ok).returncode == 0
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr create -R lucassantana-dev/lucky --base release",
+        "/usr/bin/gh pr create -R LucasSantana-Dev/Lucky --base release",
+        "gh pr create -R LucasSantana-Dev/Lucky -Brelease",
+        "gh pr create --repo=LucasSantana-Dev/Lucky --base=release",
+    ],
+)
+def test_pr_guard_sees_every_spelling(tmp_path, command):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    res = _pr_guard(tmp_path, command)
+    assert res.returncode == 2
+    assert "pass --base main" in res.stderr
+
+
+def test_pr_guard_attached_base_passes(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    assert (
+        _pr_guard(tmp_path, "gh pr create -R LucasSantana-Dev/Lucky -Bmain").returncode
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh api -X POST repos/LucasSantana-Dev/Lucky/pulls -f base=main -f head=fix/a",
+        "gh pr create -R LucasSantana-Dev/Lucky --base main; gh pr create --base main",
+        'gh pr create -R LucasSantana-Dev/Lucky --base main --title "unclosed',
+    ],
+)
+def test_pr_guard_blocks_other_ways_to_open_prs(tmp_path, command):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    assert _pr_guard(tmp_path, command).returncode == 2
+
+
+def test_pr_guard_blocks_on_unreadable_input(tmp_path):
+    _guard_repo(tmp_path)
+    res = subprocess.run(
+        ["/bin/bash", str(tmp_path / "hook" / "pr-create-guard.sh")],
+        input="not json",
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 2
+
+
+def test_pr_guard_lets_branch_names_with_api_through(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/api-error", "origin/main")
+    assert _pr_guard(tmp_path, CREATE).returncode == 0
+
+
+def test_loop_auto_merge_holds_a_pr_closing_an_unchecked_issue(cfg):
+    cfg["auto_merge"] = "no-red"
+    pr = make_pr(["docs/a.md"], closes=(1, 2))
+    out = gate.score(pr, make_issue(), cfg)
+    assert out["decision"] == "owner-review"
+    assert any("did not check: [2]" in r for r in out["reasons"])
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        CREATE + "\ngh pr create -R LucasSantana-Dev/Lucky --base main",
+        "bash -c 'gh pr create -R LucasSantana-Dev/Lucky --base main'",
+        'eval "$(echo gh pr create -R LucasSantana-Dev/Lucky --base main)"',
+        'gh api graphql -f query="$MUTATION"',
+        "env gh api graphql -F query=@/tmp/q.graphql",
+        'gh api "$ENDPOINT" -f base=main -f head=fix/a',
+        "bash -c 'gh api graphql -f query=@q'",
+        "gh api repos/LucasSantana-Dev/Lucky/pulls?x=1 -f base=main -f head=fix/a",
+        "gh api repos/LucasSantana-Dev/Lucky/pulls --input body.json",
+        "gh api -XPOST repos/LucasSantana-Dev/Lucky/pulls",
+        'gh api --method="$M" repos/LucasSantana-Dev/Lucky/pulls',
+        "gh api graphql -f query='mutation { createPullRequest(input: {}) { clientMutationId } }'",
+    ],
+)
+def test_pr_guard_blocks_hidden_pr_creation(tmp_path, command):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    assert _pr_guard(tmp_path, command).returncode == 2
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh api repos/LucasSantana-Dev/Lucky/pulls/5/comments/1/replies -f body=ok",
+        "gh api repos/LucasSantana-Dev/Lucky/pulls/5/comments/1/replies"
+        " -f body='createPullRequest is blocked now'",
+        "gh api graphql -f query='mutation($t: ID!) { resolveReviewThread(input: {threadId: $t})"
+        " { thread { isResolved } } }' -f t=abc",
+        "gh pr view 5 -R LucasSantana-Dev/Lucky\ngh pr checks 5 -R LucasSantana-Dev/Lucky",
+        "gh api repos/LucasSantana-Dev/Lucky/pulls?state=open",
+        "gh api -X GET repos/LucasSantana-Dev/Lucky/pulls -f state=open",
+    ],
+)
+def test_pr_guard_lets_pr_reads_and_replies_through(tmp_path, command):
+    _guard_repo(tmp_path)
+    assert _pr_guard(tmp_path, command).returncode == 0
+
+
+def test_pr_guard_blocks_a_fork_head(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    res = _pr_guard(tmp_path, CREATE + " --head someone:fix/a")
+    assert res.returncode == 2
+    assert "fork branch" in res.stderr
+    assert (
+        _pr_guard(tmp_path, CREATE + " --head lucassantana-dev:fix/a").returncode == 0
+    )
+
+
+def test_pr_guard_sees_a_branch_it_had_not_fetched(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    _branch(clone, "fix/b", "fix/a", push=False)
+    _git("-C", str(clone), "branch", "-q", "-D", "fix/a")
+    _git("-C", str(clone), "update-ref", "-d", "refs/remotes/origin/fix/a")
+    res = _pr_guard(tmp_path, CREATE)
+    assert res.returncode == 2
+    assert "origin/fix/a" in res.stderr
+
+
+def test_push_guard_blocks_more_than_one_push_url(tmp_path):
+    _push_guard(tmp_path, "git -C {repo} status")
+    repo = tmp_path / "Lucky"
+    url = "https://github.com/LucasSantana-Dev/Lucky.git"
+    _git(
+        "-C",
+        str(repo),
+        "remote",
+        "set-url",
+        "--push",
+        "origin",
+        "/elsewhere/mirror.git",
+    )
+    _git("-C", str(repo), "remote", "set-url", "--add", "--push", "origin", url)
+    res, _ = _push_guard(tmp_path, "git -C {repo} push origin fix/x", listed="12\n")
+    assert res.returncode == 2
+    assert "more than one push URL" in res.stderr
+
+
+def test_pr_guard_checks_gh_behind_a_wrapper(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    res = _pr_guard(
+        tmp_path, "env gh pr create -R LucasSantana-Dev/Lucky --base release"
+    )
+    assert res.returncode == 2
+    assert "pass --base main" in res.stderr
+    assert _pr_guard(tmp_path, "timeout 60 " + CREATE).returncode == 0
+
+
+def test_pr_guard_allows_pr_create_in_a_title(tmp_path):
+    clone = _guard_repo(tmp_path)
+    _branch(clone, "fix/a", "origin/main")
+    cmd = 'gh pr create -R LucasSantana-Dev/Lucky --base main --title "fix: pr create guard"'
+    assert _pr_guard(tmp_path, cmd).returncode == 0
+
+
+# --- release and bot PRs, session PRs, conflicts, backlog round -----------
+
+RELEASE_BRANCH = "release-please--branches--main--components--lucky"
+
+
+@pytest.mark.parametrize(
+    "extra,why",
+    [
+        ({"headRefName": RELEASE_BRANCH}, "release or dependency bot branch"),
+        ({"headRefName": "dependabot/npm_and_yarn/x-1.2.3"}, "dependency bot branch"),
+        ({"headRefName": "renovate/x"}, "dependency bot branch"),
+        ({"labels": [{"name": "autorelease: pending"}]}, "release label"),
+        ({"headRefName": None}, "head branch or labels not loaded"),
+        ({"labels": None}, "head branch or labels not loaded"),
+    ],
+)
+def test_merge_check_refuses_release_and_bot_prs(cfg, extra, why):
+    pr = make_pr(["src/x.ts"])
+    for k, v in extra.items():
+        if v is None:
+            del pr[k]
+        else:
+            pr[k] = v
+    reasons = gate.merge_check(pr, cfg, [make_issue()])
+    assert any(why in r for r in reasons), reasons
+
+
+def test_merge_check_passes_a_clean_session_branch(cfg):
+    pr = make_pr(["src/x.ts"])
+    pr["headRefName"] = "feat/queue-tracks"
+    assert gate.merge_check(pr, cfg, [make_issue()]) == []
+
+
+def test_automerge_refuses_a_release_please_pr(tmp_path):
+    pr = _gh_pr(headRefName=RELEASE_BRANCH, labels=[{"name": "autorelease: pending"}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "release or dependency bot branch" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_refuses_a_pr_another_human_commented_on(tmp_path):
+    pr = _gh_pr(comments=[{"author": {"login": "someone"}}])
+    res, log = _automerge(tmp_path, "LucasSantana-Dev/Lucky", "7", prs={7: pr})
+    assert res.returncode == 1
+    assert "another human" in res.stdout
+    assert _merge_calls(log) == []
+
+
+def test_automerge_loads_branch_and_labels():
+    fields = next(
+        ln for ln in AUTOMERGE.read_text().splitlines() if ln.startswith("FIELDS=")
+    )
+    assert {"headRefName", "labels", "mergeable"} <= set(
+        fields[len("FIELDS=") :].split(",")
+    )
+
+
+def test_gate_session_cooldown_counts_from_the_last_push():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    assert "PUSHED=$(jq -r '.commits[-1].committedDate // .updatedAt'" in text
+    body = _gate_fn("autofix_pr")
+    assert 'date -d "$PUSHED"' in body and 'date -d "$UPDATED"' not in body
+
+
+def _session_pr(files=("src/x.ts",), **extra):
+    pr = make_pr(list(files))
+    pr["headRefName"] = "feat/queue-tracks"
+    pr["mergeable"] = "MERGEABLE"
+    pr.update(extra)
+    return pr
+
+
+def test_score_session_queues_a_clean_green_pr(cfg):
+    res = gate.score_session(_session_pr(), make_issue(), cfg)
+    assert res["decision"] == "queue", res
+
+
+def test_score_session_skips_release_prs_silently(cfg):
+    pr = _session_pr(
+        headRefName=RELEASE_BRANCH, comments=[{"author": {"login": "someone"}}]
+    )
+    assert gate.score_session(pr, None, cfg)["decision"] == "skip"
+
+
+def test_score_session_halts_on_another_human(cfg):
+    pr = _session_pr(comments=[{"author": {"login": "someone"}}])
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == "halt"
+    issue = make_issue(comments=["someone"])
+    assert gate.score_session(_session_pr(), issue, cfg)["decision"] == "halt"
+
+
+@pytest.mark.parametrize(
+    "extra,decision,fix",
+    [
+        ({"mergeable": "CONFLICTING", "statusCheckRollup": []}, "autofix", "conflict"),
+        (
+            {"statusCheckRollup": [{"conclusion": "FAILURE", "status": "COMPLETED"}]},
+            "autofix",
+            "ci",
+        ),
+        (
+            {"statusCheckRollup": [{"conclusion": None, "status": "IN_PROGRESS"}]},
+            "wait",
+            None,
+        ),
+        ({"mergeable": "UNKNOWN"}, "queue", None),
+    ],
+)
+def test_score_session_flow(cfg, extra, decision, fix):
+    res = gate.score_session(_session_pr(**extra), make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == (decision, fix), res
+
+
+def test_score_session_fixes_bot_threads_and_leaves_owner_threads(cfg):
+    pr = _session_pr()
+    pr["reviewThreads"] = _threads_conn(thread("cubic-dev-ai"))
+    res = gate.score_session(pr, make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == ("autofix", "threads")
+    pr["reviewThreads"] = _threads_conn(thread("cubic-dev-ai", OWNER))
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == "owner-review"
+
+
+def test_score_session_sends_owner_paths_to_the_owner_before_any_fix(cfg):
+    pr = _session_pr(
+        files=("src/x.ts", "package-lock.json"),
+        statusCheckRollup=[{"conclusion": "FAILURE", "status": "COMPLETED"}],
+    )
+    res = gate.score_session(pr, make_issue(), cfg)
+    assert res["decision"] == "owner-review"
+    assert "package-lock.json" in res["reasons"][-1]
+
+
+def test_score_session_wants_a_human_for_a_stacked_branch(cfg):
+    pr = _session_pr(openPrs=[{"number": 99, "oids": [OWN_OID]}], number=5)
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == "needs-human"
+
+
+def test_loop_score_fixes_a_conflict_before_waiting_on_checks(cfg):
+    pr = make_pr(["src/x.ts"])
+    pr["mergeable"] = "CONFLICTING"
+    pr["statusCheckRollup"] = []
+    res = gate.score(pr, make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == ("autofix", "conflict")
+
+
+def test_score_cli_session_flag(cfg):
+    data = json.dumps({"pr": _session_pr(), "issue": make_issue()})
+    out = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "score",
+            "--session",
+            "--repo",
+            "LucasSantana-Dev/Lucky",
+        ],
+        input=data,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert json.loads(out)["decision"] == "queue"
+
+
+def _proposal(title, agent=True, body="What is wrong in src/x.ts:10, how to test it."):
+    return {"title": title, "body": body, "agent": agent}
+
+
+def test_backlog_plan_dedupes_caps_and_labels(cfg):
+    existing = [{"title": "fix(queue): skip tracks that fail to load"}]
+    proposals = [
+        _proposal(
+            "fix: skip tracks that fail to load"
+        ),  # same words as an existing issue
+        _proposal("test: cover the shuffle edge cases"),
+        _proposal("test: cover the shuffle edge cases"),  # dup inside the round
+        _proposal("docs: README install step is wrong", agent=False),
+        _proposal(
+            "fix: refresh the oauth token on 401"
+        ),  # skip word, the picker would never take it
+        _proposal("refactor: share the embed builder"),
+        _proposal("fix: dedupe autoplay picks by artist key"),
+        _proposal("test: one over the round cap here"),
+    ]
+    create, skipped = gate.backlog_plan(proposals, existing, cfg)
+    assert [c["title"] for c in create] == [
+        "test: cover the shuffle edge cases",
+        "docs: README install step is wrong",
+        "fix: refresh the oauth token on 401",
+        "refactor: share the embed builder",
+        "fix: dedupe autoplay picks by artist key",
+    ]
+    labels = {c["title"]: c["labels"] for c in create}
+    assert labels["test: cover the shuffle edge cases"] == [
+        "ready-for-agent",
+        "effort:s",
+    ]
+    assert labels["docs: README install step is wrong"] == ["ready-for-human"]
+    assert labels["fix: refresh the oauth token on 401"] == ["ready-for-human"]
+    assert "duplicates an existing issue" in skipped["#0"]
+    assert "duplicates an existing issue" in skipped["#2"]
+    assert "over the round cap" in skipped["#7"]
+
+
+@pytest.mark.parametrize(
+    "proposal,why",
+    [
+        (_proposal("short"), "title missing"),
+        (_proposal("x" * 121), "title missing"),
+        (_proposal("fix: a fine title here", body=""), "body missing"),
+        (_proposal("fix: a fine title here", body="x" * 4001), "body missing"),
+        (_proposal("fix: ping @someone about this"), "mentions"),
+        (_proposal("fix: a fine title here", body="ok\n/review now"), "mentions"),
+        ("not an object", "title missing"),
+    ],
+)
+def test_backlog_plan_drops_bad_proposals(cfg, proposal, why):
+    create, skipped = gate.backlog_plan([proposal], [], cfg)
+    assert create == []
+    assert why in skipped["#0"]
+
+
+def test_backlog_plan_needs_a_list_and_strips_dashes(cfg):
+    assert gate.backlog_plan(None, [], cfg) == (
+        [],
+        {"#all": "proposals file is not a JSON array"},
+    )
+    create, _ = gate.backlog_plan(
+        [_proposal("fix: retry \u2014 then give up", body="a \u2013 b")], [], cfg
+    )
+    assert create[0]["title"] == "fix: retry, then give up"
+    assert create[0]["body"] == "a, b"
+    assert create[0]["labels"] == ["ready-for-agent", "effort:s"]
+
+
+def test_backlog_plan_cli(tmp_path):
+    data = json.dumps(
+        {"proposals": [_proposal("test: cover the shuffle edge cases")], "existing": []}
+    )
+    out = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "backlog-plan",
+            "--repo",
+            "LucasSantana-Dev/Lucky",
+        ],
+        input=data,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert [c["title"] for c in json.loads(out)["create"]] == [
+        "test: cover the shuffle edge cases"
+    ]
+
+
+def test_claude_plan_cmd_is_read_only_plus_the_scratch_dir():
+    res = _lib(f"claude_plan_cmd LucasSantana-Dev/Lucky /workspace/Lucky p {SCRATCH}")
+    assert res.returncode == 0, res.stderr
+    out = res.stdout
+    assert "Edit\\(//tmp/agent-run.Ab3dEf9h/\\*\\*\\)" in out
+    assert "Read\\(//workspace/Lucky/\\*\\*\\)" in out
+    assert f"--add-dir {SCRATCH}" in out
+    assert "--permission-mode dontAsk" in out
+    allowed = out.split("--allowedTools", 1)[1].split("--disallowedTools", 1)[0]
+    # No Bash at all: git grep -O runs a command and git log --output writes a file.
+    for word in ("Bash", "push", "commit", "Write", " Read ", " Edit "):
+        assert word not in allowed, word
+    assert allowed.split() == [
+        "Read\\(//workspace/Lucky/\\*\\*\\)",
+        "Edit\\(//tmp/agent-run.Ab3dEf9h/\\*\\*\\)",
+        "Glob",
+        "Grep",
+    ]
+    denied = out.split("--disallowedTools", 1)[1]
+    assert "Bash\\(gh\\ pr\\ merge\\*\\)" in denied
+    assert "Read\\(//etc/profile.d/\\*\\*\\)" in denied
+    # The prompt carries issue titles anyone can write: no credential in the environment.
+    env = out.split("timeout 45m", 1)[0]
+    for var in (
+        "GITHUB_TOKEN",
+        "AGENT_GITHUB_TOKEN",
+        "GH_TOKEN",
+        "AGENT_DISCORD_WEBHOOK",
+    ):
+        assert f"-u {var} " in env, var
+
+
+def test_claude_cmd_keeps_the_token_for_gh():
+    res = _lib(f"claude_cmd LucasSantana-Dev/Lucky /w p fix/issue-7 {SCRATCH}")
+    assert res.returncode == 0, res.stderr
+    assert "-u GITHUB_TOKEN" not in res.stdout
+    assert (
+        "Read\\(//etc/profile.d/\\*\\*\\)" in res.stdout.split("--disallowedTools")[1]
+    )
+
+
+def test_claude_plan_cmd_refuses_a_foreign_scratch_dir():
+    res = _lib('claude_plan_cmd LucasSantana-Dev/Lucky /w p "$1"', "/workspace/Lucky")
+    assert (res.returncode, res.stdout) == (1, "")
+
+
+@pytest.mark.parametrize(
+    "workdir", ["/w", "/workspace/../etc", "/workspace/..", "/workspace/a b", ""]
+)
+def test_claude_plan_cmd_refuses_a_workdir_outside_workspace(workdir):
+    res = _lib(f'claude_plan_cmd LucasSantana-Dev/Lucky "$1" p {SCRATCH}', workdir)
+    assert (res.returncode, res.stdout) == (1, "")
+
+
+def test_session_prs_lists_owner_prs_from_local_branches(tmp_path):
+    sha = "a" * 40
+
+    def pr(n, branch, oid=sha, fork=False):
+        return {
+            "number": n,
+            "headRefName": branch,
+            "headRefOid": oid,
+            "isCrossRepository": fork,
+            "labels": [],
+        }
+
+    prs = [
+        pr(1, "feat/a"),
+        pr(2, "feat/not-local"),
+        pr(3, "fix/issue-9"),
+        pr(4, "agent/x"),
+        pr(5, "feat/b", fork=True),
+        pr(6, "main"),
+        pr(7, "fix/b"),
+        # The clone has an old copy, or someone pushed from elsewhere: not the session's.
+        pr(8, "fix/stale"),
+        # claude_cmd would refuse these branches: listing them would only burn fix attempts.
+        pr(9, "hotfix/x"),
+        pr(10, "feat/a/b"),
+        # A worker PR (registered) stays a loop PR.
+        pr(11, "fix/issue-12"),
+    ]
+    (tmp_path / "prs.json").write_text(json.dumps(prs))
+    (tmp_path / "prs").mkdir()
+    (tmp_path / "prs" / "o_r-11").write_text("1\n")
+    local = [
+        "feat/a",
+        "fix/issue-9",
+        "agent/x",
+        "feat/b",
+        "main",
+        "fix/b",
+        "fix/issue-12",
+    ]
+    local += ["hotfix/x", "feat/a/b"]
+    heads = "".join(f"{b} {sha}\n" for b in local) + f"fix/stale {'c' * 40}\n"
+    res = _lib(
+        f'AGENT_STATE_DIR="{tmp_path}"; '
+        'run_on_agent() { case "$1" in '
+        f"git*) printf '{heads}' ;; "
+        f'gh*) [[ "$1" == *"--author LucasSantana-Dev"* ]] && cat "{tmp_path}/prs.json" ;; esac; }}; '
+        "session_prs o/r /w"
+    )
+    assert res.returncode == 0, res.stderr
+    # fix/issue-9 is not in the registry: a session named it (Lucky #2878), so it is followed.
+    assert res.stdout.split() == ["1", "3", "7"]
+    down = _lib("run_on_agent() { return 255; }; session_prs o/r /w")
+    assert down.returncode == 1
+
+
+def test_gate_queues_session_prs_only_through_pr_automerge():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    assert 'OUT=$(act "pr-automerge $REPO $N")' in text
+    assert 'act "pr-automerge $REPO $N --replies $REPLIES"' in text
+    merges = [ln for ln in text.splitlines() if "gh pr merge" in ln and "act" in ln]
+    assert all("--auto" not in ln and "--admin" not in ln for ln in merges), merges
+    # Session PRs are never stale-closed.
+    assert '[[ "$KIND" == "loop" ]] && [[ "$DECISION" == "wait"' in text
+
+
+def test_gate_conflict_fix_merges_the_base_and_never_rebases():
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    assert "git merge --no-edit -q origin/$BASE" in text
+    # The cleanup (release_workdir) aborts a half-done merge before detaching.
+    assert 'release_workdir "$WORKDIR" "$BASE" "autofix #$N"' in text
+    assert "git merge --abort" in LIB.read_text()
+    assert "git rebase" not in text and "push --force" not in text
+
+
+def test_worker_backlog_round_runs_once_a_day_and_only_reads():
+    text = (TASKS / "agent-worker.sh").read_text()
+    body = text[text.index("backlog_round() {") : text.index("\nfor REPO in")]
+    assert "claude_plan_cmd" in body and "claude_cmd " not in body
+    assert body.index('date +%s > "$marker"') < body.index('act "$PLAN_CMD"')
+    assert body.index("budget_take") < body.index('act "$PLAN_CMD"')
+    # A planning run that changed the clone creates nothing.
+    assert (
+        body.index('act "$PLAN_CMD"')
+        < body.rindex("workdir_clean")
+        < body.index("gh issue create")
+    )
+    assert "backlog-plan --repo" in body
+
+
+@pytest.mark.parametrize(
+    "extra,decision",
+    [
+        ({"isDraft": True}, "wait"),
+        ({"labels": [{"name": "needs-human"}]}, "wait"),
+        ({"isCrossRepository": True}, "halt"),
+        ({"isCrossRepository": None}, "halt"),
+        ({"changedFiles": 101}, "owner-review"),
+        ({"files": []}, "owner-review"),
+        (
+            {"closingIssuesReferences": [{"number": 1}, {"number": 99}]},
+            "owner-review",
+        ),
+    ],
+)
+def test_score_session_fails_closed(cfg, extra, decision):
+    pr = _session_pr(**extra)
+    assert gate.score_session(pr, make_issue(), cfg)["decision"] == decision
+
+
+def test_score_session_does_not_fix_a_truncated_file_list(cfg):
+    pr = _session_pr(
+        changedFiles=101,
+        statusCheckRollup=[{"conclusion": "FAILURE", "status": "COMPLETED"}],
+    )
+    res = gate.score_session(pr, make_issue(), cfg)
+    assert (res["decision"], res.get("fix")) == ("owner-review", None)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "Found " + "gh" + "p_" + "A" * 36 + " in src/x.ts:10.",
+        "The hook posts to https://discord.com/api/" + "webhooks/1/abc in x.ts.",
+        "In /etc/profile.d: export GITHUB" + "_TOKEN='x', see src/x.ts:1.",
+        "-----BEGIN OPENSSH " + "PRIVATE KEY----- in a fixture, src/x.ts:2.",
+    ],
+)
+def test_backlog_plan_never_posts_credential_shapes(cfg, body):
+    create, skipped = gate.backlog_plan(
+        [_proposal("fix: drop the leaked value from the fixture", body=body)], [], cfg
+    )
+    assert create == [] and "credential" in skipped["#0"]
+
+
+def test_backlog_plan_reads_skip_words_in_the_body_too(cfg):
+    body = "The deploy script in scripts/x.sh:3 skips the health check."
+    create, _ = gate.backlog_plan(
+        [_proposal("fix: wait for the health check", body=body)], [], cfg
+    )
+    assert create[0]["labels"] == ["ready-for-human"]
+
+
+def _gate_fn(name):
+    text = (TASKS / "agent-pr-gate.sh").read_text()
+    start = text.index(f"\n{name}() {{") + 1
+    return text[start : text.index("\n}\n", start) + 3]
+
+
+def test_gate_pr_survives_set_e_on_every_decision():
+    """gate_pr runs once per PR under set -euo pipefail: a trailing skipped `[[ ]] && cmd`
+    (close with no linked issue) must not end the run before the other PRs and repos."""
+    pr = {
+        "number": 1,
+        "headRefOid": "a" * 40,
+        "headRefName": "feat/x",
+        "closingIssuesReferences": [],
+        "labels": [],
+        "updatedAt": "2026-10-19T00:00:00Z",
+    }
+    for decision in ("close", "wait", "skip", "owner-review", "split", "needs-human"):
+        res = {"decision": decision, "pillars": {}, "reasons": []}
+        script = (
+            "set -euo pipefail\n"
+            + _gate_fn("gate_pr")
+            + 'load_pr() { echo "$PRJ"; }; score_pr() { echo "$RES"; }\n'
+            + "try_act() { :; }; notify_once() { :; }; has_label() { return 1; }\n"
+            + 'date() { [[ "${1:-}" == -d ]] && echo 0 || command date "$@"; }\n'
+            + "REPO=o/r STALE_DAYS=5 AGENT_DRY_RUN=1\n"
+            + 'for N in 1 2; do gate_pr loop "$N"; echo "done $N"; done\n'
+        )
+        out = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PRJ": json.dumps(pr), "RES": json.dumps(res)},
+        )
+        assert out.returncode == 0, (decision, out.stderr)
+        assert "done 2" in out.stdout, decision
+
+
+def test_gate_autofix_leaves_a_clone_a_chat_has_checked_out():
+    body = _gate_fn("autofix_pr")
+    assert body.index("workdir_clean") < body.index("budget_take")
+    assert body.index("workdir_clean") < body.index("git switch")
+
+
+def test_workdir_clean_refuses_a_checked_out_branch():
+    on_branch = _lib(
+        "run_on_agent() { printf '## feat/x...origin/feat/x [ahead 1]\\n'; }; "
+        'out=$(workdir_clean /w) || echo "no: $out"'
+    )
+    assert on_branch.stdout.strip() == (
+        "no: branch feat/x is checked out (a chat may be using it)"
+    )
+    no_line = _lib(
+        "run_on_agent() { printf ' M a.ts\\n'; }; "
+        'out=$(workdir_clean /w) || echo "no: $out"'
+    )
+    assert (
+        no_line.stdout.strip() == "no: could not check: no branch line from git status"
+    )
+
+
+def test_release_workdir_stashes_leftovers_before_detaching():
+    res = _lib(
+        "AGENT_DRY_RUN=0; "
+        'run_on_agent() { case "$1" in *"status --porcelain") ;; *) echo "RUN $1" ;; esac; }; '
+        'notify() { echo "N $*"; }; release_workdir /w main "autofix #5"'
+    )
+    assert res.returncode == 0
+    (cmd,) = res.stdout.splitlines()  # clean tree: no notice
+    assert (
+        "git stash push -q --include-untracked -m 'agent-loop leftover: autofix #5'"
+        in cmd
+    )
+    assert cmd.index("git stash push") < cmd.index("git switch -q --detach origin/main")
+    assert (
+        "stash drop" not in cmd and "reset --hard" not in cmd and "clean -" not in cmd
+    )
+
+
+def test_release_workdir_reports_leftovers_it_stashes():
+    res = _lib(
+        "AGENT_DRY_RUN=0; "
+        'run_on_agent() { case "$1" in *"status --porcelain") printf \' M a.ts\\n?? b.ts\\n\' ;; esac; }; '
+        'notify() { echo "N $*"; }; release_workdir /w main "autofix #5"'
+    )
+    lines = res.stdout.splitlines()
+    assert lines[0] == "/w: stashing leftovers of autofix #5: a.ts, b.ts"
+    assert lines[1].startswith("N --title agent: leftovers stashed")
+    assert "agent-loop leftover: autofix #5" in lines[1]
+
+
+def test_release_workdir_alerts_when_the_clone_stays_on_a_branch():
+    res = _lib(
+        "AGENT_DRY_RUN=0; run_on_agent() { return 1; }; "
+        'notify() { echo "N $*"; }; release_workdir /w main "issue #7" || echo rc=$?'
+    )
+    lines = res.stdout.splitlines()
+    assert lines[0] == "WARN: could not return /w to origin/main after issue #7"
+    assert lines[1].startswith("N --title agent: clone stuck on a branch")
+    assert "--urgency alert" in lines[1]
+    assert lines[-1] == "rc=1"
+
+
+@pytest.mark.parametrize(
+    ("value", "idle"), [("240", 14400), ("5", 10800), ("3h", 10800), ("", 10800)]
+)
+def test_release_idle_checkout_clamps_the_idle_minutes(value, idle):
+    res = _lib(
+        f'AGENT_DRY_RUN=0; AGENT_CHAT_IDLE_MIN="{value}"; '
+        'run_on_agent() { echo "$1"; }; release_idle_checkout /w main'
+    )
+    assert res.returncode == 0, res.stderr
+    assert f"-ge {idle} " in res.stdout
+
+
+def _idle_git(cwd, *args):
+    subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
+
+
+def _idle_repo(tmp_path):
+    origin, clone = tmp_path / "origin.git", tmp_path / "clone"
+    subprocess.run(
+        ["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True
+    )
+    subprocess.run(
+        ["git", "clone", "-q", str(origin), str(clone)], check=True, capture_output=True
+    )
+    _idle_git(
+        clone,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "c",
+    )
+    _idle_git(clone, "push", "-q", "origin", "HEAD:main", "HEAD:feat/x")
+    _idle_git(clone, "fetch", "-q", "origin")
+    _idle_git(clone, "switch", "-q", "-c", "feat/x", "--track", "origin/feat/x")
+    return clone
+
+
+def _age(path, seconds):
+    t = time.time() - seconds
+    os.utime(path, (t, t))
+
+
+# The remote command runs for real on a temp clone; GNU `stat -c %Y` is shimmed on macOS.
+STAT_SHIM = (
+    'stat -c %Y / >/dev/null 2>&1 || { stat() { [[ "$1" == -c ]] && shift 2; '
+    'command stat -f %m "$@"; }; export -f stat; }; '
+)
+
+
+def test_release_idle_checkout_runs_on_a_real_clone(tmp_path):
+    clone = _idle_repo(tmp_path)
+    run = (
+        STAT_SHIM
+        + 'AGENT_DRY_RUN=0; run_on_agent() { bash -c "$1"; }; release_idle_checkout "$1" main'
+    )
+    # HEAD just moved (fresh switch), index old: a chat may be working, keep it.
+    _age(clone / ".git" / "index", 4 * 3600)
+    busy = _lib(run, str(clone))
+    assert (busy.returncode, busy.stdout) == (1, "")
+    # Both old: released and detached on origin/main.
+    _age(clone / ".git" / "logs" / "HEAD", 4 * 3600)
+    _age(clone / ".git" / "index", 4 * 3600)
+    freed = _lib(run, str(clone))
+    assert (freed.returncode, freed.stdout.strip()) == (0, "feat/x"), freed.stderr
+    head = subprocess.run(
+        ["git", "-C", str(clone), "symbolic-ref", "-q", "HEAD"], capture_output=True
+    )
+    assert head.returncode == 1
+
+
+def test_release_idle_checkout_keeps_a_dirty_or_unpushed_branch(tmp_path):
+    clone = _idle_repo(tmp_path)
+    run = (
+        STAT_SHIM
+        + 'AGENT_DRY_RUN=0; run_on_agent() { bash -c "$1"; }; release_idle_checkout "$1" main'
+    )
+    (clone / "new.txt").write_text("x")
+    for p in (clone / ".git" / "logs" / "HEAD", clone / ".git" / "index"):
+        _age(p, 4 * 3600)
+    assert _lib(run, str(clone)).returncode == 1
+    (clone / "new.txt").unlink()
+    _idle_git(
+        clone,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "local",
+    )
+    for p in (clone / ".git" / "logs" / "HEAD", clone / ".git" / "index"):
+        _age(p, 4 * 3600)
+    assert _lib(run, str(clone)).returncode == 1
+    _idle_git(clone, "symbolic-ref", "-q", "HEAD")  # still on the branch
+
+
+def test_gate_and_worker_release_the_clone_through_release_workdir():
+    gate = (TASKS / "agent-pr-gate.sh").read_text()
+    worker = (TASKS / "agent-worker.sh").read_text()
+    assert 'release_workdir "$WORKDIR" "$BASE" "autofix #$N"' in gate
+    assert 'release_workdir "$WORKDIR" "$BASE" "issue #$ISSUE"' in worker
+    assert 'release_idle_checkout "$WORKDIR" "$BASE"' in gate
+    for text in (gate, worker):
+        assert 'try_act "cd $WORKDIR && git switch -q --detach' not in text
+
+
+def test_worker_backlog_prompt_is_owner_titles_cut_inside_jq():
+    text = (TASKS / "agent-worker.sh").read_text()
+    body = text[text.index("backlog_round() {") : text.index("\nfor REPO in")]
+    assert "head -c 30000" not in body and ".[0:30000]" in body
+    assert "select(.author.login == $o)" in body
+    assert "number,title,state,author" in body
+    # No Bash in the planning run: the history comes in the prompt.
+    assert "git -C $WORKDIR log --oneline" in body
