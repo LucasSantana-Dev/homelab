@@ -55,6 +55,8 @@ monitoring_units=(
     "host-security-audit.timer"
     "kopia-snapshot-freshness.service"
     "kopia-snapshot-freshness.timer"
+    "lucky-music-gates.service"
+    "lucky-music-gates.timer"
 )
 for unit_file in "${monitoring_units[@]}"; do
     src="${MONITORING_DIR}/${unit_file}"
@@ -70,6 +72,7 @@ done
 timers=(
     homelab-update.timer homelab-watchdog.timer version-drift-exporter.timer
     compose-services-exporter.timer host-security-audit.timer kopia-snapshot-freshness.timer
+    lucky-music-gates.timer
 )
 
 echo "Reloading systemd daemon..."
