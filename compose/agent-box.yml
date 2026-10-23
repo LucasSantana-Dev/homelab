@@ -39,12 +39,15 @@ services:
     - ../config/agent-box/protect-homelab.sh:/opt/agent-config/hooks/protect-homelab.sh:ro
     - ../config/agent-box/secret-write-guard.sh:/opt/agent-config/hooks/secret-write-guard.sh:ro
     - ../config/agent-box/tag-deploy-guard.sh:/opt/agent-config/hooks/tag-deploy-guard.sh:ro
+    - ../config/agent-box/bash-secret-guard.sh:/opt/agent-config/hooks/bash-secret-guard.sh:ro
     - ../config/agent-box/codex-config.toml:/opt/agent-config/codex-config.toml:ro
     - ../config/agent-box/codex-mcp.json:/opt/agent-config/codex-mcp.json:ro
     - ../config/agent-box/codex-agents.md:/opt/agent-config/codex-agents.md:ro
     - ../config/agent-box/CLAUDE.md:/opt/agent-config/CLAUDE.md:ro
     - ../secrets/agent-box.secrets.yaml.age:/run/secrets/agent-box.secrets.yaml:ro
-    - /home/luk-server/.config/sops/age/keys.txt:/run/secrets/age.key:ro
+    # Dedicated age key that decrypts only agent-box.secrets.yaml.age (agent-box
+    # rule in .sops.yaml). The host master key is never mounted here.
+    - /home/luk-server/.config/sops/age/agent-box.key:/run/secrets/agent-box-age.key:ro
     deploy:
       resources:
         limits:
