@@ -33,6 +33,16 @@ uk = c.get('updateKind', {})
 print(uk.get('remoteValue') or d.get('result', {}).get('tag') or c.get('result', {}).get('tag') or '?')
 " 2>/dev/null || echo "?")
 
+# The payload is untrusted text that ends up in an LLM prompt. Accept only values
+# shaped like a container name or image tag/digest; anything else is rejected
+# without calling claude. "unknown" and "?" are the parse fallbacks above.
+NAME_RE='^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+TAG_RE='^([A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|sha256:[a-f0-9]{64}|\?)$'
+if ! [[ $NAME =~ $NAME_RE && $OLD_TAG =~ $TAG_RE && $NEW_TAG =~ $TAG_RE ]]; then
+    printf '%s\n' '{"safe_to_schedule":false,"urgency":"low","reason":"rejected: invalid container name or tag"}'
+    exit 0
+fi
+
 PROMPT="You are a homelab ops assistant. A container image update is available.
 
 Container: $NAME

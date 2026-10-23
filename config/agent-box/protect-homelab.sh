@@ -12,8 +12,8 @@ block() { printf 'BLOCK: %s\n' "$*" >&2; exit 2; }
 PROTECTED_RE='lucky[-_](bot|backend|frontend|nginx|postgres|redis|webhook|tunnel)|nextcloud|nextcloud[-_](db|redis)|homeassistant|pihole|cloudflared|caddy[-_]lan'
 
 # docker stop / rm / kill / restart / pause on a protected container
-if printf '%s' "$CMD" | grep -qE 'docker\s+(stop|rm|kill|restart|pause)'; then
-    TARGETS=$(printf '%s' "$CMD" | grep -oE '[a-zA-Z0-9_-]+' | tail -n +4)
+if printf '%s' "$CMD" | grep -qE 'docker\s+(container\s+)?(stop|rm|kill|restart|pause)'; then
+    TARGETS=$(printf '%s' "$CMD" | grep -oE '[a-zA-Z0-9_-]+' | tail -n +3)
     for t in $TARGETS; do
         if printf '%s' "$t" | grep -qE "$PROTECTED_RE"; then
             block "Container '$t' is a production service — stop/rm/kill blocked. Confirm with user first."

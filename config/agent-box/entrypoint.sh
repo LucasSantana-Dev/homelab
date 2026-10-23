@@ -6,7 +6,8 @@ log() { echo "[agent-box] $*"; }
 
 # --- Decrypt secrets ---
 SECRETS_FILE=/run/secrets/agent-box.secrets.yaml
-AGE_KEY_FILE=/run/secrets/age.key
+# Dedicated agent-box age key: it can decrypt only this secrets file.
+AGE_KEY_FILE=/run/secrets/agent-box-age.key
 if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
     log "Decrypting secrets..."
     # Load secrets from dotenv output without eval (security hardening #338)
@@ -116,8 +117,11 @@ mkdir -p /home/agent/.claude/hooks
 cp /opt/agent-config/hooks/protect-homelab.sh    /home/agent/.claude/hooks/protect-homelab.sh
 cp /opt/agent-config/hooks/secret-write-guard.sh /home/agent/.claude/hooks/secret-write-guard.sh
 cp /opt/agent-config/hooks/tag-deploy-guard.sh   /home/agent/.claude/hooks/tag-deploy-guard.sh
-chmod +x /home/agent/.claude/hooks/protect-homelab.sh          /home/agent/.claude/hooks/secret-write-guard.sh          /home/agent/.claude/hooks/tag-deploy-guard.sh
-chown agent:agent /home/agent/.claude/hooks/protect-homelab.sh                   /home/agent/.claude/hooks/secret-write-guard.sh                   /home/agent/.claude/hooks/tag-deploy-guard.sh
+cp /opt/agent-config/hooks/bash-secret-guard.sh  /home/agent/.claude/hooks/bash-secret-guard.sh
+for _hook in protect-homelab secret-write-guard tag-deploy-guard bash-secret-guard; do
+    chmod +x "/home/agent/.claude/hooks/${_hook}.sh"
+    chown agent:agent "/home/agent/.claude/hooks/${_hook}.sh"
+done
 log "Guardrail hooks installed."
 cp /opt/agent-config/CLAUDE.md /home/agent/.claude/CLAUDE.md
 chown agent:agent /home/agent/.claude/CLAUDE.md
@@ -162,13 +166,22 @@ fi
 
 # --- WUD classify HTTP endpoint (port 8080) ---
 # n8n calls POST /wud-classify with WUD payload; hermes returns classification JSON.
+# Callers must send the shared secret WUD_CLASSIFY_TOKEN (from the agent-box sops
+# file) in the X-Classify-Token header. Without the secret the listener stays off.
 cat > /tmp/wud-server.py << 'PYEOF'
-import http.server, json, subprocess
+import hmac, http.server, json, os, subprocess, sys
+
+TOKEN = os.environ.get('WUD_CLASSIFY_TOKEN', '').encode()
+if len(TOKEN) < 32:
+    sys.exit('[agent-box] WUD_CLASSIFY_TOKEN unset or shorter than 32 chars; not starting /wud-classify')
 
 CLASSIFY_CMD = [
     'su', '-s', '/bin/bash', 'agent', '-c',
     'source /etc/profile.d/agent-env.sh 2>/dev/null; exec bash /workspace/homelab/scripts/agent-tasks/hermes-wud-classify.sh'
 ]
+# The classifier gets a minimal env; it sources agent-env.sh for what it needs,
+# so the shared token and other decrypted secrets are not inherited.
+CHILD_ENV = {'PATH': os.environ.get('PATH', '/usr/local/bin:/usr/bin:/bin'), 'LANG': 'en_US.UTF-8', 'LC_ALL': 'en_US.UTF-8'}
 FALLBACK = json.dumps({'safe_to_schedule': True, 'urgency': 'low', 'reason': 'hermes unavailable'}).encode()
 MAX_BODY = 64 * 1024  # WUD payloads are ~1-2KB; cap to avoid resource exhaustion (#310)
 
@@ -186,6 +199,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
+        given = self.headers.get('X-Classify-Token', '').encode()
+        if not hmac.compare_digest(given, TOKEN):
+            self.send_response(401)
+            self.end_headers()
+            return
         try:
             length = int(self.headers.get('Content-Length', 0))
         except (TypeError, ValueError):
@@ -196,7 +214,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         body = self.rfile.read(length)
         try:
-            r = subprocess.run(CLASSIFY_CMD, input=body, capture_output=True, timeout=120)
+            r = subprocess.run(CLASSIFY_CMD, input=body, capture_output=True, timeout=120, env=CHILD_ENV)
             out = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else FALLBACK
         except Exception:
             out = FALLBACK
@@ -207,8 +225,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 http.server.HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
 PYEOF
-python3 /tmp/wud-server.py &
-log "WUD classify endpoint started on :8080"
+_wud_token="${WUD_CLASSIFY_TOKEN:-}"
+if [[ ${#_wud_token} -ge 32 ]]; then
+    python3 /tmp/wud-server.py &
+    log "WUD classify endpoint started on :8080"
+else
+    log "WARNING: WUD_CLASSIFY_TOKEN unset or shorter than 32 chars; /wud-classify listener not started."
+fi
 
 # --- Start SSH ---
 log "Starting SSH daemon..."
