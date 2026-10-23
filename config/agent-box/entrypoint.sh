@@ -15,7 +15,8 @@ as_agent() {
 
 # --- Decrypt secrets ---
 SECRETS_FILE=/run/secrets/agent-box.secrets.yaml
-AGE_KEY_FILE=/run/secrets/age.key
+# Dedicated agent-box age key: it can decrypt only this secrets file.
+AGE_KEY_FILE=/run/secrets/agent-box-age.key
 if [[ -f "$SECRETS_FILE" && -f "$AGE_KEY_FILE" ]]; then
     log "Decrypting secrets..."
     # Load secrets from dotenv output without eval (security hardening #338)
@@ -203,8 +204,17 @@ fi
 
 # --- WUD classify HTTP endpoint (port 8080) ---
 # n8n calls POST /wud-classify with WUD payload; hermes returns classification JSON.
-as_agent 'exec python3 -I /opt/agent-config/wud-server.py' &
-log "WUD classify endpoint started on :8080"
+# Callers must send WUD_CLASSIFY_TOKEN (agent-box sops file) as X-Classify-Token. The
+# token goes to the server on stdin (printf is a builtin: no argv, no env, no file).
+_wud_token="${WUD_CLASSIFY_TOKEN:-}"
+unset WUD_CLASSIFY_TOKEN
+if [[ ${#_wud_token} -ge 32 ]]; then
+    printf '%s\n' "$_wud_token" | as_agent 'exec python3 -I /opt/agent-config/wud-server.py' &
+    log "WUD classify endpoint started on :8080"
+else
+    log "WARNING: WUD_CLASSIFY_TOKEN unset or shorter than 32 chars; /wud-classify listener not started."
+fi
+unset _wud_token
 
 # --- SSH host key ---
 # Persistent volume, root only: a rebuild keeps the host identity, so known_hosts

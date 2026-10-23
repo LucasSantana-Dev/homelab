@@ -105,8 +105,8 @@ docker logs agent-box --tail 100 -f
 ```
 
 ### Secrets update
-1. Edit secrets/agent-box.secrets.yaml.age with SOPS
-2. docker restart agent-box (entrypoint re-decrypts on start)
+1. Edit secrets/agent-box.secrets.yaml.age with SOPS (on the host, from the repo root, so the agent-box rule in .sops.yaml applies)
+2. docker restart agent-box (entrypoint re-decrypts on start with the dedicated agent-box age key)
 
 ## Adding a New Agent Task
 

@@ -58,6 +58,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://agent-box:8080/wud-classify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Classify-Token",
+              "value": "={{ $env.WUD_CLASSIFY_TOKEN }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.raw) }}",

@@ -32,6 +32,9 @@ A single n8n webhook receives all three, normalizes them, and posts to Discord
    API key from n8n → Settings → API.)
 2. **Set the Discord target** the workflow posts to — add `OPS_DIGEST_DISCORD_WEBHOOK`
    to the n8n container env (a Discord webhook URL), then restart n8n.
+   For the WUD classification step, also set `WUD_CLASSIFY_TOKEN` (same value in
+   `.env` and in `secrets/agent-box.secrets.yaml.age`): the `HermesClassify` node
+   sends it as `X-Classify-Token`, and agent-box answers 401 without it.
 3. **Activate** the workflow. Its endpoint is
    `https://n8n.<domain>/webhook/ops-digest` (n8n's `WEBHOOK_URL` is already set).
 4. **Point each source at it** (add `?source=sentry|healthchecks|wud` so the
