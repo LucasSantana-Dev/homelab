@@ -25,8 +25,12 @@ services:
       # Discord target for the ops-digest workflow (ADR-0025 Phase 2). Empty =
       # workflow inactive; see docs/runbooks/ops-alert-digest.md. (#266-style: set in .env)
       - OPS_DIGEST_DISCORD_WEBHOOK=${OPS_DIGEST_DISCORD_WEBHOOK:-}
-      # Allow $env.* expressions in Code/HTTP nodes so the Discord node can read
-      # OPS_DIGEST_DISCORD_WEBHOOK at runtime.
+      # Shared secret the ops-digest HermesClassify node sends to agent-box
+      # POST /wud-classify (X-Classify-Token). Same value as WUD_CLASSIFY_TOKEN in
+      # secrets/agent-box.secrets.yaml.age; agent-box refuses the call without it.
+      - WUD_CLASSIFY_TOKEN=${WUD_CLASSIFY_TOKEN:-}
+      # Allow $env.* expressions in Code/HTTP nodes so the workflow can read
+      # OPS_DIGEST_DISCORD_WEBHOOK and WUD_CLASSIFY_TOKEN at runtime.
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       # Disable external task runner (Python 3 absent in image; without this n8n
       # spawns a second process that pushes the 512M container over limit on startup)
