@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "anthropic/claude-sonnet-4-6",
+  "model": "anthropic/claude-sonnet-5-5",
   "skills": {
     "paths": [
       "/home/agent/.claude/skills",
@@ -11,19 +11,19 @@
   "agent": {
     "main": {
       "description": "Primary architect and implementation agent",
-      "model": "anthropic/claude-opus-4-6"
+      "model": "anthropic/claude-opus-5-5"
     },
     "fast": {
       "description": "Fast edits and quick lookup agent",
-      "model": "anthropic/claude-sonnet-4-6"
+      "model": "anthropic/claude-sonnet-5-5"
     },
     "reviewer": {
       "description": "Code review and quality agent",
-      "model": "anthropic/claude-sonnet-4-6"
+      "model": "anthropic/claude-sonnet-5-5"
     },
     "planner": {
       "description": "Planning and task breakdown agent",
-      "model": "anthropic/claude-sonnet-4-6"
+      "model": "anthropic/claude-sonnet-5-5"
     }
   },
   "command": {
