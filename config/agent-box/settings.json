@@ -1,11 +1,11 @@
 {
   "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-5-20251001",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5-5",
     "CLAUDE_DIR": "/home/agent/.claude",
     "LANG": "en_US.UTF-8",
     "LC_ALL": "en_US.UTF-8"
   },
-  "model": "claude-sonnet-4-6",
+  "model": "claude-sonnet-5-5",
   "autoUpdates": false,
   "skipDangerousModePermissionPrompt": false,
   "permissions": {

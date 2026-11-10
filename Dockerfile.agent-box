@@ -51,8 +51,11 @@ RUN pip3 install --no-cache-dir uv --break-system-packages && \
 # Claude CLI + OpenCode
 # PINNED: @openai/codex@0.125.0 — newer versions (>=0.126) reject gpt-5.4 with ChatGPT Pro OAuth.
 # Upgrade only when OpenAI adds Pro OAuth support for a newer model in codex release notes.
+# PINNED: @anthropic-ai/claude-code@2.1.311 (npm "stable" tag). settings.json sets autoUpdates=false, so the
+# image is the only place the CLI version changes. Floor is 2.1.284 for claude-sonnet-5-5; 2.1.293 or later
+# is also what makes the "haiku" alias mean Haiku 5.5 on the Anthropic API. Bump on purpose, then rebuild.
 # hadolint ignore=DL3016
-RUN npm install -g @anthropic-ai/claude-code opencode-ai @openai/codex@0.125.0
+RUN npm install -g @anthropic-ai/claude-code@2.1.311 opencode-ai @openai/codex@0.125.0
 
 # agent user
 RUN useradd -m -s /bin/bash agent && \
