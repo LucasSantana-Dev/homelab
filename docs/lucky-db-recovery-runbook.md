@@ -94,6 +94,9 @@ Backups are written as `backups/lucky/<db>-<timestamp>.sql.age`, encrypted with
 dump never touches the disk. The job refuses to run if the recipient file or
 `age` is missing.
 
+Retention: after each successful backup the job deletes Lucky backups older than
+30 days (`LUCKY_BACKUP_RETENTION_DAYS`). Nothing is pruned when the backup fails.
+
 The private key is `/var/lib/docker/lucky-backup-key/key.txt` (root, 0600). It sits
 on the LUKS-encrypted Docker volume, so a stolen disk cannot decrypt the backups.
 Keep a copy in your password manager: if the LUKS volume is lost, the backups are

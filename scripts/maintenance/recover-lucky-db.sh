@@ -21,6 +21,7 @@ CONTAINER="${LUCKY_DB_CONTAINER:-lucky-postgres}"
 # Backups hold Discord user data, so they are written age-encrypted and never
 # touch the disk in plaintext. This file holds only the PUBLIC recipient. The
 # private key lives on the LUKS volume (see docs/lucky-db-recovery-runbook.md).
+RETENTION_DAYS="${LUCKY_BACKUP_RETENTION_DAYS:-30}"
 AGE_RECIPIENTS_FILE="${LUCKY_BACKUP_AGE_RECIPIENTS:-$HOMELAB_DIR/config/lucky-backup.age.pub}"
 
 if [[ -z "$DB_PASSWORD" ]]; then
@@ -61,6 +62,12 @@ backup_db() {
     fi
     echo "Backup saved: $backup_file"
     echo "$backup_file"
+    # Retention: track history and other user data must not outlive the 30 days
+    # stated to Discord. Prune only after a successful backup, so a run of
+    # failures never deletes the last good copies.
+    local pruned
+    pruned=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name "$DB_NAME-*.sql*" -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
+    echo "Pruned $pruned backup(s) older than $RETENTION_DAYS days."
 }
 
 apply_schema() {
