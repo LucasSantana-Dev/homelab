@@ -86,3 +86,26 @@ configuration.
 - Application feature debugging unrelated to DB schema
 - Secret rotation workflow
 - k3s migration operations
+
+## Backup encryption (age)
+
+Backups are written as `backups/lucky/<db>-<timestamp>.sql.age`, encrypted with
+`age` to the public recipient in `config/lucky-backup.age.pub`. The plaintext
+dump never touches the disk. The job refuses to run if the recipient file or
+`age` is missing.
+
+Retention: after each successful backup the job deletes Lucky backups older than
+30 days (`LUCKY_BACKUP_RETENTION_DAYS`). Nothing is pruned when the backup fails.
+
+The private key is `/var/lib/docker/lucky-backup-key/key.txt` (root, 0600). It sits
+on the LUKS-encrypted Docker volume, so a stolen disk cannot decrypt the backups.
+Keep a copy in your password manager: if the LUKS volume is lost, the backups are
+useless without it.
+
+Restore a backup (LUKS volume unlocked). `pipefail` makes a decryption failure
+fail the command, and `ON_ERROR_STOP=1` stops at the first SQL error instead of
+reporting success. The variables default to the same values as the script:
+
+```bash
+(set -o pipefail; sudo age -d -i /var/lib/docker/lucky-backup-key/key.txt backups/lucky/<file>.sql.age | docker exec -i "${LUCKY_DB_CONTAINER:-lucky-postgres}" psql -v ON_ERROR_STOP=1 -U "${LUCKY_DB_USER:-discordbot}" -d "${LUCKY_DB_NAME:-discordbot}")
+```
