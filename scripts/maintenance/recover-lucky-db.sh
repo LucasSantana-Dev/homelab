@@ -18,6 +18,10 @@ DB_NAME="${LUCKY_DB_NAME:-discordbot}"
 DB_USER="${LUCKY_DB_USER:-discordbot}"
 DB_PASSWORD="${LUCKY_DB_PASSWORD:-}"
 CONTAINER="${LUCKY_DB_CONTAINER:-lucky-postgres}"
+# Backups hold Discord user data, so they are written age-encrypted and never
+# touch the disk in plaintext. This file holds only the PUBLIC recipient. The
+# private key lives on the LUKS volume (see docs/lucky-db-recovery-runbook.md).
+AGE_RECIPIENTS_FILE="${LUCKY_BACKUP_AGE_RECIPIENTS:-$HOMELAB_DIR/config/lucky-backup.age.pub}"
 
 if [[ -z "$DB_PASSWORD" ]]; then
     echo "ERROR: LUCKY_DB_PASSWORD is not set. Define it in $HOMELAB_DIR/.env or export it before running." >&2
@@ -43,8 +47,18 @@ check_tables() {
 }
 
 backup_db() {
-    local backup_file="$BACKUP_DIR/$DB_NAME-$(date +%Y%m%d-%H%M%S).sql"
-    docker exec "$CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" > "$backup_file"
+    # Fail closed: without a recipient, refuse rather than write a plaintext dump.
+    if [[ ! -s "$AGE_RECIPIENTS_FILE" ]] || ! command -v age >/dev/null; then
+        echo "ERROR: need age and a recipient file at $AGE_RECIPIENTS_FILE; refusing to write a plaintext backup." >&2
+        exit 1
+    fi
+    local backup_file="$BACKUP_DIR/$DB_NAME-$(date +%Y%m%d-%H%M%S).sql.age"
+    # pipefail (set above) fails the line if pg_dump fails; drop the partial file then.
+    if ! (umask 077; docker exec "$CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" | age -R "$AGE_RECIPIENTS_FILE" > "$backup_file"); then
+        rm -f "$backup_file"
+        echo "ERROR: backup failed, partial file removed." >&2
+        exit 1
+    fi
     echo "Backup saved: $backup_file"
     echo "$backup_file"
 }
