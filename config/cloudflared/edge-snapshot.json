@@ -80,27 +80,6 @@
       }
     },
     {
-      "hostname": "linkding.luk-homeserver.com.br",
-      "service": "http://host.docker.internal:80",
-      "originRequest": {
-        "httpHostHeader": "linkding.luk-homeserver.com.br"
-      }
-    },
-    {
-      "hostname": "miniflux.luk-homeserver.com.br",
-      "service": "http://host.docker.internal:80",
-      "originRequest": {
-        "httpHostHeader": "miniflux.luk-homeserver.com.br"
-      }
-    },
-    {
-      "hostname": "forgejo.luk-homeserver.com.br",
-      "service": "http://host.docker.internal:80",
-      "originRequest": {
-        "httpHostHeader": "forgejo.luk-homeserver.com.br"
-      }
-    },
-    {
       "hostname": "status.luk-homeserver.com.br",
       "service": "http://host.docker.internal:80",
       "originRequest": {
@@ -198,12 +177,6 @@
         "proxied": true
       },
       {
-        "name": "forgejo.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
         "name": "grafana.luk-homeserver.com.br",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
@@ -234,12 +207,6 @@
         "proxied": true
       },
       {
-        "name": "linkding.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
         "name": "lucky.luk-homeserver.com.br",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
@@ -252,31 +219,7 @@
         "proxied": true
       },
       {
-        "name": "luk-homeserver.com.br",
-        "type": "MX",
-        "content": "<redacted>",
-        "proxied": false
-      },
-      {
-        "name": "luk-homeserver.com.br",
-        "type": "MX",
-        "content": "<redacted>",
-        "proxied": false
-      },
-      {
-        "name": "luk-homeserver.com.br",
-        "type": "TXT",
-        "content": "<redacted>",
-        "proxied": false
-      },
-      {
         "name": "manager.luk-homeserver.com.br",
-        "type": "CNAME",
-        "content": "<tunnel:homelab>.cfargotunnel.com",
-        "proxied": true
-      },
-      {
-        "name": "miniflux.luk-homeserver.com.br",
         "type": "CNAME",
         "content": "<tunnel:homelab>.cfargotunnel.com",
         "proxied": true
