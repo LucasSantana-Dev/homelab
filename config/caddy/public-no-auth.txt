@@ -16,6 +16,5 @@ www.luk-homeserver.com.br         # Homepage; Cloudflare Access app in front
 home.luk-homeserver.com.br        # Homepage; Cloudflare Access app in front
 homeassistant.luk-homeserver.com.br  # HA login + long-lived tokens for the mobile app
 cloud.luk-homeserver.com.br       # Nextcloud login; sync clients use app passwords
-forgejo.luk-homeserver.com.br     # tinyauth on every path except the OAuth2 server-to-server endpoints
 auth.luk-homeserver.com.br        # tinyauth itself
 rclone.luk-homeserver.com.br      # static OAuth home/privacy pages; Access bypass app
