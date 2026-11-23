@@ -162,7 +162,8 @@ scrape_configs:
     metrics_path: /probe
     params:
       module: [http_public]
-    scrape_interval: 5m
+    # Under the 5m lookback, so TLSCertExpiringSoon keeps its `for` state between scrapes.
+    scrape_interval: 2m
     static_configs:
       - targets:
           - https://lucky.luk-homeserver.com.br

@@ -22,7 +22,7 @@ route:
     # failed notification (AlertmanagerNotifyFailing) within 24h instead of never (#321).
     - matchers:
         - alertname="Watchdog"
-      receiver: 'discord-notifications'
+      receiver: 'discord-heartbeat'
       group_wait: 0s
       repeat_interval: 24h
     # Notification failures also go to a non-Discord path (ADR-0026 phase 2), and
@@ -58,6 +58,13 @@ receivers:
     webhook_configs:
       - url_file: '/etc/alertmanager/deadman_fail_url'
         send_resolved: false
+  # Daily heartbeat (#321) with its own fixed text, so it never reads as a live warning.
+  - name: 'discord-heartbeat'
+    discord_configs:
+      - webhook_url_file: '/etc/alertmanager/discord_webhook_url'
+        send_resolved: false
+        title: '💓 Daily heartbeat: alert pipeline OK'
+        message: 'Prometheus, Alertmanager and this Discord webhook are working. No action needed.'
   - name: 'discord-notifications'
     discord_configs:
       - webhook_url_file: '/etc/alertmanager/discord_webhook_url'
