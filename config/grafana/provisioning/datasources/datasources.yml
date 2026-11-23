@@ -16,6 +16,19 @@ datasources:
       alertmanagerUid: alertmanager
     version: 1
 
+  # Alertmanager, referenced by the Prometheus datasource (alertmanagerUid).
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    isDefault: false
+    editable: true
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false
+    version: 1
+
   # Sentry - Error tracking and performance monitoring
   - name: Sentry
     type: grafana-sentry-datasource
