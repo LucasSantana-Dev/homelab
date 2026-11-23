@@ -45,6 +45,15 @@ limits_config:
   ingestion_rate_mb: 10
   ingestion_burst_size_mb: 20
 
+# Enforces limits_config.retention_period; without a compactor with
+# retention_enabled nothing is ever deleted.
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  delete_request_store: filesystem
+
 # By default, Loki will send anonymous, but uniquely-identifiable usage and configuration
 # analytics to Grafana Labs. These statistics are sent to https://stats.grafana.org/
 #
