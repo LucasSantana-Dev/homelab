@@ -1,0 +1,152 @@
+# promtool unit tests for the monitoring_pipeline group in ../alerts.yml.
+# Run: promtool test rules config/prometheus/tests/monitoring-pipeline.test.yml
+rule_files:
+  - ../alerts.yml
+
+evaluation_interval: 30s
+
+tests:
+  # A single failed notification fires at once: no `for:` on purpose, a dead
+  # webhook only fails about once per 24h.
+  - interval: 1m
+    input_series:
+      - series: 'alertmanager_notifications_failed_total{integration="discord"}'
+        values: '0 0 0 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AlertmanagerNotifyFailing
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: AlertmanagerNotifyFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              integration: discord
+            exp_annotations:
+              summary: "Alertmanager failed to deliver a notification via discord"
+              description: "Alertmanager notifications through discord failed in the last 10m. Alerts may be going nowhere."
+              runbook: "`docker logs alertmanager --tail 50`; a dead Discord webhook returns 404, recreate it and update config/alertmanager/discord_webhook_url."
+
+  # Negative: a counter that stays flat, even at a nonzero value, never fires.
+  - interval: 1m
+    input_series:
+      - series: 'alertmanager_notifications_failed_total{integration="discord"}'
+        values: '5x20'
+      - series: 'alertmanager_notifications_failed_total{integration="webhook"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AlertmanagerNotifyFailing
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'up{job="loki",instance="loki:3100"}'
+        values: '1 1 0x20'
+      - series: 'up{job="blackbox",instance="blackbox-exporter:9115"}'
+        values: '0x20'
+      - series: 'up{job="lucky-bot",instance="lucky-bot:9091"}'
+        values: '0x20'
+    alert_rule_test:
+      # loki has been down for 3m: still pending.
+      - eval_time: 5m
+        alertname: MonitoringTargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: blackbox
+              instance: "blackbox-exporter:9115"
+            exp_annotations:
+              summary: "Monitoring target blackbox is down"
+              description: "Prometheus cannot scrape blackbox (blackbox-exporter:9115) for more than 5 minutes."
+              runbook: "`docker ps -a` then `docker logs <service> --tail 50`; restart it with `docker compose up -d <service>`."
+      # loki crosses 5m of downtime. lucky-bot is never matched (it has its own alert).
+      - eval_time: 10m
+        alertname: MonitoringTargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: blackbox
+              instance: "blackbox-exporter:9115"
+            exp_annotations:
+              summary: "Monitoring target blackbox is down"
+              description: "Prometheus cannot scrape blackbox (blackbox-exporter:9115) for more than 5 minutes."
+              runbook: "`docker ps -a` then `docker logs <service> --tail 50`; restart it with `docker compose up -d <service>`."
+          - exp_labels:
+              severity: warning
+              job: loki
+              instance: "loki:3100"
+            exp_annotations:
+              summary: "Monitoring target loki is down"
+              description: "Prometheus cannot scrape loki (loki:3100) for more than 5 minutes."
+              runbook: "`docker ps -a` then `docker logs <service> --tail 50`; restart it with `docker compose up -d <service>`."
+
+  - interval: 1m
+    input_series:
+      - series: 'prometheus_rule_evaluation_failures_total{rule_group="/etc/prometheus/alerts.yml;homelab_alerts"}'
+        values: '0+1x30'
+      - series: 'prometheus_rule_evaluation_failures_total{rule_group="/etc/prometheus/alerts.yml;lucky_alerts"}'
+        values: '0x30'
+    alert_rule_test:
+      # Failing, but not yet for 10m.
+      - eval_time: 5m
+        alertname: PrometheusRuleEvalFailing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: PrometheusRuleEvalFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              rule_group: "/etc/prometheus/alerts.yml;homelab_alerts"
+            exp_annotations:
+              summary: "Prometheus rule evaluation is failing in /etc/prometheus/alerts.yml;homelab_alerts"
+              description: "Rules in /etc/prometheus/alerts.yml;homelab_alerts failed to evaluate for 10m, so those alerts cannot fire."
+              runbook: "`docker logs prometheus --tail 50 | grep -i rule`; usually a rule file edit or a query that now errors, fix the expr and reload."
+
+  # Certificate expiry is an absolute unix timestamp: 864000 is 10 days after the
+  # test epoch (under the 14 day threshold), 2592000 is 30 days (fine).
+  - interval: 5m
+    input_series:
+      - series: 'probe_ssl_earliest_cert_expiry{job="blackbox-tls",instance="https://luk-homeserver.com.br"}'
+        values: '864000x40'
+      - series: 'probe_ssl_earliest_cert_expiry{job="blackbox-tls",instance="https://lucky.luk-homeserver.com.br"}'
+        values: '2592000x40'
+      - series: 'probe_ssl_earliest_cert_expiry{job="blackbox",instance="http://homepage:3000/"}'
+        values: '864000x40'
+    alert_rule_test:
+      # Under threshold but inside the 1h `for:`.
+      - eval_time: 30m
+        alertname: TLSCertExpiringSoon
+        exp_alerts: []
+      - eval_time: 2h
+        alertname: TLSCertExpiringSoon
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: blackbox-tls
+              instance: "https://luk-homeserver.com.br"
+            exp_annotations:
+              summary: "TLS certificate for https://luk-homeserver.com.br expires in under 14 days"
+              description: "The certificate served at https://luk-homeserver.com.br expires in 9d 22h 0m 0s."
+              runbook: "Check why renewal stalled: `docker logs caddy --tail 50` for the Caddy-managed cert, or the Cloudflare edge cert for the public hostname."
+
+  # ServiceDown and HighResponseTime only look at the internal blackbox job, so a
+  # failing public TLS probe does not double-page next to Gatus.
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="blackbox",instance="http://homepage:3000/"}'
+        values: '0x20'
+      - series: 'probe_success{job="blackbox-tls",instance="https://luk-homeserver.com.br"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: blackbox
+              instance: "http://homepage:3000/"
+            exp_annotations:
+              summary: "Service http://homepage:3000/ is down"
+              description: "Service http://homepage:3000/ is not responding to health checks."
+              runbook: "Blackbox probe failed \u2014 `docker ps` the target; check its healthcheck + caddy route. NB: probes hit internal service names, not public URLs."

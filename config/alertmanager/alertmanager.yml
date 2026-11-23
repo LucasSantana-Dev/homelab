@@ -17,6 +17,20 @@ route:
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1m
+      continue: true
+    # Same heartbeat to Discord, once a day: a dead webhook then shows up as a
+    # failed notification (AlertmanagerNotifyFailing) within 24h instead of never (#321).
+    - matchers:
+        - alertname="Watchdog"
+      receiver: 'discord-notifications'
+      group_wait: 0s
+      repeat_interval: 24h
+    # Notification failures also go to a non-Discord path (ADR-0026 phase 2), and
+    # continue so Discord still receives them when it is up.
+    - matchers:
+        - alertname="AlertmanagerNotifyFailing"
+      receiver: 'deadmanswitch-fail'
+      continue: true
     - matchers:
         - severity="critical"
       receiver: 'discord-notifications'
@@ -36,6 +50,13 @@ receivers:
   - name: 'deadmanswitch'
     webhook_configs:
       - url_file: '/etc/alertmanager/deadman_ping_url'
+        send_resolved: false
+  # Signals failure on the same healthchecks check as the ping above. The owner
+  # creates the gitignored file on the host with that check's /fail URL; it is
+  # never committed (like deadman_ping_url).
+  - name: 'deadmanswitch-fail'
+    webhook_configs:
+      - url_file: '/etc/alertmanager/deadman_fail_url'
         send_resolved: false
   - name: 'discord-notifications'
     discord_configs:
