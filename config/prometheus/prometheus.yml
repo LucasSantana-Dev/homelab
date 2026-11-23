@@ -11,9 +11,14 @@ alerting:
 
 rule_files:
   - "alerts.yml"
-  # Only Lucky's recap rules: the rest of its rules duplicate lucky_alerts in
-  # alerts.yml and would page twice. A glob, so a host without the Lucky checkout loads nothing.
+  # A Lucky rule file is loaded here only when every alert name in it is unique
+  # across both repos, otherwise it would page twice. recap-*, play-* and
+  # command-events qualify. lucky-alerts, disk and host-memory stay out until the
+  # lucky_alerts group in alerts.yml is deduplicated. A glob, so a host without
+  # the Lucky checkout loads nothing.
   - "/etc/prometheus-lucky/rules/recap-*.rules.yml"
+  - "/etc/prometheus-lucky/rules/play-*.rules.yml"
+  - "/etc/prometheus-lucky/rules/command-events*.rules.yml"
   # CoJam's own rules, from the CoJam checkout. A glob, so a host without the
   # checkout (or without rules yet) loads nothing.
   - "/etc/prometheus-cojam/rules/cojam-*.rules.yml"
@@ -49,6 +54,20 @@ scrape_configs:
   - job_name: 'alertmanager'
     static_configs:
       - targets: ['alertmanager:9093']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Promtail: log shipper metrics on its http port (a dead shipper is silent otherwise).
+  - job_name: 'promtail'
+    static_configs:
+      - targets: ['promtail:9080']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # cloudflared: tunnel metrics on :2000 (the distroless image has no healthcheck).
+  - job_name: 'cloudflared'
+    static_configs:
+      - targets: ['cloudflared:2000']
     scrape_interval: 15s
     metrics_path: /metrics
 
@@ -135,3 +154,25 @@ scrape_configs:
         labels:
           service: 'cojam-server'
           environment: 'production'
+
+  # TLS certificate expiry of the public endpoints. Used ONLY for
+  # probe_ssl_earliest_cert_expiry: Gatus already owns up/down for these URLs and
+  # posts to Alertmanager, so no up/down alert is built on this job.
+  - job_name: 'blackbox-tls'
+    metrics_path: /probe
+    params:
+      module: [http_public]
+    # Under the 5m lookback, so TLSCertExpiringSoon keeps its `for` state between scrapes.
+    scrape_interval: 2m
+    static_configs:
+      - targets:
+          - https://lucky.luk-homeserver.com.br
+          - https://luk-homeserver.com.br
+          - https://cojam.lucassantana.tech/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

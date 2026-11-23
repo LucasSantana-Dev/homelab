@@ -1,0 +1,76 @@
+name: Monitoring Config
+
+# Validates the Prometheus and Alertmanager config with the same versions prod
+# runs: syntax, rules, and the promtool unit tests. Nothing here deploys.
+
+on:
+  pull_request:
+    paths:
+      - 'config/prometheus/**'
+      - 'config/alertmanager/**'
+      - 'config/blackbox/**'
+      - '.github/workflows/monitoring-config.yml'
+  push:
+    branches: [release, main]
+    paths:
+      - 'config/prometheus/**'
+      - 'config/alertmanager/**'
+      - 'config/blackbox/**'
+      - '.github/workflows/monitoring-config.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  prometheus:
+    name: promtool (config, rules, unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The Lucky and CoJam rule globs match nothing here, which promtool accepts.
+      - name: Check config
+        run: |
+          docker run --rm \
+            -v "$PWD/config/prometheus:/etc/prometheus:ro" \
+            --entrypoint promtool prom/prometheus:v3.10.0 \
+            check config /etc/prometheus/prometheus.yml
+
+      - name: Check rules
+        run: |
+          docker run --rm \
+            -v "$PWD/config/prometheus:/etc/prometheus:ro" \
+            --entrypoint promtool prom/prometheus:v3.10.0 \
+            check rules /etc/prometheus/alerts.yml
+
+      - name: Unit test rules
+        run: |
+          docker run --rm \
+            -v "$PWD/config/prometheus:/etc/prometheus:ro" \
+            --entrypoint sh prom/prometheus:v3.10.0 \
+            -c 'promtool test rules /etc/prometheus/tests/*.test.yml'
+
+  alertmanager:
+    name: amtool check-config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The real url files are gitignored host secrets. Mount a dummy at every
+      # path the config references, so a new url_file never breaks CI silently.
+      - name: Check config
+        run: |
+          dummy="$(mktemp)"
+          echo "https://example.invalid/hook" > "$dummy"
+          chmod 644 "$dummy"
+          mounts=()
+          for path in $(grep -hoE "(url_file|webhook_url_file): *'[^']+'" config/alertmanager/alertmanager.yml | grep -oE "'[^']+'" | tr -d "'" | sort -u); do
+            mounts+=(-v "$dummy:$path:ro")
+          done
+          echo "dummy url files: ${#mounts[@]}"
+          test "${#mounts[@]}" -gt 0
+          docker run --rm \
+            -v "$PWD/config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro" \
+            "${mounts[@]}" \
+            --entrypoint amtool prom/alertmanager:v0.31.1 \
+            check-config /etc/alertmanager/alertmanager.yml

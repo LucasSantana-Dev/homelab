@@ -130,9 +130,7 @@ groups:
           description: "Free inodes below 10% — writes will fail even with free space."
           runbook: "Find the offender: `sudo du --inodes -x -d3 / | sort -rn | head`; usually many small files under /var/log or a container."
 
-      # ponytail: skipped a TLS-cert-expiry alert — probe_ssl_earliest_cert_expiry
-      # returns no data (blackbox targets are internal HTTP; public TLS terminates
-      # at Cloudflare). Add if/when blackbox probes an HTTPS endpoint we own.
+      # TLS certificate expiry: see TLSCertExpiringSoon in monitoring_pipeline.
 
       # Per-container OOM kills — cAdvisor exports the counter; only its own OOM
       # was alerted. Catches the silent memory-pressure failure mode on the N100.
@@ -150,7 +148,7 @@ groups:
 
       # Service Response Time Alerts
       - alert: HighResponseTime
-        expr: probe_duration_seconds > 5
+        expr: probe_duration_seconds{job="blackbox"} > 5
         for: 5m
         labels:
           severity: warning
@@ -159,7 +157,7 @@ groups:
           description: "Response time for {{ $labels.instance }} is above 5 seconds."
 
       - alert: ServiceDown
-        expr: probe_success == 0
+        expr: probe_success{job="blackbox"} == 0
         for: 5m
         labels:
           severity: warning
@@ -623,3 +621,53 @@ groups:
           summary: "Lucky growth gate PROXY: 48h avg memory >70% — manually check 30d trend"
           description: "48h average memory utilization = {{ $value | humanizePercentage }} (threshold 70%). Within-retention proxy (TSDB=72h) for the ADR-0038 gate of >70% sustained 30d. On fire, verify the real 30d trend before re-evaluating k8s vs second-node / cloud-DB scale-out. See ADR-0038 Phase 3."
           runbook: "docs/adr/0038-reaffirm-compose-over-kubernetes-2026.md"
+
+  # Alerts on the alert pipeline itself (ADR-0026 phase 2, #321). The Watchdog
+  # catches a dead Prometheus/Alertmanager; these catch a pipeline that is up
+  # but failing to notify, scrape or evaluate.
+  - name: monitoring_pipeline
+    interval: 30s
+    rules:
+      # No `for:`: a dead webhook now fails about once per 24h (the daily Watchdog
+      # to Discord), so any `for:` would hide it. Also routed to the healthchecks
+      # /fail URL, a path that does not depend on Discord.
+      - alert: AlertmanagerNotifyFailing
+        expr: increase(alertmanager_notifications_failed_total[10m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertmanager failed to deliver a notification via {{ $labels.integration }}"
+          description: "Alertmanager notifications through {{ $labels.integration }} failed in the last 10m. Alerts may be going nowhere."
+          runbook: "`docker logs alertmanager --tail 50`; a dead Discord webhook returns 404, recreate it and update config/alertmanager/discord_webhook_url."
+
+      # blackbox is the exporter itself (the probe job's up is 0 only when the
+      # exporter is unreachable; a failing target is ServiceDown).
+      - alert: MonitoringTargetDown
+        expr: up{job=~"loki|promtail|alertmanager|grafana|blackbox|cloudflared"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Monitoring target {{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }}) for more than 5 minutes."
+          runbook: "`docker ps -a` then `docker logs <service> --tail 50`; restart it with `docker compose up -d <service>`."
+
+      - alert: PrometheusRuleEvalFailing
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus rule evaluation is failing in {{ $labels.rule_group }}"
+          description: "Rules in {{ $labels.rule_group }} failed to evaluate for 10m, so those alerts cannot fire."
+          runbook: "`docker logs prometheus --tail 50 | grep -i rule`; usually a rule file edit or a query that now errors, fix the expr and reload."
+
+      - alert: TLSCertExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry{job="blackbox-tls"} - time() < 14 * 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate for {{ $labels.instance }} expires in under 14 days"
+          description: "The certificate served at {{ $labels.instance }} expires in {{ $value | humanizeDuration }}."
+          runbook: "Check why renewal stalled: `docker logs caddy --tail 50` for the Caddy-managed cert, or the Cloudflare edge cert for the public hostname."
