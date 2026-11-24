@@ -20,11 +20,17 @@ route:
       continue: true
     # Same heartbeat to Discord, once a day: a dead webhook then shows up as a
     # failed notification (AlertmanagerNotifyFailing) within 24h instead of never (#321).
+    # 23h45m, not 24h: a repeat only goes out on a group_interval tick (30m). At the
+    # 24h tick a bit less than 24h has passed since the last send, so 24h slipped to
+    # the next tick and the post drifted 30 min later every day (#555). 23h45m is
+    # already due at the 24h tick, so the post keeps its time. group_interval is set
+    # here, not inherited, so a change to the root value cannot bring the drift back.
     - matchers:
         - alertname="Watchdog"
       receiver: 'discord-heartbeat'
       group_wait: 0s
-      repeat_interval: 24h
+      group_interval: 30m
+      repeat_interval: 23h45m
     # Notification failures also go to a non-Discord path (ADR-0026 phase 2), and
     # continue so Discord still receives them when it is up.
     - matchers:
