@@ -358,6 +358,9 @@ services:
     - 'wud.tag.include=^\d+\.\d+\.\d+$$'
     container_name: loki
     restart: unless-stopped
+    # Docker's default 10s stop timeout SIGKILLs Loki mid WAL flush, which
+    # loses segments on restart (#554). Give it time to flush and exit.
+    stop_grace_period: 60s
     volumes:
     - ../appdata/loki:/loki
     - ../config/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
